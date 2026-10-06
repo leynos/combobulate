@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from docs_validation.contracts import (
-    check_backend_capabilities, check_design_trace, check_revision_contracts,
+    check_backend_capabilities, check_design_trace, check_revision_contracts, source_citations,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -105,6 +105,49 @@ class MetadataIds(unittest.TestCase):
             with self.subTest(source_id=replacement), patch.object(context, 'load', return_value=mutated):
                 with self.assertRaisesRegex(AssertionError, 'Unresolved capability source'):
                     check_backend_capabilities(context)
+
+
+    def test_ordinary_hyphenated_prose_links_code_and_tables_are_not_citations(self):
+        text = (
+            'The e-commerce and d-service terms are ordinary prose (e-commerce).\n\n'
+            '[e-commerce](https://example.test/shop) and [d-service](https://example.test/service).\n\n'
+            '`e-commerce` and `d-service` are literal labels.\n\n'
+            '| Description |\n| --- |\n| e-commerce and d-service |\n'
+        )
+        self.assertEqual(source_citations(text, {'E-POLARS-NULL', 'D-TOR'}), set())
+        self.assertEqual(source_citations('D-Day and identifier abc-d-service are ordinary.', {'D-TOR'}), set())
+
+    def test_explicit_citation_forms_keep_lowercase_and_mixed_case_detection(self):
+        source_ids = {'E-POLARS-NULL', 'D-TOR'}
+        forms = (
+            '[e-polars-null]', '[E-Polars-Null,\nd-tor]',
+            '(e-polars-null)', '`e-polars-null`',
+            '[e-polars-null](https://example.test/source)',
+            '| Source |\n| --- |\n| e-polars-null |\n',
+        )
+        for text in forms:
+            with self.subTest(text=text):
+                citations = source_citations(text, source_ids)
+                self.assertTrue(citations)
+                self.assertTrue(any(value != value.upper() for value in citations))
+        self.assertEqual(source_citations('[e-missing, D-TOR]', source_ids), {'e-missing', 'D-TOR'})
+        self.assertEqual(source_citations('E-MISSING explains a problem.', source_ids), {'E-MISSING'})
+        self.assertEqual(source_citations('[E-POLARS-NULL, D-TOR]', source_ids), source_ids)
+
+    def test_complete_source_check_accepts_ordinary_prose_and_word_links(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            (context.root / 'docs/references.md').write_text((ROOT / 'docs/references.md').read_text())
+            (context.root / 'README.md').write_text(
+                '# Title\n\nThe e-commerce/d-service markets have (e-commerce) labels.\n\n'
+                '[e-commerce](https://example.test) is a word link.\n\n'
+                'Source [E-POLARS-NULL] remains canonical.\n')
+            capabilities = ValidationContext(ROOT).load('spec/backend-capabilities.json')
+            with patch.object(context, 'load', return_value=capabilities):
+                self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
 
 
 if __name__ == '__main__':

@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from jsonschema import Draft202012Validator, ValidationError
 from .context import ValidationContext, require, unique_ids
+from .markdown import MD
 
 
 def check_kernel_envelope(context: ValidationContext) -> None:
@@ -75,6 +76,39 @@ def check_design_trace(context: ValidationContext, phases: list[dict], trace: di
         require(set(entry['goals']) <= goals, f'Unresolved requirement goals {entry["id"]}')
 
 
+SOURCE_ID = r'[ED]-[A-Z][A-Z0-9-]*'
+SOURCE_WORD = rf'(?<![A-Z0-9-])({SOURCE_ID})(?![A-Z0-9-])'
+
+
+def bracket_citations(text: str) -> set[str]:
+    """Extract explicit citation groups; '[e-polars-null, d-tor]' declares two source IDs."""
+    citations: set[str] = set()
+    for group in re.findall(r'\[([^\[\]]+)\]', text):
+        ids = [value.strip() for value in group.split(',')]
+        if all(re.fullmatch(SOURCE_ID, value, re.I) for value in ids):
+            citations.update(ids)
+    return citations
+
+
+def source_citations(text: str, source_ids: set[str]) -> set[str]:
+    """Detect coded references without classifying ordinary e-commerce as a source.
+
+    Known IDs retain canonical spelling checks in prose, code, tables and link
+    labels. Unknown uppercase IDs and explicit bracket citation groups remain
+    checked. Markdown word links such as '[e-commerce](url)' remain ordinary text.
+    """
+    citations: set[str] = set()
+    for token in MD.parse(text):
+        if token.type != 'inline':
+            continue
+        visible = ''.join(child.content if child.type in {'text', 'code_inline'} else ' '
+                          for child in token.children or [])
+        candidates = re.findall(SOURCE_WORD, visible, re.I)
+        citations.update(value for value in candidates if value.isupper() or value.upper() in source_ids)
+        citations.update(bracket_citations(visible))
+    return citations
+
+
 def check_backend_capabilities(context: ValidationContext) -> set[str]:
     """Resolve sources and refusal rules; documentation never enables unrun probes."""
     refs = (context.root/'docs/references.md').read_text()
@@ -84,7 +118,7 @@ def check_backend_capabilities(context: ValidationContext) -> set[str]:
     source_ids = set(declared_sources)
     require(len(source_ids) == len(declared_sources), 'Duplicate source ID')
     for path in context.markdown_paths():
-        for sid in re.findall(r'(?<![A-Z0-9-])([ED]-[A-Z][A-Z0-9-]+)', path.read_text(), re.I):
+        for sid in source_citations(path.read_text(), source_ids):
             require(sid == sid.upper(), f'Noncanonical source ID {sid}: {path}')
             require(sid in source_ids, f'Unknown source ID {sid}: {path}')
     capabilities = context.load('spec/backend-capabilities.json')
