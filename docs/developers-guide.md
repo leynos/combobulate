@@ -412,6 +412,12 @@ They check both operand orders and distinguish compatible results from the named
 `ShapeAgreement` failure. These tests validate the Python example model;
 product proof obligations remain planned.
 
+Generated allocation-accounting tests compare stage totals and peaks with an
+independent capacity-membership oracle. They check alias duplication, ID and
+stage ordering, scratch increases, and additional distinct live allocations.
+Empty live sets, zero capacities, and scratch-only stages remain valid model
+inputs. Stage sequences are nonempty, matching the model's peak operation.
+
 Source citations use canonical registered IDs, such as `[E-POLARS-NULL]`.
 Unresolved bracket groups and uppercase coded references are rejected. Case
 variants of registered IDs are also rejected, including link labels. An
