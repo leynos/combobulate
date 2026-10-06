@@ -9,10 +9,11 @@ name: Coverage (main)
 # one a pull request's ratchet compares against.
 #
 # workflow_dispatch is mandatory, not a convenience: merges performed by
-# the automerge workflow's GITHUB_TOKEN do not fire push-event workflows,
+# an external automerge workflow's GITHUB_TOKEN do not fire push-event workflows,
 # so automerged changes to main only receive coverage when this workflow
-# is dispatched from main. The token is an environment secret of the
-# main-only `codescene` environment, which the job declares.
+# is dispatched from main. Before provisioning the token, restrict the
+# declared `codescene` environment to main and store it as an environment secret.
+# Repository files cannot create that remote protection or CodeScene project.
 
 'on':
   push:
@@ -31,8 +32,8 @@ concurrency:
 jobs:
   coverage-upload:
     runs-on: ubuntu-latest
-    # CS_ACCESS_TOKEN is a secret of this environment, which admits main
-    # alone, so no other ref can reach the token.
+    # Restrict this environment to main before adding CS_ACCESS_TOKEN.
+    # With no token configured, the conditional CodeScene upload skips.
     environment: codescene
     permissions:
       contents: read

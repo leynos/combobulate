@@ -149,12 +149,35 @@ class ContractBoundaries(unittest.TestCase):
                     (0, 6, 'uncertifiable-domain'))
         for lower, upper, result in expected:
             with self.subTest(lower=lower, upper=upper):
-                self.assertEqual(classify_admission({'classification': 'bounded',
+                self.assertEqual(classify_admission({'classification': 'bound',
                                  'lower': lower, 'upper': upper, 'budget': 5}), result)
         self.assertEqual(classify_admission({'classification': 'unknown'}),
                          'runtime-obligation-or-strict-refusal')
         with self.assertRaisesRegex(AssertionError, 'Malformed cost interval'):
-            classify_admission({'classification': 'bounded', 'lower': 5, 'upper': 4, 'budget': 6})
+            classify_admission({'classification': 'bound', 'lower': 5, 'upper': 4, 'budget': 6})
+
+    def test_cost_admission_rejects_unknown_classifications(self):
+        for classification in ('bounded', 'unrecognised', ''):
+            with self.subTest(classification=classification):
+                with self.assertRaisesRegex(AssertionError, 'Unknown cost classification'):
+                    classify_admission({'classification': classification,
+                                        'lower': 0, 'upper': 0, 'budget': 5})
+
+    def test_exact_cost_requires_equal_bounds(self):
+        self.assertEqual(classify_admission({'classification': 'exact',
+                         'lower': 5, 'upper': 5, 'budget': 5}), 'certified-within-model')
+        with self.assertRaisesRegex(AssertionError, 'Exact cost must have equal'):
+            classify_admission({'classification': 'exact',
+                                'lower': 0, 'upper': 5, 'budget': 5})
+
+    def test_cost_admission_rejects_malformed_intervals_and_budgets(self):
+        for field, value in (('lower', True), ('upper', 5.0),
+                             ('budget', True), ('budget', -1), ('budget', '5')):
+            case = {'classification': 'bound', 'lower': 0, 'upper': 5, 'budget': 5}
+            case[field] = value
+            with self.subTest(field=field, value=value):
+                with self.assertRaisesRegex(AssertionError, 'Malformed cost'):
+                    classify_admission(case)
 
 
 if __name__ == '__main__':

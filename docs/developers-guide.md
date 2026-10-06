@@ -125,8 +125,11 @@ runs for usage errors, an already-failing test baseline, or internal errors.
 `main`, and is the only CodeScene caller; `ci.yml` measures pull requests for
 their own ratchet, at the same `generate-coverage` revision with
 `publish-artefact: 'false'`, and names no CodeScene token, host or command. The
-publisher job runs in the `codescene` environment, which admits `main` alone
-and holds `CS_ACCESS_TOKEN` as an environment secret. A
+publisher job declares the `codescene` environment. Before provisioning a
+`CS_ACCESS_TOKEN`, configure that environment to admit `main` alone and store
+the token as its environment secret. The scaffold does not create remote
+environment protection or provision a CodeScene project. Without a token, the
+upload step skips; coverage measurement and publication still run. A
 `Check CodeScene token availability` step (id `codescene_token`) runs exactly
 `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
 with no `if:` and no `env`. The upload runs only when that output is `true` and
@@ -135,9 +138,10 @@ so the workflow binds it in no `env` of its own, and uploads with
 `mode: upload` and no checksum input. Publisher runs share the concurrency group
 `coverage-main-${{ github.ref }}` with `cancel-in-progress: false`: a running
 publisher is never cancelled, and a newer trigger replaces an older pending
-run, so the newest trigger's run is the one that publishes. A merge made by the
-Dependabot automerge workflow's `GITHUB_TOKEN` fires no push event, so it
-publishes nothing until a dispatch from `main` or the next push.
+run, so the newest trigger's run is the one that publishes. If an external
+automerge workflow merges using `GITHUB_TOKEN`, that merge fires no push-event
+workflow, so it publishes nothing until a dispatch from `main` or the next
+push. This scaffold does not include an automerge workflow.
 `tests/codescene_publisher.rs` holds the shape over the committed workflows.
 
 ## Tooling
