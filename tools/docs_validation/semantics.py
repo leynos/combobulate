@@ -4,6 +4,10 @@ from __future__ import annotations
 import math
 import operator
 from .context import ValidationContext, require
+from .semantic_domains import (
+    validate_board, validate_boolean, validate_i64, validate_i64_values, validate_integer_values,
+    validate_shape, validate_subtraction,
+)
 
 
 class SemanticFailure(Exception):
@@ -12,6 +16,8 @@ class SemanticFailure(Exception):
 
 def checked_add(left: int, right: int) -> int:
     """Add signed i64 values; checked_add(2**63 - 1, 1) raises overflow."""
+    validate_i64(left)
+    validate_i64(right)
     result = left+right
     if not -(2**63) <= result < 2**63:
         raise SemanticFailure('IntegerOverflow')
@@ -40,6 +46,9 @@ def left_reduce(values: list[int], operation) -> int:
 
 def agreement(left: list[int], right: list[int], broadcasting: bool) -> list[int]:
     """Agree scalar/array shapes; agreement([], [3], False) yields [3]."""
+    validate_shape(left)
+    validate_shape(right)
+    validate_boolean(broadcasting, 'broadcast policy')
     if left==right or not right:
         return left
     if not left:
@@ -64,12 +73,14 @@ def agreement(left: list[int], right: list[int], broadcasting: bool) -> list[int
 
 def subtract_reduce(case: dict):
     """Model association explicitly; [10, 3, 2] gives 9 rightwards and 5 leftwards."""
+    validate_subtraction(case)
     reducer = right_reduce if case['kind'] == 'reduce' else left_reduce
     return reducer(case['input'], operator.sub)
 
 
 def subtract_scan(case: dict) -> list[int]:
     """Reduce every prefix; right subtraction over [10, 3, 2] gives [10, 7, 9]."""
+    validate_subtraction(case)
     reducer = right_reduce if case['kind'] == 'scan' else left_reduce
     return [reducer(case['input'][:i], operator.sub)
             for i in range(1, len(case['input']) + 1)]
@@ -78,12 +89,16 @@ def subtract_scan(case: dict) -> list[int]:
 def rank_transpose_shape(case: dict) -> list[int]:
     """Reverse cell axes only; rank two maps [4, 2, 3] to [4, 3, 2]."""
     rank, shape = case['cell_rank'], case['input_shape']
+    validate_shape(shape)
+    require(type(rank) is int and 0 <= rank <= len(shape), 'Malformed cell rank')
     return shape[:-rank] + shape[-rank:][::-1] if rank else shape
 
 
 def rows_mean_shape(case: dict) -> list[int]:
     """Drop the final axis; [2, 0] fails but [0, 0] has no empty cells to average."""
     shape = case['input_shape']
+    validate_shape(shape)
+    require(bool(shape), 'Malformed row-mean shape: expected at least one axis')
     if shape[-1] == 0 and math.prod(shape[:-1]) > 0:
         raise SemanticFailure('EmptyMean')
     return shape[:-1]
@@ -97,6 +112,8 @@ def shape_agreement(case: dict) -> list[int]:
 def nullable_sum(case: dict) -> int | None:
     """Sum valid values; [1, None] yields 1 when skipping nulls, otherwise None."""
     values = case['input']
+    validate_boolean(case['skip_nulls'], 'null policy')
+    validate_integer_values(values, nullable=True)
     if not case['skip_nulls'] and None in values:
         return None
     return sum(value for value in values if value is not None)
@@ -113,6 +130,7 @@ def neighbours(board: list[list[int]], y: int, x: int):
 def neighbour_sum(case: dict) -> list[list[int]]:
     """Model a bounded 2-D stencil; [[1, 0]] maps to [[0, 1]]."""
     board = case['input']
+    validate_board(board)
     return [[sum(neighbours(board, y, x)) for x in range(len(board[0]))]
             for y in range(len(board))]
 
@@ -120,6 +138,9 @@ def neighbour_sum(case: dict) -> list[list[int]]:
 def inner_shape(case: dict) -> list[int]:
     """Contract matching axes; [2, 3] with [3, 4] yields [2, 4]."""
     left, right = case['left'], case['right']
+    validate_shape(left)
+    validate_shape(right)
+    require(bool(left) and bool(right), 'Malformed contraction shape: expected at least one axis')
     if left[-1] != right[0]:
         raise SemanticFailure('Contraction')
     return left[:-1] + right[1:]
@@ -127,6 +148,8 @@ def inner_shape(case: dict) -> list[int]:
 
 def reshape(case: dict) -> list[int]:
     """Require equal element counts; [2, 3] can reshape to [6], but not [5]."""
+    validate_shape(case['input_shape'])
+    validate_shape(case['target_shape'])
     if math.prod(case['input_shape']) != math.prod(case['target_shape']):
         raise SemanticFailure('ElementCount')
     return case['target_shape']
@@ -134,7 +157,10 @@ def reshape(case: dict) -> list[int]:
 
 def checked_add_grouping(case: dict) -> int:
     """Use checked i64 arithmetic with the specified association; overflow fails."""
-    reducer = right_reduce if case['association'] == 'right' else left_reduce
+    association = case['association']
+    validate_i64_values(case['input'])
+    require(association in {'left', 'right'}, f'Unknown checked-add association {association}')
+    reducer = right_reduce if association == 'right' else left_reduce
     return reducer(case['input'], checked_add)
 
 

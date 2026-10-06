@@ -264,5 +264,27 @@ class ContractBoundaries(unittest.TestCase):
                                      'runtime-obligation-or-strict-refusal')
 
 
+    def test_transpose_rank_requires_integer_in_the_input_rank(self):
+        for rank in (-1, 4, True, 1.5):
+            with self.subTest(rank=rank), self.assertRaisesRegex(AssertionError, 'Malformed cell rank'):
+                evaluate({'kind': 'rank_transpose_shape', 'input_shape': [0, 3, 4], 'cell_rank': rank})
+        for rank, expected in ((0, [0, 3, 4]), (1, [0, 3, 4]), (2, [0, 4, 3]), (3, [4, 3, 0])):
+            with self.subTest(rank=rank):
+                self.assertEqual(evaluate({'kind': 'rank_transpose_shape',
+                                 'input_shape': [0, 3, 4], 'cell_rank': rank}), expected)
+        self.assertEqual(evaluate({'kind': 'rank_transpose_shape', 'input_shape': [], 'cell_rank': 0}), [])
+
+    def test_checked_add_grouping_rejects_unrecognised_association(self):
+        for association in ('lef', '', None, True):
+            with self.subTest(association=association):
+                with self.assertRaisesRegex(AssertionError, 'Unknown checked-add association'):
+                    evaluate({'kind': 'checked_add_grouping', 'input': [1, 2, 3],
+                              'association': association})
+        for association in ('left', 'right'):
+            with self.subTest(association=association):
+                self.assertEqual(evaluate({'kind': 'checked_add_grouping',
+                                 'input': [1, 2, 3], 'association': association}), 6)
+
+
 if __name__ == '__main__':
     unittest.main()
