@@ -16,13 +16,20 @@ DESIGN_DOCUMENTS = (
     'roadmap.md', 'technical-design.md', 'terms-of-reference.md',
     'testable-bets.md', 'validation.md',
 )
-DOCUMENT_REPORTS = ('revision-comparison.json', 'validation-results.json')
+DOCUMENT_REPORTS = ('revision-comparison.json',)
 
 
 def require(condition: bool, message: str) -> None:
     """Raise a readable contract failure; e.g. require(False, 'Missing task')."""
     if not condition:
         raise AssertionError(message)
+
+
+def unique_ids(entries: list[dict], name: str) -> set[str]:
+    """Index declared IDs without hiding duplicates; repeated R1 records fail."""
+    ids = {entry['id'] for entry in entries}
+    require(len(ids) == len(entries), f'Duplicate {name} ID')
+    return ids
 
 
 def same_typed_value(actual: object, expected: object) -> bool:
@@ -69,7 +76,7 @@ class ValidationContext:
         ]
 
     def json_paths(self) -> list[Path]:
-        """Enumerate spec masters and report inputs, without repository discovery."""
+        """Enumerate source JSON inputs; the generated validation report stays separate."""
         return sorted((self.root / 'spec').glob('*.json')) + [
             self.root / 'docs' / name for name in DOCUMENT_REPORTS
         ]

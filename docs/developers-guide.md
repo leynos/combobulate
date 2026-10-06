@@ -362,7 +362,10 @@ Install `tools/requirements.txt`, then run `make design-check`. The dedicated
 These checks cover specification links, generated reference/roadmap/bet drift,
 example semantics, schemas, proof-evidence envelopes, and cost-model negative
 controls. They do not execute Kani, Verus, proposed Rust macros, or Polars
-probes.
+probes. The default checker also verifies the committed validation report
+without changing it. After deliberate design or validator changes, run
+`python3 tools/check_docs.py --write`, review the report diff, then run
+`make design-check`. Failed source checks leave the existing report untouched.
 
 The `tools/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its

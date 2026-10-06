@@ -110,5 +110,18 @@ class TypedExpectations(unittest.TestCase):
                     check_examples(context)
 
 
+    def test_success_outcome_field_matches_the_model_output_kind(self):
+        ledger = ValidationContext(ROOT).load('spec/examples.json')
+        swaps = (('EX03', 'expected', 'expected_shape'), ('EX05', 'expected_shape', 'expected'))
+        for case_id, original, replacement in swaps:
+            mutated = copy.deepcopy(ledger)
+            case = next(case for case in mutated['cases'] if case['id'] == case_id)
+            case[replacement] = case.pop(original)
+            context = ValidationContext(ROOT)
+            with self.subTest(case_id=case_id), patch.object(context, 'load', return_value=mutated):
+                with self.assertRaisesRegex(AssertionError, 'Wrong outcome field'):
+                    check_examples(context)
+
+
 if __name__ == '__main__':
     unittest.main()

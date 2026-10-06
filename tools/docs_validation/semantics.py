@@ -190,6 +190,16 @@ EXAMPLE_MODELS = {
 }
 
 
+MODEL_OUTPUT_FIELDS = {
+    'reduce': 'expected', 'fold_left': 'expected',
+    'scan': 'expected', 'scan_left': 'expected',
+    'rank_transpose_shape': 'expected_shape', 'rows_mean_shape': 'expected_shape',
+    'agreement': 'expected_shape', 'sum': 'expected', 'neighbour_sum': 'expected',
+    'inner_shape': 'expected_shape', 'reshape': 'expected_shape',
+    'checked_add_grouping': 'expected',
+}
+
+
 def evaluate(case: dict):
     """Dispatch a documentation model; unknown example kinds fail explicitly."""
     kind = case['kind']
@@ -202,6 +212,10 @@ def expectation_field(case: dict) -> str:
     fields = {'expected', 'expected_shape', 'expected_error'} & case.keys()
     require(len(fields) == 1, f'Expected exactly one outcome field in {case["id"]}')
     field = next(iter(fields))
+    kind = case['kind']
+    require(kind in MODEL_OUTPUT_FIELDS, f'Unrecognized example kind: {kind}')
+    require(field == 'expected_error' or field == MODEL_OUTPUT_FIELDS[kind],
+            f'Wrong outcome field in {case["id"]}: {kind} requires {MODEL_OUTPUT_FIELDS[kind]}')
     if field == 'expected_shape':
         validate_shape(case[field])
     if field == 'expected_error':

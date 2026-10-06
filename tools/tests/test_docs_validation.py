@@ -50,8 +50,7 @@ class MarkdownBoundaries(unittest.TestCase):
         (self.root / 'target/bad.json').write_text('broken')
         (self.root / 'package.json').write_text('broken')
         paths = [str(path.relative_to(self.root)) for path in self.context.json_paths()]
-        self.assertEqual(paths, ['spec/cases.json', 'docs/revision-comparison.json',
-                                 'docs/validation-results.json'])
+        self.assertEqual(paths, ['spec/cases.json', 'docs/revision-comparison.json'])
 
     def test_rejects_broken_anchor_and_parent_escape(self):
         for href, message in (('#missing', 'Broken anchor'), ('../outside.md', 'Out-of-pack')):

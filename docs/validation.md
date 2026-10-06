@@ -58,9 +58,19 @@ python tools/check_docs.py
 ```
 
 The generators update only their marked Markdown regions when called without
-`--check`. The checker writes `docs/validation-results.json`. The supplied
-Python helpers parse and execute in the document-checking environment. They do
-not invoke a compiler, verifier or backend.
+`--check`. By default, the checker verifies that the committed
+`docs/validation-results.json` matches checks recomputed in memory. It rejects
+invalid, stale or falsified reports without changing files. To regenerate the
+report after a deliberate source change, run:
+
+```bash
+python tools/check_docs.py --write
+make design-check
+```
+
+Review the report diff before committing it. Regeneration writes the report
+only after all source checks pass. The supplied Python helpers do not invoke a
+compiler, verifier or backend.
 
 ## Unrun checks and limits
 

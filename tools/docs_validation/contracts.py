@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from jsonschema import Draft202012Validator, ValidationError
-from .context import ValidationContext, require
+from .context import ValidationContext, require, unique_ids
 
 
 def check_kernel_envelope(context: ValidationContext) -> None:
@@ -58,15 +58,17 @@ def check_obligations(context: ValidationContext, tasks: dict, verification_ids:
 
 def check_design_trace(context: ValidationContext, phases: list[dict], trace: dict) -> None:
     """Resolve design rows and goal links; table alignment has no semantic effect."""
-    requirement_ids = {row['id'] for row in trace['requirements']}
-    verification_ids = {row['id'] for row in trace['verification']}
+    requirement_ids = unique_ids(trace['requirements'], 'requirement')
+    verification_ids = unique_ids(trace['verification'], 'verification')
     design = (context.root/'docs/technical-design.md').read_text()
     tor = (context.root/'docs/terms-of-reference.md').read_text()
     for rid in requirement_ids:
         require(re.search(r'^\|\s*' + re.escape(rid) + r'\s*\|', design, re.M), f'Missing requirement row {rid}')
     for vid in verification_ids:
         require(re.search(r'^\|\s*' + re.escape(vid) + r'\s*\|', design, re.M), f'Missing verification row {vid}')
-    goals = set(re.findall(r'^\|\s*(G\d+)\s*\|', tor, re.M))
+    declared_goals = re.findall(r'^\|\s*(G\d+)\s*\|', tor, re.M)
+    goals = set(declared_goals)
+    require(len(goals) == len(declared_goals), 'Duplicate goal ID')
     for phase in phases:
         require(set(phase['goals']) <= goals, f'Unresolved phase goals {phase["number"]}')
     for entry in trace['requirements']:
@@ -76,7 +78,9 @@ def check_design_trace(context: ValidationContext, phases: list[dict], trace: di
 def check_backend_capabilities(context: ValidationContext) -> set[str]:
     """Resolve sources and refusal rules; documentation never enables unrun probes."""
     refs = (context.root/'docs/references.md').read_text()
-    source_ids = set(re.findall(r'^### ((?:E|D)-[A-Z0-9-]+)\s*$', refs, re.M))
+    declared_sources = re.findall(r'^### ((?:E|D)-[A-Z0-9-]+)\s*$', refs, re.M)
+    source_ids = set(declared_sources)
+    require(len(source_ids) == len(declared_sources), 'Duplicate source ID')
     for path in context.markdown_paths():
         for sid in re.findall(r'(?<![A-Z0-9-])([ED]-[A-Z][A-Z0-9-]+)', path.read_text()):
             require(sid in source_ids, f'Unknown source ID {sid}: {path}')
@@ -99,8 +103,8 @@ def check_revision_contracts(context: ValidationContext) -> None:
     tasks = {t['id']: t for p in phases for step in p['steps'] for t in step['tasks']}
     bets = context.load('spec/bets.json')['bets']
     trace = context.load('spec/traceability.json')
-    requirement_ids = {r['id'] for r in trace['requirements']}
-    verification_ids = {v['id'] for v in trace['verification']}
+    requirement_ids = unique_ids(trace['requirements'], 'requirement')
+    verification_ids = unique_ids(trace['verification'], 'verification')
     check_bets_and_tasks(bets, tasks, requirement_ids)
     obligations = check_obligations(context, tasks, verification_ids)
     check_design_trace(context, phases, trace)

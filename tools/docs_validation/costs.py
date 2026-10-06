@@ -42,6 +42,7 @@ def nonnegative_integer(value: object, name: str) -> int:
 
 def shape_product(case: dict) -> int | str:
     """Bound a shape product by target usize width; [65536, 65536] overflows 32 bits."""
+    require(isinstance(case['shape'], list), 'Malformed cost shape: expected a dimension list')
     shape = [nonnegative_integer(dimension, 'shape dimension') for dimension in case['shape']]
     target_bits = nonnegative_integer(case['target_bits'], 'target width')
     require(target_bits > 0, 'Malformed target width: expected a positive integer')
@@ -55,13 +56,22 @@ def right_prefix_work(case: dict) -> int:
     return length * (length - 1) // 2
 
 
+def tracked_stage_bytes(stage: dict, capacities: dict[str, int]) -> int:
+    """Count one stage; repeated string allocation IDs count once and [] needs only scratch."""
+    live = stage['live']
+    require(isinstance(live, list), 'Malformed live allocations: expected an allocation-ID list')
+    require(all(type(allocation_id) is str for allocation_id in live),
+            'Malformed live allocation ID: expected a string')
+    scratch = nonnegative_integer(stage['scratch'], 'scratch bytes')
+    return sum(capacities[key] for key in set(live)) + scratch
+
+
 def tracked_peak(case: dict) -> int:
     """Count distinct live allocations plus scratch; repeated alias IDs count once."""
+    require(isinstance(case['stages'], list), 'Malformed stages: expected a stage list')
     capacities = {key: nonnegative_integer(value, 'allocation capacity')
                   for key, value in case['capacities'].items()}
-    scratch = [nonnegative_integer(stage['scratch'], 'scratch bytes') for stage in case['stages']]
-    return max(sum(capacities[key] for key in set(stage['live'])) + extra
-               for stage, extra in zip(case['stages'], scratch))
+    return max(tracked_stage_bytes(stage, capacities) for stage in case['stages'])
 
 
 COST_MODELS = {
