@@ -5,6 +5,17 @@ import math
 from .context import ValidationContext, require
 
 
+def admission_interval(case: dict) -> tuple[int, int] | None:
+    """Validate present bounds; unknown/estimate can supply two null bounds."""
+    lo, hi = case.get('lower'), case.get('upper')
+    if case['classification'] in {'estimate', 'unknown'} and lo is None and hi is None:
+        return None
+    require(type(lo) is int and type(hi) is int and 0 <= lo <= hi,
+            'Malformed cost interval')
+    require(case['classification'] != 'exact' or lo == hi, 'Exact cost must have equal interval bounds')
+    return lo, hi
+
+
 def classify_admission(case: dict) -> str:
     """Classify budget intervals; unknown cost always needs a runtime obligation."""
     kind = case['classification']
@@ -12,12 +23,10 @@ def classify_admission(case: dict) -> str:
             f'Unknown cost classification {kind}')
     limit = case['budget']
     require(type(limit) is int and limit >= 0, 'Malformed cost budget')
+    interval = admission_interval(case)
     if kind in {'estimate', 'unknown'}:
         return 'runtime-obligation-or-strict-refusal'
-    lo, hi = case['lower'], case['upper']
-    require(type(lo) is int and type(hi) is int and 0 <= lo <= hi,
-            'Malformed cost interval')
-    require(kind != 'exact' or lo == hi, 'Exact cost must have equal interval bounds')
+    lo, hi = interval
     if lo > limit:
         return 'certain-excess'
     if hi <= limit:

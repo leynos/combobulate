@@ -14,14 +14,24 @@ class SemanticFailure(Exception):
     """Named failure in this small documentation-example model."""
 
 
-def checked_add(left: int, right: int) -> int:
-    """Add signed i64 values; checked_add(2**63 - 1, 1) raises overflow."""
+def checked_i64_binary(left: int, right: int, operation) -> int:
+    """Check one I64 operation; subtraction of 1 from I64_MIN raises overflow."""
     validate_i64(left)
     validate_i64(right)
-    result = left+right
+    result = operation(left, right)
     if not -(2**63) <= result < 2**63:
         raise SemanticFailure('IntegerOverflow')
     return result
+
+
+def checked_add(left: int, right: int) -> int:
+    """Add signed i64 values; checked_add(2**63 - 1, 1) raises overflow."""
+    return checked_i64_binary(left, right, operator.add)
+
+
+def checked_subtract(left: int, right: int) -> int:
+    """Subtract signed i64 values; checked_subtract(-2**63, 1) raises overflow."""
+    return checked_i64_binary(left, right, operator.sub)
 
 
 def right_reduce(values: list[int], operation) -> int:
@@ -75,14 +85,14 @@ def subtract_reduce(case: dict):
     """Model association explicitly; [10, 3, 2] gives 9 rightwards and 5 leftwards."""
     validate_subtraction(case)
     reducer = right_reduce if case['kind'] == 'reduce' else left_reduce
-    return reducer(case['input'], operator.sub)
+    return reducer(case['input'], checked_subtract)
 
 
 def subtract_scan(case: dict) -> list[int]:
     """Reduce every prefix; right subtraction over [10, 3, 2] gives [10, 7, 9]."""
     validate_subtraction(case)
     reducer = right_reduce if case['kind'] == 'scan' else left_reduce
-    return [reducer(case['input'][:i], operator.sub)
+    return [reducer(case['input'][:i], checked_subtract)
             for i in range(1, len(case['input']) + 1)]
 
 
@@ -116,7 +126,13 @@ def nullable_sum(case: dict) -> int | None:
     validate_integer_values(values, nullable=True)
     if not case['skip_nulls'] and None in values:
         return None
-    return sum(value for value in values if value is not None)
+    return checked_right_sum([value for value in values if value is not None])
+
+
+def checked_right_sum(values: list[int]) -> int:
+    """Right-sum I64 values; [-1, I64_MAX, 1] fails on its overflowing suffix."""
+    validate_i64_values(values)
+    return right_reduce(values, checked_add) if values else 0
 
 
 def neighbours(board: list[list[int]], y: int, x: int):
@@ -131,7 +147,7 @@ def neighbour_sum(case: dict) -> list[list[int]]:
     """Model a bounded 2-D stencil; [[1, 0]] maps to [[0, 1]]."""
     board = case['input']
     validate_board(board)
-    return [[sum(neighbours(board, y, x)) for x in range(len(board[0]))]
+    return [[checked_right_sum(list(neighbours(board, y, x))) for x in range(len(board[0]))]
             for y in range(len(board))]
 
 

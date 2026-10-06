@@ -34,10 +34,13 @@ def validate_i64_values(values: object) -> None:
 
 
 def validate_integer_values(values: object, nullable: bool = False) -> None:
-    """Require the model's integer list; optional nulls never permit booleans or floats."""
+    """Require model I64 values; optional nulls never permit booleans or floats."""
     require(isinstance(values, list), 'Malformed integer input: expected a list')
     require(all(type(value) is int or (nullable and value is None) for value in values),
             'Malformed integer operand')
+    for value in values:
+        if value is not None:
+            validate_i64(value)
 
 
 def validate_subtraction(case: dict) -> None:
