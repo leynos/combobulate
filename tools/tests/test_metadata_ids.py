@@ -64,5 +64,48 @@ class MetadataIds(unittest.TestCase):
                     check_backend_capabilities(context)
 
 
+    def test_source_citations_reject_lowercase_and_mixed_case_with_canonical_controls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            (context.root / 'docs/references.md').write_text((ROOT / 'docs/references.md').read_text())
+            capabilities = ValidationContext(ROOT).load('spec/backend-capabilities.json')
+            variants = ('e-polars-null', 'E-Polars-Null', 'e-POLARS-NULL', 'd-tor', 'D-Tor')
+            for source_id in variants:
+                (context.root / 'README.md').write_text('# Title\n\n[' + source_id + ']\n')
+                with self.subTest(source_id=source_id), patch.object(context, 'load', return_value=capabilities):
+                    with self.assertRaisesRegex(AssertionError, 'Noncanonical source ID ' + source_id):
+                        check_backend_capabilities(context)
+            (context.root / 'README.md').write_text(
+                '# Title\n\n[E-POLARS-NULL, D-TOR]. Identifier abc-d-other is unrelated.\n')
+            with patch.object(context, 'load', return_value=capabilities):
+                self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
+
+    def test_source_register_rejects_noncanonical_heading_even_without_citations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            for source_id in ('e-unused', 'E-Unused', 'd-unused', 'D-Unused'):
+                (context.root / 'docs/references.md').write_text('# References\n\n### ' + source_id + '\n')
+                with self.subTest(source_id=source_id):
+                    with self.assertRaisesRegex(AssertionError, 'Noncanonical source ID ' + source_id):
+                        check_backend_capabilities(context)
+
+    def test_capability_source_lists_require_exact_registered_case(self):
+        source = ValidationContext(ROOT)
+        capabilities = source.load('spec/backend-capabilities.json')
+        for replacement in ('e-polars2-release', 'E-Polars2-Release'):
+            mutated = copy.deepcopy(capabilities)
+            mutated['capabilities'][0]['sources'][0] = replacement
+            context = ValidationContext(ROOT)
+            with self.subTest(source_id=replacement), patch.object(context, 'load', return_value=mutated):
+                with self.assertRaisesRegex(AssertionError, 'Unresolved capability source'):
+                    check_backend_capabilities(context)
+
+
 if __name__ == '__main__':
     unittest.main()

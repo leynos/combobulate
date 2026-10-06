@@ -78,11 +78,14 @@ def check_design_trace(context: ValidationContext, phases: list[dict], trace: di
 def check_backend_capabilities(context: ValidationContext) -> set[str]:
     """Resolve sources and refusal rules; documentation never enables unrun probes."""
     refs = (context.root/'docs/references.md').read_text()
-    declared_sources = re.findall(r'^### ((?:E|D)-[A-Z0-9-]+)\s*$', refs, re.M)
+    declared_sources = re.findall(r'^### ((?:E|D)-[A-Z0-9-]+)\s*$', refs, re.M | re.I)
+    for sid in declared_sources:
+        require(sid == sid.upper(), f'Noncanonical source ID {sid}: {context.root / "docs/references.md"}')
     source_ids = set(declared_sources)
     require(len(source_ids) == len(declared_sources), 'Duplicate source ID')
     for path in context.markdown_paths():
-        for sid in re.findall(r'(?<![A-Z0-9-])([ED]-[A-Z][A-Z0-9-]+)', path.read_text()):
+        for sid in re.findall(r'(?<![A-Z0-9-])([ED]-[A-Z][A-Z0-9-]+)', path.read_text(), re.I):
+            require(sid == sid.upper(), f'Noncanonical source ID {sid}: {path}')
             require(sid in source_ids, f'Unknown source ID {sid}: {path}')
     capabilities = context.load('spec/backend-capabilities.json')
     require(capabilities['selected_rust_revision'] is None, 'Unselected backend was pinned fictitiously')
