@@ -24,26 +24,34 @@ def classify_admission(case: dict) -> str:
     return 'uncertifiable-domain'
 
 
+def nonnegative_integer(value: object, name: str) -> int:
+    """Validate an integer count; 0 passes, while True, 1.0, and -1 fail."""
+    require(type(value) is int and value >= 0, f'Malformed {name}: expected a nonnegative integer')
+    return value
+
+
 def shape_product(case: dict) -> int | str:
     """Bound a shape product by target usize width; [65536, 65536] overflows 32 bits."""
-    shape = case['shape']
-    require(all(isinstance(dimension, int) and dimension >= 0 for dimension in shape),
-            'Invalid shape model')
+    shape = [nonnegative_integer(dimension, 'shape dimension') for dimension in case['shape']]
+    target_bits = nonnegative_integer(case['target_bits'], 'target width')
+    require(target_bits > 0, 'Malformed target width: expected a positive integer')
     value = math.prod(shape)
-    return value if value <= (1 << case['target_bits']) - 1 else 'overflow'
+    return value if value <= (1 << target_bits) - 1 else 'overflow'
 
 
 def right_prefix_work(case: dict) -> int:
     """Count reductions over all prefixes; length 3 needs 3 operations."""
-    length = case['length']
-    require(length >= 0, 'Negative prefix length')
+    length = nonnegative_integer(case['length'], 'prefix length')
     return length * (length - 1) // 2
 
 
 def tracked_peak(case: dict) -> int:
     """Count distinct live allocations plus scratch; repeated alias IDs count once."""
-    return max(sum(case['capacities'][key] for key in set(stage['live']))
-               + stage['scratch'] for stage in case['stages'])
+    capacities = {key: nonnegative_integer(value, 'allocation capacity')
+                  for key, value in case['capacities'].items()}
+    scratch = [nonnegative_integer(stage['scratch'], 'scratch bytes') for stage in case['stages']]
+    return max(sum(capacities[key] for key in set(stage['live'])) + extra
+               for stage, extra in zip(case['stages'], scratch))
 
 
 COST_MODELS = {

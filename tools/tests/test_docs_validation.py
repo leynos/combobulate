@@ -10,7 +10,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.costs import classify_admission
+from docs_validation.costs import (
+    classify_admission, right_prefix_work, shape_product, tracked_peak,
+)
 from docs_validation.ledger import check_dependencies, collect_tasks
 from docs_validation.markdown import (
     check_local_link, check_markdown, generated_matches, headings, semantic_tokens,
@@ -178,6 +180,50 @@ class ContractBoundaries(unittest.TestCase):
             with self.subTest(field=field, value=value):
                 with self.assertRaisesRegex(AssertionError, 'Malformed cost'):
                     classify_admission(case)
+
+
+    def test_shape_counts_and_target_width_reject_malformed_numbers(self):
+        for value in (True, 1.0, -1):
+            with self.subTest(field='dimension', value=value):
+                with self.assertRaisesRegex(AssertionError, 'Malformed shape dimension'):
+                    shape_product({'shape': [value], 'target_bits': 64})
+        for value in (True, 32.0, -1, 0):
+            with self.subTest(field='target_bits', value=value):
+                with self.assertRaisesRegex(AssertionError, 'Malformed target width'):
+                    shape_product({'shape': [1], 'target_bits': value})
+
+    def test_shape_product_accepts_zero_and_valid_target_widths(self):
+        for width in (32, 64):
+            with self.subTest(width=width):
+                self.assertEqual(shape_product({'shape': [0, 2**64], 'target_bits': width}), 0)
+                self.assertEqual(shape_product({'shape': [], 'target_bits': width}), 1)
+                self.assertEqual(shape_product({'shape': [2**width - 1], 'target_bits': width}),
+                                 2**width - 1)
+                self.assertEqual(shape_product({'shape': [2**width], 'target_bits': width}), 'overflow')
+
+    def test_prefix_length_requires_nonnegative_integer(self):
+        for value in (True, 4096.0, -1):
+            with self.subTest(value=value), self.assertRaisesRegex(AssertionError, 'Malformed prefix length'):
+                right_prefix_work({'length': value})
+        for length, expected in ((0, 0), (1, 0), (3, 3)):
+            with self.subTest(length=length):
+                self.assertEqual(right_prefix_work({'length': length}), expected)
+
+    def test_allocation_capacities_and_scratch_require_nonnegative_integers(self):
+        for field in ('capacity', 'scratch'):
+            for value in (True, 80.0, -1):
+                case = {'capacities': {'source': 80},
+                        'stages': [{'live': ['source', 'source'], 'scratch': 8}]}
+                if field == 'capacity':
+                    case['capacities']['source'] = value
+                else:
+                    case['stages'][0]['scratch'] = value
+                with self.subTest(field=field, value=value), self.assertRaisesRegex(AssertionError, 'Malformed'):
+                    tracked_peak(case)
+        self.assertEqual(tracked_peak({'capacities': {'source': 0},
+                         'stages': [{'live': ['source', 'source'], 'scratch': 0}]}), 0)
+        self.assertEqual(tracked_peak({'capacities': {'source': 80},
+                         'stages': [{'live': ['source', 'source'], 'scratch': 8}]}), 88)
 
 
 if __name__ == '__main__':
