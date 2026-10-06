@@ -10,13 +10,14 @@ def classify_admission(case: dict) -> str:
     kind = case['classification']
     require(kind in {'exact', 'bound', 'estimate', 'unknown'},
             f'Unknown cost classification {kind}')
+    limit = case['budget']
+    require(type(limit) is int and limit >= 0, 'Malformed cost budget')
     if kind in {'estimate', 'unknown'}:
         return 'runtime-obligation-or-strict-refusal'
-    lo, hi, limit = case['lower'], case['upper'], case['budget']
+    lo, hi = case['lower'], case['upper']
     require(type(lo) is int and type(hi) is int and 0 <= lo <= hi,
             'Malformed cost interval')
     require(kind != 'exact' or lo == hi, 'Exact cost must have equal interval bounds')
-    require(type(limit) is int and limit >= 0, 'Malformed cost budget')
     if lo > limit:
         return 'certain-excess'
     if hi <= limit:

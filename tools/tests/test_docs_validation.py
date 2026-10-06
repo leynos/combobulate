@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
+from docs_validation.contracts import check_backend_capabilities
 from docs_validation.costs import (
     classify_admission, right_prefix_work, shape_product, tracked_peak,
 )
@@ -101,6 +102,28 @@ class MarkdownBoundaries(unittest.TestCase):
         self.assertFalse(generated_matches('START wrong END', 'body', 'START', 'END'))
 
 
+    def test_source_scan_resolves_both_namespaces_without_partial_identifier_matches(self):
+        (self.root / 'spec').mkdir()
+        (self.root / 'spec/backend-capabilities.json').write_text(
+            '{"selected_rust_revision": null, "capabilities": []}')
+        (self.root / 'docs/references.md').write_text('# References\n\n### D-TOR\n\n### E-RUST\n')
+        (self.root / 'README.md').write_text(
+            "# Title\n\n[D-TOR], E-RUST, D-TOR's policy; G1, V001 and ABC-D-OTHER.\n")
+        self.assertEqual(check_backend_capabilities(self.context), set())
+
+    def test_source_scan_rejects_typo_and_deleted_internal_reference(self):
+        (self.root / 'spec').mkdir()
+        (self.root / 'spec/backend-capabilities.json').write_text(
+            '{"selected_rust_revision": null, "capabilities": []}')
+        cases = (('D-TOOR', '### D-TOR'), ('D-TOR', '### E-RUST'),
+                 ('E-MISSING', '### E-RUST'))
+        for cited_id, heading in cases:
+            (self.root / 'docs/references.md').write_text('# References\n\n' + heading + '\n')
+            (self.root / 'README.md').write_text('# Title\n\n[' + cited_id + ']\n')
+            with self.subTest(cited_id=cited_id), self.assertRaisesRegex(AssertionError, cited_id):
+                check_backend_capabilities(self.context)
+
+
 class ContractBoundaries(unittest.TestCase):
     """Reject unresolved plans and preserve semantic negative-control distinctions."""
 
@@ -153,7 +176,7 @@ class ContractBoundaries(unittest.TestCase):
             with self.subTest(lower=lower, upper=upper):
                 self.assertEqual(classify_admission({'classification': 'bound',
                                  'lower': lower, 'upper': upper, 'budget': 5}), result)
-        self.assertEqual(classify_admission({'classification': 'unknown'}),
+        self.assertEqual(classify_admission({'classification': 'unknown', 'budget': 0}),
                          'runtime-obligation-or-strict-refusal')
         with self.assertRaisesRegex(AssertionError, 'Malformed cost interval'):
             classify_admission({'classification': 'bound', 'lower': 5, 'upper': 4, 'budget': 6})
@@ -224,6 +247,21 @@ class ContractBoundaries(unittest.TestCase):
                          'stages': [{'live': ['source', 'source'], 'scratch': 0}]}), 0)
         self.assertEqual(tracked_peak({'capacities': {'source': 80},
                          'stages': [{'live': ['source', 'source'], 'scratch': 8}]}), 88)
+
+
+    def test_unknown_and_estimate_require_valid_budgets_without_known_bounds(self):
+        for classification in ('unknown', 'estimate'):
+            for budget in (True, 1.5, -1, '5', None):
+                case = {'classification': classification, 'lower': None,
+                        'upper': None, 'budget': budget}
+                with self.subTest(classification=classification, budget=budget):
+                    with self.assertRaisesRegex(AssertionError, 'Malformed cost budget'):
+                        classify_admission(case)
+            for budget in (0, 5):
+                with self.subTest(classification=classification, budget=budget):
+                    self.assertEqual(classify_admission({'classification': classification,
+                                     'lower': None, 'upper': None, 'budget': budget}),
+                                     'runtime-obligation-or-strict-refusal')
 
 
 if __name__ == '__main__':

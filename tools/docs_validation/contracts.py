@@ -78,8 +78,8 @@ def check_backend_capabilities(context: ValidationContext) -> set[str]:
     refs = (context.root/'docs/references.md').read_text()
     source_ids = set(re.findall(r'^### ((?:E|D)-[A-Z0-9-]+)\s*$', refs, re.M))
     for path in context.markdown_paths():
-        for sid in re.findall(r'(?<![A-Z0-9-])(E-[A-Z][A-Z0-9-]+)', path.read_text()):
-            require(sid in source_ids, f'Unknown external source ID {sid}: {path}')
+        for sid in re.findall(r'(?<![A-Z0-9-])([ED]-[A-Z][A-Z0-9-]+)', path.read_text()):
+            require(sid in source_ids, f'Unknown source ID {sid}: {path}')
     capabilities = context.load('spec/backend-capabilities.json')
     require(capabilities['selected_rust_revision'] is None, 'Unselected backend was pinned fictitiously')
     cap_ids = set()
