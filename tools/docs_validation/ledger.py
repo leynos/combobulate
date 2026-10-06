@@ -7,18 +7,54 @@ from .context import ValidationContext, require
 from .markdown import generated_matches
 
 
+def numbered_identity(value: object, name: str, components: int) -> tuple[int, ...]:
+    """Parse a canonical positive numbered identity; '1.2' is a step, while '1.02' fails."""
+    parts = value.split('.') if isinstance(value, str) else []
+    require(len(parts) == components and all(re.fullmatch(r'[1-9][0-9]*', part) for part in parts),
+            f'Malformed {name} identity: {value}')
+    return tuple(map(int, parts))
+
+
+def check_phase_order(phases: list[dict]) -> None:
+    """Require unique ascending positive integer phases; [1, 2] passes, [2, 1] fails."""
+    previous = 0
+    for phase in phases:
+        number = phase['number']
+        require(type(number) is int and number > 0, f'Malformed phase number: {number}')
+        require(number > previous, 'Phase numbers must be unique and ascending')
+        previous = number
+
+
+def check_step_hierarchy(phase: dict) -> None:
+    """Bind ordered step identities to their phase; phase 1 cannot contain step '2.1'."""
+    previous = 0
+    for step in phase['steps']:
+        parent, number = numbered_identity(step['number'], 'step', 2)
+        require(parent == phase['number'], f'Misnumbered step {step["number"]} in phase {phase["number"]}')
+        require(number > previous, f'Step numbers must be unique and ascending in phase {parent}')
+        previous = number
+
+
+def check_task_identity(task_id: str, step_number: str) -> None:
+    """Bind canonical task identities to their step; task '1.2.1' cannot belong to step '1.1'."""
+    phase, step, _ = numbered_identity(task_id, 'task', 3)
+    require(f'{phase}.{step}' == step_number, f'Misnumbered task {task_id}')
+
+
 def collect_tasks(phases: list[dict]) -> tuple[dict[str, dict], set[int]]:
     """Index task contracts and design sections; repeated task IDs fail."""
     tasks: dict[str, dict] = {}
     sections: set[int] = set()
+    check_phase_order(phases)
     for phase in phases:
+        check_step_hierarchy(phase)
         require(bool(phase['idea']) and bool(phase['gate']), 'Missing GIST hypothesis/gate')
         for step in phase['steps']:
             require(bool(step['question']), 'Missing step question')
             for task in step['tasks']:
                 task_id = task['id']
                 require(task_id not in tasks, f'Duplicate task {task_id}')
-                require(task_id.startswith(step['number'] + '.'), f'Misnumbered task {task_id}')
+                check_task_identity(task_id, step['number'])
                 require(bool(task['success']) and bool(task['sections']), f'Missing task contract {task_id}')
                 tasks[task_id] = task
                 for start, end in re.findall(r'(\d+)(?:-(\d+))?', task['sections']):
@@ -27,10 +63,16 @@ def collect_tasks(phases: list[dict]) -> tuple[dict[str, dict], set[int]]:
 
 
 def check_dependencies(tasks: dict[str, dict]) -> None:
-    """Require each dependency to exist earlier; this strict order proves acyclicity."""
+    """Require dependencies earlier in both taxonomy and emitted task order; unrelated tasks can reorder."""
+    positions = {task_id: position for position, task_id in enumerate(tasks)}
     for task_id, task in tasks.items():
-        for dependency in task['requires']:
+        dependencies = task['requires']
+        require(isinstance(dependencies, list) and all(type(dependency) is str for dependency in dependencies),
+                f'Malformed dependencies at {task_id}: expected a string-ID list')
+        for dependency in dependencies:
             require(dependency in tasks, f'Unknown dependency {dependency} at {task_id}')
+            require(positions[dependency] < positions[task_id],
+                    f'Dependency is not earlier in emitted task order: {task_id} -> {dependency}')
             require(tuple(map(int, dependency.split('.'))) < tuple(map(int, task_id.split('.'))),
                     f'Dependency is not earlier in this sequence: {task_id} -> {dependency}')
 

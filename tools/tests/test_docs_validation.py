@@ -139,7 +139,7 @@ class ContractBoundaries(unittest.TestCase):
 
     def test_duplicate_task_ids_are_not_hidden_by_indexing(self):
         task = {'id': '1.1.1', 'success': 'witness', 'sections': '1-19'}
-        phases = [{'idea': 'hypothesis', 'gate': 'witness', 'steps': [
+        phases = [{'number': 1, 'idea': 'hypothesis', 'gate': 'witness', 'steps': [
             {'number': '1.1', 'question': 'why?', 'tasks': [task, task]}]}]
         with self.assertRaisesRegex(AssertionError, 'Duplicate task'):
             collect_tasks(phases)
