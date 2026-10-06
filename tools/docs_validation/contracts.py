@@ -1,0 +1,134 @@
+"""Validate contracts claims in the design pack without claiming Rust evidence."""
+from __future__ import annotations
+
+import re
+from jsonschema import Draft202012Validator, ValidationError
+from .context import ValidationContext, require
+
+
+def check_kernel_envelope(context: ValidationContext) -> None:
+    """Validate the envelope; removing validity from the example must fail."""
+    schema = context.load('spec/kernel-contract.schema.json')
+    Draft202012Validator.check_schema(schema)
+    example = context.load('spec/kernel-contract.example.json')
+    validator = Draft202012Validator(schema)
+    validator.validate(example)
+    broken = dict(example)
+    broken.pop('validity')
+    rejected = False
+    try:
+        validator.validate(broken)
+    except ValidationError:
+        rejected = True
+    require(rejected, 'Missing-validity negative control was not rejected')
+    context.record('kernel-contract-envelope', 'Draft 2020-12 schema and sample validate; missing-validity mutation is rejected. No claim about truth of native kernel metadata.', 1)
+
+
+def check_bets_and_tasks(bets: list[dict], tasks: dict, requirement_ids: set[str]) -> None:
+    """Validate planned bets and proof-first mappings; unrun bets cannot claim results."""
+    bet_ids = {bet['id'] for bet in bets}
+    require(len(bet_ids) == len(bets), 'Duplicate bet ID')
+    for bet in bets:
+        for key in ['hypothesis', 'success_witness', 'negative_control', 'falsifier',
+                    'decision_rule', 'measurement']:
+            require(bool(bet[key].strip()), f'Missing bet field {key}: {bet["id"]}')
+        require(bet['status'] == 'planned-not-run', 'Fabricated experiment result')
+        require(set(bet['requirements']) <= requirement_ids, 'Unresolved bet requirement')
+        require(set(bet['tasks']) <= set(tasks), 'Unresolved bet task')
+    for task in tasks.values():
+        require(bool(task.get('proof_first')), f'No proof-first contract: {task["id"]}')
+        require(bool(task.get('bets')) and set(task['bets']) <= bet_ids,
+                f'Unresolved task bet: {task["id"]}')
+
+
+def check_obligations(context: ValidationContext, tasks: dict, verification_ids: set[str]) -> list[dict]:
+    """Require substantive planned proof contracts; evidence remains absent at design time."""
+    obligations = context.load('spec/proof-obligations.json')['obligations']
+    require(len({o['id'] for o in obligations}) == len(obligations), 'Duplicate proof ID')
+    for obligation in obligations:
+        require(set(obligation['tasks']) <= set(tasks), 'Unresolved proof task')
+        require(set(obligation['verification']) <= verification_ids, 'Unresolved proof verification ID')
+        require(bool(obligation['property']) and bool(obligation['scope'])
+                and bool(obligation['non_vacuity']), 'Incomplete proof contract')
+        require(obligation['status'] == 'planned-not-run' and obligation['evidence'] is None,
+                'This design pack must not fabricate a proof result')
+        require({'Verus', 'Kani'} & set(obligation['tools']), 'No selected verifier')
+    return obligations
+
+
+def check_design_trace(context: ValidationContext, phases: list[dict], trace: dict) -> None:
+    """Resolve design rows and goal links; table alignment has no semantic effect."""
+    requirement_ids = {row['id'] for row in trace['requirements']}
+    verification_ids = {row['id'] for row in trace['verification']}
+    design = (context.root/'docs/technical-design.md').read_text()
+    tor = (context.root/'docs/terms-of-reference.md').read_text()
+    for rid in requirement_ids:
+        require(re.search(r'^\|\s*' + re.escape(rid) + r'\s*\|', design, re.M), f'Missing requirement row {rid}')
+    for vid in verification_ids:
+        require(re.search(r'^\|\s*' + re.escape(vid) + r'\s*\|', design, re.M), f'Missing verification row {vid}')
+    goals = set(re.findall(r'^\|\s*(G\d+)\s*\|', tor, re.M))
+    for phase in phases:
+        require(set(phase['goals']) <= goals, f'Unresolved phase goals {phase["number"]}')
+    for entry in trace['requirements']:
+        require(set(entry['goals']) <= goals, f'Unresolved requirement goals {entry["id"]}')
+
+
+def check_backend_capabilities(context: ValidationContext) -> set[str]:
+    """Resolve sources and refusal rules; documentation never enables unrun probes."""
+    refs = (context.root/'docs/references.md').read_text()
+    source_ids = set(re.findall(r'^### ((?:E|D)-[A-Z0-9-]+)\s*$', refs, re.M))
+    for path in context.markdown_paths():
+        for sid in re.findall(r'(?<![A-Z0-9-])(E-[A-Z][A-Z0-9-]+)', path.read_text()):
+            require(sid in source_ids, f'Unknown external source ID {sid}: {path}')
+    capabilities = context.load('spec/backend-capabilities.json')
+    require(capabilities['selected_rust_revision'] is None, 'Unselected backend was pinned fictitiously')
+    cap_ids = set()
+    for cap in capabilities['capabilities']:
+        require(cap['id'] not in cap_ids, 'Duplicate capability ID')
+        cap_ids.add(cap['id'])
+        require(set(cap['sources']) <= source_ids, 'Unresolved capability source')
+        require(cap['rust_probe_status'] == 'not-run' and cap['eligible'] is False,
+                'Documentation alone cannot enable an untested Rust capability')
+        require(bool(cap['probe']) and bool(cap['refusal_rule']), 'Incomplete capability probe')
+    return cap_ids
+
+
+def check_revision_contracts(context: ValidationContext) -> None:
+    """Check proposed contracts and report planned coverage, not verifier evidence."""
+    phases = context.load('spec/roadmap.json')['phases']
+    tasks = {t['id']: t for p in phases for step in p['steps'] for t in step['tasks']}
+    bets = context.load('spec/bets.json')['bets']
+    trace = context.load('spec/traceability.json')
+    requirement_ids = {r['id'] for r in trace['requirements']}
+    verification_ids = {v['id'] for v in trace['verification']}
+    check_bets_and_tasks(bets, tasks, requirement_ids)
+    obligations = check_obligations(context, tasks, verification_ids)
+    check_design_trace(context, phases, trace)
+    cap_ids = check_backend_capabilities(context)
+    context.record('testable-bets', 'Every bet has a witness, negative control, falsifier, decision rule, and resolved task/requirement links; all remain planned.', len(bets))
+    context.record('proof-first-task-coverage', 'Every implementation or decision task has an explicit proof-first contract and bet mapping. This is planned coverage, not proof discharge.', len(tasks))
+    context.record('proof-obligations', 'Properties, scopes, tool choices, non-vacuity controls, and task/V links resolve; no proof result is fabricated.', len(obligations))
+    context.record('backend-capability-plans', 'All source IDs and probe/refusal contracts resolve; no unrun backend capability is marked eligible.', len(cap_ids))
+
+
+def check_proof_evidence_envelope(context: ValidationContext) -> None:
+    """Validate planned evidence; proof claims without witnesses must fail."""
+    import copy
+    schema = context.load('spec/proof-evidence.schema.json')
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    example = context.load('spec/proof-evidence.example.json')
+    validator.validate(example)
+    mutations = []
+    missing = copy.deepcopy(example)
+    missing.pop('success_witness')
+    mutations.append(missing)
+    unsupported_claim = copy.deepcopy(example)
+    unsupported_claim['status'] = 'proved'
+    mutations.append(unsupported_claim)
+    missing_trust = copy.deepcopy(example)
+    missing_trust['status'] = 'trusted'
+    mutations.append(missing_trust)
+    for mutation in mutations:
+        require(not validator.is_valid(mutation), 'Invalid proof-evidence mutation accepted')
+    context.record('proof-evidence-envelope', 'The planned record validates; missing witness, proof status without actual bindings/results, and unscoped trust mutations fail. Schema validity does not establish a proposition.', len(mutations))

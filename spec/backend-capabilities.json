@@ -1,0 +1,131 @@
+{
+  "revision": "0.2",
+  "status": "probe-plan-not-backend-evidence",
+  "checked_documentation_date": "2026-10-06",
+  "observed_rust_docs_version": "0.55.2",
+  "selected_rust_revision": null,
+  "selected_features": [],
+  "capabilities": [
+    {
+      "id": "PC01",
+      "name": "Explicit Rust engine selection and positional ordering",
+      "sources": [
+        "E-POLARS2-RELEASE",
+        "E-POLARS2-RUST"
+      ],
+      "probe": "Force each available engine; inspect declared row order and verify correspondence after reorderable operations.",
+      "refusal_rule": "An engine choice and ordering guarantee cannot be inferred from Python defaults.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC02",
+      "name": "Streaming partition, prefix, halo, and segment contracts",
+      "sources": [
+        "E-POLARS2-RELEASE",
+        "E-POLARS-MAP"
+      ],
+      "probe": "Repartition one logical dataset at every small boundary and force native adapters used by that engine.",
+      "refusal_rule": "Unavailable kernel partition contracts exclude that streaming lowering.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC03",
+      "name": "Spill permission, quota, control scope, and cleanup",
+      "sources": [
+        "E-POLARS2-RELEASE"
+      ],
+      "probe": "Determine actual Rust controls and their process/query scope; no-spill, quota exhaustion, cancellation and conflicting concurrent policies.",
+      "refusal_rule": "Default no unrequested disk; strict profile refuses an unenforceable guarantee.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC04",
+      "name": "Operation-specific out-of-core execution",
+      "sources": [
+        "E-POLARS2-RELEASE"
+      ],
+      "probe": "Record which operations actually spill in the selected revision and which retain unbounded backend state.",
+      "refusal_rule": "Do not infer join/group-by spilling from sorting support.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC05",
+      "name": "Empty/nested validity and schema semantics",
+      "sources": [
+        "E-POLARS2-UPGRADE"
+      ],
+      "probe": "Check null versus empty explosion, parent validity, zero-width transpose, explicit dtype and row/cardinality results.",
+      "refusal_rule": "Combobulate schemas remain authoritative even when backend empty results use Null dtype.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC06",
+      "name": "Dtype and extension-metadata planning specialization",
+      "sources": [
+        "E-POLARS2-DTYPE",
+        "E-POLARS2-UPGRADE"
+      ],
+      "probe": "Identify public Rust hooks; specialize one typed operation and preserve logical metadata/validation across import.",
+      "refusal_rule": "Backend plan-time callbacks are not Rust compile-time execution; extension tags are not domain proofs.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC07",
+      "name": "Deterministic plugin optimizer participation",
+      "sources": [
+        "E-POLARS2-PLUGIN"
+      ],
+      "probe": "Compare enabled/disabled sharing for pure total code, then a deterministic-fallible guarded callback.",
+      "refusal_rule": "Determinism alone cannot authorize speculation, skipped failures or merged effects.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC08",
+      "name": "Physical node to source provenance",
+      "sources": [
+        "E-POLARS2-PROVENANCE"
+      ],
+      "probe": "Bind actual physical/IR attribution to Combobulate source origin; inject a fused-kernel failure.",
+      "refusal_rule": "Retain own source mapping when an optional backend hook is unavailable.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    },
+    {
+      "id": "PC09",
+      "name": "Strict table boundary and extension representation",
+      "sources": [
+        "E-POLARS2-ANNOUNCE",
+        "E-POLARS2-UPGRADE"
+      ],
+      "probe": "Test unequal-length concat, lossy membership coercion, unknown extension storage and logical ordering.",
+      "refusal_rule": "Explicit local policies remain authoritative; Map does not replace ordered segments.",
+      "documentation_status": "documented-upstream-opportunity",
+      "rust_probe_status": "not-run",
+      "eligible": false,
+      "evidence_artifacts": []
+    }
+  ]
+}

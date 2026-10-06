@@ -1,0 +1,335 @@
+{
+  "revision": "0.2",
+  "policy": "state-model-and-contract-before-implementation; discharge-in-same-delivery-slice",
+  "obligations": [
+    {
+      "id": "PF01",
+      "title": "Checked shape and cardinality",
+      "property": "For every accepted shape, cardinality equals the mathematical product; zero extents yield zero before irrelevant intermediate multiplication, and all exported machine-size results fit their target type.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V2",
+        "V14"
+      ],
+      "tasks": [
+        "1.2.4",
+        "2.1.1"
+      ],
+      "scope": "Verus proves structural arithmetic; Kani checks the shipped finite-width checker over symbolic dimensions without allocating those dimensions.",
+      "non_vacuity": "Positive scalar and nonzero shapes plus zero-times-large extents; mutate the zero-first and overflow checks.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF02",
+      "title": "Structural index and origin maps",
+      "property": "Checked reshape, transpose, permutation, gather and rank maps select exactly the modelled source cells, preserve required bits/validity/origin and never permit out-of-bounds access.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V3",
+        "V4"
+      ],
+      "tasks": [
+        "2.1.2",
+        "3.1.1",
+        "3.2.1",
+        "3.2.4"
+      ],
+      "scope": "Generic sequence/cell proofs plus bounded executable mapping and machine-width checks; unsafe pointer refinements need separate audit/Miri evidence.",
+      "non_vacuity": "Nonempty rectangular values, null cells and repeated legal gathers; mutate a stride, domain generation or permutation uniqueness check.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF03",
+      "title": "Empty-frame schema inference",
+      "property": "The schema rule computes frame ++ output-cell shape without invoking an absent cell; empty cells follow the operation-specific policy.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V4"
+      ],
+      "tasks": [
+        "3.1.1",
+        "3.1.2"
+      ],
+      "scope": "Prove the schema relation; count actual kernel calls in bounded cases.",
+      "non_vacuity": "[0,3] rows(mean) has zero calls, [3,0] errors, [0,3,4] rank-2 transpose yields [0,4,3]; no first-cell sampling.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF04",
+      "title": "Graph meaning and preparation refinement",
+      "property": "Each public builder denotes its documented operation; preparation and admitted rewrites preserve values, validity, permitted errors, guards and effects under explicit kernel contracts.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V1",
+        "V5",
+        "V7",
+        "V15"
+      ],
+      "tasks": [
+        "2.3.2",
+        "2.3.5",
+        "4.2.3"
+      ],
+      "scope": "Verus establishes local semantic/refinement rules; Kani checks bounded graph compositions and executable guards. Rust macro correctness also needs compile/UI checks.",
+      "non_vacuity": "Shared host expression executes once; intentionally change flow ordering or move a fallible node across its guard.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF05",
+      "title": "Outcome and frame contracts",
+      "property": "Success returns the modelled value; specified inputs/resources/termination conditions imply success; failure or pre-commit cancellation preserves the output frame promised by the selected atomic API.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V7",
+        "V15",
+        "V19"
+      ],
+      "tasks": [
+        "2.3.5",
+        "6.2.2",
+        "6.2.4"
+      ],
+      "scope": "State safety separately from termination/progress. Verus proves sequential state/frame invariants; Kani explores bounded errors and commit transitions.",
+      "non_vacuity": "Reach successful commit and error/cancellation paths; always-Err, early-write and duplicate-commit mutations fail.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF06",
+      "title": "Typed higher-order application",
+      "property": "For each applicable active valid cell, the caller supplies the callable precondition; every output allowed by its postcondition satisfies the lifted relation. Inactive cells never invoke it.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V7",
+        "V11",
+        "V19"
+      ],
+      "tasks": [
+        "2.2.5",
+        "5.1.4",
+        "5.3.4"
+      ],
+      "scope": "Use call_requires/call_ensures-style universal postcondition reasoning and typed executable bindings; captures/effects/termination remain explicit.",
+      "non_vacuity": "Nonempty active and inactive cells, faulting inactive input and a consumer-defined kernel; rejecting eager select must not rely on an all-false mask.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF07",
+      "title": "Reducer histories and numeric policies",
+      "property": "Accumulator state relates to precisely the processed input history; finalization/merge preserves the declared order, null, empty, overflow and frame contract.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V8",
+        "V19"
+      ],
+      "tasks": [
+        "2.2.2",
+        "2.2.3",
+        "2.2.5",
+        "6.2.1"
+      ],
+      "scope": "Prove traversal/association and integer checks. IEEE bit/policy reasoning is distinct from real arithmetic or transcendental accuracy.",
+      "non_vacuity": "Right subtraction 9 versus left 5, singleton -0, MAX grouping, wrong-count finalizer and unapproved merge mutations.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF08",
+      "title": "Partition invariance",
+      "property": "Partitioned native execution preserves the logical snapshot, ordered neighbourhoods, prefix state and segment ownership regardless of physical chunk boundaries.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V6"
+      ],
+      "tasks": [
+        "3.3.1",
+        "3.3.2",
+        "6.1.3"
+      ],
+      "scope": "Verus proves partition composition for owned kernels; Kani checks bounded halos/segments. Upstream backend conformance remains separate.",
+      "non_vacuity": "One-cell and awkward chunks, zero extents and empty segments; omit a halo or reset prefix state at a chunk boundary.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF09",
+      "title": "Conservative staged cost analysis",
+      "property": "The shared analyser never understates the abstract quantity it claims to bound; static/preparation/runtime evaluations agree for equal facts and target profiles.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V9",
+        "V16"
+      ],
+      "tasks": [
+        "1.2.4",
+        "2.4.1",
+        "2.4.2",
+        "2.4.3"
+      ],
+      "scope": "Verus proves cost-expression and admission soundness; Kani checks finite-width overflow and branch outcomes. No theorem about elapsed time or untracked backend allocation.",
+      "non_vacuity": "Exact, interval and unknown examples including 4096^2 F64, zero products and cross-width overflow; mutate upper/lower direction or unknown handling.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF10",
+      "title": "Schedule checking and resource admission",
+      "property": "Every admitted owned schedule satisfies its shape/guard/index and tracked-live-allocation obligations, or halts before the next forbidden reservation, assuming the recorded kernel contracts.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V9",
+        "V17"
+      ],
+      "tasks": [
+        "3.3.3",
+        "4.3.1"
+      ],
+      "scope": "Prove the small checker, not planner optimality. Scope the theorem to named buffers, scratch, metadata and permitted concurrency.",
+      "non_vacuity": "Admit a small allocation then reject next growth; omit halo, reuse stale schedule identity or conflate aliased handles with distinct allocations.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF11",
+      "title": "Backend eligibility and effect control",
+      "property": "A backend capability becomes eligible only under compatible tested semantics, engine and control scope; strict no-spill admission never relies on unenforceable per-query controls.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V5",
+        "V18"
+      ],
+      "tasks": [
+        "1.2.6",
+        "4.1.3",
+        "4.2.4",
+        "4.2.5"
+      ],
+      "scope": "Verify owned capability and policy checking; explicitly trust/test upstream execution. Python version and documentation alone do not constitute Rust conformance evidence.",
+      "non_vacuity": "Attempt Python-only capability admission, deterministic-fallible speculation, stale backend cache and concurrent global-control mutation.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF12",
+      "title": "Consumer proof composition",
+      "property": "Separate downstream crates establish application properties through shipped public views, lemmas, contracts and comb! without private symbols, alternate proof executors or assumed whole-engine specifications.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V15",
+        "V19"
+      ],
+      "tasks": [
+        "1.2.5",
+        "3.4.1",
+        "5.3.4",
+        "6.2.4"
+      ],
+      "scope": "Verus verified dependencies and Kani public executable/contract harnesses retain precise implementation identity and scope.",
+      "non_vacuity": "Run correct and incorrect application fixtures; fake trusted executor and private-method stubs cannot satisfy acceptance.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF13",
+      "title": "Witness applicability",
+      "property": "Selections, permutations, validated views and resource witnesses apply only to their bound extent/domain/policy/immutable generation; rebinding re-establishes changed facts.",
+      "tools": [
+        "Verus",
+        "Kani"
+      ],
+      "verification": [
+        "V3",
+        "V7",
+        "V19"
+      ],
+      "tasks": [
+        "3.2.4",
+        "5.3.1",
+        "5.3.3"
+      ],
+      "scope": "Prove applicability and frame conditions; executable checks protect unverified safe callers, including interior-mutability or generation boundaries.",
+      "non_vacuity": "Same-length different source, stale generation and partial validity cases fail; legal reuse against unchanged bindings succeeds.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    },
+    {
+      "id": "PF14",
+      "title": "Proof compatibility and evidence binding",
+      "property": "An accepted proof record identifies the property, executable/specification, target, toolchain, scopes and trust basis; relevant changes invalidate dependent evidence and released specification changes follow explicit compatibility policy.",
+      "tools": [
+        "Verus",
+        "Kani",
+        "structural validation"
+      ],
+      "verification": [
+        "V14",
+        "V20"
+      ],
+      "tasks": [
+        "1.1.4",
+        "3.4.1",
+        "4.3.3",
+        "6.2.4"
+      ],
+      "scope": "Typed binding and dependency verification support semantic review; hashes identify artefacts but do not prove correspondence.",
+      "non_vacuity": "Strengthen a precondition, weaken a postcondition, swap a compiled body or import stale verification metadata; dependent gates fail.",
+      "status": "planned-not-run",
+      "implementation_binding": null,
+      "evidence": null
+    }
+  ]
+}

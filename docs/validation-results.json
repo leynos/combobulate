@@ -1,0 +1,102 @@
+{
+  "status": "pass",
+  "scope": "documentation-pack-only",
+  "checks": [
+    {
+      "check": "markdown-structure",
+      "status": "pass",
+      "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
+      "count": 10
+    },
+    {
+      "check": "local-links",
+      "status": "pass",
+      "detail": "All explicit local Markdown links resolve, including anchors where used.",
+      "count": 22
+    },
+    {
+      "check": "catalogue",
+      "status": "pass",
+      "detail": "Unique IDs, scope labels, semantic table regeneration, and task mappings pass.",
+      "count": 148
+    },
+    {
+      "check": "roadmap",
+      "status": "pass",
+      "detail": "All tasks remain open, have success/design contracts, and form an acyclic earlier-dependency graph.",
+      "count": 72
+    },
+    {
+      "check": "design-coverage",
+      "status": "pass",
+      "detail": "All 19 numbered design sections occur in task references; this is referential coverage, not proof of complete implementation scope.",
+      "count": 19
+    },
+    {
+      "check": "kernel-contract-envelope",
+      "status": "pass",
+      "detail": "Draft 2020-12 schema and sample validate; missing-validity mutation is rejected. No claim about truth of native kernel metadata.",
+      "count": 1
+    },
+    {
+      "check": "semantic-examples",
+      "status": "pass",
+      "detail": "Small Python specification model checks expected values/shapes/errors; association and flattened-row-leakage controls distinguish wrong algorithms. Zero-kernel-call claims remain future Rust obligations, not measured here.",
+      "count": 20
+    },
+    {
+      "check": "testable-bets",
+      "status": "pass",
+      "detail": "Every bet has a witness, negative control, falsifier, decision rule, and resolved task/requirement links; all remain planned.",
+      "count": 8
+    },
+    {
+      "check": "proof-first-task-coverage",
+      "status": "pass",
+      "detail": "Every implementation or decision task has an explicit proof-first contract and bet mapping. This is planned coverage, not proof discharge.",
+      "count": 72
+    },
+    {
+      "check": "proof-obligations",
+      "status": "pass",
+      "detail": "Properties, scopes, tool choices, non-vacuity controls, and task/V links resolve; no proof result is fabricated.",
+      "count": 14
+    },
+    {
+      "check": "backend-capability-plans",
+      "status": "pass",
+      "detail": "All source IDs and probe/refusal contracts resolve; no unrun backend capability is marked eligible.",
+      "count": 9
+    },
+    {
+      "check": "proof-evidence-envelope",
+      "status": "pass",
+      "detail": "The planned record validates; missing witness, proof status without actual bindings/results, and unscoped trust mutations fail. Schema validity does not establish a proposition.",
+      "count": 3
+    },
+    {
+      "check": "cost-documentation-examples",
+      "status": "pass",
+      "detail": "Python checks exact/interval/unknown admission, target-width/zero arithmetic, prefix work and distinct-allocation accounting, with wrong-bound and alias controls. No Rust const or verifier execution occurred.",
+      "count": 14
+    },
+    {
+      "check": "python-tools",
+      "status": "pass",
+      "detail": "All delivered Python tool files parse; generator and checker execution also exercised their main paths.",
+      "count": 12
+    }
+  ],
+  "not_run": [
+    "Kani or Verus verification and downstream proof fixtures",
+    "Rust constant evaluation or actual static cost certification",
+    "Polars engine/capability/spill probes",
+    "Rust compilation or doctests",
+    "Combobulate execution or backend conformance",
+    "Actual trasic integration",
+    "Repository CI/markdownlint gates",
+    "Nixie validation (no Mermaid diagrams supplied)",
+    "Performance or memory benchmarks",
+    "Online link recheck from runtime"
+  ]
+}

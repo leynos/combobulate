@@ -1,0 +1,1417 @@
+{
+  "revision": "0.2",
+  "status": "proposed-all-tasks-open",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Foundational contracts and a demonstrable build spine",
+      "idea": "If one small executable semantic kernel can serve ordinary Rust, constant evaluation, Kani, and Verus, proof-first development can expose downstream contracts without separate unverified models or mandatory heavy backend dependencies.",
+      "goals": [
+        "G1",
+        "G2",
+        "G6",
+        "G7",
+        "G8"
+      ],
+      "gate": "Continue only when the pinned shared-kernel and public-only consumer probes execute and verify with recorded assumptions and non-vacuous negative controls. Revise the representation or narrow the certified subset if the toolchains cannot share an executable binding. The Polars probe must report actual capabilities, not infer them from a version label.",
+      "context": "This phase permits foundational work, but its output must include a runnable public path. Document preparation alone does not complete a task.",
+      "steps": [
+        {
+          "number": "1.1",
+          "title": "Resolve the decisions that control acceptance",
+          "question": "Which constraints are approved, and which remain experiments? The answer bounds every later implementation and prevents retrospective changes to success criteria.",
+          "sections": "§§1-2, 15-16",
+          "tasks": [
+            {
+              "id": "1.1.1",
+              "title": "Record the scope, decision authority, licence, and pre-1.0 API policy.",
+              "requires": [],
+              "sections": "§§1-2, 15-16, 17",
+              "success": "ToR Q1/Q4/Q7 have explicit owner decisions; the Core/Integration boundary and candidate ADR disposition match all five documents.",
+              "details": [],
+              "proof_first": "Write decision and exception authority before accepting claims; approval is not verification.",
+              "bets": [
+                "B01"
+              ]
+            },
+            {
+              "id": "1.1.2",
+              "title": "Record the numeric, validity, reduction, and macro-staging contracts.",
+              "requires": [
+                "1.1.1"
+              ],
+              "sections": "§§4-7, 17",
+              "success": "Accepted contract records resolve association, empty identities, dtype conversion, macro grammar, and typed-cell atomicity without superseded-name shims.",
+              "details": [],
+              "proof_first": "Write pre/postconditions, empty/failure rules, and a non-vacuous example before implementing each primitive.",
+              "bets": [
+                "B01",
+                "B02"
+              ]
+            },
+            {
+              "id": "1.1.3",
+              "title": "Pre-register resource and performance acceptance controls.",
+              "requires": [
+                "1.1.1"
+              ],
+              "sections": "§§12, 14, 17",
+              "success": "ToR Q2 has named workloads, controls, target environments, budgets, uncertainty handling, and thresholds recorded before acceptance measurements.",
+              "details": [],
+              "proof_first": "Pre-register proof/build budgets too; a timeout or changed threshold cannot be relabelled as a proved property.",
+              "bets": [
+                "B01",
+                "B03"
+              ]
+            },
+            {
+              "id": "1.1.4",
+              "title": "Record the proof-first policy, public proof contract, and trusted-boundary authority.",
+              "requires": [
+                "1.1.1",
+                "1.1.2",
+                "1.1.3"
+              ],
+              "sections": "§§14, 16-19, 17",
+              "success": "The obligation/evidence schema binds claims to executable and specification identities, toolchains, scopes, assumptions, and negative controls. Approved exceptions have owners, expiry/revisit triggers, and claim restrictions; timeout, skipped or vacuous results cannot pass a proof gate.",
+              "details": [],
+              "proof_first": "Specify the merge-state rules before implementing the gate; an invalid record with no success witness or with an unreported assumption must fail.",
+              "bets": [
+                "B01",
+                "B02",
+                "B08"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "1.2",
+          "title": "Prove that the proposed package and public path are viable",
+          "question": "Can a small public Rust program create and execute an array without Polars or custom Fn implementations? The result informs feature selection and the baseline dependency lock.",
+          "sections": "§§3-4, 7, 10",
+          "tasks": [
+            {
+              "id": "1.2.1",
+              "title": "Establish the facade, macro, and internal semantic-kernel workspace with pinned feature/toolchain profiles.",
+              "requires": [
+                "1.1.1",
+                "1.1.4"
+              ],
+              "sections": "§§3, 10, 15, 17-19",
+              "success": "Record exact Rust, Kani, Verus, solver, and dependency revisions and target/features. Native-only and Polars-enabled builds compile; proof tooling is optional for ordinary consumers. The semantic kernel imports neither Polars nor glam; select the Rust backend independently of the Python Polars 2 version.",
+              "details": [],
+              "proof_first": "Record each tool/profile capability and trust boundary first; compile-only evidence is not a theorem.",
+              "bets": [
+                "B01",
+                "B05"
+              ]
+            },
+            {
+              "id": "1.2.2",
+              "title": "Implement the minimal values, expression handles, and ordinary application path.",
+              "requires": [
+                "1.1.2",
+                "1.2.1"
+              ],
+              "sections": "§§4, 7-8, 17",
+              "success": "A public fixture constructs an I64 vector, applies identity/add, prepares, and collects it without exposing internal graph generics or copying input buffers unnecessarily.",
+              "details": [],
+              "proof_first": "Specify materialized/graph denotation and success witnesses first; expose executable identities for later proof bindings.",
+              "bets": [
+                "B01",
+                "B02"
+              ]
+            },
+            {
+              "id": "1.2.3",
+              "title": "Introduce the independent semantic-example runner and route-identifying harness.",
+              "requires": [
+                "1.2.2"
+              ],
+              "sections": "§14, 17",
+              "success": "The harness reads the golden-case contract, reports the selected executor, and detects a seeded wrong-result mutation; reference execution does not reuse the optimized operation implementation.",
+              "details": [],
+              "proof_first": "State the oracle independence boundary first; a seeded wrong result must fail rather than share the same faulty body.",
+              "bets": [
+                "B01"
+              ]
+            },
+            {
+              "id": "1.2.4",
+              "title": "Deliver one checked cardinality kernel through runtime, constant evaluation, Kani, and Verus.",
+              "requires": [
+                "1.2.3"
+              ],
+              "sections": "§§3, 4, 17-18",
+              "success": "The same shipped executable body, or an explicit checked refinement to it, passes runtime/const agreement, Kani machine-width overflow/zero witnesses, and a Verus cardinality invariant. Pin supported targets and reject unsupported static certificates rather than substituting an unchecked checker. Record compile/proof cost against pre-registered limits.",
+              "details": [],
+              "proof_first": "Write the mathematical zero-product and representability contract first; require a satisfiable valid-input witness and a seeded multiply-before-zero defect that fails the intended check.",
+              "bets": [
+                "B01",
+                "B03"
+              ]
+            },
+            {
+              "id": "1.2.5",
+              "title": "Export the first collection model and verified dependency for an external identity consumer.",
+              "requires": [
+                "1.2.4"
+              ],
+              "sections": "§§4, 17",
+              "success": "A separate crate imports only public API/specifications and establishes identity over typed I64 storage in both pinned toolchains. Ordinary safe constructors check inputs. The published executable binding and imported verification metadata identify the same implementation; no external_body assertion stands in for the whole executor.",
+              "details": [],
+              "proof_first": "State the logical-view and successful-construction postconditions before the implementation; a consumer which asserts a wrong value must fail for that assertion.",
+              "bets": [
+                "B01",
+                "B02"
+              ]
+            },
+            {
+              "id": "1.2.6",
+              "title": "Produce the pinned Polars capability probe and minimal explicit-engine execution report.",
+              "requires": [
+                "1.2.1",
+                "1.2.2"
+              ],
+              "sections": "§§10, 19, 17",
+              "success": "An actual Rust fixture selects and reports an engine and compares a small positional result with native execution. The report records documented, tested, unsupported, or inconclusive capability status for every PC entry; probe spill-control scope without changing process globals concurrently. Missing future capabilities remain unavailable, not emulated invisibly.",
+              "details": [],
+              "proof_first": "Specify capability-evidence admission before probing; a Python release number alone must not enable a Rust capability or a strict no-spill guarantee.",
+              "bets": [
+                "B05",
+                "B06"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Readable numeric pipelines with trustworthy failures",
+      "idea": "If public contracts, exact numerics, and preserved comb! notation compose with the same checked static/runtime cost rules, consumers can write readable numerical programmes and establish both successful outcomes and controlled failures without private internals.",
+      "goals": [
+        "G1",
+        "G2",
+        "G4",
+        "G7",
+        "G8"
+      ],
+      "gate": "Continue when public numeric programmes, statically admitted/rejected examples, runtime residual checks, and meaningful downstream proofs pass. Revise the static subset if compile-cost limits fail; unknowns must remain visible and no alternate DSL or silent scalar-only proof configuration may replace comb!.",
+      "context": "This slice delivers useful numerical transformations and readable diagnostics end to end. It does not wait for rendering or relational integration.",
+      "steps": [
+        {
+          "number": "2.1",
+          "title": "Make shapes and logical indexing reliable on real values",
+          "question": "Do scalars, empty axes, views, and dynamic dimensions share a consistent public model? The result supplies the base for reductions and rank application.",
+          "sections": "§§4-5",
+          "tasks": [
+            {
+              "id": "2.1.1",
+              "title": "Implement checked shapes, nullability, scalar extension, and explicit broadcast inference.",
+              "requires": [
+                "1.2.3",
+                "1.2.4",
+                "1.2.5"
+              ],
+              "sections": "§§4-5, 14, 17",
+              "success": "V2 witnesses scalar [], empty [0], zero-times-large extents, singleton agreement, and rejected non-scalar ambiguity; seeded broadcast/zero-product faults fail.",
+              "details": [],
+              "proof_first": "Verus proves cardinality/agreement rules; Kani checks machine-size overflow and zero-extents on the shipped checker. Write invariants first.",
+              "bets": [
+                "B01",
+                "B03"
+              ]
+            },
+            {
+              "id": "2.1.2",
+              "title": "Implement literal construction, shape queries, iota/range, reshape, ravel, and axis permutation.",
+              "requires": [
+                "2.1.1"
+              ],
+              "sections": "§§4-5, 7, 17",
+              "success": "V3 validates logical row-major indexing and scalar transpose identity; invalid literal/shape sizes fail before allocation; public fixtures expose copies when a view cannot satisfy a consumer.",
+              "details": [],
+              "proof_first": "Specify coordinate mapping first; Verus proves reshape/permutation relations, Kani checks executable bounds, and Miri/audit covers applicable unsafe gaps.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.1.3",
+              "title": "Implement runtime shape obligations and binding-time checks.",
+              "requires": [
+                "2.1.1"
+              ],
+              "sections": "§§4, 8, 17",
+              "success": "A symbolic filtered size can feed a checked reshape; an impossible downstream shape fails before its allocation rather than sampling input data during preparation.",
+              "details": [],
+              "proof_first": "Specify obligation producer/consumer guards first; Kani explores binding transitions and Verus relates admitted shapes to model facts.",
+              "bets": [
+                "B03",
+                "B04"
+              ]
+            },
+            {
+              "id": "2.1.4",
+              "title": "Implement checked dense and nullable borrowed views with public invariants and observers.",
+              "requires": [
+                "1.2.5",
+                "2.1.3"
+              ],
+              "sections": "§§4, 17",
+              "success": "Consumers construct shape-checked views and inspect length, shape, validity, and checked logical indexing without allocation or private storage access. Verus models and Kani constructors cover invalid extents and validity lengths; a safe unverified caller cannot bypass runtime validation.",
+              "details": [],
+              "proof_first": "Declare representation, lifetime, error, and successful-result relations first. Verify constructors and index observers against the actual body; test non-null and null-parent counterexamples.",
+              "bets": [
+                "B02"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "2.2",
+          "title": "Make numerical results and exceptional paths explicit",
+          "question": "Can the evaluator preserve the promised dtype, null, and association rules without borrowing accidental backend defaults? The result determines which later optimizations are eligible.",
+          "sections": "§6",
+          "tasks": [
+            {
+              "id": "2.2.1",
+              "title": "Implement scalar arithmetic, explicit casts, comparisons, predicates, and three-valued logic.",
+              "requires": [
+                "1.1.2",
+                "2.1.1"
+              ],
+              "sections": "§6, 17",
+              "success": "All core scalar verbs have numeric/special-value tables; checked overflow and cast failures have coordinates; Bool counting requires a cast; comparison/null/NaN controls pass V5/V8.",
+              "details": [],
+              "proof_first": "Prove/check integer and validity primitives with Kani; separate structural/policy claims from floating accuracy and document unsupported models before coding.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.2.2",
+              "title": "Implement exact reductions, left folds, and empty-identity handling.",
+              "requires": [
+                "2.2.1"
+              ],
+              "sections": "§6, 17",
+              "success": "Right subtraction gives 9, left gives 5, singleton -0 remains -0, and the MAX regrouping negative control rejects an invalid optimization.",
+              "details": [],
+              "proof_first": "Verus proves sequence association and empty/singleton traversal; Kani checks signed-zero bits and checked-overflow counterexamples on executable paths.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.2.3",
+              "title": "Implement exact prefix scans and explicit left accumulation with cost estimates.",
+              "requires": [
+                "1.1.3",
+                "2.2.2"
+              ],
+              "sections": "§§6, 12, 17",
+              "success": "scan(sub) and scan_left(sub) differ as specified; empty scans invoke no operation; the generic quadratic route is visible and respects admitted work limits.",
+              "details": [],
+              "proof_first": "State right-prefix semantics and work count before loops; Verus proves sequence/count rules and Kani distinguishes left-scan substitution and overflow.",
+              "bets": [
+                "B03"
+              ]
+            },
+            {
+              "id": "2.2.4",
+              "title": "Implement reducer-state finalization and the core statistical aggregates.",
+              "requires": [
+                "2.2.2"
+              ],
+              "sections": "§6, 17",
+              "success": "Mean/variance/stddev follow their specified algorithms, null/empty/ddof policies, and count bounds; state merging cannot bypass numerical eligibility.",
+              "details": [],
+              "proof_first": "Specify accumulator/finalizer invariant first; verify control/count arithmetic, and disclose floating primitive assumptions instead of modelling IEEE values as reals silently.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.2.5",
+              "title": "Export reducer-state invariants and typed callable contracts for a sequential native aggregate.",
+              "requires": [
+                "2.1.4",
+                "2.2.4"
+              ],
+              "sections": "§§6, 9, 17",
+              "success": "An external reducer proves the relation between state and processed inputs, including empty and failure outcomes. Higher-order contracts quantify over all outputs allowed by the callable contract, not one desired possible output. A supplied merge function gains no reassociation permission without its required law.",
+              "details": [],
+              "proof_first": "Specify accumulator history and finalization before code; prove traversal with Verus and bounded executable failure paths with Kani. A wrong-count finalizer and an invalid checked-overflow merge must fail.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "2.3",
+          "title": "Make the preserved macro notation explain itself",
+          "question": "Does the established comb! syntax build the same graph as ordinary Rust, while preserving ownership and source diagnostics? The result determines whether the frontend earns its complexity.",
+          "sections": "§§7, 13",
+          "tasks": [
+            {
+              "id": "2.3.1",
+              "title": "Implement comb!, arr!, and array! over the ordinary application interface.",
+              "requires": [
+                "2.1.2",
+                "2.2.1"
+              ],
+              "sections": "§7, 17",
+              "success": "Public pipeline and literal examples work; malformed stages/ragged literals point to original tokens; embedded host expressions execute once; no custom Fn implementation is required.",
+              "details": [],
+              "proof_first": "Specify macro lowering through ordinary builders before parser work; Kani consumer calls and UI tests detect duplicated host evaluation.",
+              "bets": [
+                "B02",
+                "B03"
+              ]
+            },
+            {
+              "id": "2.3.2",
+              "title": "Implement verb!, shared lets, operator composition, sections, and flow!.",
+              "requires": [
+                "2.2.4",
+                "2.3.1"
+              ],
+              "sections": "§§7-9, 17",
+              "success": "fork/compose/flow/hook/over/flip/dup and lhs/rhs binding build inspectable graphs; an external descriptor participates without a macro-name whitelist.",
+              "details": [],
+              "proof_first": "Specify composition denotation and shared-node/effect relations first; prove builder rules and Kani-check bounded graph construction.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.3.3",
+              "title": "Implement structured errors, provenance lineage, and failed-plan explain output.",
+              "requires": [
+                "2.1.3",
+                "2.3.1"
+              ],
+              "sections": "§§8, 13, 17",
+              "success": "V1/V10 counterexamples detect duplicated host evaluation and lost spans; routine dtype/shape errors display operation and valid suggestions without backend types on the first screen.",
+              "details": [],
+              "proof_first": "Specify error category/provenance preservation first; test UI spans and Kani-check bounded provenance transformations, not human readability as a theorem.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.3.4",
+              "title": "Deliver a vector-statistics example with a comprehension and failure corpus.",
+              "requires": [
+                "2.2.3",
+                "2.3.2",
+                "2.3.3"
+              ],
+              "sections": "§§7, 13-14, 17",
+              "success": "A public example composes reusable statistics and scans without private primitives; an independently reviewed equivalent Rust version records comprehension differences rather than only line counts.",
+              "details": [],
+              "proof_first": "Publish public-only successful/error witnesses; test comprehension empirically and identify which semantic claims the chosen verifier establishes.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "2.3.5",
+              "title": "Expose a sequential native execution route with caller-owned output and scratch and graph-meaning contracts.",
+              "requires": [
+                "2.1.4",
+                "2.2.5",
+                "2.3.4"
+              ],
+              "sections": "§§7-9, 17",
+              "success": "A production-usable native route executes comb! through specified builders and preparation, without Polars, private imports, or cfg-dependent semantic substitution. Contracts cover values, validity, permitted errors, success conditions, and unchanged output on pre-commit failure; insufficient scratch is a structured error.",
+              "details": [],
+              "proof_first": "Write builder-denotation, preparation-refinement, and atomic-output relations first. An always-Err implementation must fail the success witness; a partial-write mutation must fail unchanged-output checks.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "2.4",
+          "title": "Admit small numerical programmes using static and runtime costs",
+          "question": "Can a consumer obtain useful checked resource bounds without encoding every shape in generic types or changing comb! syntax? The result determines the certified static subset and the runtime fallback contract.",
+          "sections": "§§7-8, 12, 18",
+          "tasks": [
+            {
+              "id": "2.4.1",
+              "title": "Retain static descriptors and implement the restricted shared cost-expression evaluator.",
+              "requires": [
+                "1.2.4",
+                "2.3.5"
+              ],
+              "sections": "§§7-8, 12, 18, 17",
+              "success": "Static, symbolic-bounded, and dynamic descriptors share semantic identities and the checked analyser. Runtime and constant evaluation agree on scalar, zero, product, and exact-prefix-scan cases. Target pointer width/layout comes from the target; host escapes still execute only once during ordinary construction.",
+              "details": [],
+              "proof_first": "State the abstract work/payload model and checked arithmetic before implementation. Verus establishes conservative composition and Kani checks machine overflow; no mandatory solver runs in downstream macros.",
+              "bets": [
+                "B03"
+              ]
+            },
+            {
+              "id": "2.4.2",
+              "title": "Implement static certification and residual runtime admission with precise cost diagnostics.",
+              "requires": [
+                "2.1.3",
+                "2.4.1"
+              ],
+              "sections": "§§8, 12-13, 18, 17",
+              "success": "Exact 4096-by-4096 F64 materialization fails a 64 MiB payload budget; at-most-4096 bounds report uncertifiable-domain rather than universal overflow. Unknown callback cost never becomes zero. Strict mode rejects undisclosed obligations; adaptive mode retains checks before allocation. Under-budget witnesses succeed.",
+              "details": [],
+              "proof_first": "Prove each admission transition against exact/bounded/estimated/unknown meanings; Kani checks next-reservation rejection, and Verus states the bound theorem with explicit assumptions.",
+              "bets": [
+                "B03",
+                "B04"
+              ]
+            },
+            {
+              "id": "2.4.3",
+              "title": "Deliver an external compile-time-costing and runtime-equivalence consumer suite.",
+              "requires": [
+                "2.4.2"
+              ],
+              "sections": "§§14, 17-18",
+              "success": "Compile-pass/fail consumers retain comb! notation, exercise both target-width profiles and a runtime-bound plan, and compare cost records without executing host code during compilation. Record build latency and diagnostic spans; certificates for changed policy/target/descriptors fail validation.",
+              "details": [],
+              "proof_first": "Use successful and deliberately rejected resource witnesses, including zero-times-large dimensions and an underestimated native contract. A source-hash match alone must not certify semantics.",
+              "bets": [
+                "B03",
+                "B04"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Matrix and neighbourhood transformations without indexing surprises",
+      "idea": "If rank, contraction, and stencil operations share logical coordinates and infer empty results without sampling data, compact matrix and neighbourhood programs can remain faithful across layouts and partitions.",
+      "goals": [
+        "G1",
+        "G2",
+        "G4",
+        "G7",
+        "G8"
+      ],
+      "gate": "Continue when rank/product/stencil examples match the independent coordinate model and seeded row-boundary/empty-frame faults fail. Revise convenience rules rather than encode special cases for the examples. The independent downstream suite and checked native schedule must establish their scoped contracts before the public proof API stabilizes.",
+      "context": "This slice delivers row normalization, pairwise comparisons, generalized products, Minesweeper counts, and Life from public primitives.",
+      "steps": [
+        {
+          "number": "3.1",
+          "title": "Apply operations to cells without guessing from a first row",
+          "question": "Can rank application infer uniform results for arbitrary frames, including empty ones? The result establishes the contract that native extensions later inherit.",
+          "sections": "§§4-5, 9",
+          "tasks": [
+            {
+              "id": "3.1.1",
+              "title": "Implement rank, rank2, each, rows, and bounded cols convenience.",
+              "requires": [
+                "2.1.3",
+                "2.3.2"
+              ],
+              "sections": "§5, 17",
+              "success": "V4 verifies [0,3,4] rank-2 transpose -> [0,4,3] with zero calls, [0,3] rows(mean) -> [0], and [3,0] rows(mean) failure.",
+              "details": [],
+              "proof_first": "Verus proves frame/cell shape composition without evaluation; Kani verifies empty-frame zero-call and empty-cell failure witnesses.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "3.1.2",
+              "title": "Implement uniform dense cell assembly and schema-contract failures.",
+              "requires": [
+                "3.1.1"
+              ],
+              "sections": "§§4-5, 9, 17",
+              "success": "A native test operation returning inconsistent cell shapes fails with the first identified conflicting coordinate; it never changes the declared result to ragged data silently.",
+              "details": [],
+              "proof_first": "Specify successful schema and failure relations before assembly; Kani rejects nonuniform outputs and Verus preserves logical-cell correspondence.",
+              "bets": [
+                "B02"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "3.2",
+          "title": "Express matrix relationships and ordered selections directly",
+          "question": "Do public indexing, ordering, and product operators replace dimension manipulation without hiding cost or order? The results inform planner region and cardinality contracts.",
+          "sections": "§5",
+          "tasks": [
+            {
+              "id": "3.2.1",
+              "title": "Implement take/drop/reverse/rotate/shift, gather/compress, and concat.",
+              "requires": [
+                "2.1.2",
+                "2.1.3",
+                "3.1.1"
+              ],
+              "sections": "§5, 17",
+              "success": "Coordinate models validate prefix/suffix signs, fill/wrap distinctions, selected-axis bounds, nullable-mask policy, and stable selection order.",
+              "details": [],
+              "proof_first": "Prove coordinate/selection relations with Verus and Kani-check bounds, MIN counts, unknown masks, and checked casts before unsafe access.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "3.2.2",
+              "title": "Implement stable sort and grade with explicit exceptional-value ordering.",
+              "requires": [
+                "2.2.1",
+                "3.2.1"
+              ],
+              "sections": "§§5-6, 17",
+              "success": "Grades are lane-local indices; null/NaN input requires deliberate placement; equal keys retain stable order across views and partitions.",
+              "details": [],
+              "proof_first": "State ordering/stability and exceptional-key equivalence first; Verus supplies permutation/stability obligations and Kani checks bounded equal-key cases.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "3.2.3",
+              "title": "Implement outer, outer_cells, generalized inner, and explicit batched matmul.",
+              "requires": [
+                "1.1.3",
+                "2.2.2",
+                "3.1.2"
+              ],
+              "sections": "§§5-6, 12, 17",
+              "success": "Scalar and small-matrix numeric/Boolean/min-plus cases match the independent evaluator; mismatched contraction or batch frames fail; empty products and output budgets obey the contract.",
+              "details": [],
+              "proof_first": "Specify contraction indexing and association first; Verus proves shape/index/work bounds and Kani checks empty contraction and arithmetic admission.",
+              "bets": [
+                "B03",
+                "B04"
+              ]
+            },
+            {
+              "id": "3.2.4",
+              "title": "Implement source-scoped selections and permutation witnesses with reusable correspondence lemmas.",
+              "requires": [
+                "2.1.4",
+                "3.2.3"
+              ],
+              "sections": "§§4-5, 17",
+              "success": "Public Selection and permutation constructors attach facts to extent/domain and immutable generation. Consumers prove shared gathers preserve correspondence. Reusing a witness on another source, stale generation, or incompatible policy fails; duplicates remain legal for gather but not for a permutation/restoration witness.",
+              "details": [],
+              "proof_first": "State applicability and frame conditions first; prove generic element movement in Verus and bounded executable invalid-map cases in Kani, including empty selections.",
+              "bets": [
+                "B02"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "3.3",
+          "title": "Prove neighbourhood semantics across real boundaries",
+          "question": "Can stencil kernels avoid full neighbourhood expansion without changing input snapshots or boundary rules? The answer validates halo-dependent execution as a generic facility.",
+          "sections": "§§5, 9, 14",
+          "tasks": [
+            {
+              "id": "3.3.1",
+              "title": "Implement footprint!, explicit anchors/boundaries, and the scalar stencil path.",
+              "requires": [
+                "3.1.2",
+                "3.2.1"
+              ],
+              "sections": "§§5, 7, 17",
+              "success": "Odd/even anchors, Fill/Wrap/Reflect, single-element axes, and zero extents have fixtures; a seeded flattened-horizontal-shift fault fails on a rectangular image.",
+              "details": [],
+              "proof_first": "Verus proves coordinate/boundary mappings; Kani exercises even anchors, extent-one and zero cases. The flattened-wrap mutation must fail.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "3.3.2",
+              "title": "Implement bounded tile-and-halo execution and public Minesweeper/Life examples.",
+              "requires": [
+                "1.1.3",
+                "2.3.3",
+                "3.3.1"
+              ],
+              "sections": "§§5, 9, 12, 14, 17",
+              "success": "V6 exercises one-cell and awkward partitions; all reads observe the input snapshot; measured temporary storage remains within the admitted tile/halo bound.",
+              "details": [],
+              "proof_first": "State halo/snapshot invariants before optimization; prove partition equivalence in Verus and Kani-check bounded alias/halo and reservation paths.",
+              "bets": [
+                "B04"
+              ]
+            },
+            {
+              "id": "3.3.3",
+              "title": "Implement a small schedule checker and tracked-storage certificate for product and stencil schedules.",
+              "requires": [
+                "2.4.3",
+                "3.2.4",
+                "3.3.2"
+              ],
+              "sections": "§§8-9, 12, 18, 17",
+              "success": "The planner proposes a schedule; a separate checker validates index/guard obligations, liveness, distinct backing-buffer capacity, halo/scratch reservations, and admission. A native route runs only after checking. Underestimated scratch, duplicate alias accounting, missing halo, and stale certificates produce distinguishable results.",
+              "details": [],
+              "proof_first": "Prove checker soundness relative to the explicit schedule/kernel resource contracts with Verus; Kani checks allocation transitions and rejected malformed schedules. No whole-process RSS guarantee follows.",
+              "bets": [
+                "B04"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "3.4",
+          "title": "Let a downstream crate compose proofs over actual array programmes",
+          "question": "Can consumers prove useful numeric application properties using public contracts rather than library internals? This decides which API and specification surfaces can stabilize.",
+          "sections": "§§14, 17-18",
+          "tasks": [
+            {
+              "id": "3.4.1",
+              "title": "Deliver public-only Kani and Verus consumer programmes and proof-compatibility controls.",
+              "requires": [
+                "2.3.5",
+                "3.3.3"
+              ],
+              "sections": "§§14, 17-18",
+              "success": "External fixtures verify a transpose round trip, shared gather/validity, custom callable/reducer, and preallocated atomic failure through actual comb! calls. Both success and error branches have witnesses. Breaking a public pre/postcondition or executable binding invalidates a consumer proof; proof-SDK configuration does not swap executors.",
+              "details": [],
+              "proof_first": "Define consumer goals before freezing signatures; retain failed fixtures for wrong denotation, always-Err, private API dependency, and fake trusted executor. Record all remaining assumptions and exact Kani scopes.",
+              "bets": [
+                "B02",
+                "B08"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Polars-backed workflows with visible semantic and resource boundaries",
+      "idea": "If a capability-probed adapter treats streaming order, spill effects, and optimizer permissions as contracts, Polars 2-era improvements can benefit real workflows without weakening array meaning, downstream proof assumptions, or stated resource limits.",
+      "goals": [
+        "G2",
+        "G4",
+        "G6",
+        "G7",
+        "G8"
+      ],
+      "gate": "Accept the Core scope only after B01-B05 and the Core part of B08 pass, and B06 records a measured adoption or an explicit decline/defer decision, with scoped verifier evidence, public consumer fixtures, compile/runtime cost admission, forced-engine conformance, and explicit disk-policy controls. Unsupported future capabilities stay unavailable. Record negative benefit results and narrow acceleration rather than weakening semantics.",
+      "context": "This is the Core acceptance slice. Core publication is a separate authority decision after evidence; an accessible repository and licence remain prerequisites.",
+      "steps": [
+        {
+          "number": "4.1",
+          "title": "Cross between ordered tables and arrays deliberately",
+          "question": "Can an ordered, homogeneous array emerge from a relational pipeline without name-based alignment or discarded validity? The result defines the Polars interoperability boundary.",
+          "sections": "§10",
+          "tasks": [
+            {
+              "id": "4.1.1",
+              "title": "Implement ordered table-to-array and named array-to-table conversion.",
+              "requires": [
+                "1.2.1",
+                "3.2.1"
+              ],
+              "sections": "§10, 17",
+              "success": "Column order/common dtype and output names are explicit; an unordered relational source cannot masquerade as established positional correspondence.",
+              "details": [],
+              "proof_first": "Specify the relational-to-positional contract first; check the adapter locally and force backend ordering counterexamples in integration tests.",
+              "bets": [
+                "B05"
+              ]
+            },
+            {
+              "id": "4.1.2",
+              "title": "Implement chunked scalar and nested-array import/export with parent validity.",
+              "requires": [
+                "2.1.2",
+                "4.1.1"
+              ],
+              "sections": "§10, 17",
+              "success": "Round-trips preserve logical order and invalid parents; flattening cannot reveal hidden child values; copies/rechunking appear in explain output.",
+              "details": [],
+              "proof_first": "Prove local parent-validity/index mapping where expressible; Kani checks small chunk/slice cases and audit/Miri covers unsafe representation obligations.",
+              "bets": [
+                "B05"
+              ]
+            },
+            {
+              "id": "4.1.3",
+              "title": "Implement explicit streaming order, nested-validity, and batch-boundary contracts.",
+              "requires": [
+                "1.2.6",
+                "4.1.2"
+              ],
+              "sections": "§§5, 9-10, 19, 17",
+              "success": "Forced available engines preserve declared position/validity through one-cell and awkward batches, including empty versus null segments and zero-width frames. Missing order prevents an alignment claim; logical indices restore correspondence only where required. Prefix/halo state crosses physical boundaries.",
+              "details": [],
+              "proof_first": "Specify index/validity obligations in the adapter before lowering. Verify local validators with Kani or Verus, and run backend conformance with row-shuffle, lost-parent-validity, and split-segment negative controls.",
+              "bets": [
+                "B05"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "4.2",
+          "title": "Execute only faithful backend regions",
+          "question": "Can capability matching choose useful native Polars operations while rejecting wrong null/order/guard semantics? The result determines the supported backend matrix.",
+          "sections": "§§8-10",
+          "tasks": [
+            {
+              "id": "4.2.1",
+              "title": "Implement lowering registration and policy-aware Polars elementwise regions.",
+              "requires": [
+                "2.3.3",
+                "3.4.1",
+                "4.1.2",
+                "4.1.3"
+              ],
+              "sections": "§§8-10, 17",
+              "success": "Forced eligible operations exercise real Polars expressions; null, cast, and failure contracts match; ambiguous registrations and unsupported policies return domain errors.",
+              "details": [],
+              "proof_first": "Write lowering eligibility predicates before registration; Kani/Verus validate the owned decision logic, while upstream execution remains a reported external assumption.",
+              "bets": [
+                "B05",
+                "B06"
+              ]
+            },
+            {
+              "id": "4.2.2",
+              "title": "Implement cardinality-aware region boundaries and faithful reduction/scan routes.",
+              "requires": [
+                "2.2.3",
+                "3.2.3",
+                "4.2.1"
+              ],
+              "sections": "§§6, 8-10, 17",
+              "success": "Differing-length results do not enter a flat dataframe without representation changes; exact scans cannot silently route to a left-cumulative kernel; fallback choice is visible.",
+              "details": [],
+              "proof_first": "Prove region-boundary and exact-association checks before enabling routes; forced-engine tests must not compare two uses of the same fallback.",
+              "bets": [
+                "B05"
+              ]
+            },
+            {
+              "id": "4.2.3",
+              "title": "Integrate native halo/product kernels and guard-aware rewrite eligibility.",
+              "requires": [
+                "3.3.2",
+                "4.2.2"
+              ],
+              "sections": "§§8-10, 17",
+              "success": "Fused and unfused paths agree on values and failures; a fallible branch cannot move outside a guard; custom batch kernels retain partition contracts.",
+              "details": [],
+              "proof_first": "Prove local rewrite side conditions before enabling fusion; Kani checks guard/CSE counterexamples and Verus relates logical and physical schedules.",
+              "bets": [
+                "B04",
+                "B06"
+              ]
+            },
+            {
+              "id": "4.2.4",
+              "title": "Gate dtype specialization, deterministic plugins, and physical provenance by measured backend capabilities.",
+              "requires": [
+                "1.2.6",
+                "4.2.3"
+              ],
+              "sections": "§§8-10, 13, 19, 17",
+              "success": "Use only public interfaces available in the pinned Rust revision. Planning-time dtype specialization retains cell/extension metadata without claiming compile-time evaluation. CSE requires effect/guard/failure eligibility, and provenance maps to source spans. Unsupported features produce an explicit capability result.",
+              "details": [],
+              "proof_first": "Prove local eligibility rules with Kani or Verus; a deterministic-but-fallible guarded callback must not gain speculative execution permission. Compare enabled/disabled routes for benefit under pre-registered controls.",
+              "bets": [
+                "B06"
+              ]
+            },
+            {
+              "id": "4.2.5",
+              "title": "Implement execution I/O and spill policies with truthful control scope.",
+              "requires": [
+                "3.3.3",
+                "4.2.4"
+              ],
+              "sections": "§§8, 12, 19, 17",
+              "success": "Default execution forbids unrequested temporary-disk effects. A strict route without enforceable no-spill control refuses admission. Opt-in spill records quota, location, cleanup and cancellation semantics; process-global controls cannot masquerade as per-query isolation. Distinguish streamed sinks from materialized results and operation-specific OOC support.",
+              "details": [],
+              "proof_first": "State admission and cleanup invariants first; Kani checks policy transitions and failure paths. Integration tests exercise quota/cancel failures and concurrent-policy conflicts without claiming untracked backend allocation is verified.",
+              "bets": [
+                "B05",
+                "B04"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "4.3",
+          "title": "Release a measured and supportable numeric core",
+          "question": "Does the integrated core meet its actual cost, diagnostic, and conformance promises on selected environments? The outcome permits a release decision rather than an assumption of readiness.",
+          "sections": "§§12-16",
+          "tasks": [
+            {
+              "id": "4.3.1",
+              "title": "Implement admitted allocation/work limits, cancellation checkpoints, and cost reporting.",
+              "requires": [
+                "1.1.3",
+                "3.3.3",
+                "4.2.3",
+                "4.2.5"
+              ],
+              "sections": "§§8, 12-13, 17",
+              "success": "Known excessive work fails before execution, dynamic expansion stops before the next forbidden allocation, untracked backend/native allocation is labelled, and no hard process ceiling is falsely reported.",
+              "details": [],
+              "proof_first": "Verus proves tracked reservation invariants and Kani checks failures/cancellation; distinguish resource estimates from enforced bounds before admission code.",
+              "bets": [
+                "B04",
+                "B05"
+              ]
+            },
+            {
+              "id": "4.3.2",
+              "title": "Deliver the route-forced E2E and combinatorial core conformance suite.",
+              "requires": [
+                "2.4.3",
+                "3.2.2",
+                "3.4.1",
+                "4.3.1"
+              ],
+              "sections": "§14, 17",
+              "success": "V1-V10 run over the declared interaction matrix with route IDs and negative controls; tests cannot compare the same unnoticed fallback against itself.",
+              "details": [],
+              "proof_first": "Run actual consumer/verifier and backend routes, plus seeded faults; skipped routes and unmet tool bounds remain incomplete evidence.",
+              "bets": [
+                "B02",
+                "B05",
+                "B08"
+              ]
+            },
+            {
+              "id": "4.3.3",
+              "title": "Publish a Core acceptance dossier and reference/example coverage report.",
+              "requires": [
+                "1.1.1",
+                "4.3.2"
+              ],
+              "sections": "§§2, 14-16, 17",
+              "success": "Every Core catalogue row maps to implementation evidence or an explicitly approved scope revision; measurements meet pre-registered gates; owner release/publication decisions remain separate from test success. Core admission also requires B01-B05 and the Core portion of B08, a documented B06 adoption/decline/defer decision, all required proof obligations discharged or scope narrowed without weakening the user mandate, and a published trusted-boundary report. No skipped backend or verifier result counts as success.",
+              "details": [],
+              "proof_first": "Audit proof coverage, non-vacuity, TCB, exact bindings, cost/capability records, and open exceptions before the release decision.",
+              "bets": [
+                "B01",
+                "B08"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "title": "Typed native collections without flattening domain meaning",
+      "idea": "If typed cells, layout-aware adapters, and declarative native contracts remain independent of Polars, geometry-shaped batches can reuse readable scalar kernels without losing semantic types or correspondence.",
+      "goals": [
+        "G3",
+        "G5",
+        "G6",
+        "G7"
+      ],
+      "gate": "Continue when independently packaged numeric and typed extensions work without core patches, preserve layout/validity/correspondence, and show acceptable measured overhead. Decline automatic batching where the direct loop remains clearer or cheaper.",
+      "context": "Synthetic geometry fixtures can proceed without a trasic checkout. They establish extension capability, not real trasic adoption or external-renderer compatibility.",
+      "steps": [
+        {
+          "number": "5.1",
+          "title": "Let a third party extend the collection algebra",
+          "question": "Can an external crate describe schemas and execution properties with low ceremony and no internal imports? The answer tests the open extension boundary.",
+          "sections": "§§4, 9",
+          "tasks": [
+            {
+              "id": "5.1.1",
+              "title": "Implement typed Batch values and native operation schema/contract registration.",
+              "requires": [
+                "3.1.2",
+                "4.2.1"
+              ],
+              "sections": "§§4, 9, 17",
+              "success": "`Batch<T>` keeps internal coordinates closed; native calls supply empty-frame inference; wrong output schemas fail without relying on metadata for unchecked safety.",
+              "details": [],
+              "proof_first": "Specify cell models and runtime-safe contract validation first; Verus/Kani check owned schema boundaries without trusting metadata for unchecked safety.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "5.1.2",
+              "title": "Implement batch-dispatched map_cells and the extension conformance harness.",
+              "requires": [
+                "5.1.1"
+              ],
+              "sections": "§§9, 14, 17",
+              "success": "A compiled loop uses one region dispatch; faulting declarations and unsupported partition claims fail the harness; evidence records actual tested bounds.",
+              "details": [],
+              "proof_first": "Specify higher-order map traversal first; prove preservation for an arbitrary cell/kernel relation and check bounded executable errors with Kani.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            },
+            {
+              "id": "5.1.3",
+              "title": "Deliver independently packaged numeric and typed extension examples.",
+              "requires": [
+                "5.1.2"
+              ],
+              "sections": "§§9, 14, 17",
+              "success": "V11 proves both fixtures use only public interfaces and can register a lowering without editing core or implementing an impossible foreign-trait/foreign-type pairing.",
+              "details": [],
+              "proof_first": "Use external consumer proof fixtures without private imports or assumed executor bodies; demonstrate a wrong user contract is rejected.",
+              "bets": [
+                "B02"
+              ]
+            },
+            {
+              "id": "5.1.4",
+              "title": "Lift consumer-supplied kernel contracts through typed batch application.",
+              "requires": [
+                "3.4.1",
+                "5.1.3"
+              ],
+              "sections": "§§9, 17",
+              "success": "External typed native functions retain their executable/specification binding through map_cells; an arbitrary cell type can remain uninterpreted in structural proofs. Consumer pre/postconditions compose without proving Polars or glam internals. Opaque contracts remain explicitly trusted or exclude proof-required routes.",
+              "details": [],
+              "proof_first": "Export map pre/post and error/frame contracts before extension interfaces stabilize. Verus checks higher-order composition; Kani exercises actual custom kernels under declared bounds and deliberate contract defects.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "5.2",
+          "title": "Cross the glam and component boundary honestly",
+          "question": "Do declared cell schemas make checked borrowing and conversion transparent across target layouts? The result bounds zero-copy claims and typed-kernel performance.",
+          "sections": "§10",
+          "tasks": [
+            {
+              "id": "5.2.1",
+              "title": "Implement glam cell adapters, explicit components, and checked reconstruction.",
+              "requires": [
+                "4.1.2",
+                "5.1.2",
+                "5.1.4"
+              ],
+              "sections": "§10, 17",
+              "success": "Vec3/Vec3A/DVec3 and matrix fixtures preserve component order, parent validity, alignment, and domain checks; matrix row/column mapping is not inferred from raw layout.",
+              "details": [],
+              "proof_first": "State representation and component refinement before adapters; verify owned transforms where supported, and label glam math/unsafe layouts separately.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            },
+            {
+              "id": "5.2.2",
+              "title": "Implement typed-view eligibility and measured layout conversion reporting.",
+              "requires": [
+                "4.3.1",
+                "5.2.1"
+              ],
+              "sections": "§§10, 12, 14, 17",
+              "success": "SIMD/scalar and AoS/SoA/native/Arrow cases expose borrow success or repack; invalid alignment/length/validity rejects borrowing; copied bytes and conversion time are measured separately.",
+              "details": [],
+              "proof_first": "Prove/check eligibility arithmetic and lifetime boundaries; Kani coverage does not replace unsafe audit or certify an untested SIMD route.",
+              "bets": [
+                "B07"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "5.3",
+          "title": "Preserve identity and actual guarded execution across batches",
+          "question": "Can selection and resource binding preserve the identity of each logical item, including inactive lanes? The outcome controls whether rendering-shaped orchestration is safe to attempt.",
+          "sections": "§§4, 8, 11",
+          "tasks": [
+            {
+              "id": "5.3.1",
+              "title": "Implement domain mappings, zip_aligned/zip_positional, compact, and restore.",
+              "requires": [
+                "3.2.1",
+                "5.1.2"
+              ],
+              "sections": "§§4, 11, 17",
+              "success": "Equal-sized but differently reordered batches fail aligned zip; explicit positional pairing works; restoration validates unique in-range indices and preserves untouched template cells.",
+              "details": [],
+              "proof_first": "Verus proves generic origin/selection/restoration relations; Kani rejects equal-length different-domain and duplicate-writer cases.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            },
+            {
+              "id": "5.3.2",
+              "title": "Implement masked_apply with explicit inactive and unknown-mask policies.",
+              "requires": [
+                "4.2.3",
+                "5.3.1"
+              ],
+              "sections": "§§9, 11, 17",
+              "success": "A deliberately faulting inactive kernel is never invoked; actual masks or compact/evaluate/restore pass V7; select-style eager evaluation fails the negative control.",
+              "details": [],
+              "proof_first": "State active-only callable preconditions and no-inactive-invocation before implementation; verify guard lowering and its negative controls with both tools at their stated scope.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "5.3.3",
+              "title": "Implement parameterized prepared plans and lifetime/generation-checked resources.",
+              "requires": [
+                "2.1.3",
+                "4.3.1",
+                "5.1.1"
+              ],
+              "sections": "§§4, 8, 11-12, 17",
+              "success": "Plans reuse schema work without caching old results; stale resource generations/incompatible bindings fail; borrowed resources cannot outlive execution; sample reads occur at the declared stage.",
+              "details": [],
+              "proof_first": "Specify resource/binding generations before caching; Kani explores stale handles and Verus preserves witness validity across permitted reuse.",
+              "bets": [
+                "B04",
+                "B07"
+              ]
+            },
+            {
+              "id": "5.3.4",
+              "title": "Deliver downstream proofs of aligned selection and genuinely masked custom kernels.",
+              "requires": [
+                "5.1.4",
+                "5.3.2",
+                "5.3.3"
+              ],
+              "sections": "§§4, 9, 11, 17",
+              "success": "Public-only Kani and Verus consumers require the kernel precondition only on active valid cells and establish preserved origin/order. A faulting inactive cell never invokes the callable; stale witnesses and eager select substitutions fail. Concurrent/SIMD implementations keep distinct evidence from the sequential native proof.",
+              "details": [],
+              "proof_first": "Write the active-cell higher-order contract before the harness and implementation; include nonempty active and inactive witnesses, not an all-false mask that proves nothing about results.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Segmented work and measured rendering adoption",
+      "idea": "If segmented collections and explicit accumulation effects preserve domain provenance and sample identity, selected CSG and tile workflows can remove coordination code without replacing their numerical algorithms.",
+      "goals": [
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G7"
+      ],
+      "gate": "Accept Integration scope only after the typed/segmented suite and relevant adoption evidence pass. Record a continue, revise, or decline result separately for each trasic experiment; lack of repository access leaves adoption unverified, not failed or complete. B07/B08 and all public Integration proof contracts require actual downstream evidence even when the real-client adoption decision is deferred.",
+      "context": "This phase closes the collection features needed by demanding-client experiments. It does not impose a wavefront integrator, GPU backend, or new CSG tie policy.",
+      "steps": [
+        {
+          "number": "6.1",
+          "title": "Represent variable output counts without pretending they are dense",
+          "question": "Can segmented offsets and expansion maps retain empty segments, ownership, and bounded memory? The answer informs CSG events and reconstruction splats.",
+          "sections": "§§4, 9, 11-12",
+          "tasks": [
+            {
+              "id": "6.1.1",
+              "title": "Implement `Segmented<T>`, per_segment, and flat_map_cells.",
+              "requires": [
+                "4.3.1",
+                "5.1.2",
+                "5.3.1"
+              ],
+              "sections": "§§4, 9, 11, 17",
+              "success": "Offset monotonicity/terminal length checks hold, empty segments infer schema, and variable cell outputs never silently become dense; expansion respects admitted budgets.",
+              "details": [],
+              "proof_first": "Prove segment invariants with Verus and check malformed offsets/expansion in Kani; no first-segment schema sampling.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.1.2",
+              "title": "Implement explicit replication/cycling and stable unique/membership integration verbs.",
+              "requires": [
+                "3.2.2",
+                "6.1.1"
+              ],
+              "sections": "§§5-6, 12, 17",
+              "success": "Replication and cycling validate empty/count rules and mapping provenance; unique/member use the documented null/NaN/signed-zero key equivalence with stable order.",
+              "details": [],
+              "proof_first": "Specify count and key-equivalence rules first; Verus proves maps and Kani checks checked sums/empty cycles and stable equivalence cases.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.1.3",
+              "title": "Export segmented logical views and checked segment ownership for downstream verification.",
+              "requires": [
+                "5.3.4",
+                "6.1.2"
+              ],
+              "sections": "§§4, 11, 17",
+              "success": "Public SegmentedView constructors prove monotonic offsets/terminal length and expose segment contents without storage internals. An external consumer proves empty-segment preservation and variable-output ownership. Invalid offsets and over-budget expansion fail before access or allocation.",
+              "details": [],
+              "proof_first": "Specify generic segment/selection relations first; Verus proves arbitrary-size structural invariants and Kani checks malformed offsets, target-width arithmetic, and bounded expansion paths.",
+              "bets": [
+                "B02",
+                "B07"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "6.2",
+          "title": "Accumulate indexed contributions with a visible effect boundary",
+          "question": "Can the engine describe collision, weighting, order, and cancellation without hidden shared mutation? The result determines whether film accumulation is a safe consumer.",
+          "sections": "§§6, 11-12",
+          "tasks": [
+            {
+              "id": "6.2.1",
+              "title": "Implement reduce_by and scatter_reduce using declared reducer state.",
+              "requires": [
+                "2.2.4",
+                "5.3.3",
+                "6.1.1",
+                "6.1.3"
+              ],
+              "sections": "§§6, 11, 17",
+              "success": "Key/index bounds and collision policies are explicit; weighted-splat fixtures preserve their denominators and prescribed order; merge eligibility never assumes floating associativity.",
+              "details": [],
+              "proof_first": "Specify accumulator history and collision order before loops; Verus proves reduction/merge obligations and Kani checks executable bounds/failure paths.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.2.2",
+              "title": "Implement tile-local execute_into commit and cancellation semantics.",
+              "requires": [
+                "4.3.1",
+                "6.2.1"
+              ],
+              "sections": "§§11-12, 17",
+              "success": "V7 state-machine witnesses show no destination change before successful commit and no pre-commit cancelled tile commits; non-cooperative kernel latency remains an explicit limit.",
+              "details": [],
+              "proof_first": "Write atomic commit/frame conditions first; prove the sequential transition relation and Kani-check success, precommit failure, and cancellation reachability.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.2.3",
+              "title": "Deliver the typed/segmented/resource combinatorial acceptance suite.",
+              "requires": [
+                "5.2.2",
+                "5.3.2",
+                "6.1.2",
+                "6.2.2"
+              ],
+              "sections": "§14, 17",
+              "success": "Mandatory mask/fallibility/fusion, parent-validity/components/import, and segment/partition/cancellation combinations exercise real routes; seeded correspondence and duplicate-commit faults fail.",
+              "details": [],
+              "proof_first": "Exercise actual typed consumers and claimed backends; negative controls must preserve enough valid input to expose the intended wrong behaviour.",
+              "bets": [
+                "B07",
+                "B08"
+              ]
+            },
+            {
+              "id": "6.2.4",
+              "title": "Publish downstream reducer and tile-commit proofs with the Integration evidence boundary.",
+              "requires": [
+                "5.3.4",
+                "6.1.3",
+                "6.2.3"
+              ],
+              "sections": "§§6, 11, 14, 17",
+              "success": "Both toolchain consumers establish accumulator-history correctness and unchanged destination on pre-commit error/cancellation. Successful commit and cancellation paths are reachable. Duplicate commit, wrong denominator, and erased callback assumptions fail. API/specification drift invalidates the right dependent evidence.",
+              "details": [],
+              "proof_first": "Prove sequential state transitions and frame conditions; list scheduler, unsafe adapter, numerical algorithm, and external effects separately in the trusted basis. A sequential proof is not a race-freedom proof.",
+              "bets": [
+                "B07",
+                "B08"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "6.3",
+          "title": "Decide whether actual trasic adoption earns its cost",
+          "question": "Which concrete geometry and render workflows improve without losing meaning or exceeding agreed overhead? Each experiment can reject adoption independently and must inform the final integration boundary.",
+          "sections": "§§11, 14-16",
+          "tasks": [
+            {
+              "id": "6.3.1",
+              "title": "Pin the trasic revision, kernels, oracles, and experiment-specific acceptance controls.",
+              "requires": [
+                "1.1.3",
+                "5.1.3"
+              ],
+              "sections": "§§1, 11, 14-16, 17",
+              "success": "Q5 resolves against an accessible actual source tree; direct-loop baselines and compatibility oracles are named; unavailable access leaves these experiments explicitly blocked.",
+              "details": [],
+              "proof_first": "State which application properties follow from collection contracts and which need domain/oracle evidence before measuring adoption.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.3.2",
+              "title": "Run the packet-geometry adoption experiment through the actual scalar kernels.",
+              "requires": [
+                "5.2.2",
+                "5.3.2",
+                "6.3.1"
+              ],
+              "sections": "§§11, 14, 17",
+              "success": "Record correctness, preparation/execution overhead, allocations/layout changes, and comprehension for singleton/small/large batches; publish continue/revise/decline without changing the kernel to favour the abstraction.",
+              "details": [],
+              "proof_first": "Compose the packet consumer contract first; verify structural correspondence independently of the trusted numerical intersection implementation.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.3.3",
+              "title": "Run the segmented CSG boundary-event adoption experiment.",
+              "requires": [
+                "6.1.1",
+                "6.2.3",
+                "6.3.1"
+              ],
+              "sections": "§§11, 14, 17",
+              "success": "Compare empty/coincident/tangent events and material/orientation provenance against the chosen domain oracle; generic stable sorting is not accepted as a substitute for CSG tie semantics.",
+              "details": [],
+              "proof_first": "Prove segment ownership through public contracts; geometric coincidence/tie correctness needs its own domain proof or external evidence.",
+              "bets": [
+                "B07"
+              ]
+            },
+            {
+              "id": "6.3.4",
+              "title": "Run the complete tile adoption experiment and record the Integration release decision.",
+              "requires": [
+                "6.2.3",
+                "6.2.4",
+                "6.3.2",
+                "6.3.3"
+              ],
+              "sections": "§§11-16, 17",
+              "success": "Sample identity, weighting, cancellation, output, peak storage, and comprehension meet the pre-registered controls or produce explicit revision/decline decisions; no core/runtime benefit is inferred from a merged adapter alone. Integration proof obligations and downstream fixtures pass before publishing corresponding proof-capable APIs, independently of whether trasic adoption continues.",
+              "details": [],
+              "proof_first": "Carry the consumer proof scope and remaining numerical/scheduler assumptions into the adoption dossier; no release claim exceeds the evidence.",
+              "bets": [
+                "B07",
+                "B08"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "title": "Deferred extensions after the core contract earns trust",
+      "idea": "If the core and any adopted integrations have explicit evidence and stable requirements, broader capabilities can be evaluated on user value without silently destabilizing the established semantics.",
+      "goals": [
+        "G3",
+        "G5",
+        "G6",
+        "G7",
+        "G8"
+      ],
+      "gate": "Promote an extension only after a bounded proposal names its users, semantics, evidence, and cost. A declined proposal is a valid outcome. These tasks do not promise the deferred implementation.",
+      "context": "Deferred scope is not required to complete the Core or Integration acceptance gates. Explicit non-goals remain excluded even if adjacent extensions are investigated.",
+      "steps": [
+        {
+          "number": "7.1",
+          "title": "Evaluate specialized numerical engines against an actual workload",
+          "question": "Would a dense decomposition/FFT route solve a demonstrated problem better than an external library call? The outcome controls whether another adapter is justified.",
+          "sections": "§§2, 10, 15",
+          "tasks": [
+            {
+              "id": "7.1.1",
+              "title": "Prepare a workload-backed proposal for dense linear algebra or signal operations.",
+              "requires": [
+                "4.3.3"
+              ],
+              "sections": "§§2, 10, 15, 17",
+              "success": "Specify exact versus relaxed numerical policy, materialization/copy cost, and existing-library alternatives; accept or decline without adding an unmeasured backend.",
+              "details": [],
+              "proof_first": "Any promoted backend requires a proof-first contract and refinement/TCB disposition before implementation, including numeric equivalence.",
+              "bets": [
+                "B08"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "7.2",
+          "title": "Evaluate adaptive control and advanced scalar domains",
+          "question": "Does a real application require graph-level iteration or additional scalar families rather than a named native kernel? The outcome bounds any semantic expansion.",
+          "sections": "§§2, 6, 9",
+          "tasks": [
+            {
+              "id": "7.2.1",
+              "title": "Prepare separate contracts for demonstrated adaptive-control or dtype needs.",
+              "requires": [
+                "5.1.3"
+              ],
+              "sections": "§§2, 6, 9, 17",
+              "success": "Each proposal states termination/domain/failure rules, inference obligations, and existing-kernel alternatives; no list-monad or arbitrary-loop claim enters the core by implication.",
+              "details": [],
+              "proof_first": "Specify termination, effects and scalar model before promotion; an unsupported proof domain cannot become an implicit trusted primitive.",
+              "bets": [
+                "B08"
+              ]
+            }
+          ]
+        },
+        {
+          "number": "7.3",
+          "title": "Evaluate accelerator compilation only with a measured execution case",
+          "question": "Can GPU/JIT or differentiation benefits pay for their compiler, control-flow, and verification obligations? The outcome determines whether a new project boundary is necessary.",
+          "sections": "§§2-3, 9, 15",
+          "tasks": [
+            {
+              "id": "7.3.1",
+              "title": "Produce a separate accelerator/differentiation architecture and cost case.",
+              "requires": [
+                "6.3.4"
+              ],
+              "sections": "§§2-3, 9, 15, 17",
+              "success": "A representative adopted workload, transfer/control-flow costs, and verification plan justify or reject the extension; no Rust array syntax alone counts as a performance case.",
+              "details": [],
+              "proof_first": "Promotion requires a new execution/refinement and concurrency proof plan; scalar evidence cannot certify the accelerator by association.",
+              "bets": [
+                "B08"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

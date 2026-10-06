@@ -1,0 +1,1976 @@
+{
+  "revision": "0.2",
+  "status": "proposed-unimplemented",
+  "scopes": {
+    "Core": "Initial semantic/numeric language and Polars release target; draft scope.",
+    "Integration": "Gated typed-cell, segmented, resource, or demanding-client extension.",
+    "Deferred": "Not an initial delivery promise."
+  },
+  "entries": [
+    {
+      "id": "V001",
+      "group": "Verbs",
+      "name": "add",
+      "signature": "(numeric, numeric) -> numeric",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates.",
+      "execution": "Pointwise; no reassociation or operand reordering by default.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V002",
+      "group": "Verbs",
+      "name": "sub",
+      "signature": "(numeric, numeric) -> numeric",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates.",
+      "execution": "Pointwise; no reassociation or operand reordering by default.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V003",
+      "group": "Verbs",
+      "name": "mul",
+      "signature": "(numeric, numeric) -> numeric",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates.",
+      "execution": "Pointwise; no reassociation or operand reordering by default.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V004",
+      "group": "Verbs",
+      "name": "div",
+      "signature": "(numeric, numeric) -> F64",
+      "shape": "Same shape or scalar extension.",
+      "contract": "True division; converts numeric inputs to F64; IEEE zero/non-finite behaviour; null propagates.",
+      "execution": "Pointwise; use checked_div to make invalid division an error.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V005",
+      "group": "Verbs",
+      "name": "idiv",
+      "signature": "(I64, I64) -> I64",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Truncates towards zero; zero denominator and MIN/-1 fail; null propagates.",
+      "execution": "Pointwise, fallible.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V006",
+      "group": "Verbs",
+      "name": "rem",
+      "signature": "(I64, I64) -> I64",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Truncating remainder has dividend sign; reject zero and MIN/-1; null propagates.",
+      "execution": "Pointwise, fallible; not Euclidean modulo.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V007",
+      "group": "Verbs",
+      "name": "neg",
+      "signature": "numeric -> numeric",
+      "shape": "Preserved.",
+      "contract": "Checked I64 rejects MIN; F64 uses its documented signed-zero behaviour; null propagates.",
+      "execution": "Pointwise.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V008",
+      "group": "Verbs",
+      "name": "abs",
+      "signature": "numeric -> numeric",
+      "shape": "Preserved.",
+      "contract": "Checked I64 rejects MIN; F64 uses its documented signed-zero behaviour; null propagates.",
+      "execution": "Pointwise.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V009",
+      "group": "Verbs",
+      "name": "square",
+      "signature": "numeric -> numeric",
+      "shape": "Preserved.",
+      "contract": "square preserves numeric dtype with checked integer multiplication. Null propagates.",
+      "execution": "Pointwise; transcendental reproducibility is limited to the selected implementation/environment.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V010",
+      "group": "Verbs",
+      "name": "sqrt",
+      "signature": "F64 -> F64",
+      "shape": "Preserved.",
+      "contract": "F64 input; ordinary IEEE-style non-finite results, not implicit checked-domain errors. Null propagates.",
+      "execution": "Pointwise; transcendental reproducibility is limited to the selected implementation/environment.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V011",
+      "group": "Verbs",
+      "name": "exp",
+      "signature": "F64 -> F64",
+      "shape": "Preserved.",
+      "contract": "F64 input; ordinary IEEE-style non-finite results, not implicit checked-domain errors. Null propagates.",
+      "execution": "Pointwise; transcendental reproducibility is limited to the selected implementation/environment.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V012",
+      "group": "Verbs",
+      "name": "log",
+      "signature": "F64 -> F64",
+      "shape": "Preserved.",
+      "contract": "F64 input; ordinary IEEE-style non-finite results, not implicit checked-domain errors. Null propagates.",
+      "execution": "Pointwise; transcendental reproducibility is limited to the selected implementation/environment.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V013",
+      "group": "Verbs",
+      "name": "pow",
+      "signature": "(F64, F64) -> F64",
+      "shape": "Same shape or scalar extension.",
+      "contract": "F64 power; no I64 overload in the initial surface; null propagates.",
+      "execution": "Pointwise; backend must meet the selected numerical conformance policy.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V014",
+      "group": "Verbs",
+      "name": "min",
+      "signature": "(numeric, numeric) -> numeric",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Binary primitive; propagates null and NaN. Signed-zero ties choose -0 for min and +0 for max.",
+      "execution": "Not an aggregate; use minimum/maximum for reduction.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V015",
+      "group": "Verbs",
+      "name": "max",
+      "signature": "(numeric, numeric) -> numeric",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Binary primitive; propagates null and NaN. Signed-zero ties choose -0 for min and +0 for max.",
+      "execution": "Not an aggregate; use minimum/maximum for reduction.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V016",
+      "group": "Verbs",
+      "name": "hypot",
+      "signature": "(F64, F64) -> F64",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Scaled finite hypotenuse; null propagates. Infinity dominates NaN; otherwise NaN propagates; zero inputs yield +0. Do not use sqrt(x*x+y*y).",
+      "execution": "Native or specifically equivalent lowering; special-value table must match the reference evaluator.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V017",
+      "group": "Verbs",
+      "name": "checked_div",
+      "signature": "(numeric, numeric) -> F64",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Reject zero denominator, non-finite operands, or non-finite result in active non-null cells.",
+      "execution": "Fallible pointwise operation; no speculative execution across a guard.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V018",
+      "group": "Verbs",
+      "name": "eq",
+      "signature": "(comparable, comparable) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "No implicit mixed numeric cast; null yields unknown. F64 ordered comparisons with NaN are false; eq false and ne true.",
+      "execution": "Pointwise. Object-handle equality is not elementwise equality.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V019",
+      "group": "Verbs",
+      "name": "ne",
+      "signature": "(comparable, comparable) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "No implicit mixed numeric cast; null yields unknown. F64 ordered comparisons with NaN are false; eq false and ne true.",
+      "execution": "Pointwise. Object-handle equality is not elementwise equality.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V020",
+      "group": "Verbs",
+      "name": "lt",
+      "signature": "(comparable, comparable) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "No implicit mixed numeric cast; null yields unknown. F64 ordered comparisons with NaN are false; eq false and ne true.",
+      "execution": "Pointwise. Object-handle equality is not elementwise equality.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V021",
+      "group": "Verbs",
+      "name": "le",
+      "signature": "(comparable, comparable) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "No implicit mixed numeric cast; null yields unknown. F64 ordered comparisons with NaN are false; eq false and ne true.",
+      "execution": "Pointwise. Object-handle equality is not elementwise equality.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V022",
+      "group": "Verbs",
+      "name": "gt",
+      "signature": "(comparable, comparable) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "No implicit mixed numeric cast; null yields unknown. F64 ordered comparisons with NaN are false; eq false and ne true.",
+      "execution": "Pointwise. Object-handle equality is not elementwise equality.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V023",
+      "group": "Verbs",
+      "name": "ge",
+      "signature": "(comparable, comparable) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "No implicit mixed numeric cast; null yields unknown. F64 ordered comparisons with NaN are false; eq false and ne true.",
+      "execution": "Pointwise. Object-handle equality is not elementwise equality.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V024",
+      "group": "Verbs",
+      "name": "and",
+      "signature": "(Bool, Bool) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion.",
+      "execution": "Both arguments may evaluate; this is not guarded execution.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V025",
+      "group": "Verbs",
+      "name": "or",
+      "signature": "(Bool, Bool) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion.",
+      "execution": "Both arguments may evaluate; this is not guarded execution.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V026",
+      "group": "Verbs",
+      "name": "xor",
+      "signature": "(Bool, Bool) -> Bool",
+      "shape": "Same shape or scalar extension.",
+      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion.",
+      "execution": "Both arguments may evaluate; this is not guarded execution.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V027",
+      "group": "Verbs",
+      "name": "not",
+      "signature": "Bool -> Bool",
+      "shape": "Preserved.",
+      "contract": "Negates known truth values; unknown remains unknown.",
+      "execution": "Pointwise.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V028",
+      "group": "Verbs",
+      "name": "is_null",
+      "signature": "array -> Bool",
+      "shape": "Preserved.",
+      "contract": "Non-null diagnostic mask. is_null tests validity; is_nan/is_finite require F64 and return false for null cells.",
+      "execution": "Pointwise; null and NaN remain distinct.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V029",
+      "group": "Verbs",
+      "name": "is_nan",
+      "signature": "array -> Bool",
+      "shape": "Preserved.",
+      "contract": "Non-null diagnostic mask. is_null tests validity; is_nan/is_finite require F64 and return false for null cells.",
+      "execution": "Pointwise; null and NaN remain distinct.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V030",
+      "group": "Verbs",
+      "name": "is_finite",
+      "signature": "array -> Bool",
+      "shape": "Preserved.",
+      "contract": "Non-null diagnostic mask. is_null tests validity; is_nan/is_finite require F64 and return false for null cells.",
+      "execution": "Pointwise; null and NaN remain distinct.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V031",
+      "group": "Verbs",
+      "name": "cast",
+      "signature": "dtype -> Unary",
+      "shape": "Preserved.",
+      "contract": "Bool-to-I64/F64 uses 0/1; I64-to-F64 may round. F64-to-I64 requires finite, integral, in-range values; no numeric-to-Bool cast.",
+      "execution": "Explicit pointwise conversion; returns a domain error on invalid active input.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V032",
+      "group": "Verbs",
+      "name": "identity",
+      "signature": "value -> value",
+      "shape": "Preserved.",
+      "contract": "Shares the input handle; no evaluation or copy.",
+      "execution": "Graph identity.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.2.2"
+      ]
+    },
+    {
+      "id": "V033",
+      "group": "Verbs",
+      "name": "shape",
+      "signature": "array -> I64 vector",
+      "shape": "[rank(input)].",
+      "contract": "Reject a dimension that cannot fit I64 when materializing the query; [] describes a scalar.",
+      "execution": "Metadata where known; dynamic dimensions resolve after producer execution.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V034",
+      "group": "Verbs",
+      "name": "size",
+      "signature": "array -> I64 scalar",
+      "shape": "[].",
+      "contract": "Logical element count, not byte size or internal typed-cell coordinates; checked conversion to I64.",
+      "execution": "Metadata or dynamic obligation.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V035",
+      "group": "Verbs",
+      "name": "iota",
+      "signature": "n -> I64 vector",
+      "shape": "[n].",
+      "contract": "Produces 0 through n-1; n=0 is empty; reject negative/out-of-range sizes.",
+      "execution": "Checked allocation/streaming budget; no implicit repeated data.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V036",
+      "group": "Verbs",
+      "name": "range",
+      "signature": "integer range -> I64 vector",
+      "shape": "[range length].",
+      "contract": "Host Rust Range/RangeInclusive determines endpoints; checked length and increment.",
+      "execution": "Literal/source construction; bounded allocation.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V037",
+      "group": "Verbs",
+      "name": "reshape",
+      "signature": "shape -> Unary",
+      "shape": "Requested shape.",
+      "contract": "Exact logical element count; no inferred -1 dimension in the initial surface. Empty shapes obey the same product rule.",
+      "execution": "Metadata for canonical layout; view or explicit materialization otherwise.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V038",
+      "group": "Verbs",
+      "name": "reshape_cycle",
+      "signature": "shape -> Unary",
+      "shape": "Requested shape.",
+      "contract": "Repeats/truncates row-major logical elements; a nonempty target from an empty source fails.",
+      "execution": "Expansion is costed and budgeted; target with zero elements is valid.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.2"
+      ]
+    },
+    {
+      "id": "V039",
+      "group": "Verbs",
+      "name": "ravel",
+      "signature": "array -> vector",
+      "shape": "[size(input)].",
+      "contract": "Logical row-major order; typed cells stay atomic.",
+      "execution": "Index view when possible, otherwise visible copy.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V040",
+      "group": "Verbs",
+      "name": "transpose",
+      "signature": "array -> array",
+      "shape": "Visible axes reversed.",
+      "contract": "Rank zero and one are identities. Typed-cell internals remain closed.",
+      "execution": "Logical index transformation; consumers may require materialization.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V041",
+      "group": "Verbs",
+      "name": "permute_axes",
+      "signature": "permutation -> Unary",
+      "shape": "Axes permuted.",
+      "contract": "Permutation must contain every visible axis exactly once.",
+      "execution": "Index transformation with validated bounds.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.2"
+      ]
+    },
+    {
+      "id": "V042",
+      "group": "Verbs",
+      "name": "reverse",
+      "signature": "array -> array",
+      "shape": "Preserved.",
+      "contract": "Reverse last visible axis by default; rank-zero default is identity.",
+      "execution": "Index mapping; explicit axis on a scalar fails.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V043",
+      "group": "Verbs",
+      "name": "take",
+      "signature": "count -> Unary",
+      "shape": "Selected axis length min(abs(count), length).",
+      "contract": "Non-negative takes a prefix; negative takes a suffix. Clamp at axis length; never invent fill elements.",
+      "execution": "Index/slice operation; last axis by default.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V044",
+      "group": "Verbs",
+      "name": "drop",
+      "signature": "count -> Unary",
+      "shape": "Selected axis length max(length-abs(count), 0).",
+      "contract": "Non-negative drops a prefix; negative drops a suffix.",
+      "execution": "Index/slice operation; last axis by default.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V045",
+      "group": "Verbs",
+      "name": "rotate",
+      "signature": "offset -> Unary",
+      "shape": "Preserved.",
+      "contract": "Output coordinate i reads input (i-offset) modulo axis length. Empty axis is unchanged.",
+      "execution": "Coordinate-aware wrap; no flattened cross-row leakage.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V046",
+      "group": "Verbs",
+      "name": "shift",
+      "signature": "offset -> Unary",
+      "shape": "Preserved.",
+      "contract": "Same sign convention as rotate; out-of-range reads use explicit .fill(value). No fill default.",
+      "execution": "Coordinate-aware non-wrapping shift.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V047",
+      "group": "Verbs",
+      "name": "gather",
+      "signature": "indices -> Unary",
+      "shape": "Selected axis replaced by index-vector length.",
+      "contract": "Initial indices are non-null rank-one I64; negative/out-of-bounds indices fail, including inactive accesses unless guarded.",
+      "execution": "Indexed read; preserve declared index order.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V048",
+      "group": "Verbs",
+      "name": "compress",
+      "signature": "mask -> Unary",
+      "shape": "Selected axis has data-dependent length.",
+      "contract": "Mask is a matching rank-one Bool vector; nulls require .null_mask(Error|False|True), default Error.",
+      "execution": "Selection retains relative order and selection-map provenance.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V049",
+      "group": "Verbs",
+      "name": "replicate",
+      "signature": "counts -> Unary",
+      "shape": "Selected axis length sum(counts).",
+      "contract": "Matching rank-one non-null non-negative I64 counts; checked total.",
+      "execution": "Expansion with size budget; repeated cells retain source correspondence.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.2"
+      ]
+    },
+    {
+      "id": "V050",
+      "group": "Verbs",
+      "name": "concat",
+      "signature": "(array, array) -> array",
+      "shape": "Selected axis lengths add.",
+      "contract": "Same cell schema and all non-concatenated dimensions agree; default last axis.",
+      "execution": "Ordering barrier if backend could reorder.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "V051",
+      "group": "Verbs",
+      "name": "sort_up",
+      "signature": "array -> array or I64 indices",
+      "shape": "Preserved.",
+      "contract": "Sort each last-axis lane stably; grade returns lane-local indices. Require explicit null/NaN ordering when such values occur.",
+      "execution": "Lane-global; no opaque backend ordering defaults.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.2"
+      ]
+    },
+    {
+      "id": "V052",
+      "group": "Verbs",
+      "name": "sort_down",
+      "signature": "array -> array or I64 indices",
+      "shape": "Preserved.",
+      "contract": "Sort each last-axis lane stably; grade returns lane-local indices. Require explicit null/NaN ordering when such values occur.",
+      "execution": "Lane-global; no opaque backend ordering defaults.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.2"
+      ]
+    },
+    {
+      "id": "V053",
+      "group": "Verbs",
+      "name": "grade_up",
+      "signature": "array -> array or I64 indices",
+      "shape": "Preserved.",
+      "contract": "Sort each last-axis lane stably; grade returns lane-local indices. Require explicit null/NaN ordering when such values occur.",
+      "execution": "Lane-global; no opaque backend ordering defaults.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.2"
+      ]
+    },
+    {
+      "id": "V054",
+      "group": "Verbs",
+      "name": "grade_down",
+      "signature": "array -> array or I64 indices",
+      "shape": "Preserved.",
+      "contract": "Sort each last-axis lane stably; grade returns lane-local indices. Require explicit null/NaN ordering when such values occur.",
+      "execution": "Lane-global; no opaque backend ordering defaults.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.2"
+      ]
+    },
+    {
+      "id": "V055",
+      "group": "Verbs",
+      "name": "unique",
+      "signature": "vector -> vector",
+      "shape": "[M], M<=N.",
+      "contract": "Stable first-occurrence order. Eq policy treats all NaNs as one key and signed zeros as one key; nulls form one key.",
+      "execution": "Global/data-dependent; vector only initially.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.2"
+      ]
+    },
+    {
+      "id": "V056",
+      "group": "Verbs",
+      "name": "member",
+      "signature": "(array, vector) -> Bool array",
+      "shape": "Left shape.",
+      "contract": "Membership uses the unique key policy, including null as a key; no nullable Boolean output.",
+      "execution": "Global right lookup; not ordinary eq semantics.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.2"
+      ]
+    },
+    {
+      "id": "V057",
+      "group": "Verbs",
+      "name": "select",
+      "signature": "(mask, then_value, else_value) -> value",
+      "shape": "Agreement of all operands.",
+      "contract": "No guaranteed short circuit. Unknown mask produces an invalid output cell; arrays extend only under explicit/default agreement.",
+      "execution": "May evaluate both branches; not a guard.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.1"
+      ]
+    },
+    {
+      "id": "V058",
+      "group": "Verbs",
+      "name": "sum",
+      "signature": "array -> scalar",
+      "shape": "[] by default; selected axes can remain with .keep_dims().",
+      "contract": "All visible axes in row-major order; exact right reduction of add; empty uses zero; null propagates.",
+      "execution": "No silent backend regrouping; dtype/null/association contract must match.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "V059",
+      "group": "Verbs",
+      "name": "product",
+      "signature": "array -> scalar",
+      "shape": "[] by default; selected axes can remain with .keep_dims().",
+      "contract": "All visible axes in row-major order; exact right reduction of mul; empty uses one; null propagates.",
+      "execution": "No silent backend regrouping; dtype/null/association contract must match.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "V060",
+      "group": "Verbs",
+      "name": "any",
+      "signature": "array -> scalar",
+      "shape": "[] by default; selected axes can remain with .keep_dims().",
+      "contract": "All visible axes in row-major order; exact right reduction of or; empty uses false; null propagates.",
+      "execution": "No silent backend regrouping; dtype/null/association contract must match.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "V061",
+      "group": "Verbs",
+      "name": "all",
+      "signature": "array -> scalar",
+      "shape": "[] by default; selected axes can remain with .keep_dims().",
+      "contract": "All visible axes in row-major order; exact right reduction of and; empty uses true; null propagates.",
+      "execution": "No silent backend regrouping; dtype/null/association contract must match.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "V062",
+      "group": "Verbs",
+      "name": "minimum",
+      "signature": "numeric array -> scalar",
+      "shape": "[] by default.",
+      "contract": "Whole-cell aggregate of min/max; empty requires explicit .identity(value); null/NaN propagate.",
+      "execution": "Distinct from binary min/max.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "V063",
+      "group": "Verbs",
+      "name": "maximum",
+      "signature": "numeric array -> scalar",
+      "shape": "[] by default.",
+      "contract": "Whole-cell aggregate of min/max; empty requires explicit .identity(value); null/NaN propagate.",
+      "execution": "Distinct from binary min/max.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "V064",
+      "group": "Verbs",
+      "name": "mean",
+      "signature": "numeric array -> F64 scalar",
+      "shape": "[] by default.",
+      "contract": "Whole-cell aggregate; empty/all-skipped-null input fails. Cast numeric values to F64, exact right sum, then divide by valid count.",
+      "execution": "Explicit reducer state/finalize contract; count must fit exactly supported range.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.4"
+      ]
+    },
+    {
+      "id": "V065",
+      "group": "Verbs",
+      "name": "variance",
+      "signature": "numeric array -> F64 scalar",
+      "shape": "[] by default.",
+      "contract": "Two-pass definition using mean and right-summed squared deviations; ddof=0; require count>ddof; null propagates.",
+      "execution": "Alternative stable/parallel algorithms need an explicit numerical policy, not a silent rewrite.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.4"
+      ]
+    },
+    {
+      "id": "V066",
+      "group": "Verbs",
+      "name": "stddev",
+      "signature": "numeric array -> F64 scalar",
+      "shape": "[] by default.",
+      "contract": "Two-pass definition using mean and right-summed squared deviations; ddof=0; require count>ddof; null propagates.",
+      "execution": "Alternative stable/parallel algorithms need an explicit numerical policy, not a silent rewrite.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.4"
+      ]
+    },
+    {
+      "id": "V067",
+      "group": "Verbs",
+      "name": "matmul",
+      "signature": "(numeric array, numeric array) -> array",
+      "shape": "[...,m,k] x [...,k,n] -> [...,m,n].",
+      "contract": "Both ranks at least two; batch frames equal or one empty; explicit broadcasting otherwise. Exact inner add/mul contraction by default.",
+      "execution": "Blocked execution allowed only if accumulation semantics stay equivalent.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.3"
+      ]
+    },
+    {
+      "id": "V068",
+      "group": "Verbs",
+      "name": "components",
+      "signature": "Batch<T> -> scalar array",
+      "shape": "Batch shape ++ declared component shape.",
+      "contract": "Explicitly opens a homogeneous numeric cell schema; preserves parent validity and declared matrix coordinate order. Heterogeneous records need another adapter.",
+      "execution": "Checked view or explicit repack; never assumes Rust layout.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.2.1",
+        "5.2.2"
+      ]
+    },
+    {
+      "id": "V069",
+      "group": "Verbs",
+      "name": "from_components",
+      "signature": "schema -> Unary",
+      "shape": "Trailing component axes become one typed element.",
+      "contract": "Validate shape/dtype/domain. All-valid components construct a cell; all-null give a null cell; partial component validity fails initially.",
+      "execution": "Checked reconstruction; domain invalidity differs from null.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.2.1",
+        "5.2.2"
+      ]
+    },
+    {
+      "id": "V070",
+      "group": "Verbs",
+      "name": "zip_aligned",
+      "signature": "(Batch<A>, Batch<B>) -> Batch<(A,B)>",
+      "shape": "Equal batch shape.",
+      "contract": "Requires checked common logical correspondence and order, not merely equal length.",
+      "execution": "No join; mismatched histories require deliberate alignment/selection.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.3.1"
+      ]
+    },
+    {
+      "id": "V071",
+      "group": "Verbs",
+      "name": "zip_positional",
+      "signature": "(Batch<A>, Batch<B>) -> Batch<(A,B)>",
+      "shape": "Equal batch shape.",
+      "contract": "Caller deliberately chooses positional pairing; does not assert common origin.",
+      "execution": "Records explicit positional boundary.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.3.1"
+      ]
+    },
+    {
+      "id": "V072",
+      "group": "Verbs",
+      "name": "compact",
+      "signature": "(mask, batch) -> selected batch + map",
+      "shape": "[active count].",
+      "contract": "Preserves relative order and returns restoration indices; inactive is not an error or null.",
+      "execution": "Native masked/segmented boundary, with output cardinality checked.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.3.1"
+      ]
+    },
+    {
+      "id": "V073",
+      "group": "Verbs",
+      "name": "restore",
+      "signature": "(selected batch, map, template) -> batch",
+      "shape": "Template shape.",
+      "contract": "Checks source domain, map uniqueness, and bounds; unselected cells retain template values.",
+      "execution": "Indexed write to fresh output; no duplicate-writer ambiguity.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.3.1"
+      ]
+    },
+    {
+      "id": "V074",
+      "group": "Verbs",
+      "name": "scatter_reduce",
+      "signature": "(indices, values, reducer) -> array",
+      "shape": "Declared destination shape.",
+      "contract": "Validate bounds and collision policy; reducer declares merge/order/finalize contract.",
+      "execution": "Explicit indexed accumulation; deterministic mode fixes accepted ordering.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.2.1"
+      ]
+    },
+    {
+      "id": "V075",
+      "group": "Verbs",
+      "name": "reduce_by",
+      "signature": "(keys, values, reducer) -> segmented/keyed result",
+      "shape": "One result per declared key group.",
+      "contract": "Stable key order by first occurrence unless explicitly ordered; preserves reducer policy.",
+      "execution": "Grouping is explicit, not hidden array alignment.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.2.1"
+      ]
+    },
+    {
+      "id": "C001",
+      "group": "Conjunctions",
+      "name": "compose",
+      "signature": "(f, g) -> Unary",
+      "shape": "Derived from g then f.",
+      "contract": "compose(f,g)(x) = f(g(x)); shares graph nodes.",
+      "execution": "Composition does not execute kernels.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "C002",
+      "group": "Conjunctions",
+      "name": "flow",
+      "signature": "(f, g) -> Unary",
+      "shape": "Derived from f then g.",
+      "contract": "flow(f,g)(x) = g(f(x)); matches pipeline reading direction.",
+      "execution": "Composition preserves fallibility/effect order.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "C003",
+      "group": "Conjunctions",
+      "name": "fork",
+      "signature": "(f, g, h) -> Unary",
+      "shape": "Agreement of branch outputs into binary g.",
+      "contract": "fork(f,g,h)(x) = g(f(x),h(x)); one shared input node, distinct branch effects remain distinct.",
+      "execution": "No textual duplication or speculative guarded-branch lifting.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "C004",
+      "group": "Conjunctions",
+      "name": "hook",
+      "signature": "(f, g) -> Unary",
+      "shape": "Input and g output must satisfy f.",
+      "contract": "hook(f,g)(x) = f(x,g(x)); f binary, g unary.",
+      "execution": "Structured graph sharing.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "C005",
+      "group": "Conjunctions",
+      "name": "over",
+      "signature": "(f, g) -> Binary",
+      "shape": "f accepts transformed operands.",
+      "contract": "over(f,g)(x,y) = f(g(x),g(y)); f binary, g unary.",
+      "execution": "Two applications of g, not one fused effect by assumption.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "C006",
+      "group": "Conjunctions",
+      "name": "inner",
+      "signature": "(reduce_op, pair_op) -> Binary",
+      "shape": "L++[k] and [k]++R -> L++R.",
+      "contract": "Pairs k in index order, then right-reduces; empty contraction needs a registered/supplied identity.",
+      "execution": "Not batched matmul; no ordinary Polars cross-join lowering.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.3"
+      ]
+    },
+    {
+      "id": "M001",
+      "group": "Operator modifiers",
+      "name": "each",
+      "signature": "f -> Unary/Binary",
+      "shape": "Shape/frame of scalar logical elements.",
+      "contract": "Numeric spelling of rank(0,f); typed logical elements remain closed.",
+      "execution": "Lifts a declared operation, not arbitrary tracing.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.1.1",
+        "3.1.2"
+      ]
+    },
+    {
+      "id": "M002",
+      "group": "Operator modifiers",
+      "name": "rank",
+      "signature": "(cell_rank, f) -> Unary",
+      "shape": "frame ++ result_cell_shape.",
+      "contract": "Trailing cell rank must be within input rank; empty frame uses inference, never samples a cell.",
+      "execution": "Dense result requires uniform output cell schema.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.1.1",
+        "3.1.2"
+      ]
+    },
+    {
+      "id": "M003",
+      "group": "Operator modifiers",
+      "name": "rank2",
+      "signature": "(left_rank, right_rank, f) -> Binary",
+      "shape": "Agreed frame ++ result_cell_shape.",
+      "contract": "Frames equal or one empty; no broader frame broadcast by default.",
+      "execution": "Checks binary cell/output schema before lowering.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.1.1",
+        "3.1.2"
+      ]
+    },
+    {
+      "id": "M004",
+      "group": "Operator modifiers",
+      "name": "rows",
+      "signature": "f -> Unary",
+      "shape": "rank(1,f).",
+      "contract": "Requires rank at least one; trailing rank-one cells, including empty ones.",
+      "execution": "Explicit documented convenience, not implicit row-name semantics.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.1.1",
+        "3.1.2"
+      ]
+    },
+    {
+      "id": "M005",
+      "group": "Operator modifiers",
+      "name": "cols",
+      "signature": "f -> Unary",
+      "shape": "Per-column scalar result [...,n], or vector result [...,q,n].",
+      "contract": "Requires rank>=2. Applies f to column vectors of each trailing matrix; permits scalar or rank-one output, otherwise use rank/permutation.",
+      "execution": "Column gather/view and assembly are visible to planner.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.1.1",
+        "3.1.2"
+      ]
+    },
+    {
+      "id": "M006",
+      "group": "Operator modifiers",
+      "name": "reduce",
+      "signature": "Binary -> Unary",
+      "shape": "Removes last axis by default.",
+      "contract": "Exact right association without reordering; singleton passes through; empty only uses identity; rank-zero explicit reduction fails.",
+      "execution": "May partition independent lanes, not the contracted lane without permission.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "M007",
+      "group": "Operator modifiers",
+      "name": "fold_left",
+      "signature": "Binary -> Unary",
+      "shape": "Removes selected axis.",
+      "contract": "Nonempty unseeded left fold; singleton passes through; empty uses registered/explicit empty identity only.",
+      "execution": "Sequential lane state; no implicit injected initial value.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2"
+      ]
+    },
+    {
+      "id": "M008",
+      "group": "Operator modifiers",
+      "name": "scan",
+      "signature": "Binary -> Unary",
+      "shape": "Preserved.",
+      "contract": "Each prefix receives exact right reduction; inclusive; empty output empty; generic opaque case may require quadratic work.",
+      "execution": "Never substitute scan_left solely because a backend has cumsum.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.3"
+      ]
+    },
+    {
+      "id": "M009",
+      "group": "Operator modifiers",
+      "name": "scan_left",
+      "signature": "Binary -> Unary",
+      "shape": "Preserved.",
+      "contract": "Inclusive left accumulation; no injected identity; empty output empty.",
+      "execution": "Prefix state across chunk boundaries.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.3"
+      ]
+    },
+    {
+      "id": "M010",
+      "group": "Operator modifiers",
+      "name": "outer",
+      "signature": "Binary -> Binary",
+      "shape": "left_shape ++ right_shape.",
+      "contract": "Cartesian application to logical elements; exact size check before expansion.",
+      "execution": "Blocked/streamed execution possible, output still intrinsically sized.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.3"
+      ]
+    },
+    {
+      "id": "M011",
+      "group": "Operator modifiers",
+      "name": "outer_cells",
+      "signature": "(left_rank, right_rank, f) -> Binary",
+      "shape": "left_frame ++ right_frame ++ result_cell_shape.",
+      "contract": "All pairs of cells; uniform result schema required.",
+      "execution": "Batch-pair tiling with cost checks, not implicit singleton insertion.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.3"
+      ]
+    },
+    {
+      "id": "M012",
+      "group": "Operator modifiers",
+      "name": "broadcast",
+      "signature": "f -> Unary/Binary",
+      "shape": "Explicit trailing singleton agreement.",
+      "contract": "Dimensions agree when equal or one is 1; 0 with 1 gives 0; other 0 mismatch fails.",
+      "execution": "Explicit index mapping; does not alter domain correspondence claims.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.1"
+      ]
+    },
+    {
+      "id": "M013",
+      "group": "Operator modifiers",
+      "name": "stencil",
+      "signature": "(footprint, f) -> Unary",
+      "shape": "Selected spatial shape ++ result_cell_shape.",
+      "contract": "Ordered active offsets; explicit boundary policy; snapshot reads; rank-one neighbourhood passed to f.",
+      "execution": "Halo-dependent; rectangular axes, not flattened shifts.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.3.1",
+        "3.3.2"
+      ]
+    },
+    {
+      "id": "M014",
+      "group": "Operator modifiers",
+      "name": "repeat",
+      "signature": "(n, f) -> Unary",
+      "shape": "Composition-derived.",
+      "contract": "n=0 identity; fixed n, checked plan expansion/work budget.",
+      "execution": "Not adaptive convergence control.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "M015",
+      "group": "Operator modifiers",
+      "name": "flip",
+      "signature": "Binary -> Binary",
+      "shape": "Reversed input contract.",
+      "contract": "flip(f)(x,y) = f(y,x).",
+      "execution": "Changes operand order deliberately.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "M016",
+      "group": "Operator modifiers",
+      "name": "dup",
+      "signature": "Binary -> Unary",
+      "shape": "f receives the same value twice.",
+      "contract": "dup(f)(x) = f(x,x); shared input.",
+      "execution": "Does not duplicate source evaluation.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "M017",
+      "group": "Operator modifiers",
+      "name": "map_cells",
+      "signature": "declared kernel/verb -> Unary",
+      "shape": "Batch shape ++ declared output shape.",
+      "contract": "Typed logical-element application; schema known without first-cell execution. A proof-capable map lifts the bound callable relation over corresponding cells, including failure behaviour.",
+      "execution": "One batch dispatch around a compiled loop, not required per-cell dynamic dispatch.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.1.2"
+      ]
+    },
+    {
+      "id": "M018",
+      "group": "Operator modifiers",
+      "name": "flat_map_cells",
+      "signature": "declared kernel/verb -> Unary",
+      "shape": "Segmented output.",
+      "contract": "Variable cardinality per input; offsets/lengths checked; no implicit dense array.",
+      "execution": "Expansion budget and correspondence metadata.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.1"
+      ]
+    },
+    {
+      "id": "M019",
+      "group": "Operator modifiers",
+      "name": "per_segment",
+      "signature": "f -> Unary",
+      "shape": "One independently described result per segment.",
+      "contract": "Preserve segment ownership/order unless f explicitly changes it; empty segment schema is inferable.",
+      "execution": "Segment-dependent, not arbitrary chunk-independent.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.1"
+      ]
+    },
+    {
+      "id": "M020",
+      "group": "Operator modifiers",
+      "name": "masked_apply",
+      "signature": "(mask, inputs, f) -> expression",
+      "shape": "Declared active outputs plus inactive policy.",
+      "contract": "No domain-sensitive kernel evaluation on inactive cells; unknown-mask policy explicit. Require the kernel precondition only on active valid cells; opaque captures and termination assumptions remain explicit.",
+      "execution": "Requires true guard or compact/evaluate/restore, not select lowering.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.3.2"
+      ]
+    },
+    {
+      "id": "P001",
+      "group": "Policy modifiers",
+      "name": ".lhs(value) / .rhs(value)",
+      "signature": "Binary -> Unary",
+      "shape": "Derived with bound operand.",
+      "contract": "lhs(a): f(a,x); rhs(b): f(x,b). Handles bind once; no host re-evaluation.",
+      "execution": "Inspectable partial application, not opaque currying.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "P002",
+      "group": "Policy modifiers",
+      "name": ".axis(axis) / .axes(axes)",
+      "signature": "axis-aware operation -> operation",
+      "shape": "Operation-specific.",
+      "contract": "Zero-based axes; checked unique indices/names; no implicit negative indices. Multi-axis order is caller-specified.",
+      "execution": "Do not silently sort contraction axes.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.1",
+        "3.1.1"
+      ]
+    },
+    {
+      "id": "P003",
+      "group": "Policy modifiers",
+      "name": ".all_axes()",
+      "signature": "reduction -> operation",
+      "shape": "Scalar, or singleton axes with keep_dims.",
+      "contract": "Canonical row-major flattening of all visible axes; rank-zero input is its sole element.",
+      "execution": "Typed-cell coordinates are not visible axes.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2",
+        "4.2.2"
+      ]
+    },
+    {
+      "id": "P004",
+      "group": "Policy modifiers",
+      "name": ".keep_dims()",
+      "signature": "reduction -> operation",
+      "shape": "Reduced axes retained with extent 1.",
+      "contract": "Affects result shape only, not accumulation order or validity.",
+      "execution": "Schema-level operation.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2",
+        "4.2.2"
+      ]
+    },
+    {
+      "id": "P005",
+      "group": "Policy modifiers",
+      "name": ".identity(value)",
+      "signature": "reduction/contraction -> operation",
+      "shape": "Unchanged output schema.",
+      "contract": "Used for an empty lane only; not an initial seed and not proof of an algebraic identity.",
+      "execution": "Never inject into nonempty/singleton reduction.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2",
+        "4.2.2"
+      ]
+    },
+    {
+      "id": "P006",
+      "group": "Policy modifiers",
+      "name": ".skip_nulls()",
+      "signature": "aggregate/reduction -> operation",
+      "shape": "Same outer shape.",
+      "contract": "Remove invalid elements preserving order; then apply the normal empty-input policy.",
+      "execution": "Requires matching validity-aware kernel; not global null coercion.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2",
+        "4.2.2"
+      ]
+    },
+    {
+      "id": "P007",
+      "group": "Policy modifiers",
+      "name": ".null_mask(policy)",
+      "signature": "selection -> operation",
+      "shape": "May affect cardinality.",
+      "contract": "Error default; False drops unknown selections; True selects them deliberately.",
+      "execution": "Does not alter NaN handling.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "P008",
+      "group": "Policy modifiers",
+      "name": ".ddof(n)",
+      "signature": "variance/stddev -> operation",
+      "shape": "Aggregate shape.",
+      "contract": "Non-negative integer; require non-null count > n. Default 0.",
+      "execution": "Part of numerical definition and plan identity.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.4"
+      ]
+    },
+    {
+      "id": "P009",
+      "group": "Policy modifiers",
+      "name": ".reassociate()",
+      "signature": "reduction -> operation",
+      "shape": "Preserved.",
+      "contract": "Permits alternative grouping only; no operand permutation, skipped failure, or implicit widening. Checked-overflow semantics still hold.",
+      "execution": "Planner must prove eligibility or reject the requested route.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.2",
+        "4.2.2"
+      ]
+    },
+    {
+      "id": "P010",
+      "group": "Policy modifiers",
+      "name": ".fill(value)",
+      "signature": "shift -> operation",
+      "shape": "Preserved.",
+      "contract": "Required shift fill; dtype/schema must match or require explicit cast.",
+      "execution": "Does not define stencil boundary handling.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.1"
+      ]
+    },
+    {
+      "id": "P011",
+      "group": "Policy modifiers",
+      "name": ".boundary(policy)",
+      "signature": "stencil -> operation",
+      "shape": "Preserved spatial frame.",
+      "contract": "Fill(value), Wrap, Reflect. Reflect excludes the edge on reflection; n=1 maps to 0; empty axes produce no neighbourhoods.",
+      "execution": "Kernel must fetch halos across physical partitions.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.3.1"
+      ]
+    },
+    {
+      "id": "P012",
+      "group": "Policy modifiers",
+      "name": ".anchor(coords)",
+      "signature": "stencil -> operation",
+      "shape": "Preserved spatial frame.",
+      "contract": "Default centre only for odd extents; even footprints require explicit in-bounds anchor.",
+      "execution": "Offset order follows row-major footprint traversal.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.3.1"
+      ]
+    },
+    {
+      "id": "P013",
+      "group": "Policy modifiers",
+      "name": ".nulls_first() / .nulls_last()",
+      "signature": "ordering -> operation",
+      "shape": "Preserved.",
+      "contract": "Required when nullable ordering inputs contain nulls; stable within equal keys.",
+      "execution": "Part of ordering contract.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.2"
+      ]
+    },
+    {
+      "id": "P014",
+      "group": "Policy modifiers",
+      "name": ".nan_first() / .nan_last()",
+      "signature": "ordering -> operation",
+      "shape": "Preserved.",
+      "contract": "Required when F64 ordering inputs contain NaNs; signed zeros compare equal with stable order.",
+      "execution": "Does not redefine eq or numeric min/max.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.2"
+      ]
+    },
+    {
+      "id": "P015",
+      "group": "Policy modifiers",
+      "name": ".named(label)",
+      "signature": "operation/expression -> same kind",
+      "shape": "Unchanged.",
+      "contract": "Adds user diagnostic context, never changes semantics.",
+      "execution": "Label size checked; redact data values by default.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.3"
+      ]
+    },
+    {
+      "id": "X001",
+      "group": "Macros",
+      "name": "comb!",
+      "signature": "input |> stage |> stage",
+      "shape": "Expression-derived.",
+      "contract": "Existing left-to-right pipeline; graph arithmetic/comparisons; &/|/! are elementwise; reject array &&/||. Expansion calls specified builders and preserves static descriptors when available; dynamic graphs remain supported.",
+      "execution": "Thin parser and hygienic construction; embedded host expressions evaluate once.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.1",
+        "2.4.1"
+      ]
+    },
+    {
+      "id": "X002",
+      "group": "Macros",
+      "name": "arr!",
+      "signature": "whitespace cells; semicolon rows",
+      "shape": "Literal-derived.",
+      "contract": "Retains arr![1 2 3; 4 5 6]; require rectangularity. Parentheses delimit complex/negative cell expressions.",
+      "execution": "Compile-time syntax/rectangularity diagnostics; fallible checked value construction.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.1"
+      ]
+    },
+    {
+      "id": "X003",
+      "group": "Macros",
+      "name": "array!",
+      "signature": "nested comma-separated rows",
+      "shape": "Literal-derived.",
+      "contract": "Conventional array![[1,2],[3,4]]; nested rectangular literals. Empty typed literal needs explicit dtype.",
+      "execution": "Same runtime value contract as arr!, not a second execution model.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.1"
+      ]
+    },
+    {
+      "id": "X004",
+      "group": "Macros",
+      "name": "verb!",
+      "signature": "|inputs| graph body",
+      "shape": "Inferred schema function.",
+      "contract": "Local lets share nodes; graph calls lower through application protocol; host escape separates Rust evaluation. A descriptor denotes a public logical operation; no automatic compile-time evaluation of host variables.",
+      "execution": "Reusable inspectable graph, not callback-per-row.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "X005",
+      "group": "Macros",
+      "name": "footprint!",
+      "signature": "rectangular Bool/0-1 literals",
+      "shape": "Checked footprint descriptor.",
+      "contract": "Active offsets ordered row-major; odd default anchor, even explicit anchor; reject all-zero footprint initially.",
+      "execution": "Compile-time literal checks plus stencil configuration validation.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.3.1"
+      ]
+    },
+    {
+      "id": "X006",
+      "group": "Macros",
+      "name": "flow!",
+      "signature": "[f, g, h]",
+      "shape": "Unary composition-derived.",
+      "contract": "Left-to-right composition; every descriptor expression evaluates once.",
+      "execution": "Optional convenience over flow; no alternative pipeline DSL.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "E001",
+      "group": "Execution and extension interfaces",
+      "name": "host { ... }",
+      "signature": "DSL escape",
+      "shape": "Host value/configuration.",
+      "contract": "Special syntax inside comb!/verb!, not a Rust macro. Executes once at plan construction.",
+      "execution": "No tracing, I/O sandbox, or per-execution resampling.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.1",
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "E002",
+      "group": "Execution and extension interfaces",
+      "name": ".apply(...) / .then(...)",
+      "signature": "operation/value application",
+      "shape": "Deferred output schema.",
+      "contract": "Stable ordinary Rust API; .then takes a unary descriptor. Invalid schemas surface at preparation.",
+      "execution": "Does not execute kernels.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.2.2"
+      ]
+    },
+    {
+      "id": "E003",
+      "group": "Execution and extension interfaces",
+      "name": ".as_fn()",
+      "signature": "operation -> Rust closure",
+      "shape": "Same as operation.",
+      "contract": "Clones descriptor into an ordinary closure for tap::Pipe or host combinators.",
+      "execution": "Does not implement custom Fn traits on the descriptor.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.2"
+      ]
+    },
+    {
+      "id": "E004",
+      "group": "Execution and extension interfaces",
+      "name": ".prepare(&engine)",
+      "signature": "expression -> Result<PreparedPlan>",
+      "shape": "Input/result contract recorded.",
+      "contract": "Reject known impossibilities; retain symbolic obligations and resource requirements. Preparation preserves public graph meaning; certificates bind schema/policy/target/backend capabilities and revalidate residual obligations.",
+      "execution": "Planning only; no domain kernel invocation to infer a first cell.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.3",
+        "4.2.1",
+        "2.4.2",
+        "3.3.3"
+      ]
+    },
+    {
+      "id": "E005",
+      "group": "Execution and extension interfaces",
+      "name": ".collect() / .execute(...)",
+      "signature": "expression/plan -> Result<value>",
+      "shape": "Prepared result shape.",
+      "contract": "collect uses the default engine; execute uses prepared policies/bindings; both return domain errors.",
+      "execution": "Explicit execution and allocation boundary.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.2.2",
+        "4.2.2"
+      ]
+    },
+    {
+      "id": "E006",
+      "group": "Execution and extension interfaces",
+      "name": ".explain()",
+      "signature": "expression/plan -> report",
+      "shape": "No array output.",
+      "contract": "Shows valid prefix and all independently diagnosable failures, including copies/guards/order/unknown sizes. Report exact/bounded/estimated/unknown costs, selected engine, spill permissions, evidence scope, and remaining assumptions.",
+      "execution": "No forced execution; raw backend plan is opt-in.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.3",
+        "4.3.1",
+        "2.4.2",
+        "4.2.5"
+      ]
+    },
+    {
+      "id": "E007",
+      "group": "Execution and extension interfaces",
+      "name": "native(kernel, schema)",
+      "signature": "Rust callable -> operation",
+      "shape": "Declared schema.",
+      "contract": "Trust native code; validate returned schema and boundaries; conservative effects by default. The proof-capable route retains callable/specification binding, explicit captures and higher-order pre/post/effect contracts; metadata alone is not evidence.",
+      "execution": "Batch-level dispatch; pure pointwise optimization needs a stronger explicit contract.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.1.2",
+        "5.1.1",
+        "2.2.5",
+        "5.1.4"
+      ]
+    },
+    {
+      "id": "E008",
+      "group": "Execution and extension interfaces",
+      "name": "register_lowering",
+      "signature": "registry + operation identity + contract",
+      "shape": "No array output.",
+      "contract": "Explicit registration by stable local identity/version; no orphan-rule dependence on foreign trait/type pairs. Backend capability and semantic-refinement evidence records are independent of the registration priority.",
+      "execution": "Ambiguous/unmet contracts fail clearly; no silent weaker fallback.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "4.2.1",
+        "5.1.3"
+      ]
+    },
+    {
+      "id": "E009",
+      "group": "Execution and extension interfaces",
+      "name": "parameter / bind",
+      "signature": "input schema -> handle / binding",
+      "shape": "Parameterized shape constraints.",
+      "contract": "Prepared-plan reuse rechecks schema, policy, resource generation, and dynamic obligations. Source-scoped witnesses and cost certificates do not survive incompatible rebinding.",
+      "execution": "Plan caching never treats new data as a cached result.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "5.3.3"
+      ]
+    },
+    {
+      "id": "E010",
+      "group": "Execution and extension interfaces",
+      "name": "execute_into",
+      "signature": "plan + sink + context",
+      "shape": "Sink-specific result.",
+      "contract": "Caller-owned output/scratch is available on the sequential Core route; Integration adds domain sinks. Success commits once; failure/cancellation before commit leaves the destination unchanged. Partial sinks require a distinct protocol and frame contract.",
+      "execution": "Initially tile-local commit; native kernels must cooperate with cancellation.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.5",
+        "6.2.2",
+        "6.2.4"
+      ]
+    },
+    {
+      "id": "E011",
+      "group": "Execution and extension interfaces",
+      "name": "DenseView::from_slice",
+      "signature": "(borrowed storage, shape) -> Result<DenseView<T>>",
+      "shape": "Checked visible shape.",
+      "contract": "Validates checked cardinality, logical index mapping and non-null storage; safe callers need no ghost precondition.",
+      "execution": "Borrowed production view with public observers and logical specification.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.4"
+      ]
+    },
+    {
+      "id": "E012",
+      "group": "Execution and extension interfaces",
+      "name": "NullableView::try_new",
+      "signature": "(storage, validity, shape) -> Result<NullableView<T>>",
+      "shape": "Checked visible shape.",
+      "contract": "Validates validity length/parent mapping and preserves cell bits without treating null as a scalar value.",
+      "execution": "No copying required by the interface; explicit layout conversion may still be needed.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.1.4"
+      ]
+    },
+    {
+      "id": "E013",
+      "group": "Execution and extension interfaces",
+      "name": "SegmentedView::try_new",
+      "signature": "(offsets, values, domain) -> Result<SegmentedView<T>>",
+      "shape": "Segment lengths may differ.",
+      "contract": "Offsets start at zero, are monotonic and end at value length; empty segments and ownership remain visible.",
+      "execution": "Public logical segments, validated borrowed representation.",
+      "scope": "Integration",
+      "roadmap_tasks": [
+        "6.1.3"
+      ]
+    },
+    {
+      "id": "E014",
+      "group": "Execution and extension interfaces",
+      "name": "logical_view / public lemmas",
+      "signature": "proof-facing collection and graph models",
+      "shape": "Modelled shape and contents.",
+      "contract": "Array/Batch models expose logical values, validity and origin; graph/build/prepare/execute contracts compose. Simple open definitions and focused closed lemmas preserve abstraction.",
+      "execution": "Ghost/specification surface, not an extra runtime allocation or replacement executor.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.2.5",
+        "3.4.1"
+      ]
+    },
+    {
+      "id": "E015",
+      "group": "Execution and extension interfaces",
+      "name": "Selection::from_mask / apply",
+      "signature": "(source domain, mask) -> checked selection",
+      "shape": "Stable selected positions.",
+      "contract": "Witness applies only to matching source/domain generation and policy; a matching length alone is insufficient.",
+      "execution": "Reusable validation with checked application; ordinary gathers may repeat indices.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.4",
+        "5.3.1"
+      ]
+    },
+    {
+      "id": "E016",
+      "group": "Execution and extension interfaces",
+      "name": "Permutation::try_new",
+      "signature": "(source extent/domain, indices) -> checked permutation",
+      "shape": "Same cardinality.",
+      "contract": "Validates a complete bijection and binds it to its applicability conditions; restoration separately requires uniqueness.",
+      "execution": "Public composition/inversion/correspondence lemmas.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.2.4"
+      ]
+    },
+    {
+      "id": "E017",
+      "group": "Execution and extension interfaces",
+      "name": "NativeExecutor::sequential",
+      "signature": "explicit native execution profile",
+      "shape": "Plan-derived.",
+      "contract": "Select the production sequential route, declared numeric policies, resources and output/scratch. Proof configuration never silently swaps a Polars or SIMD implementation.",
+      "execution": "No mandatory Polars or verifier installation for an ordinary consumer.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.3.5",
+        "3.4.1"
+      ]
+    },
+    {
+      "id": "E018",
+      "group": "Execution and extension interfaces",
+      "name": "StaticPlan / static_descriptor",
+      "signature": "fixed or symbolic descriptor + input contract",
+      "shape": "Exact or bounded shapes.",
+      "contract": "Retains static graph meaning under the existing comb! frontend. Arbitrary runtime graph values and host reads cannot be discovered by a proc macro.",
+      "execution": "Optional checked const path; ordinary dynamic descriptors continue to prepare at runtime.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.4.1"
+      ]
+    },
+    {
+      "id": "E019",
+      "group": "Execution and extension interfaces",
+      "name": "CostReport / cost_analysis",
+      "signature": "descriptor + resource model -> report",
+      "shape": "Metadata only.",
+      "contract": "Distinguishes exact, conservative bounds, estimates and unknowns; costs name units, target and resource scope. Unknown is not zero.",
+      "execution": "Shared restricted analyser for const, preparation and runtime refinement; elapsed time remains an estimate.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.4.1",
+        "2.4.2"
+      ]
+    },
+    {
+      "id": "E020",
+      "group": "Execution and extension interfaces",
+      "name": "AdmissionPolicy / check_cost",
+      "signature": "costs + budget + mode -> admission result",
+      "shape": "No data output.",
+      "contract": "Strict certification requires discharged upper-bound obligations; adaptive mode records runtime checks. Upper-bound excess means uncertifiable domain, not certain overrun.",
+      "execution": "Compile-fail where statically requested; checked runtime admission otherwise.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.4.2",
+        "2.4.3"
+      ]
+    },
+    {
+      "id": "E021",
+      "group": "Execution and extension interfaces",
+      "name": "ScheduleCertificate / validate_schedule",
+      "signature": "plan + proposed schedule + contracts -> checked admission",
+      "shape": "Prepared shape obligations.",
+      "contract": "Binds executable/specification/profile identities and scoped tracked-resource bounds; arbitrary opaque declarations remain assumptions, not proofs.",
+      "execution": "Small checker validates planner output; stale or unsupported certificate fails closed.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "3.3.3",
+        "4.3.1"
+      ]
+    },
+    {
+      "id": "E022",
+      "group": "Execution and extension interfaces",
+      "name": "ProofEvidence / assumption_report",
+      "signature": "public claims + scoped evidence -> report",
+      "shape": "No data output.",
+      "contract": "Records actual tool/version, bounds, executable/specification binding, trust, success witnesses and negative controls. No undifferentiated verified Boolean.",
+      "execution": "Optional proof SDK surface; a planned record is not passing evidence.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.1.4",
+        "3.4.1",
+        "4.3.3"
+      ]
+    },
+    {
+      "id": "E023",
+      "group": "Execution and extension interfaces",
+      "name": "typed_kernel_contract",
+      "signature": "native callable + logical/effect/resource contract",
+      "shape": "Declared kernel output.",
+      "contract": "Retains executable binding and captured inputs; callable postconditions constrain all permitted results. Reducers relate state to processed-input history.",
+      "execution": "Verification metadata does not alter runtime semantics or remove checks for unverified callers.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "2.2.5",
+        "5.1.4"
+      ]
+    },
+    {
+      "id": "E024",
+      "group": "Execution and extension interfaces",
+      "name": "bounded_symbolic_input",
+      "signature": "Kani support with explicit shape/value bounds",
+      "shape": "Harness-bounded shape.",
+      "contract": "Constructs valid and invalid boundary cases deliberately; never assumes desired outputs or hides empty-only generators.",
+      "execution": "Optional Kani helper functions and harness contracts, not a production source.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.2.5",
+        "3.4.1"
+      ]
+    },
+    {
+      "id": "E025",
+      "group": "Execution and extension interfaces",
+      "name": "BackendCapabilities / require_engine",
+      "signature": "pinned backend profile + requested semantics",
+      "shape": "Region-derived.",
+      "contract": "Python release numbering does not establish Rust capability. Record tested engine/order/numerics/extension/provenance support and explicit unavailable status.",
+      "execution": "Invalidates plan/certificate compatibility on relevant backend or profile change.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "1.2.6",
+        "4.1.3",
+        "4.2.4"
+      ]
+    },
+    {
+      "id": "E026",
+      "group": "Execution and extension interfaces",
+      "name": "SpillPolicy / execution_io",
+      "signature": "permissions + limits + control scope",
+      "shape": "No logical shape change.",
+      "contract": "Temporary disk is forbidden unless explicitly authorized. Strict isolation fails if the backend exposes only incompatible global controls. Cleanup/failure status is explicit.",
+      "execution": "Operation-specific streaming/OOC eligibility; materialized output payload remains accounted.",
+      "scope": "Core",
+      "roadmap_tasks": [
+        "4.2.5"
+      ]
+    }
+  ]
+}

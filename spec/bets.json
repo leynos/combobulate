@@ -1,0 +1,180 @@
+{
+  "revision": "0.2",
+  "status": "hypotheses-not-results",
+  "bets": [
+    {
+      "id": "B01",
+      "title": "One executable semantic core supports proof-first development",
+      "hypothesis": "A dependency-light kernel can share production, const-evaluated, Kani-checked and Verus-verified executable semantics at acceptable proof/build cost.",
+      "requirements": [
+        "R8",
+        "R10"
+      ],
+      "tasks": [
+        "1.1.4",
+        "1.2.4",
+        "1.2.5",
+        "4.3.3"
+      ],
+      "success_witness": "The cardinality kernel and external identity consumer succeed in every declared profile, with matched executable/specification identity and a recorded target-aware contract.",
+      "negative_control": "Multiply before noticing a zero extent; remove a constructor invariant; suppress a failed harness. Each must fail its intended gate.",
+      "falsifier": "The selected language/toolchain subset needs an unproved substitute executable body, a trusted whole-executor axiom, or proof costs above pre-registered limits.",
+      "decision_rule": "Revise the kernel representation or narrow the certified subset before stabilization; do not abandon the proof-first requirement or hide a duplicate checker.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B02",
+      "title": "Consumers compose application proofs through the public API",
+      "hypothesis": "Logical views, typed checked inputs, and higher-order contracts let separate consumer crates verify useful programmes without internal imports or new notation.",
+      "requirements": [
+        "R3",
+        "R9"
+      ],
+      "tasks": [
+        "1.2.5",
+        "2.1.4",
+        "2.3.5",
+        "3.2.4",
+        "3.4.1",
+        "5.1.4",
+        "5.3.4",
+        "6.1.3"
+      ],
+      "success_witness": "Kani and Verus consumers establish round-trip and selection properties through comb!, custom kernels and reducers, including success and failure witnesses with exact scopes.",
+      "negative_control": "Wrong transpose result, always-Err executor, stale source witness, or an assumed executor postcondition must not pass.",
+      "falsifier": "A consumer must unfold private executor code, import private symbols, change executable routes under proof cfg, or assume the very property being claimed.",
+      "decision_rule": "Revise public contracts/views and preserve production bindings before stabilizing them; record unsupported advanced properties explicitly.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B03",
+      "title": "Compile-time admission is useful without type-level shape machinery",
+      "hypothesis": "Static or bounded descriptors can discharge useful resource obligations through the same restricted analyser used during preparation and execution.",
+      "requirements": [
+        "R4",
+        "R10"
+      ],
+      "tasks": [
+        "2.4.1",
+        "2.4.2",
+        "2.4.3"
+      ],
+      "success_witness": "Exact 4096^2 non-null F64 materialization rejects 64 MiB; bounded inputs distinguish uncertifiable domain from certain excess; smaller exact inputs pass. Runtime and const checks agree on both target-width profiles.",
+      "negative_control": "Treat unknown as zero, treat an upper bound as a lower bound, use host usize layout, or execute a host configuration read during compilation.",
+      "falsifier": "The compiler accepts a known over-budget case, rejects all dynamic uses, reports false certainty, or needs unacceptable compile latency to certify the agreed examples.",
+      "decision_rule": "Reduce static expression/shape scope and retain explicit runtime admission; strict certification fails closed without changing comb! ergonomics.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B04",
+      "title": "A small checker can validate scoped resource and rewrite claims",
+      "hypothesis": "A planner can propose schedules while a smaller checked kernel validates shape, guard, liveness and resource obligations independently of planner heuristics.",
+      "requirements": [
+        "R4",
+        "R8",
+        "R10"
+      ],
+      "tasks": [
+        "2.4.2",
+        "3.3.3",
+        "4.2.5",
+        "4.3.1"
+      ],
+      "success_witness": "Admitted native schedules respect distinct live backing capacities plus scratch/halos under declared kernel contracts; runtime reservations reject the first forbidden expansion.",
+      "negative_control": "Understate halo scratch, reuse a stale certificate, double-count one alias, omit a guard or permit untracked disk writes in a strict profile.",
+      "falsifier": "The checker admits a violating schedule, certifies choices the backend may replace with unbounded alternatives, or relies on an unvalidated kernel declaration as unconditional evidence.",
+      "decision_rule": "Restrict schedules/capabilities or require runtime checks; narrow certificates to tracked resources and list external assumptions instead of promising process RSS.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B05",
+      "title": "Streaming Polars preserves the positional and resource contract",
+      "hypothesis": "Explicit engine/order/spill policies can admit useful Polars 2-era regions while preserving correspondence, validity and bounded owned resources.",
+      "requirements": [
+        "R5",
+        "R11"
+      ],
+      "tasks": [
+        "1.2.6",
+        "4.1.3",
+        "4.2.5",
+        "4.3.2"
+      ],
+      "success_witness": "Pinned Rust engines pass forced-order/null/empty/chunk/halo cases; no-spill requirements are enforced or admission refuses the route. Opt-in spill exercises quota and cancellation cleanup.",
+      "negative_control": "Shuffle rows, lose a parent validity bit, split a segment, or apply a process-global policy as if it were independent per-query state.",
+      "falsifier": "A supported route changes positional meaning, performs undisclosed I/O, or reports a hard per-plan bound without an available control.",
+      "decision_rule": "Disable the capability or select a faithful explicitly permitted route; keep strict policy failures visible and do not infer support from Python versioning.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B06",
+      "title": "New upstream optimizer hooks produce measurable benefit without semantic leakage",
+      "hypothesis": "Dtype-aware planning, deterministic-plugin optimization and physical provenance can improve the adapter when the pinned Rust API exposes compatible capabilities.",
+      "requirements": [
+        "R5",
+        "R11"
+      ],
+      "tasks": [
+        "1.2.6",
+        "4.2.4",
+        "4.3.3"
+      ],
+      "success_witness": "A named workload compares capability-enabled and disabled routes under pre-registered criteria; results/failures match and source attribution survives. Unsupported hooks have explicit dispositions.",
+      "negative_control": "Use determinism alone to speculate a fallible branch, treat metadata as a valid Normal3, or claim planning-time specialization is Rust compile-time evaluation.",
+      "falsifier": "No supported interface exists, required equivalence fails, or measured benefit does not justify coupling and maintenance cost.",
+      "decision_rule": "Decline that optional hook while retaining the semantic port and first-class Polars baseline; capability availability is not a mandate to use it.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B07",
+      "title": "Typed and segmented consumers prove orchestration without replacing domain mathematics",
+      "hypothesis": "Public cell, mask, segment and reducer contracts let rendering-shaped consumers establish identity, active-only execution and atomic commit independently of their numeric kernels.",
+      "requirements": [
+        "R6",
+        "R9"
+      ],
+      "tasks": [
+        "5.1.4",
+        "5.3.4",
+        "6.1.3",
+        "6.2.4",
+        "6.3.4"
+      ],
+      "success_witness": "Both downstream toolchain fixtures establish correspondence, segment ownership, reducer history and pre-commit unchanged output with actual user kernels; geometry/scheduler assumptions remain separately listed.",
+      "negative_control": "Invoke a faulting inactive kernel, permute only normals, drop empty segments, merge float accumulators without permission, or commit a cancelled tile.",
+      "falsifier": "The proof requires inventing numerical correctness, assuming callback termination without disclosure, or silently replacing the concurrent/SIMD implementation by scalar code.",
+      "decision_rule": "Keep direct domain code and narrow the proven orchestration route; record continue/revise/decline for trasic separately from proof SDK acceptance.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    },
+    {
+      "id": "B08",
+      "title": "Evidence and proof-API compatibility remain maintainable",
+      "hypothesis": "Versioned models, executable bindings and scoped proof records allow downstream proofs to survive legitimate internals changes and fail when their assumptions change.",
+      "requirements": [
+        "R7",
+        "R8",
+        "R9",
+        "R11"
+      ],
+      "tasks": [
+        "1.1.4",
+        "3.4.1",
+        "4.3.3",
+        "6.2.4"
+      ],
+      "success_witness": "An internal refactor preserves public proofs; precondition strengthening, postcondition weakening, backend/profile changes and stale specification bindings invalidate the affected evidence and cache entries.",
+      "negative_control": "Import verification metadata from a different executable revision, use focus/skip mode as release evidence, or label bounded Kani evidence as unbounded.",
+      "falsifier": "Consumers depend on private IR layout, relevant source changes do not invalidate evidence, or proof CI exceeds agreed limits without an explicit scope decision.",
+      "decision_rule": "Refine the public lemma surface, cache keys and verification profiles; no compatibility shim is required for obsolete unreleased APIs, but released proof contracts get deliberate versioning.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "status": "planned-not-run"
+    }
+  ]
+}

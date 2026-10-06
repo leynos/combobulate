@@ -1,0 +1,3 @@
+# Documentation checks only. These are not Rust project dependencies.
+markdown-it-py>=3,<5
+jsonschema>=4,<5
