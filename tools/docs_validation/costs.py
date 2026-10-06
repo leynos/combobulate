@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from .context import ValidationContext, require
+from .context import ValidationContext, require, same_typed_value
 
 
 def admission_interval(case: dict) -> tuple[int, int] | None:
@@ -78,7 +78,7 @@ def check_cost_examples(context: ValidationContext) -> None:
         kind = case['kind']
         require(kind in COST_MODELS, f'Unknown cost example kind {kind}')
         result = COST_MODELS[kind](case)
-        require(result == case['expected'], f'Wrong cost result {case["id"]}: {result}')
+        require(same_typed_value(result, case['expected']), f'Wrong cost result {case["id"]}: {result}')
     by_id = {c['id']: c for c in cases}
     require(classify_admission(by_id['K01']) != classify_admission(by_id['K02']),
             'Exact/bounded distinction is vacuous')

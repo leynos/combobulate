@@ -25,6 +25,25 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def same_typed_value(actual: object, expected: object) -> bool:
+    """Compare JSON result values without coercion; 1 differs from True and 1.0.
+
+    Lists compare recursively and dictionaries compare values under their JSON
+    string keys, preserving nulls and named results such as 'overflow'.
+    """
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(actual, list):
+        return len(actual) == len(expected) and all(
+            same_typed_value(left, right) for left, right in zip(actual, expected)
+        )
+    if isinstance(actual, dict):
+        return actual.keys() == expected.keys() and all(
+            same_typed_value(actual[key], expected[key]) for key in actual
+        )
+    return actual == expected
+
+
 @dataclass
 class ValidationContext:
     """Keep inputs and reports local; e.g. ValidationContext(Path('/repo'))."""

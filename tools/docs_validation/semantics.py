@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 import operator
-from .context import ValidationContext, require
+from .context import ValidationContext, require, same_typed_value
 from .semantic_domains import (
     validate_board, validate_boolean, validate_i64, validate_i64_values, validate_integer_values,
     validate_shape, validate_subtraction,
@@ -197,18 +197,32 @@ def evaluate(case: dict):
     return EXAMPLE_MODELS[kind](case)
 
 
+def expectation_field(case: dict) -> str:
+    """Require one explicit outcome; expected=None is valid, while missing outcomes fail."""
+    fields = {'expected', 'expected_shape', 'expected_error'} & case.keys()
+    require(len(fields) == 1, f'Expected exactly one outcome field in {case["id"]}')
+    field = next(iter(fields))
+    if field == 'expected_shape':
+        validate_shape(case[field])
+    if field == 'expected_error':
+        require(type(case[field]) is str and bool(case[field]),
+                f'Malformed expected error in {case["id"]}')
+    return field
+
+
 def check_examples(context: ValidationContext) -> None:
     """Check examples and wrong-algorithm controls, without invoking Rust kernels."""
     cases=context.load('spec/examples.json')['cases']
     for case in cases:
+        field = expectation_field(case)
         try:
             result=evaluate(case)
         except SemanticFailure as error:
-            require(str(error)==case.get('expected_error'), f'Wrong failure in {case["id"]}: {error}')
+            require(field == 'expected_error' and str(error) == case[field], f'Wrong failure in {case["id"]}: {error}')
         else:
-            require('expected_error' not in case, f'Missing error in {case["id"]}')
-            expected=case['expected_shape'] if 'expected_shape' in case else case.get('expected')
-            require(result==expected, f'Wrong result in {case["id"]}: {result}, expected {expected}')
+            require(field != 'expected_error', f'Missing error in {case["id"]}')
+            expected = case[field]
+            require(same_typed_value(result, expected), f'Wrong result in {case["id"]}: {result}, expected {expected}')
     require(right_reduce([10,3,2],lambda a,b:a-b)!=left_reduce([10,3,2],lambda a,b:a-b),
             'Association control is vacuous')
     board=[[1,0,0],[0,0,1]]
