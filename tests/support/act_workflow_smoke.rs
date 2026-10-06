@@ -160,7 +160,7 @@ impl ActSmoke {
     /// Writes the derived YAML and rejecting shell tools into a scratch checkout.
     fn write_tools(&self, directory: &Dir, workflow: &Value) -> Read<()> {
         directory.write(".github/workflows/ci.yml", serde_yaml::to_string(workflow)?)?;
-        for executable in ["make", "cargo", "rustc", "sudo"] {
+        for executable in ["make", "cargo", "rustc", "sudo", "uv"] {
             directory.write(format!("fixture-bin/{executable}"), STUB)?;
             directory.set_permissions(
                 format!("fixture-bin/{executable}"),
@@ -246,6 +246,8 @@ const STUB: &str = concat!(
     "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm \
      cargo-audit') ;;\n",
     "  'rustc:--version') printf '%s\\n' 'rustc fixture'; exit 0 ;;\n",
+    "  'uv:run --with PyYAML==6.0.3 python tools/whitaker_probe.py --workflow \
+     .github/workflows/ci.yml') ;;\n",
     "  'sudo:apt-get update'|'sudo:apt-get install --yes --no-install-recommends clang lld mold') \
      ;;\n",
     "  *) exit 97 ;;\n",

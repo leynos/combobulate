@@ -220,7 +220,7 @@ fn valid_hosted_environment(ci: &Value) -> bool {
 
 /// Requires every step in the fixed hosted route to satisfy its named policy.
 fn valid_hosted_steps(steps: &[Value]) -> bool {
-    steps.len() == 19 && steps.iter().all(policy::known_step)
+    steps.len() == 20 && steps.iter().all(policy::known_step)
 }
 
 /// Pins the full manual Act step count, permission, and runner version.
@@ -246,6 +246,7 @@ fn valid_ci_order(ci: &Value, steps: &[Value]) -> bool {
         Some("Install test runner"),
         Some("Install cargo-audit"),
         Some("Setup Python for audit manifest extraction"),
+        Some("Verify Whitaker capability"),
         Some("Install Whitaker"),
         Some("Audit dependencies"),
         Some("Lint"),

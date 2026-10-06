@@ -7,6 +7,45 @@ pub(super) fn assert_success_trace(trace: &[Vec<String>]) {
     assert_action_inputs(trace);
     assert_lint_environment(trace);
     assert_executor_guards(trace);
+    assert_capability_order(trace);
+}
+
+/// Confirms the exact caller-bound verification command reaches the Act runner first.
+fn assert_capability_order(trace: &[Vec<String>]) {
+    let Some((probe, invocation)) = trace
+        .iter()
+        .enumerate()
+        .find(|(_, event)| event.first().map(String::as_str) == Some("uv"))
+    else {
+        panic!("Act must execute the capability verification shell step");
+    };
+    let Some(install) = trace
+        .iter()
+        .position(|event| event.first().map(String::as_str) == Some("action-6"))
+    else {
+        panic!("Act must execute the Whitaker fixture action");
+    };
+    assert!(
+        probe < install,
+        "Act must verify dependency content before executing it"
+    );
+    assert_eq!(
+        invocation.get(7..),
+        Some(
+            [
+                "run",
+                "--with",
+                "PyYAML==6.0.3",
+                "python",
+                "tools/whitaker_probe.py",
+                "--workflow",
+                ".github/workflows/ci.yml",
+            ]
+            .map(str::to_owned)
+            .as_slice()
+        ),
+        "Act must invoke the caller-bound capability CLI"
+    );
 }
 
 /// Pins the action order and every declared input consumed by the fixtures.
@@ -77,7 +116,7 @@ fn assert_executor_guards(trace: &[Vec<String>]) {
             .iter()
             .filter(|event| matches!(
                 event.first().map(String::as_str),
-                Some("make" | "cargo" | "rustc" | "sudo")
+                Some("make" | "cargo" | "rustc" | "sudo" | "uv")
             ))
             .all(|event| matches!(
                 event.get(4).map(String::as_str),

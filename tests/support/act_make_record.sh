@@ -1,3 +1,7 @@
+# NUL-delimited invocation and environment recording for Act/Make contracts.
+# Included by act_make_harness.rs in private executor fixtures. Helpers preserve
+# argument boundaries and unset/empty/value distinctions. Token recording exposes
+# only presence, so fixture logs never contain the GitHub credential itself.
 record_environment() {
   name=$1
   eval "is_set=\${$name+set}"

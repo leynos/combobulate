@@ -317,12 +317,39 @@ def test_uses_pinned_full_sha(caller_step):
     assert SHA_RE.match(ref), f"expected a 40-hex commit SHA, got {ref!r}"
 ```
 
-If a workflow's behaviour genuinely depends on a feature only present from a
-particular commit onwards, express that as a comment or a changelog note, not
-as a test assertion on the SHA string. The sole exception is the
+If a workflow depends on a particular capability, verify that capability before
+executing the dependency. A comment records provenance; it does not enforce a
+behavioural boundary. Keep the capability check separate from the caller's
+immutable-ref check so equivalent implementations at another commit can pass.
+The sole exception for a literal revision assertion is the
 `RUSTFLAGS_PASSTHROUGH_REVISION` boundary above: until an independent probe can
 confirm that `setup-rust` supports `rustflags`, document and assert the first
 capable revision. Remove that literal revision assertion once the probe exists.
+
+Before installing Whitaker, CI runs:
+
+```sh
+uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py \
+  --workflow .github/workflows/ci.yml
+```
+
+The gate resolves the caller's current full SHA and fetches `action.yml`, the
+installer digest manifest, and all three referenced helpers at that exact
+commit. `tools/whitaker-approved.json` records the reviewed content digests and
+source provenance. The complete manifest digest also covers nested action
+references. Unavailable or changed content fails before the action runs. A
+commit bump with identical approved content passes. Execution-content changes
+require review and an explicit evidence-map update, including raw source
+provenance and passing hermetic capability mutations.
+
+The probes exercise source-derived validation and installation fragments with a
+fake installer, denied download and build executors, and private environment
+paths. They check the approved feature boundary, including source-build
+refusal, installer failures, and both output streams. They do not provide an
+operating system sandbox, simulate every composite step, or prove the behaviour
+of nested actions or the real installer binary. Installer archive integrity
+remains anchored by the approved upstream digest manifest. Acquisition has
+per-file size and time limits; the CI gate has a three-minute timeout.
 
 ## Markdown formatting
 
@@ -378,6 +405,12 @@ operand pairs, ordered reductions, scan prefixes, and nullable sums. Their
 independent oracle uses Python's unbounded integers and checks the I64 range
 after each operation. Oracle helpers are local to that test module; they must
 not become implementation dependencies or evidence of a verified Rust API.
+
+Generated shape tests solve independent per-axis constraints, including zero
+and unit extents, scalar shapes, different ranks, and disabled broadcasting.
+They check both operand orders and distinguish compatible results from the named
+`ShapeAgreement` failure. These tests validate the Python example model;
+product proof obligations remain planned.
 
 Source citations use canonical registered IDs, such as `[E-POLARS-NULL]`.
 Unresolved bracket groups and uppercase coded references are rejected. Case

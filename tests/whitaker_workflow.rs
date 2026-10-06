@@ -7,7 +7,8 @@ const CI: &str = include_str!("../.github/workflows/ci.yml");
 #[path = "support/action_ref.rs"]
 mod action_ref;
 // Shared-actions #522 establishes the binary-only installer behaviour. Dependabot
-// may advance its SHA; input and bypass contracts below protect the interface.
+// may advance its SHA; the preceding source-bound capability gate approves the
+// complete execution content, while these contracts protect the caller interface.
 const INSTALL_ACTION_PATH: &str = "leynos/shared-actions/.github/actions/install-whitaker";
 
 fn check_install_step(step: &Value) -> Result<(), String> {
@@ -75,15 +76,56 @@ fn check_job_versions(job: &Value) -> Result<(), String> {
 fn check_steps(steps: &[Value]) -> Result<(), String> {
     let mut installer = None;
     let mut lint = None;
+    let mut capability = None;
     for (index, step) in steps.iter().enumerate() {
         record_installer(step, index, &mut installer)?;
         record_lint(step, index, &mut lint)?;
+        record_capability(step, index, &mut capability)?;
         check_no_bypass(step)?;
     }
-    match (installer, lint) {
-        (Some(install), Some(gate)) if install < gate => Ok(()),
-        _ => Err("Whitaker action must precede the binding lint gate".into()),
+    match (capability, installer, lint) {
+        (Some(probe), Some(install), Some(gate)) if probe < install && install < gate => Ok(()),
+        _ => Err(
+            "Whitaker capability check must precede installation and the binding lint gate".into(),
+        ),
     }
+}
+
+/// Requires exact caller-bound source verification before executing the dependency.
+fn record_capability(
+    step: &Value,
+    index: usize,
+    capability: &mut Option<usize>,
+) -> Result<(), String> {
+    if step.get("name").and_then(Value::as_str) != Some("Verify Whitaker capability") {
+        return Ok(());
+    }
+    let command = concat!(
+        "uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py ",
+        "--workflow .github/workflows/ci.yml"
+    );
+    if step.get("run").and_then(Value::as_str) != Some(command)
+        || step.get("timeout-minutes").and_then(Value::as_u64) != Some(3)
+    {
+        return Err("Whitaker capability verification command or time bound changed".into());
+    }
+    if [
+        "if",
+        "continue-on-error",
+        "env",
+        "working-directory",
+        "shell",
+        "uses",
+    ]
+    .iter()
+    .any(|key| step.get(key).is_some())
+    {
+        return Err("Whitaker capability verification is missing, redirected or softened".into());
+    }
+    if capability.replace(index).is_some() {
+        return Err("more than one Whitaker capability gate".into());
+    }
+    Ok(())
 }
 
 fn record_installer(
@@ -243,7 +285,7 @@ fn duplicate_workflow_keys_are_rejected() {
     );
 }
 
-/// Advancing an immutable installer reference retains the binary-only input policy.
+/// Advancing a reference retains the source-verification gate and caller interface.
 #[test]
 fn whitaker_action_bumps_do_not_require_test_pin_updates() {
     let changed = action_ref::repoint_action(CI, INSTALL_ACTION_PATH, &"0".repeat(40))
@@ -251,6 +293,64 @@ fn whitaker_action_bumps_do_not_require_test_pin_updates() {
     assert_eq!(
         check_installer(&changed),
         Ok(()),
-        "immutable action bumps must retain the installer contract"
+        "immutable action bumps must retain caller verification; Python resolves and approves \
+         source"
+    );
+}
+
+#[test]
+fn weakened_capability_verification_is_rejected() {
+    for (before, after) in [
+        ("Verify Whitaker capability", "Unused Whitaker capability"),
+        (
+            "        timeout-minutes: 3",
+            "        timeout-minutes: 3\n        if: false",
+        ),
+        (
+            "        timeout-minutes: 3",
+            "        timeout-minutes: 3\n        continue-on-error: true",
+        ),
+        (
+            "--workflow .github/workflows/ci.yml",
+            "--workflow fixture.yml",
+        ),
+        ("tools/whitaker_probe.py", "tools/unrelated.py"),
+    ] {
+        assert!(
+            CI.contains(before),
+            "capability fixture anchor must exist: {before}"
+        );
+        let changed = CI.replacen(before, after, 1);
+        assert!(
+            check_installer(&changed).is_err(),
+            "altered capability gate must fail: {after}"
+        );
+    }
+}
+
+#[test]
+fn late_capability_verification_is_rejected() {
+    let mut changed: Value = serde_yaml::from_str(CI).expect("parse capability order fixture");
+    let steps = changed
+        .get_mut("jobs")
+        .and_then(|jobs| jobs.get_mut("build-test"))
+        .and_then(|job| job.get_mut("steps"))
+        .and_then(Value::as_sequence_mut)
+        .expect("build-test must contain step sequence");
+    let index = steps
+        .iter()
+        .position(|step| {
+            step.get("name").and_then(Value::as_str) == Some("Verify Whitaker capability")
+        })
+        .expect("capability step must exist");
+    steps.swap(index, index + 1);
+    let source = serde_yaml::to_string(&changed).expect("serialize late capability fixture");
+    assert_ne!(
+        source, CI,
+        "capability order mutation must change the workflow"
+    );
+    assert!(
+        check_installer(&source).is_err(),
+        "verification after dependency execution must fail"
     );
 }
