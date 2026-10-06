@@ -12,3 +12,14 @@ fn replace_this_stub_when_real_tests_exist() {
         "Cargo package metadata should match the generated package name"
     );
 }
+
+/// Calling the scaffold API in a declaration protects its compile-time contract.
+const COMPILE_TIME_GREETING: &str = combobulate::greet();
+
+#[test]
+fn greeting_remains_available_in_constant_contexts() {
+    assert_eq!(
+        COMPILE_TIME_GREETING, "Hello from Combobulate!",
+        "the const API must return the scaffold greeting"
+    );
+}

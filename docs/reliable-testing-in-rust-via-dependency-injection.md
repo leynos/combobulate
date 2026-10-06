@@ -263,8 +263,9 @@ ______________________________________________________________________
 - **Direct Environment Mutation Has No Scope Guard:** `DefaultEnv` is
   read-only; it never mutates the process environment. Direct calls to
   `std::env::set_var` or `std::env::remove_var` mutate the global process
-  environment without automatic cleanup. For integration tests that require
-  modifying the live environment, consider a crate such as
-  [temp_env](https://crates.io/crates/temp-env). For unit tests, `MockEnv` is
-  preferable. A lock or serialization annotation around such mutation does not
-  make it safe; it only serializes it, so prefer injecting the value instead.
+  environment without automatic cleanup. Use `MockEnv` to inject values in unit
+  tests. Integration tests that exercise environment lookup should launch a
+  child process with its environment configured through
+  `std::process::Command`, keeping the test runner's environment unchanged. A
+  lock or serialization annotation around live process mutation does not make
+  it safe; prefer injection or a child process instead.

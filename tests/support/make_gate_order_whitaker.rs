@@ -214,11 +214,11 @@ fn boundary_expectations(boundary: EnvironmentBoundary) -> Vec<(&'static str, &'
     ENVIRONMENT_POLICY
         .iter()
         .filter_map(|(variable, driver_reason, config_reason)| {
-            let reason = match boundary {
+            let selected_reason = match boundary {
                 EnvironmentBoundary::Driver => Some(*driver_reason),
                 EnvironmentBoundary::Config => *config_reason,
             };
-            reason.map(|diagnostic| (*variable, diagnostic))
+            selected_reason.map(|diagnostic| (*variable, diagnostic))
         })
         .collect()
 }

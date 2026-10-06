@@ -162,7 +162,7 @@ project:
   - `make check-fmt` executes:
 
     ```sh
-    cargo fmt --workspace -- --check
+    cargo fmt --all -- --check
     mdtablefix --check --git --include-untracked \
       --wrap --renumber --breaks --ellipsis --fences
     ```

@@ -567,8 +567,10 @@ When using `#[once]`, there are critical warnings:
    using `impl Trait` in arguments or return types).
 3. **Attribute Propagation:** `rstest` macros currently drop `#[expect]`
    attributes from fixtures and test functions. If a test relies on a lint
-   expectation, use `#[allow]` instead and note the workaround in a comment
-   referencing this upstream limitation.
+   expectation, restructure it so the lint-triggering code and its narrowly
+   scoped `#[expect]` are in an ordinary helper outside the macro expansion.
+   Prefer removing the lint-triggering pattern when possible. Do not replace
+   expectations with `#[allow]`; repository policy forbids that suppression.
 
 The "never dropped" behaviour arises because `rstest` typically creates a
 `static` variable to hold the result of the `#[once]` fixture. `static`
@@ -911,19 +913,21 @@ fn temp_directory() -> TempDir {
 #[fixture]
 fn temp_file_with_content(
     #[from(temp_directory)] // Use #[from] if name differs or for clarity
-    temp_dir: &TempDir, // Take a reference to ensure TempDir outlives this fixture's direct use
+    temp_dir: TempDir,
     #[default("Hello, rstest from a temp file!")] content: &str
-) -> PathBuf {
+) -> (TempDir, PathBuf) {
     let file_path = temp_dir.path().join("my_temp_file.txt");
     let mut file = File::create(&file_path).expect("Failed to create temporary file");
     file.write_all(content.as_bytes()).expect("Failed to write to temporary file");
-    file_path
+    (temp_dir, file_path)
 }
 
 #[rstest]
-fn test_read_from_temp_file(temp_file_with_content: PathBuf) {
-    assert!(temp_file_with_content.exists());
-    let mut file = File::open(temp_file_with_content).expect("Failed to open temp file");
+fn test_read_from_temp_file(temp_file_with_content: (TempDir, PathBuf)) {
+    // Keep the owner alive until the file has been read and checked.
+    let (_temp_dir, file_path) = temp_file_with_content;
+    assert!(file_path.exists());
+    let mut file = File::open(file_path).expect("Failed to open temp file");
     let mut read_content = String::new();
     file.read_to_string(&mut read_content).expect("Failed to read temp file");
     assert_eq!(read_content, "Hello, rstest from a temp file!");

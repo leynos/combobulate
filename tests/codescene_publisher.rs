@@ -18,6 +18,11 @@
 //! upload's input. Comment lines are prose, not configuration, and are not
 //! read.
 
+/// Immutable action reference checks shared across workflow contracts.
+#[path = "support/action_ref.rs"]
+mod action_ref;
+use action_ref::is_sha_pinned;
+
 /// The publisher workflow, as committed.
 const PUBLISHER: &str = include_str!("../.github/workflows/coverage-main.yml");
 
@@ -130,19 +135,6 @@ const PUBLISHER_QUEUE: [&str; 3] = [
     "group: coverage-main-${{ github.ref }}",
     "cancel-in-progress: false",
 ];
-
-/// Returns whether `uses` pins its action to a full 40-character commit SHA.
-///
-/// Shape rather than value: Dependabot bumps these pins, and a mutable ref
-/// such as `@main` would let both lanes agree while measuring anything.
-fn is_sha_pinned(uses: &str) -> bool {
-    uses.rsplit_once('@').is_some_and(|(_, reference)| {
-        reference.len() == 40
-            && reference
-                .bytes()
-                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
-    })
-}
 
 /// Returns the `uses:` line of the one step in `workflow` calling `action`.
 fn action_line<'workflow>(workflow: &'workflow str, action: &str) -> &'workflow str {

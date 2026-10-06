@@ -373,6 +373,20 @@ validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout
 formatting can preserve the contract without creating false generator drift.
 
+Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
+operand pairs, ordered reductions, scan prefixes, and nullable sums. Their
+independent oracle uses Python's unbounded integers and checks the I64 range
+after each operation. Oracle helpers are local to that test module; they must
+not become implementation dependencies or evidence of a verified Rust API.
+
+Source citations use canonical registered IDs, such as `[E-POLARS-NULL]`.
+Unresolved bracket groups and uppercase coded references are rejected. Case
+variants of registered IDs are also rejected, including link labels. An
+unregistered lower-case word link such as `[e-commerce](https://example.test)`
+is ordinary prose: its spelling alone cannot distinguish a word from a mistyped
+source. Use an uppercase ID or a plain bracket citation to make source intent
+explicit and checkable.
+
 The suite-local gate probe separates executable substitutions, recording
 settings, and caller-environment policy. The route mutation helper changes only
 an explicitly selected YAML field beneath existing parents; missing and null

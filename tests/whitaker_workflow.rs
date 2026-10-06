@@ -3,16 +3,22 @@
 use serde_yaml::Value;
 
 const CI: &str = include_str!("../.github/workflows/ci.yml");
-// This revision contains shared-actions #522. The approved pin is a policy
-// boundary: earlier revisions can build the rolling suite from source.
-const INSTALL_ACTION: &str = concat!(
-    "leynos/shared-actions/.github/actions/install-whitaker@",
-    "6dea5677a84fec60ca51b07202570e3af12ffdb4",
-);
+/// Immutable action identity checks shared across workflow contracts.
+#[path = "support/action_ref.rs"]
+mod action_ref;
+// Shared-actions #522 establishes the binary-only installer behaviour. Dependabot
+// may advance its SHA; input and bypass contracts below protect the interface.
+const INSTALL_ACTION_PATH: &str = "leynos/shared-actions/.github/actions/install-whitaker";
 
 fn check_install_step(step: &Value) -> Result<(), String> {
-    if step.get("uses").and_then(Value::as_str) != Some(INSTALL_ACTION) {
-        return Err("Whitaker action does not use the approved #522 pin".into());
+    if !step
+        .get("uses")
+        .and_then(Value::as_str)
+        .is_some_and(|uses| action_ref::matches_pinned_action(uses, INSTALL_ACTION_PATH))
+    {
+        return Err(
+            "Whitaker action must use its expected path and an immutable commit ref".into(),
+        );
     }
     if step.get("if").is_some() || step.get("continue-on-error").is_some() {
         return Err("Whitaker installation can be skipped or softened".into());
@@ -142,14 +148,17 @@ fn ci_installs_approved_whitaker_before_lint() {
 
 #[test]
 fn weakened_whitaker_provisioning_is_rejected() {
+    let unpinned = action_ref::repoint_action(CI, INSTALL_ACTION_PATH, "main")
+        .expect("the workflow must contain the Whitaker action");
+    assert_ne!(
+        unpinned, CI,
+        "the changed-ref fixture must alter the workflow"
+    );
+    assert!(
+        check_installer(&unpinned).is_err(),
+        "a floating installer ref must fail"
+    );
     let cases = [
-        (
-            INSTALL_ACTION,
-            concat!(
-                "leynos/shared-actions/.github/actions/install-whitaker@",
-                "8193dca5c1d1411e14108ec8654d4f43e7d06a30",
-            ),
-        ),
         ("cranelift: 'true'", "cranelift: 'false'"),
         (
             "          cranelift: 'true'",
@@ -195,7 +204,13 @@ fn missing_or_late_whitaker_installer_is_rejected() {
             "        with:\n",
             "          cranelift: 'true'\n",
         ),
-        INSTALL_ACTION
+        CI.lines()
+            .find_map(|line| {
+                line.trim()
+                    .strip_prefix("uses: ")
+                    .filter(|uses| uses.starts_with(INSTALL_ACTION_PATH))
+            })
+            .expect("the workflow must contain the Whitaker action")
     );
     let removed = CI.replacen(&install_step, "", 1);
     assert_ne!(removed, CI, "the installer step fixture must exist");
@@ -225,5 +240,17 @@ fn duplicate_workflow_keys_are_rejected() {
     assert!(
         check_installer(&duplicate).is_err(),
         "duplicate YAML keys must fail closed"
+    );
+}
+
+/// Advancing an immutable installer reference retains the binary-only input policy.
+#[test]
+fn whitaker_action_bumps_do_not_require_test_pin_updates() {
+    let changed = action_ref::repoint_action(CI, INSTALL_ACTION_PATH, &"0".repeat(40))
+        .expect("the workflow must contain the Whitaker action");
+    assert_eq!(
+        check_installer(&changed),
+        Ok(()),
+        "immutable action bumps must retain the installer contract"
     );
 }

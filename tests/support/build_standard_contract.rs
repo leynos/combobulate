@@ -51,6 +51,20 @@ impl Host {
         }
     }
 
+    const fn arch(self) -> &'static str {
+        match self {
+            Self::Linux => "x86_64",
+            Self::Darwin => "arm64",
+        }
+    }
+
+    const fn triple(self) -> &'static str {
+        match self {
+            Self::Linux => "x86_64-unknown-linux-gnu",
+            Self::Darwin => "aarch64-apple-darwin",
+        }
+    }
+
     const fn expects_mold(self) -> bool { matches!(self, Self::Linux) }
 }
 
@@ -146,6 +160,8 @@ fn dry_run(target: &str, host: Host, inherited: Option<&str>) -> Read<String> {
         "-n",
         "-B",
         &format!("BUILD_HOST_OS={}", host.uname()),
+        &format!("BUILD_HOST_ARCH={}", host.arch()),
+        &format!("BUILD_HOST_TRIPLE={}", host.triple()),
         target,
     ])
     .current_dir(env!("CARGO_MANIFEST_DIR"))

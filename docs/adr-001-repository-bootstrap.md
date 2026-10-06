@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted for repository setup. The product design remains proposed.
+Accepted on 2026-10-06: adopt the Rust build baseline and Combobulate design
+pack for repository setup. The product design remains proposed.
+
+## Date
+
+2026-10-06
 
 ## Context
 

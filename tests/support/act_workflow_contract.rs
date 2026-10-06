@@ -9,22 +9,28 @@ mod policy;
 #[path = "act_workflow_contract_tests.rs"]
 mod tests;
 
-use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, WorkflowSource, validate_mapping_keys};
+use super::{
+    ACT_VALIDATION_WORKFLOW,
+    CI_WORKFLOW,
+    WorkflowSource,
+    action_ref,
+    validate_mapping_keys,
+};
 
 /// Fallible workflow parsing and fixture execution result.
 type Read<T> = Result<T, Box<dyn std::error::Error>>;
 
-/// One action revision, display name, and its required input pairs.
+/// One action path (or capability-bound revision), name, and required inputs.
 type ActionContract = (
     &'static str,
     &'static str,
     &'static [(&'static str, &'static str)],
 );
 
-/// Expected revisions and inputs at every external action boundary in CI.
+/// Expected paths and inputs, with the setup-rust capability-bound revision exception.
 pub(super) const ACTIONS: &[ActionContract] = &[
     (
-        "actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231",
+        "actions/checkout",
         "checkout",
         &[("persist-credentials", "false")],
     ),
@@ -34,35 +40,28 @@ pub(super) const ACTIONS: &[ActionContract] = &[
         &[("rustflags", "")],
     ),
     (
-        "leynos/shared-actions/.github/actions/install-mdtablefix@\
-         4fb8eb7ad52454678a0662865d81d3cd17aa6e0e",
+        "leynos/shared-actions/.github/actions/install-mdtablefix",
         "Install mdtablefix",
         &[("version", "0.6.0")],
     ),
     (
-        "DavidAnson/markdownlint-cli2-action@2df9e28eb87988518ef3880c34edad45d65b1668",
+        "DavidAnson/markdownlint-cli2-action",
         "Markdown lint",
         &[("globs", "**/*.md")],
     ),
+    ("astral-sh/setup-uv", "Setup uv", &[]),
     (
-        "astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91",
-        "Setup uv",
-        &[],
-    ),
-    (
-        "actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405",
+        "actions/setup-python",
         "Setup Python for audit manifest extraction",
         &[("python-version", "3.x")],
     ),
     (
-        "leynos/shared-actions/.github/actions/install-whitaker@\
-         6dea5677a84fec60ca51b07202570e3af12ffdb4",
+        "leynos/shared-actions/.github/actions/install-whitaker",
         "Install Whitaker",
         &[("cranelift", "true")],
     ),
     (
-        "leynos/shared-actions/.github/actions/generate-coverage@\
-         dbe2e22ceaf498d85512679ccded38be9dbe7777",
+        "leynos/shared-actions/.github/actions/generate-coverage",
         "Test and Measure Coverage",
         &[
             ("output-path", "lcov.info"),
@@ -168,7 +167,7 @@ pub(super) fn valid_actions(ci: &Value) -> bool {
 /// Matches one hosted action revision, its name exception, and consumed inputs.
 fn matches_hosted_action(item: &Value, expected: &ActionContract) -> bool {
     let (revision, name, inputs) = expected;
-    text(item, &["uses"]) == Some(*revision)
+    text(item, &["uses"]).is_some_and(|uses| matches_action_revision(uses, revision))
         && (*name == "checkout" || text(item, &["name"]) == Some(*name))
         && action_inputs_match(item, inputs)
 }
@@ -347,14 +346,9 @@ pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> bool {
 /// Pins the three provisioning actions before the manual full Act command.
 fn valid_manual_action_prefix(steps: &[Value]) -> bool {
     let expected_actions = [
+        ("actions/checkout", "persist-credentials", "false"),
         (
-            "actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231",
-            "persist-credentials",
-            "false",
-        ),
-        (
-            "leynos/shared-actions/.github/actions/install-mdtablefix@\
-             4fb8eb7ad52454678a0662865d81d3cd17aa6e0e",
+            "leynos/shared-actions/.github/actions/install-mdtablefix",
             "version",
             "0.6.0",
         ),
@@ -370,6 +364,16 @@ fn valid_manual_action_prefix(steps: &[Value]) -> bool {
         .take(3)
         .zip(expected_actions)
         .all(|(item, (revision, key, value))| {
-            text(item, &["uses"]) == Some(revision) && action_inputs_match(item, &[(key, value)])
+            text(item, &["uses"]).is_some_and(|uses| matches_action_revision(uses, revision))
+                && action_inputs_match(item, &[(key, value)])
         })
+}
+
+/// Preserves only the documented setup-rust capability pin as an exact revision.
+pub(super) fn matches_action_revision(uses: &str, expected: &str) -> bool {
+    if expected.contains('@') {
+        uses == expected
+    } else {
+        action_ref::matches_pinned_action(uses, expected)
+    }
 }

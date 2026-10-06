@@ -293,25 +293,22 @@ connect to it, and seed it with some initial data. Repeating this multi-line
 setup in every single example is inefficient and makes maintenance difficult. A
 change to the setup process would require updating dozens of doctests.
 
-### 4.2 The `#[cfg(doctest)]` Pattern for Shared Helpers
+### 4.2 Shared Helpers Available to the Linked Library
 
-The canonical solution to this problem involves using a special configuration
-flag provided by `rustdoc`: `doctest`. A common mistake is to try to place
-shared test logic in a block guarded by `#[cfg(test)]`. This will not work,
-because `rustdoc` does not enable the `test` configuration flag during its
-compilation process; `#[cfg(test)]` is reserved for unit and integration tests
-run directly by `cargo test`.[^10]
+Doctests link to the normally compiled library. A helper guarded by
+`#[cfg(test)]` or `#[cfg(doctest)]` is absent from that library and cannot be
+imported by an external doctest. The `doctest` configuration flag affects
+Rustdoc's documentation processing; it does not enable that flag for the linked
+library build.[^10]
 
-Instead, `rustdoc` sets its own unique `doctest` flag. By guarding a module or
-function with `#[cfg(doctest)]`, developers can write helper code that is
-compiled and available *only* when `cargo test --doc` is running. This code is
-excluded from normal production builds and standard unit test runs, preventing
-any pollution of the final binary or the public API.
-
-The typical implementation pattern is to create a public helper module within
-the library. The doctest must refer to it via the crate name (here `mycrate`,
-standing for the reader's own crate), never via `crate::`, because the doctest
-compiles as its own separate crate:
+One option is a public, documentation-hidden helper module compiled with the
+library. This exposes a real public API, even though generated documentation
+hides it, so keep its scope narrow and its dependencies suitable for normal
+builds. Setup requiring test-only dependencies can instead live in integration
+test support, with the full shared scenario tested there and a smaller doctest
+showing the public operation. When using the public helper option, the doctest
+refers to it via the crate name (here `mycrate`), because the doctest compiles
+as its own separate crate:
 
 ```rust
 // In lib.rs or a submodule
@@ -324,7 +321,7 @@ compiles as its own separate crate:
 /// # use mycrate::doctest_helpers::setup_test_environment;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut ctx = setup_test_environment()?;
-/// let result = my_func_that_needs_env(&mut ctx);
+/// let result = mycrate::my_func_that_needs_env(&mut ctx);
 /// assert!(result.is_ok());
 /// # Ok(())
 /// # }
@@ -334,8 +331,8 @@ pub fn my_func_that_needs_env(ctx: &mut TestContext) -> Result<(), ()> {
     Ok(())
 }
 
-// This module and its contents are only compiled for doctests.
-#[cfg(doctest)]
+// The external doctest imports this from the normally compiled library.
+#[doc(hidden)]
 pub mod doctest_helpers {
     // Re-export any types needed for the function signatures above.
     pub use super::TestContext;
@@ -353,9 +350,9 @@ pub mod doctest_helpers {
 pub struct TestContext { /*... */ }
 ```
 
-This pattern is the most effective way to achieve DRY doctests. It centralizes
-setup logic, improves maintainability, and cleanly separates testing concerns
-from production code.[^10]
+This pattern centralizes setup while making its public API and normal-build
+cost explicit. Choose integration test support when that trade-off is
+inappropriate.[^10]
 
 ### 4.3 Advanced DRY: Programmatic Doctest Generation
 
@@ -476,10 +473,10 @@ feature-gated items in the generated documentation. This is achieved with the
 `#[doc(cfg(...))]` attribute, which requires enabling the
 `#![feature(doc_cfg)]` feature gate at the crate root. Both the attribute and
 the feature gate are nightly-only; the example below does not compile on stable
-Rust, and it does not compile under this repository's default
-`RUST_CHANNEL=stable`. It is retained here purely as a reference for projects
-that build their documentation on nightly (for example, via `docs.rs`, which
-runs nightly `rustdoc`).
+Rust. This repository pins `nightly-2026-08-27` in `rust-toolchain.toml`, so
+the example is compatible with the selected channel when its feature gate is
+enabled. Projects building documentation on stable need a different way to
+display feature requirements.
 
 ```rust
 // At the crate root (lib.rs)
@@ -604,8 +601,10 @@ mastering doctests:
    the `fn main() -> Result<...>` pattern, hiding the boilerplate. Avoid
    `.unwrap()` to promote robust error-handling practices.
 
-4. **Be DRY**: When setup logic is shared across multiple examples, centralize
-   it in a helper module guarded by `#[cfg(doctest)]` to avoid repetition.
+4. **Be DRY**: Centralize shared setup in a public, documentation-hidden helper
+   available in the linked library, or move complex scenarios into integration
+   test support. A `#[cfg(doctest)]` helper in the library is unavailable to
+   external doctests.
 
 5. **Master** `cfg`: Use `#[cfg(doc)]` to control an item's *visibility* in the
    final documentation. Use `#[cfg(feature = "...")]` or other `cfg` flags

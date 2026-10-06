@@ -149,6 +149,17 @@ class MetadataIds(unittest.TestCase):
             with patch.object(context, 'load', return_value=capabilities):
                 self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
 
+    def test_unknown_word_links_need_explicit_source_intent(self):
+        source_ids = {'E-POLARS-NULL', 'D-TOR'}
+        for label in ('e-commerce', 'e-missing', 'd-service', 'd-missing'):
+            with self.subTest(label=label):
+                self.assertEqual(source_citations(
+                    '[' + label + '](https://example.test/source)', source_ids), set())
+                self.assertEqual(source_citations('[' + label + ']', source_ids), {label})
+                self.assertEqual(source_citations(
+                    '[' + label.upper() + '](https://example.test/source)', source_ids),
+                    {label.upper()})
+
 
 if __name__ == '__main__':
     unittest.main()

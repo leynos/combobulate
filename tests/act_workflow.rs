@@ -1,5 +1,9 @@
 //! Regression tests for the Linux Act-validation workflow contract.
 
+/// Immutable action identity checks shared across workflow contracts.
+#[path = "support/action_ref.rs"]
+mod action_ref;
+
 /// Executes source workflow shell commands with a bounded Make fixture.
 #[path = "support/act_workflow_command.rs"]
 mod command;
@@ -23,9 +27,11 @@ const CI_WORKFLOW: &str = include_str!("../.github/workflows/ci.yml");
 #[derive(Clone, Copy)]
 struct WorkflowSource<'a>(&'a str);
 
-/// Approved full-SHA mdtablefix installer.
+/// Installer identity, independent of the current Dependabot commit.
+const MDTABLEFIX_ACTION_PATH: &str = "leynos/shared-actions/.github/actions/install-mdtablefix";
+/// Immutable test fixture revision; never compared with a committed workflow pin.
 const MDTABLEFIX_ACTION: &str = "leynos/shared-actions/.github/actions/install-mdtablefix@\
-                                 4fb8eb7ad52454678a0662865d81d3cd17aa6e0e";
+                                 0000000000000000000000000000000000000000";
 /// Invalid floating installer reference used by a mutation test.
 const UNPINNED_MDTABLEFIX_ACTION: &str =
     "leynos/shared-actions/.github/actions/install-mdtablefix@main";
@@ -291,7 +297,9 @@ fn workflow_has_mdtablefix_before_act_validation(workflow: &Workflow) -> bool {
 
     act_job.steps.get(..act_test_step).is_some_and(|steps| {
         steps.iter().any(|step| {
-            step.uses.as_deref() == Some(MDTABLEFIX_ACTION)
+            step.uses
+                .as_deref()
+                .is_some_and(|uses| action_ref::matches_pinned_action(uses, MDTABLEFIX_ACTION_PATH))
                 && step.with.get("version").and_then(serde_yaml::Value::as_str)
                     == Some(MDTABLEFIX_VERSION)
         })

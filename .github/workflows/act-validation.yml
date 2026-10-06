@@ -1,5 +1,7 @@
 name: Act Validation
 
+permissions: {}
+
 'on':
   workflow_dispatch:
 
@@ -34,9 +36,17 @@ jobs:
         # Outer Make tests check the pinned tools before starting nested Act.
         run: make install-build-tools
       - name: Install act
+        env:
+          # GitHub release asset digest for act_Linux_x86_64.tar.gz at v0.2.89.
+          ACT_SHA256: 0191d6f1f3b716b5c55820032605d05fc3c1cdbf581ebeff655019e5dd1524c0
         run: |
-          curl -fsSL "https://github.com/nektos/act/releases/download/${ACT_VERSION}/act_Linux_x86_64.tar.gz" |
-            sudo tar -xz -C /usr/local/bin act
+          set -euo pipefail
+          archive=$(mktemp "$RUNNER_TEMP/act.XXXXXX.tar.gz")
+          trap 'rm -f -- "$archive"' EXIT
+          curl -fsSL --output "$archive" \
+            "https://github.com/nektos/act/releases/download/${ACT_VERSION}/act_Linux_x86_64.tar.gz"
+          printf '%s  %s\n' "$ACT_SHA256" "$archive" | sha256sum --check --status
+          sudo tar -xzf "$archive" -C /usr/local/bin act
       - name: Check Docker runtime
         run: docker info
       - name: Run tests with act validation

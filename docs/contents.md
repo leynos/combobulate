@@ -1,5 +1,7 @@
 # Documentation contents
 
+[Documentation contents](contents.md).
+
 This index covers Combobulate's proposed design and current development
 scaffold. Design entries describe intended behaviour; they do not establish an
 implemented API or completed verification.

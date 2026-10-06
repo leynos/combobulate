@@ -37,7 +37,12 @@ fn workflow_mutations_break_the_contract() {
         ),
         (
             "changed Whitaker action",
-            CI_WORKFLOW.replace("6dea5677a84fec60ca51b07202570e3af12ffdb4", "main"),
+            super::super::action_ref::repoint_action(
+                CI_WORKFLOW,
+                "leynos/shared-actions/.github/actions/install-whitaker",
+                "main",
+            )
+            .expect("the committed workflow must contain the Whitaker action"),
         ),
         (
             "changed Whitaker input",
@@ -207,4 +212,30 @@ fn ignores_inert_package_references() {
             "inert package text must not satisfy installation: {inert}"
         );
     }
+}
+
+/// Immutable action bumps retain contracts without lockstep expected-SHA changes.
+#[test]
+fn immutable_action_bumps_preserve_workflow_contract() {
+    let reference = "0".repeat(40);
+    let mut ci = CI_WORKFLOW.to_owned();
+    for (path, ..) in super::ACTIONS {
+        if !path.contains('@') {
+            ci = super::super::action_ref::repoint_action(&ci, path, &reference)
+                .expect("every contracted action must exist in CI");
+        }
+    }
+    let mut manual = ACT_VALIDATION_WORKFLOW.to_owned();
+    for path in [
+        "actions/checkout",
+        "leynos/shared-actions/.github/actions/install-mdtablefix",
+    ] {
+        manual = super::super::action_ref::repoint_action(&manual, path, &reference)
+            .expect("every manual provisioning action must exist");
+    }
+    assert!(
+        contracts_hold(&ci, &manual),
+        "new immutable refs must preserve workflow contracts and the setup-rust capability \
+         exception"
+    );
 }
