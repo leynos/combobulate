@@ -382,6 +382,25 @@ Install mdtablefix 0.6.0 or later locally with
 `bun add --global markdownlint-cli2` or
 `npm install --global markdownlint-cli2`.
 
+## Mermaid validation
+
+Run `make nixie` after editing Mermaid diagrams. This checks fenced Mermaid
+blocks in repository Markdown by rendering them, independently of Markdown
+formatting and lint. The target requires the `nixie` executable and a renderer.
+Install `nixie-cli` with Python 3.14 or later and the headless Rust renderer:
+
+```sh
+uv tool install --python 3.14 nixie-cli
+cargo install merman-cli
+make nixie
+```
+
+The [upstream Nixie requirements](https://github.com/leynos/nixie#requirements)
+also describe the Node.js or Bun route with the official Mermaid CLI. Set
+`NIXIE` to select another compatible executable. The Make target passes
+`--no-sandbox`: this disables the Chromium sandbox when using that renderer and
+is inert with `merman-cli`.
+
 ## Design contract checks
 
 Install `tools/requirements.txt`, then run `make design-check`. The dedicated
