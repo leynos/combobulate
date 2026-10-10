@@ -330,7 +330,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   public checker functions gained parameter documentation. Declined: annotating
   every `unittest` method's return type, because the existing `tools/tests/`
   suites do not, and the one untyped helper parameter was annotated instead.
-  Date/Author: 2026-10-11, implementing agent.
+  The re-review's request to require at least one decision in every completion
+  record was declined: MS-4 requires each cited decision to be accepted, and
+  many later tasks (for example 2.1.1) are governed by no register decision, so
+  a mandatory citation would invite invented ones. Date/Author: 2026-10-11,
+  implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
