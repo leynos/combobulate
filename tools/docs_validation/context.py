@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
@@ -83,9 +84,24 @@ class ValidationContext:
 
     def load_generator(self, name: str) -> ModuleType:
         """Load a local generator; e.g. context.load_generator('generate_bets.py')."""
-        path = self.root / 'tools' / name
-        spec = importlib.util.spec_from_file_location(name[:-3], path)
+        return self.load_module(self.root / 'tools' / name)
+
+    def load_script(self, name: str) -> ModuleType:
+        """Load a helper script's functions; e.g. context.load_script('export_roadmap.py')."""
+        return self.load_module(self.root / 'scripts' / name)
+
+    @staticmethod
+    def load_module(path: Path) -> ModuleType:
+        """Import a Python file by path without running its command-line entry point.
+
+        The module is registered in `sys.modules` under a checker-private name
+        before execution, because decorators such as `dataclass` resolve the
+        defining module through that table.
+        """
+        name = f'_design_pack_{path.parent.name}_{path.stem}'
+        spec = importlib.util.spec_from_file_location(name, path)
         require(spec is not None and spec.loader is not None, str(path))
         module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
         spec.loader.exec_module(module)
         return module

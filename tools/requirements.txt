@@ -4,3 +4,5 @@ jsonschema>=4,<5
 hypothesis==6.168.5
 PyYAML==6.0.3
 wenmode==0.15.2
+cyclopts==5.2.0
+pytest==9.1.1

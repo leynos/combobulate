@@ -1,21 +1,40 @@
-"""Export the canonical Markdown roadmap to its derived JSON view.
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["cyclopts==5.2.0", "wenmode==0.15.2"]
+# ///
+"""Export the canonical `docs/roadmap.md` to its derived `spec/roadmap.json` view.
 
-`docs/roadmap.md` is canonical. This module parses the region between the
+`docs/roadmap.md` is canonical. This script parses the region between the
 roadmap markers with Wenmode's GitHub-flavoured rules and rebuilds the phase,
 step, and task structure that the design checks consume. Structure it does not
 recognize fails with the source line rather than being dropped, so the JSON
-view can never silently omit roadmap content. Upstream request
-leynos/mapsplice#144 tracks a native export that will replace this module.
+view can never silently omit roadmap content.
+
+Run ``scripts/export_roadmap.py`` after editing the roadmap to rewrite the
+export, or ``scripts/export_roadmap.py --check`` (``INPUT_CHECK=true`` in CI)
+to fail when the committed export has drifted. Exit codes: 0 when the export
+is written or matches, 1 on drift (a unified diff is printed), and 2 when the
+roadmap structure is malformed (the source line is printed). The design
+checker imports `parse_roadmap` from this file, so the parser has one home.
+Upstream request leynos/mapsplice#144 tracks a native replacement.
 """
 from __future__ import annotations
 
+import difflib
 import json
 import re
+import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
+from pathlib import Path
 
+import cyclopts
+from cyclopts import App
 from wenmode import Wenmode, presets
 from wenmode.nodes import Node
+
+ROOT = Path(__file__).resolve().parents[1]
 
 START = '<!-- roadmap:start -->'
 END = '<!-- roadmap:end -->'
@@ -218,3 +237,47 @@ def parse_roadmap(text: str) -> dict:
 def export_text(text: str) -> str:
     """Serialize the export exactly as committed: two-space indent, UTF-8, final newline."""
     return json.dumps(parse_roadmap(text), indent=2, ensure_ascii=False) + '\n'
+
+
+def drift(committed: str, fresh: str) -> str:
+    """Render the difference between the committed and fresh exports."""
+    return ''.join(difflib.unified_diff(committed.splitlines(keepends=True), fresh.splitlines(keepends=True),
+                                        'spec/roadmap.json (committed)', 'spec/roadmap.json (fresh export)'))
+
+
+app = App(help=__doc__.splitlines()[0], config=cyclopts.config.Env('INPUT_', command=False))
+
+
+@app.default
+def main(*, check: bool = False, roadmap: Path = ROOT / 'docs/roadmap.md',
+         export: Path = ROOT / 'spec/roadmap.json') -> int:
+    """Write or check the export; e.g. ``main(check=True)`` returns 1 after an unexported edit.
+
+    Parameters
+    ----------
+    check
+        Compare instead of writing; exit 1 when the committed export has drifted.
+    roadmap
+        The canonical Markdown roadmap to read.
+    export
+        The derived JSON view to write or compare.
+    """
+    try:
+        fresh = export_text(roadmap.read_text(encoding='utf-8'))
+    except RoadmapStructureError as error:
+        print(error, file=sys.stderr)
+        return 2
+    if not check:
+        export.write_text(fresh, encoding='utf-8')
+        return 0
+    committed = export.read_text(encoding='utf-8') if export.exists() else ''
+    if committed == fresh:
+        print(f'{export.name} matches {roadmap.name}.')
+        return 0
+    print(drift(committed, fresh), end='')
+    print('The roadmap export is stale: run scripts/export_roadmap.py', file=sys.stderr)
+    return 1
+
+
+if __name__ == '__main__':
+    app()

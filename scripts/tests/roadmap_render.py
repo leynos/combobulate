@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import textwrap
 
-from docs_validation.roadmap_markdown import END, START
+from export_roadmap import END, START
 
 CHECKBOX = {'open': '- [ ] ', 'done': '- [x] '}
 

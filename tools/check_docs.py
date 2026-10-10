@@ -37,11 +37,11 @@ NOT_RUN = [
 
 
 def check_tool_sources(context: ValidationContext) -> None:
-    """Parse delivered Python tooling; e.g. syntax errors in feature modules fail."""
-    paths = sorted((context.root / 'tools').rglob('*.py'))
+    """Parse delivered Python tooling and helper scripts; e.g. a syntax error in either fails."""
+    paths = sorted((context.root / 'tools').rglob('*.py')) + sorted((context.root / 'scripts').rglob('*.py'))
     for path in paths:
         ast.parse(path.read_text(), filename=str(path))
-    context.record('python-tools', 'All delivered Python tool files parse; generator and checker execution also exercised their main paths.', len(paths))
+    context.record('python-tools', 'All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.', len(paths))
 
 
 def report_data(context: ValidationContext, status: str) -> dict:

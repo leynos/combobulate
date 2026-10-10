@@ -423,15 +423,25 @@ make design-check PYTHON="uv run --python 3.14 --with-requirements tools/require
 
 `docs/roadmap.md` is the canonical roadmap. Edit it directly, preferably with
 `mapsplice` for structural changes such as inserting or renumbering tasks, then
-run `python3 tools/export_roadmap.py` to refresh `spec/roadmap.json`, the
-derived JSON view the design checks consume. Commit both files together. The
-exporter parses the marked roadmap region with Wenmode and fails, naming the
-source line, on structure it does not recognize: an unexpected heading level, a
-task without a checkbox, an unlabelled task bullet, or a ticked detail checkbox.
-`python3 tools/export_roadmap.py --check` exits 1 and prints a diff when the
+run `scripts/export_roadmap.py` to refresh `spec/roadmap.json`, the derived
+JSON view the design checks consume. Commit both files together. The exporter
+parses the marked roadmap region with Wenmode and fails, naming the source
+line, on structure it does not recognize: an unexpected heading level, a task
+without a checkbox, an unlabelled task bullet, or a ticked detail checkbox.
+`scripts/export_roadmap.py --check` exits 1 and prints a diff when the
 committed export is stale, and the design checks reject the same drift.
 Upstream request leynos/mapsplice#144 tracks a native export that will replace
 this exporter.
+
+Python helper scripts live in `scripts/` and follow
+[the scripting standards](scripting-standards.md): a `uv` shebang with a PEP
+723 dependency block, Cyclopts for the command line (so `INPUT_*` environment
+variables work in CI), and pytest suites in `scripts/tests/` named after the
+script, such as `scripts/tests/test_export_roadmap.py`. `make design-check`
+runs those suites. When the design checker needs a helper's logic, it loads the
+script by path with `ValidationContext.load_script` rather than keeping a
+second copy, so the script's dependencies are also pinned in
+`tools/requirements.txt`.
 
 The `tools/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its

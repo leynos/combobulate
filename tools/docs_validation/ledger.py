@@ -5,7 +5,6 @@ import re
 
 from .context import ValidationContext, require, same_typed_value
 from .markdown import generated_matches
-from .roadmap_markdown import RoadmapStructureError, parse_roadmap
 
 
 def numbered_identity(value: object, name: str, components: int) -> tuple[int, ...]:
@@ -95,12 +94,13 @@ def check_catalogue(catalogue: list[dict], tasks: dict[str, dict]) -> None:
 
 def check_roadmap_export(context: ValidationContext) -> None:
     """Require the committed JSON view to equal a fresh export of the canonical roadmap."""
+    exporter = context.load_script('export_roadmap.py')
     try:
-        fresh = parse_roadmap((context.root / 'docs/roadmap.md').read_text(encoding='utf-8'))
-    except RoadmapStructureError as error:
+        fresh = exporter.parse_roadmap((context.root / 'docs/roadmap.md').read_text(encoding='utf-8'))
+    except exporter.RoadmapStructureError as error:
         raise AssertionError(f'Malformed canonical roadmap: {error}') from error
     require(same_typed_value(context.load('spec/roadmap.json'), fresh),
-            'Roadmap export drift: run python tools/export_roadmap.py')
+            'Roadmap export drift: run scripts/export_roadmap.py')
 
 
 def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:

@@ -53,7 +53,7 @@ From the repository root:
 ```bash
 python -m pip install -r tools/requirements.txt
 python tools/generate_reference.py --check
-python tools/export_roadmap.py --check
+scripts/export_roadmap.py --check
 python tools/generate_bets.py --check
 python tools/check_docs.py
 ```
