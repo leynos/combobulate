@@ -9,9 +9,10 @@ record the executed checks.
 
 The checker parses Markdown and verifies one title, fenced-block structure and
 code widths, local links, source-register IDs and basic whitespace rules. It
-compares the language-reference, roadmap and bet Markdown with their JSON
-masters. It validates unique IDs, requirement/goal/task mappings, all-open task
-status and an acyclic earlier-dependency graph.
+compares the language-reference and bet Markdown with their JSON masters, and
+requires `spec/roadmap.json` to equal a fresh export of the canonical
+`docs/roadmap.md`. It validates unique IDs, requirement/goal/task mappings,
+all-open task status and an acyclic earlier-dependency graph.
 
 The pack contains 148 catalogue entries, 72 roadmap tasks, 11 requirements, 20
 verification categories, 14 named proof obligations, eight testable bets and
@@ -52,13 +53,14 @@ From the repository root:
 ```bash
 python -m pip install -r tools/requirements.txt
 python tools/generate_reference.py --check
-python tools/generate_roadmap.py --check
+scripts/export_roadmap.py --check
 python tools/generate_bets.py --check
 python tools/check_docs.py
 ```
 
 The generators update only their marked Markdown regions when called without
-`--check`. By default, the checker verifies that the committed
+`--check`; the roadmap exporter instead rewrites `spec/roadmap.json` from
+`docs/roadmap.md`. By default, the checker verifies that the committed
 `docs/validation-results.json` matches checks recomputed in memory. It rejects
 invalid, stale or falsified reports without changing files. To regenerate the
 report after a deliberate source change, run:
