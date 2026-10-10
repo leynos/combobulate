@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -163,13 +164,17 @@ class RealRoadmap(unittest.TestCase):
         self.assertEqual(context.results[-1]['check'], 'roadmap-status', 'closure runs after every other check')
 
     def test_artefact_outside_the_repository_does_not_resolve(self):
-        exists = artefact_resolver(ValidationContext(ROOT))
-        self.assertTrue(exists('docs/roadmap.md#combobulate-roadmap'), 'an in-repository heading resolves')
-        escape = '../' * (len(ROOT.resolve().parts) - 1) + 'etc/os-release'
-        self.assertTrue(Path('/etc/os-release').is_file(), 'the escape target must exist for this control to bite')
-        self.assertFalse(exists(escape), 'a relative path escaping the root never resolves')
-        self.assertFalse(exists('/etc/os-release'), 'an absolute path outside the root never resolves')
-        self.assertFalse(exists('docs/roadmap.md#no-such-heading'), 'a missing anchor does not resolve')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repository'
+            (root / 'docs').mkdir(parents=True)
+            (root / 'docs/guide.md').write_text('# Guide\n', encoding='utf-8')
+            outside = Path(directory) / 'outside.md'
+            outside.write_text('# Outside\n', encoding='utf-8')
+            exists = artefact_resolver(ValidationContext(root))
+            self.assertTrue(exists('docs/guide.md#guide'), 'an in-repository heading resolves')
+            self.assertFalse(exists('../outside.md'), 'a relative path escaping the root never resolves')
+            self.assertFalse(exists(str(outside)), 'an absolute path outside the root never resolves')
+            self.assertFalse(exists('docs/guide.md#no-such-heading'), 'a missing anchor does not resolve')
 
     def test_pf14_structural_component_targets_task_114(self):
         obligations = ValidationContext(ROOT).load('spec/proof-obligations.json')['obligations']
