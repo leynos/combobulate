@@ -1,4 +1,4 @@
-# ADR 001: Bootstrap the repository from the Rust build baseline
+# Architectural decision record (ADR) 0001: Bootstrap the repository from the Rust build baseline
 
 ## Status
 
@@ -46,5 +46,5 @@ confer merge eligibility on this repository.
 ## References
 
 - [Peregrine Web PR #11](https://github.com/leynos/peregrine-web/pull/11).
-- [Technical design](technical-design.md).
-- [GIST roadmap](roadmap.md).
+- [Technical design](../technical-design.md).
+- [GIST roadmap](../roadmap.md).

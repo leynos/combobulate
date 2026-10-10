@@ -5,14 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT (sponsor decisions D01 to D15 received on 2026-10-10 and folded
-in; `EP-M0` is sponsor-directed and proceeds now; the remaining milestones
-await explicit approval of this revision)
+Status: IN PROGRESS (the sponsor approved this revision for implementation on
+2026-10-11 by invoking the implementation workflow; `EP-M0` is complete and
+`EP-M1a` is under way)
 
-Implementation of `EP-M1a` onward must not begin until the sponsor explicitly
-approves this revision. Approval of the plan is distinct from acceptance of a
-decision; acceptances are recorded per decision identifier (see
-`Sponsor decisions`).
+Approval of the plan is distinct from acceptance of a decision; acceptances are
+recorded per decision identifier (see `Sponsor decisions`).
 
 ## Purpose / big picture
 
@@ -241,7 +239,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `tools/tests/test_roadmap_export_gate.py`; seeded faults (dropped details,
   ignored ticks) each fail the suite; the script runs through its own `uv`
   shebang; `make design-check` passes.
-- [ ] Sponsor approval of this revision.
+- [x] (2026-10-11) Sponsor approval of this revision (implementation workflow
+  invoked for this plan).
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
