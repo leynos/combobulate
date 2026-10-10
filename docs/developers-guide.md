@@ -475,10 +475,11 @@ digest cannot hide the edit, because the comparison reads the base revision
 from Git. The `Design contracts` workflow fetches full history and passes the
 pull request's merge base, or the previous head on a push to `main`. It also
 runs weekly, so date-dependent checks fail on `main` first. `make design-check`
-passes the HEAD commit date as `--as-of`; the checks never read the wall clock.
-The freeze result is printed rather than recorded in
-`docs/validation-results.json`, so the committed report does not depend on
-which base revision was supplied.
+passes the HEAD commit date as `--as-of`, and the scheduled workflow run passes
+its own run date as `AS_OF`, so expiry surfaces even when `main` is idle; the
+checks themselves never read the wall clock. The freeze result is printed
+rather than recorded in `docs/validation-results.json`, so the committed report
+does not depend on which base revision was supplied.
 
 Python helper scripts live in `scripts/` and follow
 [the scripting standards](scripting-standards.md): a `uv` shebang with a PEP

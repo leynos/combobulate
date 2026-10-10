@@ -322,6 +322,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M1b` milestone review dispositions. Fixed: completion
+  artefacts must resolve inside the repository; the real-roadmap closure test
+  runs the full check sequence so a tick that relies on a checker-sourced
+  component is judged with that check's result; the scheduled workflow passes
+  its run date as `AS_OF` so expiry surfaces while `main` is idle; the two
+  public checker functions gained parameter documentation. Declined: annotating
+  every `unittest` method's return type, because the existing `tools/tests/`
+  suites do not, and the one untyped helper parameter was annotated instead.
+  Date/Author: 2026-10-11, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`

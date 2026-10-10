@@ -131,11 +131,13 @@ def task_closure(inputs: ClosureInputs) -> tuple[list[str], list[str]]:
 
 
 def artefact_resolver(context: ValidationContext) -> Callable[[str], bool]:
-    """Resolve 'path' or 'path#anchor' beneath the root; a missing heading anchor does not resolve."""
+    """Resolve 'path' or 'path#anchor' beneath the root; '../x' or a missing heading anchor does not resolve."""
+    root = context.root.resolve()
+
     def exists(artefact: str) -> bool:
         path, _, anchor = artefact.partition('#')
-        target = context.root / path
-        if not target.is_file():
+        target = (root / path).resolve()
+        if not target.is_relative_to(root) or not target.is_file():
             return False
         return not anchor or anchor in headings(target.read_text(encoding='utf-8'))
     return exists
@@ -143,7 +145,24 @@ def artefact_resolver(context: ValidationContext) -> Callable[[str], bool]:
 
 def check_task_status(context: ValidationContext, roadmap: dict, decisions: Mapping[str, dict],
                       components: Mapping[str, list[dict]]) -> None:
-    """Require every tick to be backed by evidence; checker-sourced components read this run's results."""
+    """Require every tick to be backed by evidence; checker-sourced components read this run's results.
+
+    Parameters
+    ----------
+    context
+        The validation context; its earlier results decide checker-sourced components.
+    roadmap
+        The roadmap export, whose task ``status`` fields carry the ticks.
+    decisions
+        Decision records by identifier.
+    components
+        Validated obligation components by task identifier.
+
+    Raises
+    ------
+    AssertionError
+        When a ticked task fails any closure condition; the message lists each failure.
+    """
     tasks = roadmap_tasks(roadmap)
     inputs = ClosureInputs(
         tasks=tasks,
