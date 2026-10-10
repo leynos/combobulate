@@ -409,9 +409,9 @@ ADR format (after `EP-M1a`): `docs/adrs/adr-nnnn-title-slug.md`, title
 
 ## Conformance basis
 
-- Terms of reference: `docs/terms-of-reference.md`, revision 0.2, 6 October
-  2026. Traced items: G1, G2, G6, G7, G8; S7, S8, S10; C2, C3, C5, C6, C7,
-  C9; Q1, Q2, Q4, Q7, Q8.
+- Terms of reference: `docs/terms-of-reference.md`, revision 0.2 of 6 October
+  2026, tracing G1, G2, G6, G7, G8; S7, S8, S10; C2, C3, C5, C6, C7, C9; Q1,
+  Q2, Q4, Q7, Q8.
 - Technical design: `docs/technical-design.md`, revision 0.2, 6 October 2026.
   Traced items: R7, R8, R9, R10; §2 scope classes; §§4-7; §12; §14 V13, V14,
   V20; §15 candidate decisions, GAP2, GAP5, GAP9; §16; §17.1, §17.2, §17.7,
