@@ -72,8 +72,16 @@ make design-check
 ```
 
 Review the report diff before committing it. Regeneration writes the report
-only after all source checks pass. The supplied Python helpers do not invoke a
-compiler, verifier or backend.
+only after all source checks pass. To reject edits to accepted decisions, also
+compare with a base revision, as the `Design contracts` workflow does:
+
+```bash
+make design-check BASE_REV="$(git merge-base origin/main HEAD)"
+```
+
+The roadmap-status check accepts a ticked task only when its prerequisites,
+completion record, accepted decisions, and obligation components back it. The
+supplied Python helpers do not invoke a compiler, verifier or backend.
 
 ## Unrun checks and limits
 

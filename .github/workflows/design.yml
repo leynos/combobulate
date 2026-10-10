@@ -6,6 +6,10 @@ name: Design contracts
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    # Weekly, so date-dependent checks such as exception expiry fail on main
+    # before they surprise an unrelated pull request.
+    - cron: '17 6 * * 1'
 
 permissions:
   contents: read
@@ -17,6 +21,8 @@ jobs:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
           persist-credentials: false
+          # Full history lets the freeze check read the merge base.
+          fetch-depth: 0
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
           python-version: '3.14'
@@ -24,5 +30,19 @@ jobs:
           cache-dependency-path: tools/requirements.txt
       - name: Install documentation dependencies
         run: python3 -m pip install -r tools/requirements.txt
+      - name: Select the freeze-check base revision
+        id: base
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            echo "rev=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            echo "rev=$BEFORE" >> "$GITHUB_OUTPUT"
+          else
+            echo "rev=" >> "$GITHUB_OUTPUT"
+          fi
       - name: Validate documentation contracts
-        run: make design-check
+        run: make design-check BASE_REV="${{ steps.base.outputs.rev }}"
