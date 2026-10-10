@@ -7,6 +7,10 @@ an edit. Recomputing a stored digest in the same commit cannot hide an edit,
 because this check compares with the base revision's committed content, not
 with the head's own claims. CI passes the merge base; without a base revision
 the check does not run and says so.
+
+`FROZEN_DOCUMENTS` lists the registers compared. Each governance register
+joins it in the commit that creates the register: decisions now; acceptance
+controls (with their amendment chain) and exceptions when they are added.
 """
 from __future__ import annotations
 

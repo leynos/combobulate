@@ -12,7 +12,8 @@ code widths, local links, source-register IDs and basic whitespace rules. It
 compares the language-reference and bet Markdown with their JSON masters, and
 requires `spec/roadmap.json` to equal a fresh export of the canonical
 `docs/roadmap.md`. It validates unique IDs, requirement/goal/task mappings,
-all-open task status and an acyclic earlier-dependency graph.
+evidence-backed task ticks (prerequisites, completion records, accepted
+decisions, and obligation components) and an acyclic earlier-dependency graph.
 
 The pack contains 148 catalogue entries, 72 roadmap tasks, 11 requirements, 20
 verification categories, 14 named proof obligations, eight testable bets and
