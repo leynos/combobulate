@@ -67,13 +67,13 @@ claim that existing libraries cannot express the same mathematics.
 
 ## 4. Users, concerns, and decision rights
 
-| Role                                             | Context and concern                                                                                             | Required evidence                                                                                       | Decision right                                                                              |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Rust developer, primary user                     | Writes array or batch transformations and needs to explain them to another engineer.                            | Paired examples, shape/failure predictions, and readable diagnostics.                                   | Supplies usability evidence; no automatic release authority.                                |
-| Domain/extension author, primary user            | Owns numerical or geometry kernels and needs generic application without a core fork.                           | An external extension crate works through documented interfaces.                                        | Owns the domain algorithm and its declared contract.                                        |
-| Reviewer or maintenance engineer, secondary user | Must understand provenance, effects, resource use, and failure modes.                                           | Explain output, source-linked failures, and traceable contracts.                                        | Reviews evidence; does not approve product scope by implication.                            |
-| Verification-oriented consumer, primary user     | Must establish application properties without depending on private collection internals or an assumed executor. | Public-only downstream proof fixtures, successful/failing witnesses, and explicit residual assumptions. | Owns application/kernel contracts; does not certify an upstream backend by implication.     |
-| Project sponsor, Payton                          | Chooses scope and assesses whether the work earns its ongoing cost.                                             | Falsifiable milestones and measured outcomes.                                                           | Requested the work; final technical and release authority still needs explicit designation. |
+| Role                                             | Context and concern                                                                                             | Required evidence                                                                                       | Decision right                                                                                                                  |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Rust developer, primary user                     | Writes array or batch transformations and needs to explain them to another engineer.                            | Paired examples, shape/failure predictions, and readable diagnostics.                                   | Supplies usability evidence; no automatic release authority.                                                                    |
+| Domain/extension author, primary user            | Owns numerical or geometry kernels and needs generic application without a core fork.                           | An external extension crate works through documented interfaces.                                        | Owns the domain algorithm and its declared contract.                                                                            |
+| Reviewer or maintenance engineer, secondary user | Must understand provenance, effects, resource use, and failure modes.                                           | Explain output, source-linked failures, and traceable contracts.                                        | Reviews evidence; does not approve product scope by implication.                                                                |
+| Verification-oriented consumer, primary user     | Must establish application properties without depending on private collection internals or an assumed executor. | Public-only downstream proof fixtures, successful/failing witnesses, and explicit residual assumptions. | Owns application/kernel contracts; does not certify an upstream backend by implication.                                         |
+| Project sponsor, Payton                          | Chooses scope and assesses whether the work earns its ongoing cost.                                             | Falsifiable milestones and measured outcomes.                                                           | Final technical and release authority, as sponsor and technical owner, GitHub login `leynos` ([D01](decision-register.md#d01)). |
 
 The initial audience has Rust experience. A general-purpose educational
 interpreter, spreadsheet user interface, or automatic renderer conversion is
@@ -226,29 +226,34 @@ representation, capability or certified-scope decision, not weakened claims.
 
 ## 9. Open questions
 
-| ID  | Question                                                                                                              | Why it matters and resolution condition                                                                           | Authority                                           |
-| --- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Q1  | Which maintainer accepts architecture, scope changes, and release readiness?                                          | Record decision rights before implementation approval; advice is not approval.                                    | Sponsor to designate.                               |
-| Q2  | Which runtime, memory, compile-cost, proof-runtime/solver-memory, and CI thresholds govern the experiments?           | Record control workloads and thresholds before measuring candidate acceptance.                                    | Sponsor and designated technical owner.             |
-| Q3  | Which Rust/MSRV and exact dependency feature matrix form the initial baseline?                                        | Resolve from current compatible releases and execute the proposed build matrix.                                   | Technical owner.                                    |
-| Q4  | Is the proposed core/integration split the intended release boundary?                                                 | Accept or amend the scope matrix in `technical-design.md` §2.                                                     | Sponsor and technical owner.                        |
-| Q5  | Which current trasic source revision and geometry/reference contracts should adoption target?                         | Inspect that revision before claiming integration or performance benefit.                                         | Trasic maintainer, not yet identified here.         |
-| Q6  | Where should this pack be published, and under which repository contribution rules?                                   | Resolve an accessible repository; no destination was established in this inspection.                              | Repository owner.                                   |
-| Q7  | What package licence and external publication policy apply?                                                           | Record before publishing code or promising distribution terms.                                                    | Sponsor/repository owner.                           |
-| Q8  | Who accepts scoped trusted-boundary exceptions and released proof-API changes?                                        | Assign authority and expiry/revisit policy; an exception cannot count as proof or waive ordinary safe-API checks. | Sponsor to designate.                               |
-| Q9  | Which exact verification profiles, theorem scope and optional Polars capabilities are supported at each release gate? | Resolve through B01/B02/B05/B06 and record unsupported targets; do not infer Rust features from Python numbering. | Technical and assurance owners, not yet designated. |
+| ID  | Question                                                                                                              | Why it matters and resolution condition                                                                           | Authority                                                                                                       |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Q1  | Which maintainer accepts architecture, scope changes, and release readiness?                                          | Record decision rights before implementation approval; advice is not approval.                                    | Accepted: sponsor and technical owner `leynos` ([D01](decision-register.md#d01)).                               |
+| Q2  | Which runtime, memory, compile-cost, proof-runtime/solver-memory, and CI thresholds govern the experiments?           | Record control workloads and thresholds before measuring candidate acceptance.                                    | Sponsor and designated technical owner.                                                                         |
+| Q3  | Which Rust/MSRV and exact dependency feature matrix form the initial baseline?                                        | Resolve from current compatible releases and execute the proposed build matrix.                                   | Technical owner.                                                                                                |
+| Q4  | Is the proposed core/integration split the intended release boundary?                                                 | Accept or amend the scope matrix in `technical-design.md` §2.                                                     | Accepted: scope split unchanged ([D03](decision-register.md#d03)).                                              |
+| Q5  | Which current trasic source revision and geometry/reference contracts should adoption target?                         | Inspect that revision before claiming integration or performance benefit.                                         | Trasic maintainer, not yet identified here.                                                                     |
+| Q6  | Where should this pack be published, and under which repository contribution rules?                                   | Resolve an accessible repository; no destination was established in this inspection.                              | Repository owner.                                                                                               |
+| Q7  | What package licence and external publication policy apply?                                                           | Record before publishing code or promising distribution terms.                                                    | Accepted: ISC, unpublished until task 4.3.3 ([D04](decision-register.md#d04), [D05](decision-register.md#d05)). |
+| Q8  | Who accepts scoped trusted-boundary exceptions and released proof-API changes?                                        | Assign authority and expiry/revisit policy; an exception cannot count as proof or waive ordinary safe-API checks. | Accepted: `leynos` ([D01](decision-register.md#d01)); exception policy ([D02](decision-register.md#d02)).       |
+| Q9  | Which exact verification profiles, theorem scope and optional Polars capabilities are supported at each release gate? | Resolve through B01/B02/B05/B06 and record unsupported targets; do not infer Rust features from Python numbering. | Technical and assurance owners, not yet designated.                                                             |
 
 ## 10. Handoff
 
 The material is sufficient for design review and bounded implementation
-planning. It does not itself approve a release, set budgets, or resolve the
-questions above. `technical-design.md` maps goals to requirements and
-verification obligations; `roadmap.md` sequences those obligations as
-falsifiable workstreams. `context.md` owns domain terminology.
+planning. It does not itself approve a release or set budgets. The
+[decision register](decision-register.md) records the answers to the questions
+above as they are accepted; Q1, Q4, Q7, and Q8 are answered.
+`technical-design.md` maps goals to requirements and verification obligations;
+`roadmap.md` sequences those obligations as falsifiable workstreams.
+`context.md` owns domain terminology.
 
-Potential ADR subjects are the semantic/numerical contract, macro staging and
-stable-Rust application interface, backend/cell boundary, and initial release
-scope. They are candidates, not fabricated accepted ADRs.
+The register's
+[candidate ADR subjects](decision-register.md#candidate-adr-subjects) record
+the disposition of each potential ADR subject (D07): the semantic and numerical
+contract, macro staging and the stable-Rust application interface, and the
+initial release scope each have an ADR; the backend and cell boundary is
+deferred to task 1.2.1.
 
 Implementation that contradicts an agreed requirement must surface the conflict
 and reconcile the upstream documents before claiming completion. An unmeasured

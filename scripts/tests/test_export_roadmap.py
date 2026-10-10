@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -86,6 +87,16 @@ def test_open_checkboxes_export_as_open_status():
     statuses = {task['status'] for phase in parse_roadmap(ALL_OPEN_ROADMAP)['phases']
                 for step in phase['steps'] for task in step['tasks']}
     assert statuses == {'open'}, 'every task in the fixed fixture must export as open'
+
+
+def test_checkboxes_export_as_task_status():
+    """Require every completed JSON task to match a checked roadmap box."""
+    ticked = set(re.findall(r'^- \[x\] (\d+\.\d+\.\d+)\.', ROADMAP, re.MULTILINE))
+    exported = {task['id']: task['status'] for phase in parse_roadmap(ROADMAP)['phases']
+                for step in phase['steps'] for task in step['tasks']}
+    assert {task_id for task_id, status in exported.items() if status == 'done'} == ticked, (
+        'exactly the ticked checkboxes export as done')
+    assert set(exported.values()) <= {'open', 'done'}, 'status is open or done'
 
 
 @pytest.mark.parametrize(('text', 'expected'), [

@@ -401,6 +401,21 @@ also describe the Node.js or Bun route with the official Mermaid CLI. Set
 `--no-sandbox`: this disables the Chromium sandbox when using that renderer and
 is inert with `merman-cli`.
 
+## Licence and publication
+
+Combobulate is ISC-licensed (decision D04). `Cargo.toml` sets `publish = false`
+(decision D05), so `cargo publish` refuses to run. The flag stays until two
+things hold: the Core acceptance dossier (roadmap task 4.3.3) passes, and the
+sponsor, `leynos`, approves release. Record that approval in
+`spec/decisions.json` as a new decision that supersedes D05, with its approval
+reference, and remove `publish = false` in the same pull request; the design
+checks reject the removal while D05 stands accepted. The rationale is in
+[ADR-0004](adrs/adr-0004-licence-and-publication.md). Pre-1.0 API and
+proof-interface changes follow
+[ADR-0005](adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md): no
+compatibility shims, Cargo's 0.y.z rule, and proof-interface versioning with
+the crate.
+
 ## Design contract checks
 
 Install `tools/requirements.txt`, then run `make design-check`. The dedicated

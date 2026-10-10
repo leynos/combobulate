@@ -11,9 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from check_docs import collect_checks
 from docs_validation.context import ValidationContext
-from docs_validation.decisions import check_decision_register
+from docs_validation.decisions import (
+    GOVERNING_DOCUMENTS, check_decision_register, check_governing_documents, check_register_records,
+)
 from docs_validation.ledger import check_generated_documents, generated_documents
-from test_decision_register import REGISTER
+from test_decision_register import REGISTER, RETIRED
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -63,6 +65,43 @@ class RealRegister(unittest.TestCase):
         with patch.object(Path, 'read_text', read_text):
             with self.assertRaisesRegex(AssertionError, 'Generated content drift: docs/decision-register.md'):
                 check_generated_documents(context, context.load('spec/vocabulary.json')['entries'])
+
+
+class RealGoverningDocuments(unittest.TestCase):
+    """Keep accepted decisions reconciled with the committed governing documents."""
+
+    def setUp(self) -> None:
+        self.records = check_register_records(REGISTER)
+        self.documents = {name: (ROOT / name).read_text(encoding='utf-8') for name in GOVERNING_DOCUMENTS}
+
+    def assert_rejected(self, message: str) -> None:
+        with self.assertRaisesRegex(AssertionError, message):
+            check_governing_documents(self.records, self.documents)
+
+    def test_committed_documents_pass(self) -> None:
+        """The five committed governing documents satisfy accepted decisions."""
+        check_governing_documents(self.records, self.documents)
+
+    def test_reinserted_q4_sentence_names_d03(self) -> None:
+        """Reject a retired release-scope sentence with its decision identifier."""
+        self.documents['docs/technical-design.md'] += f'\n{RETIRED}\n'
+        self.assert_rejected('still states text retired by D03')
+
+    def test_rewrapped_q4_sentence_names_d03(self) -> None:
+        """Detect the retired sentence across a Markdown line wrap."""
+        self.documents['docs/technical-design.md'] += '\nThe classes remain proposed\npending ToR Q4.\n'
+        self.assert_rejected('still states text retired by D03')
+
+    def test_q4_described_as_open_names_d03(self) -> None:
+        """Reject a live document that describes the accepted Q4 scope as open."""
+        self.documents['docs/roadmap.md'] += '\nQ4 remains open.\n'
+        self.assert_rejected(r'docs/roadmap.md describes Q4 \(D03\)')
+
+    def test_deleted_q4_anchor_names_d03(self) -> None:
+        """Require the Terms of Reference Q4 row to retain its decision anchor."""
+        terms = self.documents['docs/terms-of-reference.md']
+        self.documents['docs/terms-of-reference.md'] = terms.replace('decision-register.md#d03', 'decision-register.md')
+        self.assert_rejected('ToR §9 row Q4 must link decision-register.md#d03')
 
 
 if __name__ == '__main__':

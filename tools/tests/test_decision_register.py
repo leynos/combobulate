@@ -27,6 +27,16 @@ RETIRED = 'The classes remain proposed pending ToR Q4.'
 REGISTER_LINK = 'See the [decision register](decision-register.md).\n'
 
 
+def proposed_register() -> dict:
+    """Return the committed register with every decision reset to proposed, as a synthetic baseline."""
+    register = copy.deepcopy(REGISTER)
+    register.pop('authorities', None)
+    for entry in register['decisions']:
+        entry.update({'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+                      'approval_reference': None, 'adr': None, 'retired_statements': []})
+    return register
+
+
 def record(register: dict, decision_id: str) -> dict:
     """Return the mutable record for one decision."""
     return next(entry for entry in register['decisions'] if entry['id'] == decision_id)
@@ -44,7 +54,7 @@ def accept(register: dict, decision_id: str) -> None:
 
 def accepted_register() -> dict:
     """Return a register in which D01 and D03 are accepted, D03 with its ADR and a retired statement."""
-    register = copy.deepcopy(REGISTER)
+    register = proposed_register()
     register['authorities'] = {'decision': 'D01', 'roles': {'sponsor': 'leynos', 'technical-owner': 'leynos'}}
     accept(register, 'D01')
     accept(register, 'D03')
@@ -81,12 +91,12 @@ class RegisterInvariants(unittest.TestCase):
         check_register_records(register)
 
     def test_duplicate_identifier_fails(self):
-        register = copy.deepcopy(REGISTER)
+        register = proposed_register()
         register['decisions'].append(copy.deepcopy(record(register, 'D03')))
         self.assert_rejected(register, 'Duplicate decision D03')
 
     def test_unknown_recommendation_fails(self):
-        register = copy.deepcopy(REGISTER)
+        register = proposed_register()
         record(register, 'D03')['recommendation'] = 'Z'
         self.assert_rejected(register, 'Unknown recommended option in D03')
 
@@ -126,7 +136,7 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D01 is accepted but the register names no authorities')
 
     def test_authorities_must_cite_an_accepted_decision(self):
-        register = copy.deepcopy(REGISTER)
+        register = proposed_register()
         register['authorities'] = {'decision': 'D01', 'roles': {'sponsor': 'leynos', 'technical-owner': 'leynos'}}
         self.assert_rejected(register, 'Authorities cite D01, which is not an accepted decision')
 
@@ -142,12 +152,12 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'Accepted decisions D03 and D04 share a subject')
 
     def test_every_in_scope_question_needs_a_live_record(self):
-        register = copy.deepcopy(REGISTER)
+        register = proposed_register()
         record(register, 'D03')['lifecycle'] = 'withdrawn'
         self.assert_rejected(register, 'In-scope questions without a live decision: Q4')
 
     def test_one_way_supersession_fails(self):
-        register = copy.deepcopy(REGISTER)
+        register = proposed_register()
         record(register, 'D04')['supersedes'] = ['D03']
         self.assert_rejected(register, 'One-way supersession D04 -> D03')
 
@@ -174,7 +184,7 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D16 must be accepted before superseding D03')
 
     def test_candidate_must_cite_a_known_decision(self):
-        register = copy.deepcopy(REGISTER)
+        register = proposed_register()
         register['candidate_adrs'][0]['decision'] = 'D99'
         self.assert_rejected(register, 'CA1 cites unknown D99')
 
