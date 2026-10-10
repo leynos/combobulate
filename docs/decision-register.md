@@ -390,7 +390,7 @@ ADR: none yet.
   (B01); disposition decided by [D07](#d07).
 - CA6. Public proof compatibility (technical-design.md §15): recorded in
   ADR-0005 and ADR-0009; disposition decided by [D07](#d07).
-- CA7. Resource certification (technical-design.md §15): deferred to task 2.4
+- CA7. Resource certification (technical-design.md §15): deferred to step 2.4
   (B03); disposition decided by [D07](#d07).
 - CA8. Backend input and output control scope (technical-design.md §15):
   deferred to task 1.2.6 (B06); disposition decided by [D07](#d07).

@@ -107,13 +107,18 @@ def render_decision(record: dict) -> str:
     ])
 
 
+def roadmap_item(identifier: str) -> str:
+    """Name a roadmap item by its depth; e.g. '2.4' is a step and '1.2.1' is a task."""
+    return f"{'task' if identifier.count('.') == 2 else 'step'} {identifier}"
+
+
 def render_candidate(candidate: dict) -> str:
     """Render one candidate ADR subject with its disposition."""
     disposition = candidate['disposition']
     if disposition['kind'] == 'adr':
         target = 'recorded in ' + ' and '.join(disposition['adrs'])
     else:
-        target = f"deferred to task {disposition['task']}"
+        target = f"deferred to {roadmap_item(disposition['roadmap_item'])}"
         if 'bet' in disposition:
             target += f" ({disposition['bet']})"
     return bullet(f"{candidate['id']}. {candidate['subject']} ({candidate['source']}): {target}; disposition "
