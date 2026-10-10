@@ -644,8 +644,8 @@ candidate ADR subjects with a `disposition` field.
 
 Add `tools/generate_decisions.py` (mirroring `tools/generate_bets.py`) that
 renders `docs/decision-register.md` between `<!-- decisions:start -->` and
-`<!-- decisions:end -->` markers, and `docs/decision-brief-1-1.md` (hand
-written, not generated) presenting D01 to D12 for the sponsor.
+`<!-- decisions:end -->` markers, and `docs/decision-brief-1-1.md` (handwritten,
+not generated) presenting D01 to D12 for the sponsor.
 
 Add `tools/docs_validation/decisions.py` with `check_decision_register` (VO-5,
 VO-6) and register it in `tools/check_docs.py` `collect_checks`. Add
@@ -672,7 +672,7 @@ D07 dispositions in `spec/decisions.json`. Mark D01 to D07 `accepted` with the
 approval reference from the sponsor's pull request review or comment.
 
 Reconcile the five documents: ToR §9 rows Q1, Q4, Q7, Q8 gain "Resolved by D0n"
-links (the table stays hand-written; its resolution column points at the
+links (the table stays handwritten; its resolution column points at the
 register); ToR §10 and technical design §15 replace the candidate-ADR prose
 with a link to the register's disposition table and agree on all eight
 subjects; technical design §2 drops "remain proposed pending ToR Q4" for the
