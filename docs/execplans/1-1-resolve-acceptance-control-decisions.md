@@ -333,8 +333,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   The re-review's request to require at least one decision in every completion
   record was declined: MS-4 requires each cited decision to be accepted, and
   many later tasks (for example 2.1.1) are governed by no register decision, so
-  a mandatory citation would invite invented ones. Date/Author: 2026-10-11,
-  implementing agent.
+  a mandatory citation would invite invented ones. The second re-review noted
+  that the freeze check covers only decisions; that is the intended `EP-M1b`
+  scope, because the control and exception registers do not exist yet. `EP-M4`
+  and `EP-M5` now state that each register joins `freeze.FROZEN_DOCUMENTS` in
+  the commit that creates it, and the module docstring says so. Date/Author:
+  2026-10-11, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
@@ -1055,7 +1059,10 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
 - Add `spec/acceptance-controls.schema.json`, `spec/acceptance-controls.json`,
   `spec/measurement-record.schema.json` (binding `control_id` and
   `control_digest`; a `purpose` of `calibration` or `acceptance`), and
-  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16).
+  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
+  `spec/acceptance-controls.json` in `freeze.FROZEN_DOCUMENTS` with its
+  amendment-chain rule, so VO-7 covers controls from the commit that creates
+  them.
 
 Calibration (D12), recorded in `docs/acceptance-calibration.md` and machine
 records under `spec/calibration/`:
@@ -1158,7 +1165,9 @@ and the bet register's measurement sentences.
   spelling the gate enforces).
 - Add `spec/exceptions.json` with its schema, update the example and
   `check_proof_evidence_envelope`, and single-source reason codes in
-  `spec/evidence-reason-codes.json`, in one change.
+  `spec/evidence-reason-codes.json`, in one change. Register
+  `spec/exceptions.json` in `freeze.FROZEN_DOCUMENTS` (an accepted exception is
+  replaced, never altered).
 - Implement the pure `tools/docs_validation/evidence_gate.py`
   (`abstract_record`, `admit`), have `roadmap_status.py` consume it, and add
   `scripts/check_evidence.py`. Tests: VO-1 to VO-4.
