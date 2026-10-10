@@ -23,8 +23,8 @@ implemented API or completed verification.
 - [Source register](references.md): technical sources and evidence limits.
 - [Design validation](validation.md): documentation checks and outstanding
   implementation/verifier obligations.
-- [Bootstrap decision](adr-001-repository-bootstrap.md): scaffold provenance,
-  repository integration, and complexity repair boundaries.
+- [ADR-0001: repository bootstrap](adrs/adr-0001-repository-bootstrap.md):
+  scaffold provenance, repository integration, and complexity repair boundaries.
 
 ## Execution plans
 

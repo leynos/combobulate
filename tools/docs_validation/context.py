@@ -71,10 +71,10 @@ class ValidationContext:
         self.results.append(row)
 
     def markdown_paths(self) -> list[Path]:
-        """Enumerate design files and README, without traversing build outputs."""
+        """Enumerate design files, ADRs, and README, without traversing build outputs."""
         return [self.root / 'README.md'] + [
             self.root / 'docs' / name for name in DESIGN_DOCUMENTS
-        ]
+        ] + sorted((self.root / 'docs' / 'adrs').glob('adr-*.md'))
 
     def json_paths(self) -> list[Path]:
         """Enumerate source JSON inputs; the generated validation report stays separate."""
