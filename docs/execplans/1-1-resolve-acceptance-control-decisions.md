@@ -223,8 +223,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   and folded into this revision.
 - [x] (2026-10-10) Upstream request leynos/mapsplice#144 filed for a JSON
   export and export validator.
-- [ ] `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode exporter and
-  drift validator (separate stacked pull request, sponsor-directed).
+- [x] (2026-10-10) `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode
+  exporter and drift validator (separate stacked pull request,
+  sponsor-directed). Evidence: the fresh export equals the previous
+  `spec/roadmap.json` exactly apart from the new per-task `status` field; 14
+  export tests pass, including a 60-example derandomized round-trip property
+  that observed every required structural class; seeded faults (dropped
+  details, ignored ticks) each fail the suite; `make design-check` passes with
+  127 tests.
 - [ ] Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
