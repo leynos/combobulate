@@ -861,7 +861,9 @@ revision 0.2 archive. See the
 
 ## Licence
 
-The project uses the ISC licence. See [LICENSE](LICENSE).
+The project uses the ISC licence. See [LICENSE](LICENSE). The crate is not
+published to crates.io until its Core release is accepted; see the
+[licence and publication decision](docs/adrs/adr-0004-licence-and-publication.md).
 
 No licence is granted for temporal paradoxes arising from attempts to send
 optimized expression graphs to 1975.

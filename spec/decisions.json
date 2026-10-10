@@ -7,6 +7,13 @@
     "Q7",
     "Q8"
   ],
+  "authorities": {
+    "decision": "D01",
+    "roles": {
+      "sponsor": "leynos",
+      "technical-owner": "leynos"
+    }
+  },
   "decisions": [
     {
       "id": "D01",
@@ -30,15 +37,36 @@
       ],
       "recommendation": "B",
       "rationale": "Terms of reference §9 already names \"Sponsor and technical owner\" as the authority for Q2 and Q4; choosing the sponsor alone would require amending that column.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "B",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D01"
+        ],
+        "answer": "Sponsor and technical owner @leynos"
+      },
+      "adr": "docs/adrs/adr-0002-governance-authority.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/terms-of-reference.md",
+          "text": "Requested the work; final technical and release authority still needs explicit designation."
+        },
+        {
+          "document": "docs/terms-of-reference.md",
+          "text": "Sponsor to designate."
+        },
+        {
+          "document": "docs/terms-of-reference.md",
+          "text": "It does not itself approve a release, set budgets, or resolve the questions above."
+        }
+      ]
     },
     {
       "id": "D02",
@@ -57,15 +85,28 @@
       ],
       "recommendation": "A",
       "rationale": "Bounded lifetimes force each exception to be revisited, and a narrowed claim keeps an exception from being read as proof (technical design §17.2, GAP9).",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D02"
+        ],
+        "answer": "Accepted"
+      },
+      "adr": "docs/adrs/adr-0002-governance-authority.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/technical-design.md",
+          "text": "Proof-exception and specification-compatibility authority unassigned."
+        }
+      ]
     },
     {
       "id": "D03",
@@ -89,15 +130,36 @@
       ],
       "recommendation": "A",
       "rationale": "The split already maps every requirement to a roadmap phase and keeps integration work out of the Core acceptance dossier.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D03"
+        ],
+        "answer": "Accepted"
+      },
+      "adr": "docs/adrs/adr-0003-initial-release-scope.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/technical-design.md",
+          "text": "The classes remain proposed pending ToR Q4."
+        },
+        {
+          "document": "docs/language-reference.md",
+          "text": "The **Core** scope is the proposed initial numeric-language release."
+        },
+        {
+          "document": "docs/context.md",
+          "text": "Unresolved choices include a dependency/toolchain baseline, quantitative performance and compile-cost gates, the accepted core release boundary, and actual trasic adoption access."
+        }
+      ]
     },
     {
       "id": "D04",
@@ -116,12 +178,20 @@
       ],
       "recommendation": "A",
       "rationale": "ISC is permissive and is already in place through ADR-0001; ratification removes the open question without changing any file.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D04"
+        ],
+        "answer": "Accepted"
+      },
+      "adr": "docs/adrs/adr-0004-licence-and-publication.md",
       "supersedes": [],
       "superseded_by": null,
       "retired_statements": []
@@ -143,15 +213,32 @@
       ],
       "recommendation": "A",
       "rationale": "Publication before the Core dossier would promise distribution terms for an unproven library.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D05"
+        ],
+        "answer": "Accepted. Ensure this is clearly documented in the developer's guide."
+      },
+      "adr": "docs/adrs/adr-0004-licence-and-publication.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/technical-design.md",
+          "text": "Q1/Q4/Q7; docs stay proposed and unreleased."
+        },
+        {
+          "document": "docs/technical-design.md",
+          "text": "Initial release boundary, licence, and authorities unratified."
+        }
+      ]
     },
     {
       "id": "D06",
@@ -169,15 +256,28 @@
       ],
       "recommendation": "A",
       "rationale": "It applies the existing no-compatibility-machinery constraint to both the Rust API and the proof interface that downstream proofs depend on.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D06"
+        ],
+        "answer": "Accepted"
+      },
+      "adr": "docs/adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/context.md",
+          "text": "No blanket source-API compatibility machinery is proposed for this unreleased, pre-1.0 library."
+        }
+      ]
     },
     {
       "id": "D07",
@@ -195,15 +295,28 @@
       ],
       "recommendation": "A",
       "rationale": "Each subject is decided where its evidence arises; subjects that depend on unrun bets are deferred to the tasks that run them.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D07"
+        ],
+        "answer": "Accepted. Please update the documentation style guide to place ADRs in `docs/adrs/` with naming pattern `adr-nnnn-foo-bar-qux.md` where `nnnn` is a four digit index and `foo-bar-qux` is the title slug. Similarly, RFCs in `docs/rfcs/` with naming pattern `rfc-nnnn-foo-bar-qux.md`\n\nThis breaks from current DF12 standards, but the current practice is really starting to bug me and I want to take this opportunity to revise it. If it goes well, we will update the centralized documentation style guide in `agent-helper-scripts` documentation library."
+      },
       "adr": null,
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/terms-of-reference.md",
+          "text": "They are candidates, not fabricated accepted ADRs."
+        }
+      ]
     },
     {
       "id": "D08",
@@ -363,12 +476,20 @@
       ],
       "recommendation": "A",
       "rationale": "Code-owner review would make an unauthorized register edit a blocked merge rather than a reviewer catch.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "B",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D13"
+        ],
+        "answer": "No, we don't do `.github/CODEOWNERS`. If we magically acquire another dev, we can change this."
+      },
+      "adr": "docs/adrs/adr-0002-governance-authority.md",
       "supersedes": [],
       "superseded_by": null,
       "retired_statements": []
