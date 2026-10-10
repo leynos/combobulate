@@ -5,6 +5,9 @@ implementers, extension authors, and reviewers. Companions: `context.md`,
 `technical-design.md`, and `roadmap.md`. Machine-readable table source:
 `../spec/vocabulary.json`.
 
+Decisions that control acceptance, with their authority, options, and status,
+are recorded in the [decision register](decision-register.md).
+
 No entry denotes a released or compiled implementation. The **Core** scope is
 the proposed initial numeric-language release. **Integration** entries belong
 to the explicitly gated typed-cell/segmented workstreams. Their presence in

@@ -13,7 +13,7 @@ from pathlib import Path
 from types import ModuleType
 
 DESIGN_DOCUMENTS = (
-    'context.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
+    'context.md', 'decision-register.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
     'roadmap.md', 'technical-design.md', 'terms-of-reference.md',
     'testable-bets.md', 'validation.md',
 )

@@ -512,7 +512,8 @@ Place ADRs in the `docs/adrs/` directory.
 This repository deliberately diverges from the shared df12 documentation style
 guide, which places ADRs directly under `docs/` with a three-digit index and
 names RFCs without a prefix. The sponsor adopted the `docs/adrs/` and
-`docs/rfcs/` layout on 2026-10-10 (decision D07); if it works well, the shared
+`docs/rfcs/` layout on 2026-10-10 (decision D07 in the
+[decision register](decision-register.md#d07)); if it works well, the shared
 guide will be updated to match.
 
 ### Required sections

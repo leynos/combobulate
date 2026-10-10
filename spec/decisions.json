@@ -1,0 +1,522 @@
+{
+  "revision": "0.2",
+  "in_scope_questions": [
+    "Q1",
+    "Q2",
+    "Q4",
+    "Q7",
+    "Q8"
+  ],
+  "decisions": [
+    {
+      "id": "D01",
+      "subject": "Decision authority for architecture, scope, release readiness, exceptions, and proof-API changes",
+      "questions": [
+        "Q1",
+        "Q8"
+      ],
+      "authority_roles": [
+        "sponsor"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "The sponsor alone accepts every decision."
+        },
+        {
+          "id": "B",
+          "summary": "The sponsor plus a named technical owner, who may be the same person, with delegated acceptance of contract records and pre-registrations."
+        }
+      ],
+      "recommendation": "B",
+      "rationale": "Terms of reference §9 already names \"Sponsor and technical owner\" as the authority for Q2 and Q4; choosing the sponsor alone would require amending that column.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D02",
+      "subject": "Trusted-boundary exception policy",
+      "questions": [
+        "Q8"
+      ],
+      "authority_roles": [
+        "sponsor"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "An exception is valid from its approval date until its `invalid_from` date, at most 90 days and never past the next release-gate task (4.3.3 or 6.3.4); renewal is a new approval; an exception names a narrowed claim and can never satisfy a proof-required component."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Bounded lifetimes force each exception to be revisited, and a narrowed claim keeps an exception from being read as proof (technical design §17.2, GAP9).",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D03",
+      "subject": "Initial release scope",
+      "questions": [
+        "Q4"
+      ],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Accept the Core, Integration, and Deferred split in technical design §2 unchanged."
+        },
+        {
+          "id": "B",
+          "summary": "Amend the scope matrix in technical design §2 before acceptance."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "The split already maps every requirement to a roadmap phase and keeps integration work out of the Core acceptance dossier.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D04",
+      "subject": "Package licence",
+      "questions": [
+        "Q7"
+      ],
+      "authority_roles": [
+        "sponsor"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Ratify the ISC licence already recorded in `Cargo.toml`, `LICENSE`, and `README.md`."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "ISC is permissive and is already in place through ADR-0001; ratification removes the open question without changing any file.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D05",
+      "subject": "External publication policy",
+      "questions": [
+        "Q7"
+      ],
+      "authority_roles": [
+        "sponsor"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Set `publish = false` in `Cargo.toml` until the Core acceptance dossier (task 4.3.3) passes and the D01 authority approves release."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Publication before the Core dossier would promise distribution terms for an unproven library.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D06",
+      "subject": "Pre-1.0 API and public proof-interface compatibility policy",
+      "questions": [],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Ratify ToR C5 and technical design §15 row 10 (no shims for pre-1.0 or unreleased APIs); follow Cargo's 0.y.z rule (a change to the leftmost non-zero component is breaking); version the public proof interface (models, pre- and postconditions, lemmas, trust declarations) with the crate version, treating a strengthened precondition or weakened postcondition as breaking (technical design §17.8). MSRV stays with ToR Q3 and task 1.2.1."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "It applies the existing no-compatibility-machinery constraint to both the Rust API and the proof interface that downstream proofs depend on.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D07",
+      "subject": "Dispositions of the candidate ADR subjects",
+      "questions": [],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Numerical and array semantics to ADR-0006; macro staging and stable-Rust application to ADR-0007; initial release scope to ADR-0003; public proof compatibility to ADR-0005 and ADR-0009; shared semantic kernel and backend and cell separation deferred to task 1.2.1 (B01 can falsify the kernel in 1.2.4); resource certification deferred to step 2.4 (B03); backend input and output control scope deferred to task 1.2.6 (B06)."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Each subject is decided where its evidence arises; subjects that depend on unrun bets are deferred to the tasks that run them.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D08",
+      "subject": "`comb!` operator precedence",
+      "questions": [],
+      "authority_roles": [
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Rust's expression precedence as parsed by `syn`, with `|>` split from the token stream first (lowest precedence, left-associative); reject, with a first-screen diagnostic, any comparison that is the unparenthesized operand of `&`, `|`, or `^` and vice versa; translate the chained-comparison error from `syn` into the same diagnostic."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Reusing Rust precedence keeps `comb!` readable to Rust developers, and rejecting comparison mixed with bitwise operators removes the one precedence trap Rust users commonly misread.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D09",
+      "subject": "F64 special values in reductions and binary `min` and `max`",
+      "questions": [],
+      "authority_roles": [
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Binary `min` and `max` follow IEEE 754-2019 `minimum` and `maximum` (NaN propagates; negative zero is less than positive zero); null propagation takes precedence over NaN; an empty F64 `sum` returns positive zero (the registered typed zero) while `sum([-0.0])` returns negative zero (a singleton passes through); a `mean` count of exactly 2^53 is admitted."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "IEEE 754-2019 `minimum` and `maximum` are total and deterministic, unlike the NaN-ignoring `minNum` and `maxNum` operations.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D10",
+      "subject": "Typed-cell atomicity",
+      "questions": [],
+      "authority_roles": [
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Record two distinct rules under distinct names: cell atomicity (a typed cell such as `DVec3` is one logical element until an explicit component operation; `Batch<DVec3>` of shape `[2,3]` has cardinality 6) and atomic output commit (failure or cancellation before commit leaves the destination unchanged)."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "The single phrase \"typed-cell atomicity\" had been used for two unrelated guarantees.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D11",
+      "subject": "Acceptance measurement environments",
+      "questions": [
+        "Q2"
+      ],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "A named, otherwise idle reference machine (CPU model, cores, memory, governor, SMT, kernel, isolation)."
+        },
+        {
+          "id": "B",
+          "summary": "Paired, interleaved runs within one hosted job on a pinned `ubuntu-24.04` runner class, with instruction counts as the primary metric and wall time secondary; proof and build ceilings use the same runner class; shared development hosts are never acceptance environments."
+        }
+      ],
+      "recommendation": "B",
+      "rationale": "The hosted paired design needs no dedicated hardware and controls drift by interleaving.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D12",
+      "subject": "Acceptance thresholds and statistics",
+      "questions": [
+        "Q2"
+      ],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "The sponsor supplies or amends every threshold value in the pre-registration proposal."
+        },
+        {
+          "id": "B",
+          "summary": "Delegate threshold selection to calibration: realistic measurements on the development machine, extrapolated to the hosted runner class, with the evidence recorded."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Thresholds govern acceptance, so the planning agent did not choose them itself.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D13",
+      "subject": "Governance enforcement",
+      "questions": [],
+      "authority_roles": [
+        "sponsor"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Commit `.github/CODEOWNERS` naming the D01 logins for the decision, exception, acceptance-control, and semantic-contract registers and the ADRs, with required code-owner review and a required Design contracts check on main."
+        },
+        {
+          "id": "B",
+          "summary": "No `CODEOWNERS` file; the base-revision freeze check and the sponsor's pull request review and merge are the controls, revisited if another developer joins."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Code-owner review would make an unauthorized register edit a blocked merge rather than a reviewer catch.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D14",
+      "subject": "`div` on I64 operands",
+      "questions": [],
+      "authority_roles": [
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Convert each operand to F64 (round to nearest, ties to even), then apply IEEE division, matching Rust `as f64` and common backends; document that this can differ from rounding the exact quotient once."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Technical design §6.1 says only \"true division to F64\"; converting operands first matches what every candidate backend computes.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    },
+    {
+      "id": "D15",
+      "subject": "Prospective details for later roadmap tasks",
+      "questions": [],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "Add details to the roadmap now so later criteria are fixed in advance: 1.2.1 and 1.2.4 build the trust-audit scanner and verifier log parsers and replay the gate rule table from Rust; 1.2.3 replays the semantic examples as `rstest` cases; 2.3.1 replays every grammar corpus entry as a `trybuild` pass or fail fixture, with a completeness check."
+        }
+      ],
+      "recommendation": "A",
+      "rationale": "Fixing the replay obligations before those tasks start prevents their success criteria from being chosen after the fact.",
+      "lifecycle": "proposed",
+      "decided_option": null,
+      "accepted_by": null,
+      "accepted_on": null,
+      "approval_reference": null,
+      "adr": null,
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
+    }
+  ],
+  "candidate_adrs": [
+    {
+      "id": "CA1",
+      "subject": "Numerical and array semantics",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "adr",
+        "adrs": [
+          "ADR-0006"
+        ]
+      }
+    },
+    {
+      "id": "CA2",
+      "subject": "Macro staging and stable-Rust application",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "adr",
+        "adrs": [
+          "ADR-0007"
+        ]
+      }
+    },
+    {
+      "id": "CA3",
+      "subject": "Backend and cell separation",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "deferred",
+        "task": "1.2.1"
+      }
+    },
+    {
+      "id": "CA4",
+      "subject": "Initial feature and release scope",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "adr",
+        "adrs": [
+          "ADR-0003"
+        ]
+      }
+    },
+    {
+      "id": "CA5",
+      "subject": "Shared semantic kernel",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "deferred",
+        "task": "1.2.1",
+        "bet": "B01"
+      }
+    },
+    {
+      "id": "CA6",
+      "subject": "Public proof compatibility",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "adr",
+        "adrs": [
+          "ADR-0005",
+          "ADR-0009"
+        ]
+      }
+    },
+    {
+      "id": "CA7",
+      "subject": "Resource certification",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "deferred",
+        "task": "2.4",
+        "bet": "B03"
+      }
+    },
+    {
+      "id": "CA8",
+      "subject": "Backend input and output control scope",
+      "source": "technical-design.md §15",
+      "decision": "D07",
+      "disposition": {
+        "kind": "deferred",
+        "task": "1.2.6",
+        "bet": "B06"
+      }
+    }
+  ]
+}
