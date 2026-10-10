@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from types import ModuleType
 
 from .context import ValidationContext, require, same_typed_value
 from .markdown import generated_matches
@@ -103,15 +104,19 @@ def check_roadmap_export(context: ValidationContext) -> None:
             'Roadmap export drift: run scripts/export_roadmap.py')
 
 
+def generated_documents(context: ValidationContext, catalogue: list[dict]) -> list[tuple[ModuleType, object, str]]:
+    """List each generator module with its master data and generated document."""
+    return [
+        (context.load_generator('generate_reference.py'), catalogue, 'docs/language-reference.md'),
+        (context.load_generator('generate_bets.py'), context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
+        (context.load_script('generate_decisions.py'), context.load('spec/decisions.json'), 'docs/decision-register.md'),
+    ]
+
+
 def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
     """Check generated contents against masters, allowing only Markdown formatting."""
-    inputs = [
-        ('generate_reference.py', catalogue, 'docs/language-reference.md'),
-        ('generate_bets.py', context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
-    ]
-    for filename, source, path in inputs:
-        generator = context.load_generator(filename)
-        text = (context.root / path).read_text()
+    for generator, source, path in generated_documents(context, catalogue):
+        text = (context.root / path).read_text(encoding='utf-8')
         require(generated_matches(text, generator.render(source), generator.START, generator.END),
                 f'Generated content drift: {path}')
 

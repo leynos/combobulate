@@ -241,7 +241,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   shebang; `make design-check` passes.
 - [x] (2026-10-11) Sponsor approval of this revision (implementation workflow
   invoked for this plan).
-- [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
+- [x] (2026-10-11) `EP-M1a` ADR relocation, decision register, generator, and
+  anchors (branch `1-1-decision-register`, stacked on `EP-M0`). Evidence: ADR
+  001 moved to `docs/adrs/adr-0001-repository-bootstrap.md` with every link
+  updated and the style guide amended (D07); `spec/decisions.json` holds D01 to
+  D15 (all `proposed`) and the eight candidate ADR subjects; 11 pytest cases in
+  `scripts/tests/test_generate_decisions.py` (red first: module missing) and 33
+  `unittest` cases in `tools/tests/test_decision_register.py` pass; seeded
+  mutations (open-status pattern disabled, supersession check removed) each
+  fail their control; a hand edit of `docs/decision-register.md` fails the
+  drift check (VO-14).
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
@@ -251,6 +260,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: generated register text containing `Batch<DVec3>` failed
+  `make fmt` (markdownlint MD033, inline HTML). Evidence: `make fmt` exit 2
+  naming `docs/decision-register.md`. Impact: register master text puts code
+  identifiers in backticks.
+- Observation: `tools/tests/test_docs_validation.py` pinned the checked
+  Markdown count at 10. Impact: it now derives the count from
+  `DESIGN_DOCUMENTS`, so adding a design document needs no test edit.
 - Observation: the checker forbids any completed roadmap task.
   Evidence: `tools/docs_validation/ledger.py` `check_task_links` fails with
   "Roadmap has fabricated completed tasks"; `tools/generate_roadmap.py` always
@@ -292,6 +308,23 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M1a` exceeded the per-milestone line tolerance (about 1,600
+  net added lines against 1,500, excluding the generated register region and
+  the validation report). The overrun is the register master itself
+  (`spec/decisions.json`, 522 lines of indented JSON for 15 decisions and 8
+  candidate subjects), not added scope; file count (24) is within tolerance.
+  Escalated to the sponsor in the milestone pull request rather than
+  compressing the master's formatting to fit. Date/Author: 2026-10-11,
+  implementing agent.
+- Decision: in `EP-M1a`, VO-5's question coverage is checked over live
+  records (`proposed` or `accepted`), because acceptances arrive in `EP-M2` to
+  `EP-M4`. Coverage by accepted records then follows from closure: tasks 1.1.1
+  to 1.1.4 cite the decisions for Q1, Q2, Q4, Q7, and Q8, and MS-4 forbids a
+  tick while a cited decision is not accepted. The register's `authorities` map
+  is optional in the schema and required by the checker once any record is
+  accepted, and it must cite an accepted D01. Options include the alternatives
+  the sponsor chose where they differ from the recommendation (D12 option B,
+  D13 option B). Date/Author: 2026-10-11, implementing agent.
 - Decision: record the sponsor's answers to D01 to D15 as given in the Lody
   session on 2026-10-10 (see `Sponsor decisions`). Approval references use
   `kind: session` with the verbatim answers; the sponsor's merge of the

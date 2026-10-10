@@ -5,6 +5,9 @@ implementers, reviewers, and prospective adopters. Companions: `context.md`,
 `technical-design.md`, `roadmap.md`, `language-reference.md`, and
 `references.md`.
 
+Decisions that control acceptance, with their authority, options, and status,
+are recorded in the [decision register](decision-register.md).
+
 ## 1. Background and motivation
 
 Combobulate addresses a readability and reuse problem in Rust collection
