@@ -23,7 +23,7 @@
     {
       "check": "roadmap",
       "status": "pass",
-      "detail": "All tasks remain open, have success/design contracts, and form an acyclic earlier-dependency graph.",
+      "detail": "0 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
       "count": 72
     },
     {
@@ -90,7 +90,13 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 35
+      "count": 39
+    },
+    {
+      "check": "roadmap-status",
+      "status": "pass",
+      "detail": "0 of 72 tasks ticked (none); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 0
     }
   ],
   "not_run": [

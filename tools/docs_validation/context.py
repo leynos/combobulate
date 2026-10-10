@@ -9,6 +9,7 @@ import importlib.util
 import json
 import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from types import ModuleType
 
@@ -54,10 +55,15 @@ def same_typed_value(actual: object, expected: object) -> bool:
 
 @dataclass
 class ValidationContext:
-    """Keep inputs and reports local; e.g. ValidationContext(Path('/repo'))."""
+    """Keep inputs and reports local; e.g. ValidationContext(Path('/repo'), as_of=date(2026, 10, 11)).
+
+    ``as_of`` is injected by the caller (``make design-check`` passes the HEAD
+    commit date) so date-dependent checks never read the wall clock.
+    """
 
     root: Path
     results: list[dict[str, object]] = field(default_factory=list)
+    as_of: date | None = None
 
     def load(self, name: str) -> dict:
         """Read JSON beneath the root; e.g. context.load('spec/bets.json')."""

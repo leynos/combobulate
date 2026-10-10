@@ -213,9 +213,13 @@ help: ## Show available targets
 
 
 PYTHON ?= python3
+# Date-dependent design checks use the HEAD commit date, never the wall clock.
+AS_OF ?= $(shell git log -1 --format=%cs)
+# Set BASE_REV (for example to the merge base) to reject edits to frozen registers.
+BASE_REV ?=
 .PHONY: design-check
 
 design-check: ## Validate design documents, fixtures, and generator contracts
-	$(PYTHON) tools/check_docs.py
+	$(PYTHON) tools/check_docs.py --as-of $(AS_OF) $(if $(BASE_REV),--base-rev $(BASE_REV))
 	$(PYTHON) -m unittest discover -s tools/tests
 	$(PYTHON) -m pytest -q scripts/tests
