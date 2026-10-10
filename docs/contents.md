@@ -26,6 +26,11 @@ implemented API or completed verification.
 - [Bootstrap decision](adr-001-repository-bootstrap.md): scaffold provenance,
   repository integration, and complexity repair boundaries.
 
+## Execution plans
+
+- [Roadmap 1.1: resolve the decisions that control acceptance](execplans/1-1-resolve-acceptance-control-decisions.md):
+  draft ExecPlan awaiting sponsor approval.
+
 ## Project guides
 
 - [User guide](users-guide.md): current availability and design examples.
