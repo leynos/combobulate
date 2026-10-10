@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:combobulate:design:semantic-contracts:0.2",
+  "title": "Combobulate semantic contract records",
+  "description": "Logical contracts of public primitives, independent of any implementation. Native kernel declarations use kernel-contract.schema.json instead and cite these identifiers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revision", "error_codes", "excluded_names", "contracts"],
+  "properties": {
+    "revision": {"const": "0.2"},
+    "error_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[A-Z][A-Za-z0-9]+$"}
+    },
+    "excluded_names": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "reason"],
+        "properties": {"name": {"$ref": "#/$defs/text"}, "reason": {"$ref": "#/$defs/text"}}
+      }
+    },
+    "contracts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/contract"}}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "texts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "title", "decision", "catalogue_ids", "preconditions", "success_relation", "success_conditions",
+        "error_relation", "mutation_frame", "termination", "empty_rule", "examples", "seeded_mutations",
+        "discharged_by", "proof_sketch"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^SC-[0-9]{2}$"},
+        "title": {"$ref": "#/$defs/text"},
+        "decision": {"type": "string", "pattern": "^D[0-9]{2}$"},
+        "catalogue_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][0-9]{3}$"}
+        },
+        "preconditions": {"$ref": "#/$defs/texts"},
+        "success_relation": {"$ref": "#/$defs/text"},
+        "success_conditions": {"$ref": "#/$defs/texts"},
+        "error_relation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["condition", "error"],
+            "properties": {"condition": {"$ref": "#/$defs/text"}, "error": {"$ref": "#/$defs/text"}}
+          }
+        },
+        "mutation_frame": {"$ref": "#/$defs/text"},
+        "termination": {"$ref": "#/$defs/text"},
+        "empty_rule": {"$ref": "#/$defs/text"},
+        "examples": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^(?:EX|G)[0-9]{2}$"}
+        },
+        "seeded_mutations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "description"],
+            "properties": {"id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"}, "description": {"$ref": "#/$defs/text"}}
+          }
+        },
+        "discharged_by": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "pattern": "^(?:PF[0-9]{2}\\.[a-z][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+|task:[0-9]+\\.[0-9]+\\.[0-9]+)$"}
+        },
+        "proof_sketch": {"$ref": "#/$defs/text"}
+      }
+    }
+  }
+}
