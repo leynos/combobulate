@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from docs_validation.context import ValidationContext
+from docs_validation.context import DESIGN_DOCUMENTS, ValidationContext
 from docs_validation.contracts import check_backend_capabilities
 from docs_validation.costs import (
     classify_admission, right_prefix_work, shape_product, tracked_peak,
@@ -41,7 +41,8 @@ class MarkdownBoundaries(unittest.TestCase):
             path.parent.mkdir(exist_ok=True)
             path.write_text('Malformed markdown with no title')
         check_markdown(self.context)
-        self.assertEqual(self.context.results[0]['count'], 10)
+        self.assertEqual(self.context.results[0]['count'], 1 + len(DESIGN_DOCUMENTS),
+                         'only README and the listed design documents are checked')
 
     def test_json_inputs_exclude_repository_and_build_metadata(self):
         (self.root / 'spec').mkdir()

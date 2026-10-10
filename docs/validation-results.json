@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 10
+      "count": 12
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 24
+      "count": 40
     },
     {
       "check": "catalogue",
@@ -31,6 +31,12 @@
       "status": "pass",
       "detail": "All 19 numbered design sections occur in task references; this is referential coverage, not proof of complete implementation scope.",
       "count": 19
+    },
+    {
+      "check": "decision-register",
+      "status": "pass",
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 0 of 15 decisions are accepted. Acceptance is not verification.",
+      "count": 15
     },
     {
       "check": "kernel-contract-envelope",
@@ -84,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 31
+      "count": 35
     }
   ],
   "not_run": [

@@ -351,8 +351,11 @@ binding. Store them under `docs/rfcs/`.
 
 #### RFC naming convention
 
-Name RFC files using the pattern `0001-short-topic.md`, where `0001` is a
-zero-padded sequence number. Place RFCs in the `docs/rfcs/` directory.
+Name RFC files using the pattern `rfc-nnnn-title-slug.md`, where `nnnn` is a
+four-digit, zero-padded sequence number and `title-slug` is the RFC title in
+lower-case words joined by hyphens (e.g.
+`rfc-0001-streaming-batch-readers.md`). Place RFCs in the `docs/rfcs/`
+directory.
 
 - Number RFCs sequentially in allocation order rather than by date.
 - Do not renumber existing RFCs after publication. Gaps are acceptable when
@@ -498,9 +501,20 @@ providing a historical record for future maintainers.
 
 ### Naming convention
 
-Name ADR files using the pattern `adr-NNN-short-description.md`, where `NNN` is
-a zero-padded sequence number (e.g. `adr-001-async-fixtures-and-tests.md`).
-Place ADRs in the `docs/` directory.
+Name ADR files using the pattern `adr-nnnn-title-slug.md`, where `nnnn` is a
+four-digit, zero-padded sequence number and `title-slug` is the ADR title in
+lower-case words joined by hyphens (e.g. `adr-0001-repository-bootstrap.md`).
+Place ADRs in the `docs/adrs/` directory.
+
+- Number ADRs sequentially in allocation order and never renumber them.
+- Refer to an ADR in prose as `ADR-nnnn` (e.g. ADR-0002).
+
+This repository deliberately diverges from the shared df12 documentation style
+guide, which places ADRs directly under `docs/` with a three-digit index and
+names RFCs without a prefix. The sponsor directed the `docs/adrs/` and
+`docs/rfcs/` layout on 2026-10-10, as recorded in the
+[roadmap 1.1 execution plan's decision log](execplans/1-1-resolve-acceptance-control-decisions.md#decision-log);
+if it works well, the shared guide will be updated to match.
 
 ### Required sections
 
@@ -514,7 +528,7 @@ Every ADR must include the following sections in order:
   for readers unfamiliar with the history.
 
 When an accepted ADR needs a targeted correction rather than replacement, add an
-`Amended by ADR-NNN (YYYY-MM-DD)` banner to its Status section and an
+`Amended by ADR-nnnn (YYYY-MM-DD)` banner to its Status section and an
 `## Amendments` section that preserves the original decision as history.
 
 ### Conditional sections
@@ -556,7 +570,7 @@ Include these sections as appropriate to the decision's complexity:
 ### ADR template
 
 ```markdown
-# Architectural decision record (ADR) NNN: <title>
+# Architectural decision record (ADR) nnnn: <title>
 
 ## Status
 

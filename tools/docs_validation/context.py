@@ -13,7 +13,7 @@ from pathlib import Path
 from types import ModuleType
 
 DESIGN_DOCUMENTS = (
-    'context.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
+    'context.md', 'decision-register.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
     'roadmap.md', 'technical-design.md', 'terms-of-reference.md',
     'testable-bets.md', 'validation.md',
 )
@@ -71,10 +71,10 @@ class ValidationContext:
         self.results.append(row)
 
     def markdown_paths(self) -> list[Path]:
-        """Enumerate design files and README, without traversing build outputs."""
+        """Enumerate design files, ADRs, and README, without traversing build outputs."""
         return [self.root / 'README.md'] + [
             self.root / 'docs' / name for name in DESIGN_DOCUMENTS
-        ]
+        ] + sorted((self.root / 'docs' / 'adrs').glob('adr-*.md'))
 
     def json_paths(self) -> list[Path]:
         """Enumerate source JSON inputs; the generated validation report stays separate."""

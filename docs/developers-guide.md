@@ -405,14 +405,14 @@ is inert with `merman-cli`.
 
 Install `tools/requirements.txt`, then run `make design-check`. The dedicated
 `Design contracts` workflow runs the same target for pull requests and main.
-These checks cover specification links, generated reference/bet drift, roadmap
-export drift, example semantics, schemas, proof-evidence envelopes, and
-cost-model negative controls. They do not execute Kani, Verus, proposed Rust
-macros, or Polars probes. The default checker also verifies the committed
-validation report without changing it. After deliberate design or validator
-changes, run `python3 tools/check_docs.py --write`, review the report diff,
-then run `make design-check`. Failed source checks leave the existing report
-untouched.
+These checks cover specification links, generated reference, bet, and
+decision-register drift, roadmap export drift, decision-register integrity,
+example semantics, schemas, proof-evidence envelopes, and cost-model negative
+controls. They do not execute Kani, Verus, proposed Rust macros, or Polars
+probes. The default checker also verifies the committed validation report
+without changing it. After deliberate design or validator changes, run
+`python3 tools/check_docs.py --write`, review the report diff, then run
+`make design-check`. Failed source checks leave the existing report untouched.
 
 The system Python may lack the pinned dependencies. A disposable environment
 works without installing anything globally:
@@ -432,6 +432,26 @@ without a checkbox, an unlabelled task bullet, or a ticked detail checkbox.
 committed export is stale, and the design checks reject the same drift.
 Upstream request leynos/mapsplice#144 tracks a native export that will replace
 this exporter.
+
+Decisions that control acceptance live in `spec/decisions.json`, validated by
+`spec/decision-register.schema.json` and rendered into the
+[decision register](decision-register.md) by `scripts/generate_decisions.py`.
+To propose a decision, add a `proposed` record with its options, a
+recommendation, and a rationale, then run the generator. Only the D01 authority
+accepts a decision. Record an acceptance by setting `lifecycle` to `accepted`
+with `decided_option`, `accepted_by`, `accepted_on`, and an
+`approval_reference` whose `author_login` is the accepting login and whose
+`names_decisions` lists the record; a session answer is quoted verbatim in
+`answer`. Accepting a decision is the moment to reconcile the governing
+documents: list each replaced sentence in `retired_statements`, and link the
+ToR §9 row of every answered question to the record's anchor (for example
+`decision-register.md#d03`). The design checks reject an accepted decision
+whose approval is malformed, whose ADR disagrees on status, whose retired text
+reappears, or whose question is still described as open or pending within 60
+characters of its identifier. Never edit an accepted record in place: add a
+superseding record and link both directions with `supersedes` and
+`superseded_by`. ADRs live in `docs/adrs/` as `adr-nnnn-title-slug.md`, per the
+[documentation style guide](documentation-style-guide.md).
 
 Python helper scripts live in `scripts/` and follow
 [the scripting standards](scripting-standards.md): a `uv` shebang with a PEP

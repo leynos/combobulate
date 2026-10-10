@@ -2,6 +2,9 @@
 
 Revision 0.2, 6 October 2026. All work remains proposed and open.
 
+Decisions that control acceptance, with their authority, options, and status,
+are recorded in the [decision register](decision-register.md).
+
 This roadmap translates `terms-of-reference.md`, `technical-design.md`,
 `context.md`, and `language-reference.md` into proposed delivery work. It makes
 no date or duration commitments. Every checkbox is open: this pack documents
