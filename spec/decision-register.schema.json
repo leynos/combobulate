@@ -38,7 +38,7 @@
     "login": {"type": "string", "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$"},
     "adr_path": {"type": "string", "pattern": "^docs/adrs/adr-[0-9]{4}-[a-z0-9]+(?:-[a-z0-9]+)*\\.md$"},
     "adr_id": {"type": "string", "pattern": "^ADR-[0-9]{4}$"},
-    "task": {"type": "string", "pattern": "^[1-9][0-9]*(?:\\.[1-9][0-9]*){1,2}$"},
+    "roadmap_item": {"type": "string", "pattern": "^[1-9][0-9]*(?:\\.[1-9][0-9]*){1,2}$"},
     "text": {"type": "string", "minLength": 1},
     "option": {
       "type": "object",
@@ -170,10 +170,10 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["kind", "task"],
+              "required": ["kind", "roadmap_item"],
               "properties": {
                 "kind": {"const": "deferred"},
-                "task": {"$ref": "#/$defs/task"},
+                "roadmap_item": {"$ref": "#/$defs/roadmap_item"},
                 "bet": {"type": "string", "pattern": "^B[0-9]{2}$"}
               }
             }

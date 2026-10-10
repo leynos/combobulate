@@ -457,7 +457,7 @@
       "decision": "D07",
       "disposition": {
         "kind": "deferred",
-        "task": "1.2.1"
+        "roadmap_item": "1.2.1"
       }
     },
     {
@@ -479,7 +479,7 @@
       "decision": "D07",
       "disposition": {
         "kind": "deferred",
-        "task": "1.2.1",
+        "roadmap_item": "1.2.1",
         "bet": "B01"
       }
     },
@@ -503,7 +503,7 @@
       "decision": "D07",
       "disposition": {
         "kind": "deferred",
-        "task": "2.4",
+        "roadmap_item": "2.4",
         "bet": "B03"
       }
     },
@@ -514,7 +514,7 @@
       "decision": "D07",
       "disposition": {
         "kind": "deferred",
-        "task": "1.2.6",
+        "roadmap_item": "1.2.6",
         "bet": "B06"
       }
     }

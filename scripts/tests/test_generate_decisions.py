@@ -52,6 +52,12 @@ def test_every_decision_and_candidate_is_rendered():
         assert f"{candidate['id']}. {candidate['subject']}" in text, f"{candidate['id']} must be listed"
 
 
+def test_deferred_dispositions_name_steps_and_tasks():
+    text = ' '.join(render(REGISTER).split())
+    assert 'Resource certification (technical-design.md §15): deferred to step 2.4 (B03)' in text, 'CA7 is a step'
+    assert 'deferred to task 1.2.1' in text, 'three-part identifiers are tasks'
+
+
 def test_rendering_is_deterministic():
     assert render(REGISTER) == render(copy.deepcopy(REGISTER)), 'rendering must not depend on identity'
 
