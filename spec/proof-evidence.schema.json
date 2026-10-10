@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:combobulate:design:proof-evidence:0.2",
+  "title": "Proposed Combobulate scoped proof evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "revision",
+    "claim_id",
+    "claim",
+    "status",
+    "binding",
+    "method",
+    "scope",
+    "assumptions",
+    "success_witness",
+    "negative_control",
+    "result_artifacts",
+    "exception"
+  ],
+  "properties": {
+    "revision": {
+      "const": "0.2"
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "proved",
+        "bounded-checked",
+        "tested",
+        "trusted",
+        "failed",
+        "inconclusive"
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executable",
+        "specification",
+        "source_revision",
+        "target",
+        "features",
+        "semantic_policy",
+        "backend_profile"
+      ],
+      "properties": {
+        "executable": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "specification": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "semantic_policy": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "backend_profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "method": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "version",
+        "solver",
+        "command"
+      ],
+      "properties": {
+        "tool": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "solver": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "command": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statement",
+        "bounds",
+        "termination",
+        "implementation_relation"
+      ],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bounds": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "termination": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation_relation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "success_witness": {
+      "type": "string",
+      "minLength": 1
+    },
+    "negative_control": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result_artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "exception": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority",
+            "reason",
+            "claim_restriction",
+            "revisit_trigger"
+          ],
+          "properties": {
+            "authority": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "claim_restriction": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revisit_trigger": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "proved",
+              "bounded-checked",
+              "tested"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "binding": {
+            "properties": {
+              "executable": {
+                "type": "string",
+                "minLength": 1
+              },
+              "specification": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "semantic_policy": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "method": {
+            "properties": {
+              "tool": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "result_artifacts": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "bounded-checked"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "properties": {
+              "bounds": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "trusted"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exception": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "revision": "0.2",
+  "operation_id": "combobulate.example.neighbour_sum_8",
+  "implementation_id": "native.row_major_tiles.proposed",
+  "schema": {
+    "inputs": [
+      "Array<I64> with shape [height, width]"
+    ],
+    "output_rule": "Array<I64> of the same shape and nullable-element policy as specified by the operation.",
+    "empty_frame_rule": "Either zero spatial extent produces an empty output with zero neighbourhood-kernel invocations."
+  },
+  "cardinality": {
+    "kind": "preserving",
+    "rule": "Exactly height*width logical output elements; checked product."
+  },
+  "partitioning": {
+    "kind": "halo",
+    "requirements": [
+      "One-cell halo on both spatial axes.",
+      "Chunk boundaries are not image boundaries.",
+      "No alias permits partially updated input reads."
+    ]
+  },
+  "read_access": {
+    "pattern": "neighbourhood",
+    "halo_rule": "Eight row-major offsets from a centred 3x3 footprint, excluding the centre; Fill(0) at the image boundary."
+  },
+  "ordering": {
+    "input_order": "Footprint offsets in row-major order.",
+    "output_order": "Original image row-major coordinate order.",
+    "reassociation": "forbidden",
+    "permutation": "forbidden"
+  },
+  "validity": {
+    "null_rule": "Any invalid neighbour makes the output invalid.",
+    "inactive_rule": "No activity mask in this example.",
+    "nan_rule": "Not applicable to I64."
+  },
+  "effects": {
+    "purity": "pure-fallible",
+    "failure_rule": "Checked right-associated I64 addition; report overflow at the responsible output coordinate.",
+    "cancellation": "cooperative"
+  },
+  "numeric": {
+    "dtype_domain": [
+      "I64"
+    ],
+    "policy": "Checked addition, exact right reduction.",
+    "equivalence_requirement": "Same result/validity or same failure category as the scalar reference evaluator for each cell."
+  },
+  "resources": {
+    "requirements": [],
+    "scratch_bound": "Declared tile plus halo; planner charges scratch before kernel admission.",
+    "output_bound": "height*width*sizeof(i64) plus validity representation, all checked."
+  },
+  "evidence": {
+    "status": "proposed",
+    "assumptions": [
+      "Rust/allocator and checked indexing behave according to their contracts."
+    ],
+    "obligations": [
+      "V3",
+      "V6",
+      "V8",
+      "V9"
+    ]
+  },
+  "outcomes": {
+    "success_relation": "Every valid output equals the exact right sum of the eight ordered neighbours.",
+    "success_conditions": "Valid shape/storage, sufficient declared output and tile scratch, no active-cell arithmetic overflow and no requested cancellation.",
+    "error_relation": "Report the specified shape/resource/overflow or cancellation outcome; no numerical failure becomes a null silently.",
+    "mutation_frame": "The source remains unchanged; the selected atomic output API commits only after successful completion.",
+    "termination": "Finite tile and footprint traversal; cancellation checks occur at declared tile boundaries."
+  },
+  "proof_contract": {
+    "logical_model": "Numeric collection shape, bit-valued cells and validity; coordinate stencil relation.",
+    "callable_binding": "Required executable/specification binding before implementation acceptance; none exists yet.",
+    "evidence_record": "proof-evidence.schema.json defines the required evidence format; all obligations here are planned.",
+    "trust_status": "Unverified design example, not a verified or tested kernel."
+  },
+  "cost_contract": {
+    "model": "Tracked output payload and validity plus bounded tile/halo scratch; worst-case neighbourhood work.",
+    "classification": "Symbolic conservative bound under the declared allocation model, not elapsed-time prediction.",
+    "assumptions": "Actual allocation capacities, target layout, and concurrency must match the admitted schedule.",
+    "control_scope": "Only allocations made through the declared execution context; no whole-process RSS or arbitrary callback guarantee."
+  }
+}

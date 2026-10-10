@@ -1,0 +1,151 @@
+{
+  "revision": "0.2",
+  "status": "documentation-example-model-only",
+  "cases": [
+    {
+      "id": "K01",
+      "kind": "admission",
+      "quantity": "output-payload-bytes",
+      "classification": "exact",
+      "lower": 134217728,
+      "upper": 134217728,
+      "budget": 67108864,
+      "expected": "certain-excess"
+    },
+    {
+      "id": "K02",
+      "kind": "admission",
+      "quantity": "output-payload-bytes",
+      "classification": "bound",
+      "lower": 0,
+      "upper": 134217728,
+      "budget": 67108864,
+      "expected": "uncertifiable-domain"
+    },
+    {
+      "id": "K03",
+      "kind": "admission",
+      "quantity": "output-payload-bytes",
+      "classification": "exact",
+      "lower": 33554432,
+      "upper": 33554432,
+      "budget": 67108864,
+      "expected": "certified-within-model"
+    },
+    {
+      "id": "K04",
+      "kind": "admission",
+      "quantity": "callback-work",
+      "classification": "unknown",
+      "lower": null,
+      "upper": null,
+      "budget": 100,
+      "expected": "runtime-obligation-or-strict-refusal"
+    },
+    {
+      "id": "K05",
+      "kind": "admission",
+      "quantity": "backend-peak-bytes",
+      "classification": "estimate",
+      "lower": 32,
+      "upper": 32,
+      "budget": 64,
+      "expected": "runtime-obligation-or-strict-refusal"
+    },
+    {
+      "id": "K06",
+      "kind": "product",
+      "shape": [
+        0,
+        9223372036854775808,
+        9223372036854775808
+      ],
+      "target_bits": 64,
+      "expected": 0
+    },
+    {
+      "id": "K07",
+      "kind": "product",
+      "shape": [],
+      "target_bits": 32,
+      "expected": 1
+    },
+    {
+      "id": "K08",
+      "kind": "product",
+      "shape": [
+        65536,
+        65536
+      ],
+      "target_bits": 32,
+      "expected": "overflow"
+    },
+    {
+      "id": "K09",
+      "kind": "product",
+      "shape": [
+        65536,
+        65536
+      ],
+      "target_bits": 64,
+      "expected": 4294967296
+    },
+    {
+      "id": "K10",
+      "kind": "right-prefix-work",
+      "length": 4096,
+      "expected": 8386560
+    },
+    {
+      "id": "K11",
+      "kind": "right-prefix-work",
+      "length": 0,
+      "expected": 0
+    },
+    {
+      "id": "K12",
+      "kind": "tracked-peak",
+      "capacities": {
+        "source": 80,
+        "output": 40
+      },
+      "stages": [
+        {
+          "live": [
+            "source",
+            "source"
+          ],
+          "scratch": 8
+        },
+        {
+          "live": [
+            "source",
+            "output"
+          ],
+          "scratch": 16
+        }
+      ],
+      "expected": 136
+    },
+    {
+      "id": "K13",
+      "kind": "admission",
+      "quantity": "output-payload-bytes",
+      "classification": "bound",
+      "lower": 80,
+      "upper": 128,
+      "budget": 64,
+      "expected": "certain-excess"
+    },
+    {
+      "id": "K14",
+      "kind": "admission",
+      "quantity": "output-payload-bytes",
+      "classification": "bound",
+      "lower": 0,
+      "upper": 64,
+      "budget": 64,
+      "expected": "certified-within-model"
+    }
+  ]
+}

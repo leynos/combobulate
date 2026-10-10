@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Combobulate proposed kernel contract envelope, revision 0.2",
+  "description": "Reviewable design envelope, not a stable plugin ABI or serialized executable plan. Schema validation checks the envelope, not truth of its claims.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "revision": {
+      "const": "0.2"
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "output_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "empty_frame_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "inputs",
+        "output_rule",
+        "empty_frame_rule"
+      ]
+    },
+    "cardinality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "preserving",
+            "reducing",
+            "filtering",
+            "expanding",
+            "segmented",
+            "custom"
+          ]
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "kind",
+        "rule"
+      ]
+    },
+    "partitioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "independent",
+            "prefix-state",
+            "halo",
+            "whole-lane",
+            "segmented",
+            "global",
+            "custom"
+          ]
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "requirements"
+      ]
+    },
+    "read_access": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "enum": [
+            "corresponding",
+            "indexed",
+            "neighbourhood",
+            "whole-cell",
+            "custom"
+          ]
+        },
+        "halo_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "pattern",
+        "halo_rule"
+      ]
+    },
+    "ordering": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "input_order": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_order": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reassociation": {
+          "type": "string",
+          "enum": [
+            "forbidden",
+            "explicit-policy",
+            "proved-for-this-domain"
+          ]
+        },
+        "permutation": {
+          "type": "string",
+          "enum": [
+            "forbidden",
+            "explicit-policy"
+          ]
+        }
+      },
+      "required": [
+        "input_order",
+        "output_order",
+        "reassociation",
+        "permutation"
+      ]
+    },
+    "validity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "null_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inactive_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nan_rule": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "null_rule",
+        "inactive_rule",
+        "nan_rule"
+      ]
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "purity": {
+          "type": "string",
+          "enum": [
+            "pure-total",
+            "pure-fallible",
+            "resource-read",
+            "sink-write",
+            "opaque"
+          ]
+        },
+        "failure_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cancellation": {
+          "type": "string",
+          "enum": [
+            "not-applicable",
+            "cooperative",
+            "non-preemptible"
+          ]
+        }
+      },
+      "required": [
+        "purity",
+        "failure_rule",
+        "cancellation"
+      ]
+    },
+    "numeric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dtype_domain": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "equivalence_requirement": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "dtype_domain",
+        "policy",
+        "equivalence_requirement"
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "scratch_bound": {
+          "type": "string",
+          "minLength": 1
+        },
+        "output_bound": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "requirements",
+        "scratch_bound",
+        "output_bound"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "tested-with-bounds",
+            "proved-with-assumptions"
+          ]
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "obligations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "status",
+        "assumptions",
+        "obligations"
+      ]
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "success_relation",
+        "success_conditions",
+        "error_relation",
+        "mutation_frame",
+        "termination"
+      ],
+      "properties": {
+        "success_relation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "success_conditions": {
+          "type": "string",
+          "minLength": 1
+        },
+        "error_relation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mutation_frame": {
+          "type": "string",
+          "minLength": 1
+        },
+        "termination": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "proof_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "logical_model",
+        "callable_binding",
+        "evidence_record",
+        "trust_status"
+      ],
+      "properties": {
+        "logical_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "callable_binding": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_record": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_status": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "cost_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "classification",
+        "assumptions",
+        "control_scope"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classification": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assumptions": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_scope": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "required": [
+    "revision",
+    "operation_id",
+    "implementation_id",
+    "schema",
+    "cardinality",
+    "partitioning",
+    "read_access",
+    "ordering",
+    "validity",
+    "effects",
+    "numeric",
+    "resources",
+    "evidence",
+    "outcomes",
+    "proof_contract",
+    "cost_contract"
+  ]
+}

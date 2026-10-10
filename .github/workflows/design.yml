@@ -1,0 +1,28 @@
+name: Design contracts
+
+'on':
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  design-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - name: Install documentation dependencies
+        run: python3 -m pip install -r tools/requirements.txt
+      - name: Validate documentation contracts
+        run: make design-check

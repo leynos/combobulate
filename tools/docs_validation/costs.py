@@ -1,0 +1,103 @@
+"""Validate costs claims in the design pack without claiming Rust evidence."""
+from __future__ import annotations
+
+import math
+from .context import ValidationContext, require, same_typed_value
+
+
+def admission_interval(case: dict) -> tuple[int, int] | None:
+    """Validate present bounds; unknown/estimate can supply two null bounds."""
+    lo, hi = case.get('lower'), case.get('upper')
+    if case['classification'] in {'estimate', 'unknown'} and lo is None and hi is None:
+        return None
+    require(type(lo) is int and type(hi) is int and 0 <= lo <= hi,
+            'Malformed cost interval')
+    require(case['classification'] != 'exact' or lo == hi, 'Exact cost must have equal interval bounds')
+    return lo, hi
+
+
+def classify_admission(case: dict) -> str:
+    """Classify budget intervals; unknown cost always needs a runtime obligation."""
+    kind = case['classification']
+    require(kind in {'exact', 'bound', 'estimate', 'unknown'},
+            f'Unknown cost classification {kind}')
+    limit = case['budget']
+    require(type(limit) is int and limit >= 0, 'Malformed cost budget')
+    interval = admission_interval(case)
+    if kind in {'estimate', 'unknown'}:
+        return 'runtime-obligation-or-strict-refusal'
+    lo, hi = interval
+    if lo > limit:
+        return 'certain-excess'
+    if hi <= limit:
+        return 'certified-within-model'
+    return 'uncertifiable-domain'
+
+
+def nonnegative_integer(value: object, name: str) -> int:
+    """Validate an integer count; 0 passes, while True, 1.0, and -1 fail."""
+    require(type(value) is int and value >= 0, f'Malformed {name}: expected a nonnegative integer')
+    return value
+
+
+def shape_product(case: dict) -> int | str:
+    """Bound a shape product by target usize width; [65536, 65536] overflows 32 bits."""
+    require(isinstance(case['shape'], list), 'Malformed cost shape: expected a dimension list')
+    shape = [nonnegative_integer(dimension, 'shape dimension') for dimension in case['shape']]
+    target_bits = nonnegative_integer(case['target_bits'], 'target width')
+    require(target_bits > 0, 'Malformed target width: expected a positive integer')
+    value = math.prod(shape)
+    return value if value <= (1 << target_bits) - 1 else 'overflow'
+
+
+def right_prefix_work(case: dict) -> int:
+    """Count reductions over all prefixes; length 3 needs 3 operations."""
+    length = nonnegative_integer(case['length'], 'prefix length')
+    return length * (length - 1) // 2
+
+
+def tracked_stage_bytes(stage: dict, capacities: dict[str, int]) -> int:
+    """Count one stage; repeated string allocation IDs count once and [] needs only scratch."""
+    live = stage['live']
+    require(isinstance(live, list), 'Malformed live allocations: expected an allocation-ID list')
+    require(all(type(allocation_id) is str for allocation_id in live),
+            'Malformed live allocation ID: expected a string')
+    scratch = nonnegative_integer(stage['scratch'], 'scratch bytes')
+    return sum(capacities[key] for key in set(live)) + scratch
+
+
+def tracked_peak(case: dict) -> int:
+    """Count distinct live allocations plus scratch; repeated alias IDs count once."""
+    require(isinstance(case['stages'], list), 'Malformed stages: expected a stage list')
+    capacities = {key: nonnegative_integer(value, 'allocation capacity')
+                  for key, value in case['capacities'].items()}
+    return max(tracked_stage_bytes(stage, capacities) for stage in case['stages'])
+
+
+COST_MODELS = {
+    'admission': classify_admission, 'product': shape_product,
+    'right-prefix-work': right_prefix_work, 'tracked-peak': tracked_peak,
+}
+
+
+def check_cost_examples(context: ValidationContext) -> None:
+    """Validate worked costs and controls; this does not execute Rust const evaluation."""
+    cases = context.load('spec/cost-cases.json')['cases']
+    require(len({case['id'] for case in cases}) == len(cases), 'Duplicate cost example ID')
+    for case in cases:
+        kind = case['kind']
+        require(kind in COST_MODELS, f'Unknown cost example kind {kind}')
+        result = COST_MODELS[kind](case)
+        require(same_typed_value(result, case['expected']), f'Wrong cost result {case["id"]}: {result}')
+    by_id = {c['id']: c for c in cases}
+    require(classify_admission(by_id['K01']) != classify_admission(by_id['K02']),
+            'Exact/bounded distinction is vacuous')
+    require(classify_admission(by_id['K04']) != 'certified-within-model',
+            'Unknown-as-zero negative control failed')
+    alias = by_id['K12']
+    wrong_peak = max(sum(alias['capacities'][key] for key in stage['live'])
+                     + stage['scratch'] for stage in alias['stages'])
+    require(wrong_peak != alias['expected'], 'Alias-count negative control is vacuous')
+    require(by_id['K08']['expected'] != by_id['K09']['expected'],
+            'Target-width distinction is vacuous')
+    context.record('cost-documentation-examples', 'Python checks exact/interval/unknown admission, target-width/zero arithmetic, prefix work and distinct-allocation accounting, with wrong-bound and alias controls. No Rust const or verifier execution occurred.', len(cases))

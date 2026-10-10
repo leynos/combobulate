@@ -1,0 +1,24 @@
+{
+  "repository": "leynos/shared-actions",
+  "action_directory": ".github/actions/install-whitaker",
+  "provenance_commit": "6dea5677a84fec60ca51b07202570e3af12ffdb4",
+  "provenance_pr": 522,
+  "scope": "Complete composite manifest, all three local helpers (stdlib/utility-only), and installer archive digest manifest. Nested action refs are covered by the manifest digest. Installer archives are authenticated by the upstream digest manifest; external nested action implementations are trusted pinned dependencies, not downloaded recursively.",
+  "files": {
+    "action.yml": "8adecf4d7b3c1224b9a6b3e1b26b46513d2a92d4afd0b25ad3d21b2436fd8cde",
+    "installer-digests.sha256": "6a02dafdc2b359f60d4332ddc5d93fd5b98dda0567a6e95df08dbca5dbc5f316",
+    "scripts/resolve-release.sh": "592a7dc472c705b4d328f1e41e8a400c5f52b5fb02aecce9cfc547ceaf311bd3",
+    "scripts/extract-zip.py": "a934c8604004de87ec80bb82a6b88484601af991df228ac31b94c4523e87aa05",
+    "scripts/verify_rolling_assets.py": "244f0430be39cf2ff3aef5bd0bfcfee0e6eb76655f8151661937c2a76cfdccf4"
+  },
+  "source_blob_sha1": {
+    "action.yml": "b4c31b8449df76090ff1109286c3735239d15939",
+    "installer-digests.sha256": "be01a067fec0d1684f140e469b76a55dd1bd5145",
+    "scripts/resolve-release.sh": "a3b089c3578cc6e33ae8ce885d92b7ca344e1cfd",
+    "scripts/extract-zip.py": "8d4174c57be4701275cf097ff039f179c9f5189f",
+    "scripts/verify_rolling_assets.py": "6951f25e0648477b83d6dacbc70fcbec8496d906"
+  },
+  "nested_actions": [
+    "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+  ]
+}

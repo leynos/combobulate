@@ -1,0 +1,161 @@
+# Relevant upstream fragments only; tests do not bind a live caller to this fixture.
+# Source: leynos/shared-actions@6dea5677a84fec60ca51b07202570e3af12ffdb4
+# Path: .github/actions/install-whitaker/action.yml; full blob b4c31b8449df76090ff1109286c3735239d15939
+name: Install Whitaker
+description: Install the Whitaker Dylint suite with a cached installer
+inputs:
+  cargo-home:
+    description: Cargo home that stores the cached whitaker-installer binary
+    required: false
+    default: ~/.cargo
+  installer-version:
+    description: 'Version of whitaker-installer to install. Defaults to the version this action pins,
+      and must be 0.2.9 or later: that is the first release with --no-source-fallback, which the action
+      always passes.'
+    required: false
+    default: 0.2.9
+  installer-sha256:
+    description: SHA-256 digest of the whitaker-installer release archive for this runner. The action's
+      pinned digest manifest takes precedence; supply this only for an asset the manifest does not pin.
+      A value that disagrees with a pinned digest is rejected.
+    required: false
+    default: ''
+  suite-version:
+    description: 'Refused. Whitaker''s lint suite is a rolling release that every consumer takes from
+      the default branch tip, and a pin would force a source build. The input stays declared only so that
+      setting it fails the step: GitHub drops an undeclared input with a warning, which would let a pin
+      look honoured while doing nothing.'
+    required: false
+    default: ''
+  cache-provider:
+    description: Cache owner for the installer binary. Use "github" for the action's built-in cache or
+      "external" when the caller mounts the Cargo home.
+    required: false
+    default: github
+  ci-mode:
+    description: 'Check the published lint assets before running the installer, retrying a short absence
+      while the rolling release republishes. A source build is refused either way: the installer always
+      receives --no-source-fallback, and a run whose output still reports one fails. Set it off only where
+      the rolling release cannot be reached, such as a local reproduction.'
+    required: false
+    default: 'true'
+  cranelift:
+    description: Also install the rustc-codegen-cranelift component for the lint suite's toolchain, for
+      a repository whose builds select the Cranelift backend. The installer adds the component through
+      rustup; nothing is compiled.
+    required: false
+    default: 'false'
+  github-token:
+    description: Token used only to read the public rolling release without meeting the unauthenticated
+      rate limit. It is never sent anywhere else.
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+  - name: Validate Whitaker inputs
+    id: validate-inputs
+    shell: bash
+    env:
+      CACHE_PROVIDER_INPUT: ${{ inputs.cache-provider }}
+      CARGO_HOME_INPUT: ${{ inputs.cargo-home }}
+      CI_MODE_INPUT: ${{ inputs.ci-mode }}
+      CRANELIFT_INPUT: ${{ inputs.cranelift }}
+      INSTALLER_SHA256_INPUT: ${{ inputs.installer-sha256 }}
+      INSTALLER_VERSION_INPUT: ${{ inputs.installer-version }}
+      SUITE_VERSION_INPUT: ${{ inputs.suite-version }}
+    run: "set -euo pipefail\ninput_error() {\n  echo \"::error title=Invalid Whitaker input::$1\" >&2\n\
+      \  exit 1\n}\nif [[ -z \"${RUNNER_TEMP:-}\" ]]; then\n  input_error \"RUNNER_TEMP must name a writable\
+      \ staging directory\"\nfi\nif [[ \"$CARGO_HOME_INPUT\" == *$'\\r'* || \"$CARGO_HOME_INPUT\" == *$'\\\
+      n'* ]]; then\n  input_error \"cargo-home must not contain a carriage return or newline\"\nfi\nif\
+      \ [[ \"$INSTALLER_VERSION_INPUT\" == *$'\\r'* || \"$INSTALLER_VERSION_INPUT\" == *$'\\n'* ]]; then\n\
+      \  input_error \"installer-version must not contain a carriage return or newline\"\nfi\ncase \"\
+      $CACHE_PROVIDER_INPUT\" in\n  github|external) ;;\n  *) input_error \"cache-provider must be github\
+      \ or external\" ;;\nesac\ncase \"$CRANELIFT_INPUT\" in\n  true|false) ;;\n  *) input_error \"cranelift\
+      \ must be true or false\" ;;\nesac\ncase \"$CI_MODE_INPUT\" in\n  true|false) ;;\n  *) input_error\
+      \ \"ci-mode must be true or false\" ;;\nesac\n# The lint suite is a rolling release: every consumer\
+      \ takes it from the\n# Whitaker default branch tip, and prebuilt lint libraries exist only\n# for\
+      \ that tip, so a pin would also force a source build. Rejected\n# rather than ignored, so a lane\
+      \ cannot believe it is pinned.\nif [[ -n \"$SUITE_VERSION_INPUT\" ]]; then\n  input_error \"suite-version\
+      \ is refused: the Whitaker lint suite is a rolling release and is never pinned\"\nfi\nif (( ${#CARGO_HOME_INPUT}\
+      \ > 240 )); then\n  input_error \"cargo-home must be at most 240 characters\"\nfi\nif (( ${#INSTALLER_VERSION_INPUT}\
+      \ > 128 )); then\n  input_error \"installer-version must be at most 128 characters\"\nfi\nif [[\
+      \ ! \"$INSTALLER_VERSION_INPUT\" =~ ^(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,2}$ ]]; then\n  input_error\
+      \ \"installer-version must be one to three numeric components without leading zeros\"\nfi\n# 0.2.9\
+      \ is the first installer with --no-source-fallback, which the run\n# step always passes. An older\
+      \ installer rejects the flag, so the floor\n# is enforced here, where the cause is legible, rather\
+      \ than as an\n# unknown-argument failure after the download.\nIFS=. read -r version_major version_minor\
+      \ version_patch <<< \"$INSTALLER_VERSION_INPUT\"\nversion_minor=\"${version_minor:-0}\"\nversion_patch=\"\
+      ${version_patch:-0}\"\nif (( version_major == 0 && (version_minor < 2 || (version_minor == 2 &&\
+      \ version_patch < 9)) )); then\n  input_error \"installer-version ${INSTALLER_VERSION_INPUT} is\
+      \ below the 0.2.9 floor, the first release with --no-source-fallback\"\nfi\ninstaller_sha256=\n\
+      if [[ -n \"$INSTALLER_SHA256_INPUT\" ]]; then\n  if [[ ! \"$INSTALLER_SHA256_INPUT\" =~ ^[0-9a-fA-F]{64}$\
+      \ ]]; then\n    input_error \"installer-sha256 must be 64 hexadecimal characters\"\n  fi\n  installer_sha256=\"\
+      $(printf '%s' \"$INSTALLER_SHA256_INPUT\" | tr 'A-F' 'a-f')\"\nfi\nif [[ \"$CARGO_HOME_INPUT\" ==\
+      \ \"~\" || \"$CARGO_HOME_INPUT\" == \"~/\"* ]]; then\n  cargo_home=\"${HOME}${CARGO_HOME_INPUT:1}\"\
+      \nelif [[ \"$CARGO_HOME_INPUT\" == /* ]]; then\n  cargo_home=\"$CARGO_HOME_INPUT\"\nelse\n  input_error\
+      \ \"cargo-home must be an absolute path or start with ~/\"\nfi\nif [[ \"/${cargo_home}/\" == *\"\
+      /../\"* ]]; then\n  input_error \"cargo-home must not contain parent-directory components\"\nfi\n\
+      path_separator=:\nif [[ \"${RUNNER_OS:-}\" == Windows ]]; then\n  path_separator=';'\nfi\nif [[\
+      \ \"$cargo_home\" == *\"$path_separator\"* ]]; then\n  input_error \"cargo-home must not contain\
+      \ the runner PATH separator\"\nfi\nmkdir -p -- \"$cargo_home\"\ncargo_home=\"$(cd -- \"$cargo_home\"\
+      \ && pwd -P)\"\nif [[ \"$cargo_home\" == *\"$path_separator\"* ]]; then\n  input_error \"cargo-home\
+      \ must not contain the runner PATH separator\"\nfi\nprintf 'cargo-home=%s\\n' \"$cargo_home\" >>\
+      \ \"$GITHUB_OUTPUT\"\ninstaller_suffix=\nif [[ \"${RUNNER_OS:-}\" == Windows ]]; then\n  installer_suffix=.exe\n\
+      fi\nprintf 'installer-path=%s\\n' \"${cargo_home}/bin/whitaker-installer${installer_suffix}\" >>\
+      \ \"$GITHUB_OUTPUT\"\nprintf 'installer-version-path=%s\\n' \"${cargo_home}/bin/.whitaker-installer-version\"\
+      \ >> \"$GITHUB_OUTPUT\"\nprintf 'installer-version=%s\\n' \"$INSTALLER_VERSION_INPUT\" >> \"$GITHUB_OUTPUT\"\
+      \nprintf 'installer-sha256=%s\\n' \"$installer_sha256\" >> \"$GITHUB_OUTPUT\"\n"
+  - name: Run Whitaker installer
+    shell: bash
+    env:
+      WHITAKER_INSTALLER_PATH: ${{ steps.validate-inputs.outputs.installer-path }}
+      WHITAKER_INSTALLER_VERSION: ${{ steps.validate-inputs.outputs.installer-version }}
+      WHITAKER_CRANELIFT: ${{ inputs.cranelift }}
+    run: "set -Eeuo pipefail\nemit_metric() {\n  if [[ -n \"${GITHUB_STEP_SUMMARY:-}\" ]]; then\n    printf\
+      \ '%s\\n' \"$1\" >> \"$GITHUB_STEP_SUMMARY\"\n  fi\n}\ntrap 'status=$?; echo \"::error title=Whitaker\
+      \ installer failed::exit-code=${status} version=${WHITAKER_INSTALLER_VERSION}\" >&2; emit_metric\
+      \ \"whitaker-installer.failure=execution\"; exit \"${status}\"' ERR\n# The two streams are kept\
+      \ apart, so the notices on each stay where\n# the reader expects them, and both are read afterwards:\
+      \ the installer\n# reports a Dylint tool's source fallback on stderr and the suite's on\n# stdout,\
+      \ and a backstop reading one stream is blind to the other.\ninstaller_log=\"${RUNNER_TEMP:-/tmp}/whitaker-installer-output.log\"\
+      \ninstaller_err=\"${RUNNER_TEMP:-/tmp}/whitaker-installer-errors.log\"\n: > \"$installer_log\"\n\
+      : > \"$installer_err\"\nif [[ ! -x \"$WHITAKER_INSTALLER_PATH\" ]]; then\n  echo \"::error title=Whitaker\
+      \ installer failed::installer was not created at ${WHITAKER_INSTALLER_PATH}\" >&2\n  exit 1\nfi\n\
+      # The installer extracts cargo-dylint and dylint-link into its bin\n# directory and then proves\
+      \ each by running it: `cargo dylint` finds\n# its subcommand only on PATH. That directory is on\
+      \ PATH on the Linux\n# and macOS images but not on Windows, where every run therefore\n# failed\
+      \ the proof and fell back to compiling cargo-dylint. It is put\n# on PATH here, and for later steps,\
+      \ which run the tools too.\n# The installer resolves the directory from the user profile on\n# Windows,\
+      \ which Git Bash's HOME need not match, and honours\n# XDG_BIN_HOME elsewhere.\non_windows_bash=false\n\
+      if [[ \"${RUNNER_OS:-}\" == Windows && -n \"${USERPROFILE:-}\" ]] &&\n  command -v cygpath >/dev/null\
+      \ 2>&1; then\n  on_windows_bash=true\nfi\nif [[ \"$on_windows_bash\" == true ]]; then\n  tool_bin=\"\
+      $(cygpath -u \"$USERPROFILE\")/.local/bin\"\nelse\n  tool_bin=\"${XDG_BIN_HOME:-${HOME}/.local/bin}\"\
+      \nfi\nexport PATH=\"${tool_bin}:${PATH}\"\nif [[ -n \"${GITHUB_PATH:-}\" && \"$on_windows_bash\"\
+      \ == true ]]; then\n  cygpath -w \"$tool_bin\" >> \"$GITHUB_PATH\"\nelif [[ -n \"${GITHUB_PATH:-}\"\
+      \ ]]; then\n  printf '%s\\n' \"$tool_bin\" >> \"$GITHUB_PATH\"\nfi\n# The lint suite always comes\
+      \ from the rolling release, and the\n# installer is told to fail rather than build anything from\
+      \ source\n# when a published lint library or Dylint tool archive is missing.\n# Passed unconditionally:\
+      \ validation has already refused an installer\n# older than 0.2.9, the first release that understands\
+      \ the flag.\n# Two calls rather than one with an options array: macOS runners ship\n# bash 3.2,\
+      \ where expanding an empty array under `set -u` is an\n# unbound-variable error.\nemit_metric \"\
+      whitaker-installer.suite=default-branch-tip\"\n# `||` holds back errexit and the ERR trap until\
+      \ stderr has been\n# replayed; `pipefail` makes the status the installer's, not tee's.\ninstaller_status=0\n\
+      if [[ \"$WHITAKER_CRANELIFT\" == \"true\" ]]; then\n  \"$WHITAKER_INSTALLER_PATH\" --no-source-fallback\
+      \ --cranelift 2> \"$installer_err\" | tee \"$installer_log\" || installer_status=$?\nelse\n  \"\
+      $WHITAKER_INSTALLER_PATH\" --no-source-fallback 2> \"$installer_err\" | tee \"$installer_log\" ||\
+      \ installer_status=$?\nfi\ncat \"$installer_err\" >&2\n# Reported here rather than through the ERR\
+      \ trap: bash 3.2 on the\n# macOS runners does not run the trap for a failing subshell, so the\n\
+      # report is written out once, in the trap's own words.\nif (( installer_status != 0 )); then\n \
+      \ echo \"::error title=Whitaker installer failed::exit-code=${installer_status} version=${WHITAKER_INSTALLER_VERSION}\"\
+      \ >&2\n  emit_metric \"whitaker-installer.failure=execution\"\n  exit \"$installer_status\"\nfi\n\
+      # Read from the installer's own output rather than inferred from a\n# green exit. With the flag\
+      \ in force a source build cannot happen, so\n# this is the backstop that catches an installer that\
+      \ ignored it: its\n# fallback notice is the evidence, and a run that reports one fails.\nsuite_source=prebuilt\n\
+      if grep -Eqi \"falling back|from source with cargo install|installing .* from source\" \"$installer_log\"\
+      \ \"$installer_err\"; then\n  suite_source=source\nfi\nemit_metric \"whitaker-installer.suite-source=${suite_source}\"\
+      \nif [[ \"$suite_source\" == \"source\" ]]; then\n  echo \"::error title=Whitaker installer::the\
+      \ installer built from source instead of using the published binaries; CI must consume them. Re-run\
+      \ once the rolling release is complete\" >&2\n  exit 1\nfi\necho \"::notice title=Whitaker installer::status=complete\
+      \ version=${WHITAKER_INSTALLER_VERSION} suite=default-branch-tip suite-source=${suite_source}\"\n\
+      emit_metric \"whitaker-installer.result=success\"\n"

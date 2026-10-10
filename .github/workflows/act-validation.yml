@@ -1,0 +1,55 @@
+name: Act Validation
+
+permissions: {}
+
+'on':
+  workflow_dispatch:
+
+jobs:
+  act-validation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ACT_VERSION: v0.2.89
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
+        with:
+          persist-credentials: false
+      - name: Install mdtablefix
+        uses: >-
+          leynos/shared-actions/.github/actions/install-mdtablefix@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
+        with:
+          version: '0.6.0'
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
+        with:
+          rustflags: ''
+      - name: Install linker prerequisites
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update \
+            && sudo apt-get install --yes --no-install-recommends clang mold
+      - name: Install the build standard
+        # Outer Make tests check the pinned tools before starting nested Act.
+        run: make install-build-tools
+      - name: Install act
+        env:
+          # GitHub release asset digest for act_Linux_x86_64.tar.gz at v0.2.89.
+          ACT_SHA256: 0191d6f1f3b716b5c55820032605d05fc3c1cdbf581ebeff655019e5dd1524c0
+        run: |
+          set -euo pipefail
+          archive=$(mktemp "$RUNNER_TEMP/act.XXXXXX.tar.gz")
+          trap 'rm -f -- "$archive"' EXIT
+          curl -fsSL --output "$archive" \
+            "https://github.com/nektos/act/releases/download/${ACT_VERSION}/act_Linux_x86_64.tar.gz"
+          printf '%s  %s\n' "$ACT_SHA256" "$archive" | sha256sum --check --status
+          sudo tar -xzf "$archive" -C /usr/local/bin act
+      - name: Check Docker runtime
+        run: docker info
+      - name: Run tests with act validation
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make test WITH_ACT=1

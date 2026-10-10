@@ -1,0 +1,356 @@
+//! Contract for the approved binary-only Whitaker installer in pull-request CI.
+
+use serde_yaml::Value;
+
+const CI: &str = include_str!("../.github/workflows/ci.yml");
+/// Immutable action identity checks shared across workflow contracts.
+#[path = "support/action_ref.rs"]
+mod action_ref;
+// Shared-actions #522 establishes the binary-only installer behaviour. Dependabot
+// may advance its SHA; the preceding source-bound capability gate approves the
+// complete execution content, while these contracts protect the caller interface.
+const INSTALL_ACTION_PATH: &str = "leynos/shared-actions/.github/actions/install-whitaker";
+
+fn check_install_step(step: &Value) -> Result<(), String> {
+    if !step
+        .get("uses")
+        .and_then(Value::as_str)
+        .is_some_and(|uses| action_ref::matches_pinned_action(uses, INSTALL_ACTION_PATH))
+    {
+        return Err(
+            "Whitaker action must use its expected path and an immutable commit ref".into(),
+        );
+    }
+    if step.get("if").is_some() || step.get("continue-on-error").is_some() {
+        return Err("Whitaker installation can be skipped or softened".into());
+    }
+    let inputs = step
+        .get("with")
+        .and_then(Value::as_mapping)
+        .ok_or("Whitaker action inputs are missing")?;
+    if inputs.get("cranelift").and_then(Value::as_str) != Some("true") {
+        return Err("Whitaker must install its Cranelift component".into());
+    }
+    for forbidden in [
+        "suite-version",
+        "allow-suite-pin",
+        "installer-version",
+        "ci-mode",
+        "source-fallback",
+        "allow-source-fallback",
+    ] {
+        if inputs.contains_key(forbidden) {
+            return Err(format!(
+                "Whitaker input {forbidden} overrides shared policy"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_installer(source: &str) -> Result<(), String> {
+    // serde_yaml rejects duplicate mapping keys rather than choosing one.
+    let workflow: Value = serde_yaml::from_str(source).map_err(|error| error.to_string())?;
+    let job = workflow
+        .get("jobs")
+        .and_then(|jobs| jobs.get("build-test"))
+        .ok_or("build-test job is missing")?;
+    check_job_versions(job)?;
+    let steps = job
+        .get("steps")
+        .and_then(Value::as_sequence)
+        .ok_or("build-test steps are missing")?;
+    check_steps(steps)
+}
+
+fn check_job_versions(job: &Value) -> Result<(), String> {
+    if job.get("env").is_some_and(|env| {
+        env.get("WHITAKER_INSTALLER_VERSION").is_some()
+            || env.get("WHITAKER_SUITE_VERSION").is_some()
+    }) {
+        return Err("job overrides the shared Whitaker versions".into());
+    }
+    Ok(())
+}
+
+fn check_steps(steps: &[Value]) -> Result<(), String> {
+    let mut installer = None;
+    let mut lint = None;
+    let mut capability = None;
+    for (index, step) in steps.iter().enumerate() {
+        record_installer(step, index, &mut installer)?;
+        record_lint(step, index, &mut lint)?;
+        record_capability(step, index, &mut capability)?;
+        check_no_bypass(step)?;
+    }
+    match (capability, installer, lint) {
+        (Some(probe), Some(install), Some(gate)) if probe < install && install < gate => Ok(()),
+        _ => Err(
+            "Whitaker capability check must precede installation and the binding lint gate".into(),
+        ),
+    }
+}
+
+/// Requires exact caller-bound source verification before executing the dependency.
+fn record_capability(
+    step: &Value,
+    index: usize,
+    capability: &mut Option<usize>,
+) -> Result<(), String> {
+    if step.get("name").and_then(Value::as_str) != Some("Verify Whitaker capability") {
+        return Ok(());
+    }
+    let command = concat!(
+        "uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py ",
+        "--workflow .github/workflows/ci.yml"
+    );
+    if step.get("run").and_then(Value::as_str) != Some(command)
+        || step.get("timeout-minutes").and_then(Value::as_u64) != Some(3)
+    {
+        return Err("Whitaker capability verification command or time bound changed".into());
+    }
+    if [
+        "if",
+        "continue-on-error",
+        "env",
+        "working-directory",
+        "shell",
+        "uses",
+    ]
+    .iter()
+    .any(|key| step.get(key).is_some())
+    {
+        return Err("Whitaker capability verification is missing, redirected or softened".into());
+    }
+    if capability.replace(index).is_some() {
+        return Err("more than one Whitaker capability gate".into());
+    }
+    Ok(())
+}
+
+fn record_installer(
+    step: &Value,
+    index: usize,
+    installer: &mut Option<usize>,
+) -> Result<(), String> {
+    let uses = step.get("uses").and_then(Value::as_str);
+    if uses.is_some_and(|action| action.contains("install-whitaker")) {
+        check_install_step(step)?;
+        if installer.replace(index).is_some() {
+            return Err("more than one Whitaker installer".into());
+        }
+    }
+    Ok(())
+}
+
+fn record_lint(step: &Value, index: usize, lint: &mut Option<usize>) -> Result<(), String> {
+    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
+    if matches!(
+        run.trim(),
+        "make lint" | "mkdir -p \"$DYLINT_DRIVER_PATH\"\nmake lint"
+    ) {
+        if lint.replace(index).is_some() {
+            return Err("more than one CI lint gate".into());
+        }
+        if step.get("if").is_some() || step.get("continue-on-error").is_some() {
+            return Err("CI lint gate can be skipped or softened".into());
+        }
+    }
+    Ok(())
+}
+
+fn check_no_bypass(step: &Value) -> Result<(), String> {
+    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
+    let cargo_installer = ["cargo binstall", "whitaker"]
+        .into_iter()
+        .all(|part| run.contains(part));
+    if run.contains("whitaker-installer") || cargo_installer {
+        return Err("direct Whitaker installation bypasses the shared action".into());
+    }
+    let uses = step.get("uses").and_then(Value::as_str);
+    if uses.is_some_and(|action| action.contains("actions/cache"))
+        && step
+            .get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| name.contains("Whitaker"))
+    {
+        return Err("a separate Whitaker cache bypasses action ownership".into());
+    }
+    Ok(())
+}
+
+#[test]
+fn ci_installs_approved_whitaker_before_lint() {
+    assert_eq!(
+        check_installer(CI),
+        Ok(()),
+        "CI Whitaker provisioning contract"
+    );
+}
+
+#[test]
+fn weakened_whitaker_provisioning_is_rejected() {
+    let unpinned = action_ref::repoint_action(CI, INSTALL_ACTION_PATH, "main")
+        .expect("the workflow must contain the Whitaker action");
+    assert_ne!(
+        unpinned, CI,
+        "the changed-ref fixture must alter the workflow"
+    );
+    assert!(
+        check_installer(&unpinned).is_err(),
+        "a floating installer ref must fail"
+    );
+    let cases = [
+        ("cranelift: 'true'", "cranelift: 'false'"),
+        (
+            "          cranelift: 'true'",
+            "          cranelift: 'true'\n          suite-version: 'rolling'",
+        ),
+        (
+            "          cranelift: 'true'",
+            "          cranelift: 'true'\n          installer-version: '0.2.6'",
+        ),
+        (
+            "          cranelift: 'true'",
+            "          cranelift: 'true'\n          source-fallback: 'true'",
+        ),
+        (
+            "      BUILD_PROFILE: debug",
+            "      BUILD_PROFILE: debug\n      WHITAKER_INSTALLER_VERSION: '0.2.6'",
+        ),
+        (
+            "        with:\n          cranelift: 'true'",
+            "        if: false\n        with:\n          cranelift: 'true'",
+        ),
+        (
+            "        with:\n          cranelift: 'true'",
+            "        continue-on-error: true\n        with:\n          cranelift: 'true'",
+        ),
+    ];
+    for (before, after) in cases {
+        assert!(CI.contains(before), "fixture anchor is missing: {before}");
+        let fixture = CI.replacen(before, after, 1);
+        assert!(
+            check_installer(&fixture).is_err(),
+            "weakened Whitaker route was accepted: {after}"
+        );
+    }
+}
+
+#[test]
+fn missing_or_late_whitaker_installer_is_rejected() {
+    let install_step = format!(
+        concat!(
+            "      - name: Install Whitaker\n",
+            "        uses: {}\n",
+            "        with:\n",
+            "          cranelift: 'true'\n",
+        ),
+        CI.lines()
+            .find_map(|line| {
+                line.trim()
+                    .strip_prefix("uses: ")
+                    .filter(|uses| uses.starts_with(INSTALL_ACTION_PATH))
+            })
+            .expect("the workflow must contain the Whitaker action")
+    );
+    let removed = CI.replacen(&install_step, "", 1);
+    assert_ne!(removed, CI, "the installer step fixture must exist");
+    assert!(
+        check_installer(&removed).is_err(),
+        "a missing installer must fail"
+    );
+    let misplaced = removed.replacen(
+        "          make lint\n",
+        &format!("          make lint\n{install_step}"),
+        1,
+    );
+    assert_ne!(misplaced, removed, "the lint step fixture must exist");
+    assert!(
+        check_installer(&misplaced).is_err(),
+        "installation after lint must fail"
+    );
+}
+
+#[test]
+fn duplicate_workflow_keys_are_rejected() {
+    let duplicate = CI.replacen(
+        "      - name: Lint\n",
+        "      - name: Lint\n        run: echo bypass\n",
+        1,
+    );
+    assert!(
+        check_installer(&duplicate).is_err(),
+        "duplicate YAML keys must fail closed"
+    );
+}
+
+/// Advancing a reference retains the source-verification gate and caller interface.
+#[test]
+fn whitaker_action_bumps_do_not_require_test_pin_updates() {
+    let changed = action_ref::repoint_action(CI, INSTALL_ACTION_PATH, &"0".repeat(40))
+        .expect("the workflow must contain the Whitaker action");
+    assert_eq!(
+        check_installer(&changed),
+        Ok(()),
+        "immutable action bumps must retain caller verification; Python resolves and approves \
+         source"
+    );
+}
+
+#[test]
+fn weakened_capability_verification_is_rejected() {
+    for (before, after) in [
+        ("Verify Whitaker capability", "Unused Whitaker capability"),
+        (
+            "        timeout-minutes: 3",
+            "        timeout-minutes: 3\n        if: false",
+        ),
+        (
+            "        timeout-minutes: 3",
+            "        timeout-minutes: 3\n        continue-on-error: true",
+        ),
+        (
+            "--workflow .github/workflows/ci.yml",
+            "--workflow fixture.yml",
+        ),
+        ("tools/whitaker_probe.py", "tools/unrelated.py"),
+    ] {
+        assert!(
+            CI.contains(before),
+            "capability fixture anchor must exist: {before}"
+        );
+        let changed = CI.replacen(before, after, 1);
+        assert!(
+            check_installer(&changed).is_err(),
+            "altered capability gate must fail: {after}"
+        );
+    }
+}
+
+#[test]
+fn late_capability_verification_is_rejected() {
+    let mut changed: Value = serde_yaml::from_str(CI).expect("parse capability order fixture");
+    let steps = changed
+        .get_mut("jobs")
+        .and_then(|jobs| jobs.get_mut("build-test"))
+        .and_then(|job| job.get_mut("steps"))
+        .and_then(Value::as_sequence_mut)
+        .expect("build-test must contain step sequence");
+    let index = steps
+        .iter()
+        .position(|step| {
+            step.get("name").and_then(Value::as_str) == Some("Verify Whitaker capability")
+        })
+        .expect("capability step must exist");
+    steps.swap(index, index + 1);
+    let source = serde_yaml::to_string(&changed).expect("serialize late capability fixture");
+    assert_ne!(
+        source, CI,
+        "capability order mutation must change the workflow"
+    );
+    assert!(
+        check_installer(&source).is_err(),
+        "verification after dependency execution must fail"
+    );
+}
