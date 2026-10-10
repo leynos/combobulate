@@ -51,7 +51,25 @@ FROZEN_DOCUMENTS: Mapping[str, Callable[[dict, dict], None]] = {
 
 
 def check_frozen(context: ValidationContext, base_rev: str | None) -> str:
-    """Compare each frozen register with the base revision; return a summary for the caller to print."""
+    """Compare each frozen register with the base revision; return a summary for the caller to print.
+
+    Parameters
+    ----------
+    context
+        The validation context whose root is a Git work tree.
+    base_rev
+        The revision to compare with, or None to skip the check.
+
+    Returns
+    -------
+    str
+        A one-line summary naming the registers compared, or why none were.
+
+    Raises
+    ------
+    AssertionError
+        When a frozen record was deleted or edited, or the base revision cannot be read.
+    """
     if base_rev is None:
         return 'Freeze check not run: no --base-rev supplied.'
     compared = []

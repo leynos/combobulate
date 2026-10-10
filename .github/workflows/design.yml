@@ -44,5 +44,15 @@ jobs:
           else
             echo "rev=" >> "$GITHUB_OUTPUT"
           fi
+          # A scheduled run evaluates expiry on its own date; other runs use
+          # the HEAD commit date, so a pull request's result is reproducible.
+          if [ "$EVENT" = schedule ]; then
+            echo "as_of=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+          else
+            echo "as_of=" >> "$GITHUB_OUTPUT"
+          fi
       - name: Validate documentation contracts
-        run: make design-check BASE_REV="${{ steps.base.outputs.rev }}"
+        env:
+          BASE_REV: ${{ steps.base.outputs.rev }}
+          RUN_DATE: ${{ steps.base.outputs.as_of }}
+        run: make design-check BASE_REV="$BASE_REV" ${RUN_DATE:+AS_OF="$RUN_DATE"}

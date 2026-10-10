@@ -9,8 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
+from check_docs import collect_checks
 from docs_validation.roadmap_status import (
-    ClosureInputs, check_roadmap_status, closure_failures, index_completions, index_components, task_closure,
+    ClosureInputs, artefact_resolver, closure_failures, index_completions, index_components, task_closure,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,7 +47,7 @@ def component(component_id: str, source: str, accepts: list[str] | None = None) 
             'accepts': accepts or ['tested'], 'evidence_source': source, 'evidence': []}
 
 
-def inputs(tasks: dict[str, dict], **overrides) -> ClosureInputs:
+def inputs(tasks: dict[str, dict], **overrides: object) -> ClosureInputs:
     """Build closure inputs in which every condition holds unless overridden."""
     values = {'tasks': tasks, 'completions': completions(tasks), 'decisions': {'D01': ACCEPTED},
               'components': {}, 'passed_checks': frozenset({'evidence-gate'}),
@@ -156,8 +157,19 @@ class ComponentsAndCompletions(unittest.TestCase):
 class RealRoadmap(unittest.TestCase):
     """The committed roadmap passes closure, and PF14.structural@1.1.4 is wired to the evidence gate."""
 
-    def test_committed_roadmap_passes(self):
-        check_roadmap_status(ValidationContext(ROOT))
+    def test_committed_roadmap_passes_after_the_checks_it_depends_on(self):
+        context = ValidationContext(ROOT)
+        collect_checks(context)
+        self.assertEqual(context.results[-1]['check'], 'roadmap-status', 'closure runs after every other check')
+
+    def test_artefact_outside_the_repository_does_not_resolve(self):
+        exists = artefact_resolver(ValidationContext(ROOT))
+        self.assertTrue(exists('docs/roadmap.md#combobulate-roadmap'), 'an in-repository heading resolves')
+        escape = '../' * (len(ROOT.resolve().parts) - 1) + 'etc/os-release'
+        self.assertTrue(Path('/etc/os-release').is_file(), 'the escape target must exist for this control to bite')
+        self.assertFalse(exists(escape), 'a relative path escaping the root never resolves')
+        self.assertFalse(exists('/etc/os-release'), 'an absolute path outside the root never resolves')
+        self.assertFalse(exists('docs/roadmap.md#no-such-heading'), 'a missing anchor does not resolve')
 
     def test_pf14_structural_component_targets_task_114(self):
         obligations = ValidationContext(ROOT).load('spec/proof-obligations.json')['obligations']
