@@ -228,8 +228,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   approval, calibration, host identity, and evidence-state expectations.
 - [x] (2026-10-15) R2 clarified checker-backed component satisfaction in MS-3
   and VO-4; implementation alignment remains pending in PRs #17 and #18.
-- [ ] `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode exporter and
-  drift validator (separate stacked pull request, sponsor-directed).
+- [x] `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode exporter and
+  drift validator (sponsor-directed, delivered in PR #11). The export preserves
+  task details and checkbox state, adds the intended per-task `status` field,
+  reports unrecognized structure with source lines, and rejects stale JSON.
+  Validation evidence is recorded in PR #11.
+- [ ] Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.

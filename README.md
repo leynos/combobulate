@@ -770,9 +770,9 @@ Rustdoc, Clippy, Whitaker, test, and spelling gates. Run `make markdownlint` and
 
 Install the documentation check dependencies with
 `python3 -m pip install -r tools/requirements.txt`, then run
-`make design-check`. This validates the design fixtures and generated
-reference, roadmap, and bet documents. It does not compile the proposed APIs or
-discharge proof obligations.
+`make design-check`. This validates the design fixtures, the generated
+reference and bet documents, and the roadmap's derived JSON export. It does not
+compile the proposed APIs or discharge proof obligations.
 
 The [developer guide](docs/developers-guide.md) explains build routes and
 contracts. The [repository layout](docs/repository-layout.md) assigns file

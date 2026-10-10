@@ -23,7 +23,7 @@ request 11. The current crate is a scaffold; the multi-crate architecture in the
 | `docs/`                                  | Design, guides, reference material, and recorded decisions.                               |
 | `docs/contents.md`                       | Canonical documentation index.                                                            |
 | `spec/`                                  | Machine-readable language, roadmap, proof, cost, and backend contracts.                   |
-| `tools/`                                 | Design generators and documentation-model validation.                                     |
+| `tools/`                                 | Design generators, the roadmap exporter, and documentation-model validation.              |
 | `tools/mold/`                            | Pinned native linker version and archive digest.                                          |
 | `Cargo.toml`, `Cargo.lock`               | Package metadata, dependencies, lint policy, and lockfile.                                |
 | `rust-toolchain.toml`                    | Pinned nightly and required components.                                                   |
@@ -42,10 +42,13 @@ planned crate boundaries. Keep integration tests under `tests/`; support
 modules serve their named suite and must not become a generic validation
 framework. Toolchain scripts belong to the root build workflow.
 
-The design generators consume `spec/` and own the corresponding generated
-reference, roadmap, and bets in `docs/`. Change the source specification before
-regenerating those documents. Validation reports describe documentation models
-and must not assert proof discharge or runtime capability eligibility.
+`docs/roadmap.md` is canonical: edit it directly (preferably with `mapsplice`
+for structural changes), then run `tools/export_roadmap.py` to refresh its
+derived JSON view, `spec/roadmap.json`. The remaining design generators consume
+`spec/` and own the generated reference and bets in `docs/`; change the source
+specification before regenerating those documents. Validation reports describe
+documentation models and must not assert proof discharge or runtime capability
+eligibility.
 
 Keep durable requirements and decisions under `docs/`, and update
 [contents](contents.md) when adding, removing, or renaming documents. Prefer

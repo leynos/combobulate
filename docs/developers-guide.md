@@ -405,13 +405,33 @@ is inert with `merman-cli`.
 
 Install `tools/requirements.txt`, then run `make design-check`. The dedicated
 `Design contracts` workflow runs the same target for pull requests and main.
-These checks cover specification links, generated reference/roadmap/bet drift,
-example semantics, schemas, proof-evidence envelopes, and cost-model negative
-controls. They do not execute Kani, Verus, proposed Rust macros, or Polars
-probes. The default checker also verifies the committed validation report
-without changing it. After deliberate design or validator changes, run
-`python3 tools/check_docs.py --write`, review the report diff, then run
-`make design-check`. Failed source checks leave the existing report untouched.
+These checks cover specification links, generated reference/bet drift, roadmap
+export drift, example semantics, schemas, proof-evidence envelopes, and
+cost-model negative controls. They do not execute Kani, Verus, proposed Rust
+macros, or Polars probes. The default checker also verifies the committed
+validation report without changing it. After deliberate design or validator
+changes, run `python3 tools/check_docs.py --write`, review the report diff,
+then run `make design-check`. Failed source checks leave the existing report
+untouched.
+
+The system Python may lack the pinned dependencies. A disposable environment
+works without installing anything globally:
+
+```bash
+make design-check PYTHON="uv run --python 3.14 --with-requirements tools/requirements.txt python3"
+```
+
+`docs/roadmap.md` is the canonical roadmap. Edit it directly, preferably with
+`mapsplice` for structural changes such as inserting or renumbering tasks, then
+run `python3 tools/export_roadmap.py` to refresh `spec/roadmap.json`, the
+derived JSON view the design checks consume. Commit both files together. The
+exporter parses the marked roadmap region with Wenmode and fails, naming the
+source line, on structure it does not recognize: an unexpected heading level, a
+task without a checkbox, an unlabelled task bullet, or a ticked detail checkbox.
+`python3 tools/export_roadmap.py --check` exits 1 and prints a diff when the
+committed export is stale, and the design checks reject the same drift.
+Upstream request leynos/mapsplice#144 tracks a native export that will replace
+this exporter.
 
 The `tools/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
