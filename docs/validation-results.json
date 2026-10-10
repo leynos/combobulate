@@ -83,8 +83,8 @@
     {
       "check": "python-tools",
       "status": "pass",
-      "detail": "All delivered Python tool files parse; generator and checker execution also exercised their main paths.",
-      "count": 30
+      "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
+      "count": 31
     }
   ],
   "not_run": [

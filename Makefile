@@ -218,3 +218,4 @@ PYTHON ?= python3
 design-check: ## Validate design documents, fixtures, and generator contracts
 	$(PYTHON) tools/check_docs.py
 	$(PYTHON) -m unittest discover -s tools/tests
+	$(PYTHON) -m pytest -q scripts/tests
