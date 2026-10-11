@@ -481,6 +481,33 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M4` milestone review dispositions (CodeRabbit CLI). Fixed in
+  this layer before any merge or acceptance measurement: `verdict` read a
+  `control_id` field that the measurement-record schema names `control_ids`
+  (the test fixture is now schema-validated); registered workload sources are
+  now checked against their SHA-256 digests, which exposed that `AC-02`'s
+  digest predated `rustfmt` on the probe, so its source digest and control
+  digests were recomputed. The wording findings inside frozen derivations
+  ("rounded up to 64 MiB", the ten-harness job budget) are clarified in the
+  calibration report rather than by editing registered fields. Date/Author:
+  2026-10-11, implementing agent.
+- Decision: `EP-M4` exceeded both per-milestone tolerances: 29 changed files
+  against 25, and about 1,990 net added lines against 1,500, excluding the
+  regenerated register and bet regions, the export, the report, and the probe's
+  generated `Cargo.lock` (1,899 lines, committed so the Polars dependency tree
+  behind the calibration is reproducible). Most of the remainder is calibration
+  evidence and the control register (`spec/` calibration records, about 520
+  lines; `spec/acceptance-controls.json`, 511). Escalated to the sponsor in the
+  milestone pull request. Date/Author: 2026-10-11, implementing agent.
+- Decision: the runner extrapolation factor comes from one workload run on
+  both machines (the design checks' unittest and pytest suites at commit
+  398d2f6, hosted run 38095157811) rather than a published processor benchmark,
+  because the hosted runner's CPU model is not recorded and the shared workload
+  removes that uncertainty. Ratios of hosted to local medians were 0.92 and
+  1.17; the factor is the larger, rounded up to 1.2. Builds use the same factor
+  with parallelism pinned to 4 jobs. Calibration reused the existing user-level
+  Verus build rather than installing a second copy. Date/Author: 2026-10-11,
+  implementing agent.
 - Decision: `EP-M3` exceeded the per-milestone line tolerance (about 2,800
   net added lines against 1,500, excluding the regenerated reference table, the
   register region, the export, and the report; 24 files, within the file

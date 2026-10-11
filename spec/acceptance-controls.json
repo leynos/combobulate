@@ -120,7 +120,7 @@
           "sources": [
             {
               "path": "tools/calibration/cardinality-probe/src/lib.rs",
-              "sha256": "3b119463afc36a567b3af768b64e2707e96156f031c5458e62409945c6a6eeda"
+              "sha256": "72573fc2da4b2ca029805e22ab2332e543cf778b685cad8468f4c5e2abd6328e"
             }
           ]
         },
@@ -169,8 +169,8 @@
         "registered_on": "2026-10-11",
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
-      "registered_digest": "42d34a04e51cddcc6b8977bd7dcb4b5906edc145de373767a50142ea758d708a",
-      "digest": "42d34a04e51cddcc6b8977bd7dcb4b5906edc145de373767a50142ea758d708a",
+      "registered_digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
+      "digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
       "amendments": []
     },
     {
