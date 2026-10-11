@@ -252,8 +252,8 @@ The register's
 [candidate ADR subjects](decision-register.md#candidate-adr-subjects) record
 the disposition of each potential ADR subject (D07): the semantic and numerical
 contract, macro staging and the stable-Rust application interface, and the
-initial release scope each have an ADR; the backend and cell boundary is
-deferred to task 1.2.1.
+initial release scope are each assigned an ADR (ADR-0006, ADR-0007, and
+ADR-0003); the backend and cell boundary is deferred to task 1.2.1.
 
 Implementation that contradicts an agreed requirement must surface the conflict
 and reconcile the upstream documents before claiming completion. An unmeasured
