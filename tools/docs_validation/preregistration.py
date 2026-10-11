@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
@@ -59,6 +60,16 @@ def check_amendment_chain(control: Mapping[str, object], sponsor: str) -> None:
     require(control['digest'] == frozen_digest(control), f"{control['id']} digest does not match its frozen fields")
 
 
+def check_sources(control: Mapping[str, object], root: Path) -> None:
+    """Require each registered workload source to match its recorded SHA-256; an edit needs an amendment."""
+    for source in control['frozen']['workload']['sources']:
+        path = root / source['path']
+        require(path.is_file(), f"{control['id']} source {source['path']} is missing")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        require(digest == source['sha256'],
+                f"{control['id']} source {source['path']} changed since registration; amend the control")
+
+
 def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object]]) -> str:
     """Decide an acceptance verdict; every retry counts and calibration never counts.
 
@@ -68,7 +79,7 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
     `not-run`.
     """
     outcomes = [OUTCOME_VERDICTS[record['outcome']] for record in records
-                if record['purpose'] == 'acceptance' and record['control_id'] == control['id']
+                if record['purpose'] == 'acceptance' and control['id'] in record['control_ids']
                 and record['control_digest'] == control['digest']]
     if not outcomes:
         return 'not-run'
@@ -118,6 +129,7 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     for control in register['controls']:
         check_completeness(control)
         check_amendment_chain(control, sponsor)
+        check_sources(control, context.root)
         check_calibration_reference(control, records)
         require(verdict(control, records.values()) == 'not-run',
                 f"{control['id']} has acceptance evidence in the calibration directory")

@@ -56,8 +56,10 @@ than tightening them.
    runner's CPU model is not recorded.
 6. Thresholds. Each time threshold is the local median times the factor
    times a safety margin of 2, rounded up to a stated granularity. Each memory
-   ceiling is the measured peak times 1.5, rounded up to 64 MiB and capped at
-   12 GiB (16 GB less a 4 GB reserve). The Verus `rlimit` is deterministic, so
+   ceiling is the measured peak times 1.5, rounded up to a multiple of 64 MiB
+   and capped at 12 GiB (16 GB less a 4 GB reserve). The `AC-02` per-job budget
+   allows ten harnesses, the expected harness count for tasks 1.2.4 and 1.2.5,
+   not the two harnesses of the probe. The Verus `rlimit` is deterministic, so
    it is the primary proof budget and needs no factor.
 
 ## Results and thresholds

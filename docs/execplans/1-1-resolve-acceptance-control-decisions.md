@@ -388,6 +388,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M4` milestone review dispositions (CodeRabbit CLI). Fixed in
+  this layer before any merge or acceptance measurement: `verdict` read a
+  `control_id` field that the measurement-record schema names `control_ids`
+  (the test fixture is now schema-validated); registered workload sources are
+  now checked against their SHA-256 digests, which exposed that `AC-02`'s
+  digest predated `rustfmt` on the probe, so its source digest and control
+  digests were recomputed. The wording findings inside frozen derivations
+  ("rounded up to 64 MiB", the ten-harness job budget) are clarified in the
+  calibration report rather than by editing registered fields. Date/Author:
+  2026-10-11, implementing agent.
 - Decision: `EP-M4` exceeded both per-milestone tolerances: 29 changed files
   against 25, and about 1,990 net added lines against 1,500, excluding the
   regenerated register and bet regions, the export, the report, and the probe's

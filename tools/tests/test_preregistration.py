@@ -11,10 +11,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from hypothesis import given, settings, strategies as st
+from jsonschema import Draft202012Validator
 
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
-    FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_amendment_chain, check_completeness,
+    FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_amendment_chain, check_completeness, check_sources,
     check_host_identity, frozen_digest, verdict,
 )
 
@@ -69,6 +70,14 @@ class Registration(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
             check_amendment_chain(control, SPONSOR)
 
+    def test_changed_source_needs_an_amendment(self):
+        control = next(item for item in REGISTER['controls'] if item['id'] == 'AC-07')
+        check_sources(control, ROOT)
+        stale = copy.deepcopy(control)
+        stale['frozen']['workload']['sources'][0]['sha256'] = '0' * 64
+        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml changed since registration'):
+            check_sources(stale, ROOT)
+
     def test_every_frozen_field_changes_the_digest(self):
         exercised: set[str] = set()
 
@@ -89,10 +98,22 @@ class Registration(unittest.TestCase):
 RECORD_OUTCOMES = sorted(OUTCOME_VERDICTS)
 
 
+RECORD_VALIDATOR = Draft202012Validator(ValidationContext(ROOT).load('spec/measurement-record.schema.json'),
+                                        format_checker=Draft202012Validator.FORMAT_CHECKER)
+
+
 def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None) -> dict:
-    """Build one measurement record for the first control."""
-    return {'purpose': purpose, 'control_id': CONTROL['id'], 'control_digest': digest or CONTROL['digest'],
-            'outcome': outcome}
+    """Build one schema-valid measurement record for the first control."""
+    entry = {'id': 'fixture', 'purpose': purpose, 'control_ids': [CONTROL['id']],
+             'control_digest': digest or CONTROL['digest'], 'recorded_on': '2026-10-12',
+             'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
+                          'memory_gib': 16, 'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
+             'toolchains': {}, 'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
+                                              'metric': 'wall time', 'unit': 's', 'samples': [1], 'median': 1}]}
+    if purpose == 'acceptance':
+        entry['outcome'] = outcome
+    RECORD_VALIDATOR.validate(entry)
+    return entry
 
 
 class Outcomes(unittest.TestCase):
