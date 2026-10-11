@@ -453,6 +453,34 @@ superseding record and link both directions with `supersedes` and
 `superseded_by`. ADRs live in `docs/adrs/` as `adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
 
+A ticked roadmap checkbox is a claim, and
+`tools/docs_validation/roadmap_status.py` is the single owner of what backs it.
+Before ticking a task, add its entry to `spec/task-completion.json`, naming the
+decisions it relies on and the artefacts that complete it (a path, optionally
+with a `#heading` anchor). The design checks then require every prerequisite to
+be ticked, every cited decision to be accepted, every artefact to resolve, and
+every proof-obligation component linked to the task to be satisfied. Components
+live in `spec/proof-obligations.json` as `PFnn.<method>@<task>`, each listing
+the admission levels (`proof`, `bounded`, `tested`) that satisfy it. A
+component whose `evidence_source` is `checker:<check>` is satisfied when that
+check passes in the same run; a `record` component fails closed until the
+evidence gate admits a proof-evidence record for it. A task that meets every
+condition but is not ticked is reported, not failed, so ticking stays a
+deliberate act.
+
+Accepted decisions are frozen. `make design-check BASE_REV=<revision>` compares
+`spec/decisions.json` with that revision and rejects an accepted record that
+was deleted or edited other than by becoming superseded; recomputing a stored
+digest cannot hide the edit, because the comparison reads the base revision
+from Git. The `Design contracts` workflow fetches full history and passes the
+pull request's merge base, or the previous head on a push to `main`. It also
+runs weekly, so date-dependent checks fail on `main` first. `make design-check`
+passes the HEAD commit date as `--as-of`, and the scheduled workflow run passes
+its own run date as `AS_OF`, so expiry surfaces even when `main` is idle; the
+checks themselves never read the wall clock. The freeze result is printed
+rather than recorded in `docs/validation-results.json`, so the committed report
+does not depend on which base revision was supplied.
+
 Python helper scripts live in `scripts/` and follow
 [the scripting standards](scripting-standards.md): a `uv` shebang with a PEP
 723 dependency block, Cyclopts for the command line (so `INPUT_*` environment

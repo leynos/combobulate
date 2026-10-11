@@ -12,7 +12,8 @@ code widths, local links, source-register IDs and basic whitespace rules. It
 compares the language-reference and bet Markdown with their JSON masters, and
 requires `spec/roadmap.json` to equal a fresh export of the canonical
 `docs/roadmap.md`. It validates unique IDs, requirement/goal/task mappings,
-all-open task status and an acyclic earlier-dependency graph.
+evidence-backed task ticks (prerequisites, completion records, accepted
+decisions, and obligation components) and an acyclic earlier-dependency graph.
 
 The pack contains 148 catalogue entries, 72 roadmap tasks, 11 requirements, 20
 verification categories, 14 named proof obligations, eight testable bets and
@@ -72,8 +73,16 @@ make design-check
 ```
 
 Review the report diff before committing it. Regeneration writes the report
-only after all source checks pass. The supplied Python helpers do not invoke a
-compiler, verifier or backend.
+only after all source checks pass. To reject edits to accepted decisions, also
+compare with a base revision, as the `Design contracts` workflow does:
+
+```bash
+make design-check BASE_REV="$(git merge-base origin/main HEAD)"
+```
+
+The roadmap-status check accepts a ticked task only when its prerequisites,
+completion record, accepted decisions, and obligation components back it. The
+supplied Python helpers do not invoke a compiler, verifier or backend.
 
 ## Unrun checks and limits
 
