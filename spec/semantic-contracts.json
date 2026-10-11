@@ -449,7 +449,7 @@
       "title": "Atomic output commit",
       "decision": "D10",
       "catalogue_ids": [
-        "P002"
+        "E010"
       ],
       "preconditions": [
         "An operation writes its result to a destination only at commit."

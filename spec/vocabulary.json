@@ -1347,7 +1347,7 @@
       "name": ".axis(axis) / .axes(axes)",
       "signature": "axis-aware operation -> operation",
       "shape": "Operation-specific.",
-      "contract": "Zero-based axes; checked unique indices/names; no implicit negative indices. Multi-axis order is caller-specified. Contracts: SC-08, SC-09.",
+      "contract": "Zero-based axes; checked unique indices/names; no implicit negative indices. Multi-axis order is caller-specified. Contract: SC-08.",
       "execution": "Do not silently sort contraction axes.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1743,7 +1743,7 @@
       "name": "execute_into",
       "signature": "plan + sink + context",
       "shape": "Sink-specific result.",
-      "contract": "Caller-owned output/scratch is available on the sequential Core route; Integration adds domain sinks. Success commits once; failure/cancellation before commit leaves the destination unchanged. Partial sinks require a distinct protocol and frame contract.",
+      "contract": "Caller-owned output/scratch is available on the sequential Core route; Integration adds domain sinks. Success commits once; failure/cancellation before commit leaves the destination unchanged. Partial sinks require a distinct protocol and frame contract. Contract: SC-09.",
       "execution": "Initially tile-local commit; native kernels must cooperate with cancellation.",
       "scope": "Core",
       "roadmap_tasks": [
