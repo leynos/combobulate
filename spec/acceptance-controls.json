@@ -1,0 +1,511 @@
+{
+  "revision": "0.2",
+  "frozen_fields": [
+    "workload",
+    "control",
+    "sizes",
+    "seeds",
+    "timed_region",
+    "metric",
+    "unit",
+    "estimand",
+    "statistic",
+    "decision_rule",
+    "warmup",
+    "interleaving",
+    "samples",
+    "outlier_policy",
+    "environment",
+    "cache_policy",
+    "proof_scope",
+    "measurement_tool",
+    "analysis_script",
+    "calibration",
+    "registered_on",
+    "authority"
+  ],
+  "outcome_verdicts": {
+    "pass": "pass",
+    "fail": "fail",
+    "budget-exceeded": "fail",
+    "resource-exhausted": "fail",
+    "inconclusive": "inconclusive",
+    "missing": "fail"
+  },
+  "controls": [
+    {
+      "id": "AC-01",
+      "title": "Verus verification budget for the cardinality kernel",
+      "tasks": [
+        "1.2.4"
+      ],
+      "requirements": [
+        "R8",
+        "R10"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "Verus verification of the shipped checked-cardinality kernel and its specification (task 1.2.4); calibrated on the probe in tools/calibration/cardinality-probe/verus.",
+          "sources": [
+            {
+              "path": "tools/calibration/cardinality-probe/verus/cardinality.rs",
+              "sha256": "bf8b3331d8b3752843dcd12d49148508fd3a6900d171a31dea187c5b9ed598ca"
+            }
+          ]
+        },
+        "control": null,
+        "sizes": "Every function of the kernel module; no symbolic size parameters.",
+        "seeds": "Not applicable: deterministic solver with fixed configuration.",
+        "timed_region": "The whole verus invocation, including Rust front end and SMT.",
+        "metric": "Per-function SMT rlimit (primary); wall time and process-tree peak memory (secondary).",
+        "unit": "rlimit units; seconds; MiB",
+        "estimand": "The resource consumption of one full verification of the kernel.",
+        "statistic": "Single run: maximum per-function rlimit, total wall time, peak memory.",
+        "decision_rule": {
+          "thresholds": {
+            "rlimit_per_function": 300000,
+            "wall_seconds": 10,
+            "memory_mib": 320,
+            "hard_timeout_seconds": 30
+          },
+          "pass_when": "Every function verifies within the rlimit, and the run stays within the wall-time and memory budgets.",
+          "inconclusive": "Never: above a budget is budget-exceeded; above the hard timeout or out of memory is resource-exhausted; both fail.",
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+        },
+        "warmup": "None.",
+        "interleaving": "Not applicable.",
+        "samples": "One run per candidate; no retries, and every rerun is recorded and counts.",
+        "outlier_policy": "None: every run counts.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "No verification cache; Rust build artefacts may be cached.",
+        "proof_scope": "Full functional specification of checked cardinality, unbounded extents.",
+        "measurement_tool": "Verus --output-json --time-expanded under systemd-run (cgroup v2 memory.peak).",
+        "analysis_script": null,
+        "calibration": {
+          "status": "calibrated",
+          "record": "spec/calibration/verifier-probe.json",
+          "derivation": "rlimit: max per-function 146824 x 2, rounded up to 10,000. Wall: median 1.643 s x factor 1.2 x 2, rounded up to 10 s. Memory: peak 201.8 MiB x 1.5, rounded up to 64 MiB."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "da483a469488f9d2e5fade01a589c7143576bd47cc123b2ca2819dfa44d6a4e5",
+      "digest": "da483a469488f9d2e5fade01a589c7143576bd47cc123b2ca2819dfa44d6a4e5",
+      "amendments": []
+    },
+    {
+      "id": "AC-02",
+      "title": "Kani harness budgets for cardinality and costing",
+      "tasks": [
+        "1.2.4",
+        "1.2.5"
+      ],
+      "requirements": [
+        "R8",
+        "R10"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "Each Kani harness of the cardinality kernel and staged costing; calibrated on the probe harnesses in tools/calibration/cardinality-probe/src/lib.rs.",
+          "sources": [
+            {
+              "path": "tools/calibration/cardinality-probe/src/lib.rs",
+              "sha256": "72573fc2da4b2ca029805e22ab2332e543cf778b685cad8468f4c5e2abd6328e"
+            }
+          ]
+        },
+        "control": null,
+        "sizes": "Symbolic full-width inputs for structural harnesses without symbolic multiplication.",
+        "seeds": "Not applicable.",
+        "timed_region": "Per harness: CBMC verification time reported by Kani; per job: the whole cargo kani invocation.",
+        "metric": "Verification time per harness; per-job wall time; process-tree peak memory.",
+        "unit": "seconds; MiB",
+        "estimand": "Per-harness and per-job verification cost.",
+        "statistic": "Single run per harness.",
+        "decision_rule": {
+          "thresholds": {
+            "harness_seconds": 10,
+            "job_seconds": 100,
+            "memory_mib": 128
+          },
+          "pass_when": "Every harness verifies with unwinding assertions on and every declared kani::cover! satisfied, within the per-harness and per-job budgets.",
+          "inconclusive": "Never: an unsatisfied cover, a timeout, or a missing harness record fails; a per-harness wrapper writes a record even when killed.",
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+        },
+        "warmup": "None.",
+        "interleaving": "Not applicable.",
+        "samples": "One run per harness; every rerun is recorded and counts.",
+        "outlier_policy": "None.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "Rust build artefacts may be cached; verification is never cached.",
+        "proof_scope": "Structural harnesses (zero-first, scalar, overflow-flag plumbing) with unwinding assertions on; multiplication over symbolic extents is proved in Verus under AC-01. A harness that needs symbolic multiplication requires a sponsor-approved amendment with its own calibration.",
+        "measurement_tool": "Kani 0.67.0 with CaDiCaL, under systemd-run.",
+        "analysis_script": null,
+        "calibration": {
+          "status": "calibrated",
+          "record": "spec/calibration/verifier-probe.json",
+          "derivation": "Harness: structural-harness median 1.014 s x factor 1.2 x 2, rounded up to 10 s; job: ten harnesses. Memory: peak 54.0 MiB x 1.5, rounded up to 64 MiB. Two multiplication harnesses (full width, and below 2^16) exhausted 900 s and are out of scope."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
+      "digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
+      "amendments": []
+    },
+    {
+      "id": "AC-03",
+      "title": "Compile-time cost of static admission",
+      "tasks": [
+        "2.4.1",
+        "2.4.2",
+        "2.4.3"
+      ],
+      "requirements": [
+        "R10"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "Incremental rebuild of a fixed client crate with static cost admission enabled versus disabled (step 2.4, bet B03).",
+          "sources": []
+        },
+        "control": {
+          "description": "The same client crate and edit with static admission disabled."
+        },
+        "sizes": "One client crate, one fixed edit, one target.",
+        "seeds": "Fixed edit sequence; interleaving order from seed 20261011.",
+        "timed_region": "cargo build after the fixed edit, excluding queueing for a compile slot.",
+        "metric": "Incremental rebuild wall time.",
+        "unit": "seconds; ratio",
+        "estimand": "Geometric mean of paired treatment/control rebuild-time ratios.",
+        "statistic": "Percentile bootstrap, at least 10,000 resamples, on log ratios; one-sided 95% upper bound.",
+        "decision_rule": {
+          "thresholds": {
+            "upper_bound_ratio": 1.25
+          },
+          "pass_when": "The one-sided 95% upper bound of the geometric-mean ratio is at most 1.25.",
+          "inconclusive": "An interval straddling 1.25 is inconclusive.",
+          "extension": "One pre-declared doubling of the pair count; still straddling after it fails."
+        },
+        "warmup": "At least 3 warm-up builds per arm, discarded.",
+        "interleaving": "Paired and interleaved, arms alternated by seed.",
+        "samples": "At least 10 pairs.",
+        "outlier_policy": "None: every pair counts.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "Warm incremental cache within a run; no shared compilation cache between arms.",
+        "proof_scope": "Not applicable.",
+        "measurement_tool": "Hosted runner job timing with the build-limits queue time excluded.",
+        "analysis_script": {
+          "path": null,
+          "requirement": "A bootstrap analysis script is registered by sponsor-approved amendment before the first acceptance measurement."
+        },
+        "calibration": {
+          "status": "not-calibrated",
+          "reason": "Static admission does not exist yet; the ratio threshold is the design target from bet B03, and the probe build times in spec/calibration/builds.json only inform its per-arm timeouts."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "4c2d4504f7b1e9dc3973a35500d197891c29dd47aa49403b5bea380c0c690a0c",
+      "digest": "4c2d4504f7b1e9dc3973a35500d197891c29dd47aa49403b5bea380c0c690a0c",
+      "amendments": []
+    },
+    {
+      "id": "AC-04",
+      "title": "Build budgets for the native-only, proof-capable, and Polars-enabled profiles",
+      "tasks": [
+        "1.2.1"
+      ],
+      "requirements": [
+        "R7"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "Cold and incremental builds of the 1.2.1 foundational probe in its three feature profiles; calibrated on the repository package and the calibration probe.",
+          "sources": [
+            {
+              "path": "tools/calibration/cardinality-probe/Cargo.toml",
+              "sha256": "41174e80e2f0c6c3ae37eedab48b2c003adb3c84e96b4b43fc9fcd61ad1d4d53"
+            }
+          ]
+        },
+        "control": null,
+        "sizes": "Three profiles; cold (empty target directory) and incremental (after touching the crate root).",
+        "seeds": "Not applicable.",
+        "timed_region": "The cargo invocation, excluding queueing for a compile slot.",
+        "metric": "Build wall time.",
+        "unit": "minutes",
+        "estimand": "Median build time per profile and phase.",
+        "statistic": "Median of 5 runs per profile and phase.",
+        "decision_rule": {
+          "thresholds": {
+            "native_cold_minutes": 1,
+            "native_incremental_minutes": 1,
+            "proof_cold_minutes": 1,
+            "proof_incremental_minutes": 1,
+            "polars_cold_minutes": 10,
+            "polars_incremental_minutes": 1
+          },
+          "pass_when": "Every profile and phase median is within its ceiling.",
+          "inconclusive": "Inconclusive is not a pass; a killed job with no record is a failure.",
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+        },
+        "warmup": "None for cold builds; one discarded incremental build.",
+        "interleaving": "Profiles alternate run by run.",
+        "samples": "5 runs per profile and phase.",
+        "outlier_policy": "None: the median absorbs a single slow run.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "No sccache; cold builds start from an empty target directory.",
+        "proof_scope": "Not applicable.",
+        "measurement_tool": "Hosted runner step timing.",
+        "analysis_script": null,
+        "calibration": {
+          "status": "calibrated",
+          "record": "spec/calibration/builds.json",
+          "derivation": "Each ceiling: local median x factor 1.2 x 2, rounded up to whole minutes, with 4 build jobs to match the runner."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "e0d232fee592b2a67b16cce97ea24c02ff5d7364f9bcb13de29d972f221632dd",
+      "digest": "e0d232fee592b2a67b16cce97ea24c02ff5d7364f9bcb13de29d972f221632dd",
+      "amendments": []
+    },
+    {
+      "id": "AC-05",
+      "title": "Runtime ratios against ordinary Rust controls",
+      "tasks": [
+        "3.4.1",
+        "4.3.3"
+      ],
+      "requirements": [
+        "R4",
+        "R5"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "The six Core benchmark workloads (S1, S5) through the native executor at two sizes each.",
+          "sources": []
+        },
+        "control": {
+          "description": "Ordinary handwritten Rust implementations of the same six workloads."
+        },
+        "sizes": "Two input sizes per workload, fixed before measurement.",
+        "seeds": "Fixed data-generation seeds per workload, frozen with the workload sources.",
+        "timed_region": "Executor run excluding data generation and graph construction.",
+        "metric": "Instruction count (primary); wall time (secondary).",
+        "unit": "instructions; ratio",
+        "estimand": "Geometric-mean treatment/control ratio per workload and size.",
+        "statistic": "Percentile bootstrap, at least 10,000 resamples; one-sided 95% upper bound per workload and size.",
+        "decision_rule": {
+          "thresholds": {
+            "upper_bound_ratio": 1.5
+          },
+          "pass_when": "All six workloads pass at both sizes; each result is reported.",
+          "inconclusive": "A straddling interval is inconclusive.",
+          "extension": "One pre-declared doubling of the pair count."
+        },
+        "warmup": "3 warm-up runs per arm.",
+        "interleaving": "Paired, interleaved within one hosted job.",
+        "samples": "At least 30 pairs per workload and size.",
+        "outlier_policy": "None.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "Not applicable.",
+        "proof_scope": "Not applicable.",
+        "measurement_tool": "Instruction counts from perf counters on the hosted runner, wall time from the harness.",
+        "analysis_script": {
+          "path": null,
+          "requirement": "Registered by sponsor-approved amendment before the first acceptance measurement."
+        },
+        "calibration": {
+          "status": "not-calibrated",
+          "reason": "No executor exists to calibrate against; the 1.5 ratio is the design target (S1, S5)."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "c2283e0f203593ef94f77677b574095574ad264c25bdb26654897e7c7bab2ef7",
+      "digest": "c2283e0f203593ef94f77677b574095574ad264c25bdb26654897e7c7bab2ef7",
+      "amendments": []
+    },
+    {
+      "id": "AC-06",
+      "title": "Tracked memory peak within the admitted bound",
+      "tasks": [
+        "2.4.3",
+        "3.3.3"
+      ],
+      "requirements": [
+        "R4"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "Admitted executions with a counting global allocator (V9, V13).",
+          "sources": []
+        },
+        "control": null,
+        "sizes": "The admission test corpus of task 2.4.3.",
+        "seeds": "Fixed corpus.",
+        "timed_region": "Each admitted execution.",
+        "metric": "Tracked peak bytes versus the admitted bound; untracked allocated bytes.",
+        "unit": "bytes",
+        "estimand": "Per execution: whether the tracked peak exceeds the bound.",
+        "statistic": "Maximum over the corpus.",
+        "decision_rule": {
+          "thresholds": {
+            "tracked_peak_over_bound_bytes": 0,
+            "untracked_bytes": 0
+          },
+          "pass_when": "No execution exceeds its admitted bound, and the counting allocator reports no untracked allocation.",
+          "inconclusive": "Inconclusive is not a pass; a killed job with no record is a failure.",
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+        },
+        "warmup": "None.",
+        "interleaving": "Not applicable.",
+        "samples": "Every corpus entry once.",
+        "outlier_policy": "None.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "Not applicable.",
+        "proof_scope": "Not applicable.",
+        "measurement_tool": "Counting GlobalAlloc in the test harness.",
+        "analysis_script": null,
+        "calibration": {
+          "status": "not-calibrated",
+          "reason": "A correctness bound rather than a resource budget: any excess fails, so there is nothing to calibrate."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "02cd021a22e7077d5b5037a82a2485479bb6f4f59d19de7f54e3e0adb88c6960",
+      "digest": "02cd021a22e7077d5b5037a82a2485479bb6f4f59d19de7f54e3e0adb88c6960",
+      "amendments": []
+    },
+    {
+      "id": "AC-07",
+      "title": "Pull request CI critical-path wall time",
+      "tasks": [
+        "1.2.1"
+      ],
+      "requirements": [
+        "R7"
+      ],
+      "frozen": {
+        "workload": {
+          "description": "The CI build-test job, the critical path of pull request checks.",
+          "sources": [
+            {
+              "path": ".github/workflows/ci.yml",
+              "sha256": "c4f72ddbc4e86fe7578b6c0f27f5a86d962c8e0275efb3f1283584596655b280"
+            }
+          ]
+        },
+        "control": null,
+        "sizes": "Every pull request.",
+        "seeds": "Not applicable.",
+        "timed_region": "Job start to completion, excluding queueing.",
+        "metric": "Job wall time.",
+        "unit": "minutes",
+        "estimand": "The 90th percentile of the last 20 successful runs.",
+        "statistic": "p90 over a rolling window of 20 runs.",
+        "decision_rule": {
+          "thresholds": {
+            "p90_minutes": 8,
+            "timeout_minutes": 8
+          },
+          "pass_when": "The rolling p90 is within the budget; the job sets timeout-minutes equal to the budget.",
+          "inconclusive": "Fewer than 20 runs is inconclusive.",
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+        },
+        "warmup": "None.",
+        "interleaving": "Not applicable.",
+        "samples": "Last 20 successful runs on main and pull requests.",
+        "outlier_policy": "None.",
+        "environment": {
+          "image": "ubuntu-24.04",
+          "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
+          "toolchains": {
+            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
+            "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
+            "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+            "kani": "0.67.0"
+          }
+        },
+        "cache_policy": "The workflow's own caches.",
+        "proof_scope": "Not applicable.",
+        "measurement_tool": "GitHub Actions job timestamps via the REST API.",
+        "analysis_script": null,
+        "calibration": {
+          "status": "calibrated",
+          "record": "spec/calibration/ci-history.json",
+          "derivation": "p90 219.0 s of the last 20 runs x 2, rounded up to whole minutes."
+        },
+        "registered_on": "2026-10-11",
+        "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
+      },
+      "registered_digest": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
+      "digest": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
+      "amendments": []
+    }
+  ]
+}

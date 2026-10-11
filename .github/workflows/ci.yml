@@ -9,6 +9,9 @@ name: CI
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    # Pre-registered budget AC-07 (spec/acceptance-controls.json): twice the p90
+    # of the last 20 runs, rounded up to whole minutes.
+    timeout-minutes: 8
     permissions:
       contents: read
     env:

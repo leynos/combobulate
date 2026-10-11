@@ -20,7 +20,7 @@
       "negative_control": "Multiply before noticing a zero extent; remove a constructor invariant; suppress a failed harness. Each must fail its intended gate.",
       "falsifier": "The selected language/toolchain subset needs an unproved substitute executable body, a trusted whole-executor axiom, or proof costs above pre-registered limits.",
       "decision_rule": "Revise the kernel representation or narrow the certified subset before stabilization; do not abandon the proof-first requirement or hide a duplicate checker.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -45,7 +45,7 @@
       "negative_control": "Wrong transpose result, always-Err executor, stale source witness, or an assumed executor postcondition must not pass.",
       "falsifier": "A consumer must unfold private executor code, import private symbols, change executable routes under proof cfg, or assume the very property being claimed.",
       "decision_rule": "Revise public contracts/views and preserve production bindings before stabilizing them; record unsupported advanced properties explicitly.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -65,7 +65,7 @@
       "negative_control": "Treat unknown as zero, treat an upper bound as a lower bound, use host usize layout, or execute a host configuration read during compilation.",
       "falsifier": "The compiler accepts a known over-budget case, rejects all dynamic uses, reports false certainty, or needs unacceptable compile latency to certify the agreed examples.",
       "decision_rule": "Reduce static expression/shape scope and retain explicit runtime admission; strict certification fails closed without changing comb! ergonomics.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -87,7 +87,7 @@
       "negative_control": "Understate halo scratch, reuse a stale certificate, double-count one alias, omit a guard or permit untracked disk writes in a strict profile.",
       "falsifier": "The checker admits a violating schedule, certifies choices the backend may replace with unbounded alternatives, or relies on an unvalidated kernel declaration as unconditional evidence.",
       "decision_rule": "Restrict schedules/capabilities or require runtime checks; narrow certificates to tracked resources and list external assumptions instead of promising process RSS.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -108,7 +108,7 @@
       "negative_control": "Shuffle rows, lose a parent validity bit, split a segment, or apply a process-global policy as if it were independent per-query state.",
       "falsifier": "A supported route changes positional meaning, performs undisclosed I/O, or reports a hard per-plan bound without an available control.",
       "decision_rule": "Disable the capability or select a faithful explicitly permitted route; keep strict policy failures visible and do not infer support from Python versioning.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -128,7 +128,7 @@
       "negative_control": "Use determinism alone to speculate a fallible branch, treat metadata as a valid Normal3, or claim planning-time specialization is Rust compile-time evaluation.",
       "falsifier": "No supported interface exists, required equivalence fails, or measured benefit does not justify coupling and maintenance cost.",
       "decision_rule": "Decline that optional hook while retaining the semantic port and first-class Polars baseline; capability availability is not a mandate to use it.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -150,7 +150,7 @@
       "negative_control": "Invoke a faulting inactive kernel, permute only normals, drop empty segments, merge float accumulators without permission, or commit a cancelled tile.",
       "falsifier": "The proof requires inventing numerical correctness, assuming callback termination without disclosure, or silently replacing the concurrent/SIMD implementation by scalar code.",
       "decision_rule": "Keep direct domain code and narrow the proven orchestration route; record continue/revise/decline for trasic separately from proof SDK acceptance.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     },
     {
@@ -173,7 +173,7 @@
       "negative_control": "Import verification metadata from a different executable revision, use focus/skip mode as release evidence, or label bounded Kani evidence as unbounded.",
       "falsifier": "Consumers depend on private IR layout, relevant source changes do not invalidate evidence, or proof CI exceeds agreed limits without an explicit scope decision.",
       "decision_rule": "Refine the public lemma surface, cache keys and verification profiles; no compatibility shim is required for obsolete unreleased APIs, but released proof contracts get deliberate versioning.",
-      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against ToR Q2 controls agreed before execution. Correctness gates are categorical; empirical thresholds remain unapproved until recorded.",
+      "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",
       "status": "planned-not-run"
     }
   ]
