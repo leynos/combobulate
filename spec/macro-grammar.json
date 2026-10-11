@@ -1,0 +1,385 @@
+{
+  "revision": "0.2",
+  "source": {
+    "title": "The Rust Reference: Expressions, Expression precedence",
+    "url": "https://doc.rust-lang.org/reference/expressions.html#expression-precedence",
+    "retrieved": "2026-10-11"
+  },
+  "precedence": [
+    {
+      "name": "unary",
+      "operators": [
+        "-",
+        "!"
+      ],
+      "associativity": "prefix"
+    },
+    {
+      "name": "multiplicative",
+      "operators": [
+        "*",
+        "/",
+        "%"
+      ],
+      "associativity": "left"
+    },
+    {
+      "name": "additive",
+      "operators": [
+        "+",
+        "-"
+      ],
+      "associativity": "left"
+    },
+    {
+      "name": "shift",
+      "operators": [
+        "<<",
+        ">>"
+      ],
+      "associativity": "left"
+    },
+    {
+      "name": "bitand",
+      "operators": [
+        "&"
+      ],
+      "associativity": "left"
+    },
+    {
+      "name": "bitxor",
+      "operators": [
+        "^"
+      ],
+      "associativity": "left"
+    },
+    {
+      "name": "bitor",
+      "operators": [
+        "|"
+      ],
+      "associativity": "left"
+    },
+    {
+      "name": "comparison",
+      "operators": [
+        "==",
+        "!=",
+        "<",
+        ">",
+        "<=",
+        ">="
+      ],
+      "associativity": "none"
+    },
+    {
+      "name": "pipe",
+      "operators": [
+        "|>"
+      ],
+      "associativity": "left"
+    }
+  ],
+  "rejections": [
+    {
+      "rule": "comparison-chain",
+      "description": "A comparison operand is an unparenthesized comparison; translates the syn error \"comparison operators cannot be chained\"."
+    },
+    {
+      "rule": "comparison-bitwise-mix",
+      "description": "A comparison and &, |, or ^ are mixed without parentheses, in either nesting."
+    },
+    {
+      "rule": "logical-operator",
+      "description": "Array && and || are rejected; & and | are elementwise logic."
+    },
+    {
+      "rule": "closure-outside-host",
+      "description": "Closures are host Rust and appear only inside host { ... }."
+    },
+    {
+      "rule": "cast-keyword",
+      "description": "as is not DSL syntax; use cast(dtype)."
+    },
+    {
+      "rule": "range",
+      "description": "Ranges are not DSL syntax."
+    },
+    {
+      "rule": "assignment",
+      "description": "Assignment and compound assignment are not DSL syntax; use verb! let bindings."
+    },
+    {
+      "rule": "syntax",
+      "description": "Any other malformed token sequence, including | followed by a separate > token."
+    }
+  ],
+  "corpus": [
+    {
+      "id": "G01",
+      "source": "a |> b |> c",
+      "expect": "accept",
+      "tree": "(|> (|> a b) c)",
+      "covers": [
+        "pipe"
+      ]
+    },
+    {
+      "id": "G02",
+      "source": "(a |> b) + c",
+      "expect": "accept",
+      "tree": "(+ (|> a b) c)",
+      "covers": [
+        "pipe",
+        "additive"
+      ]
+    },
+    {
+      "id": "G03",
+      "source": "a|>b",
+      "expect": "accept",
+      "tree": "(|> a b)",
+      "covers": [
+        "pipe"
+      ],
+      "phase2_only": true
+    },
+    {
+      "id": "G04",
+      "source": "a | > b",
+      "expect": "reject",
+      "rule": "syntax",
+      "covers": [
+        "pipe",
+        "syntax"
+      ],
+      "phase2_only": true
+    },
+    {
+      "id": "G05",
+      "source": "a + b * c",
+      "expect": "accept",
+      "tree": "(+ a (* b c))",
+      "covers": [
+        "additive",
+        "multiplicative"
+      ]
+    },
+    {
+      "id": "G06",
+      "source": "a - b - c",
+      "expect": "accept",
+      "tree": "(- (- a b) c)",
+      "covers": [
+        "additive"
+      ]
+    },
+    {
+      "id": "G07",
+      "source": "a % b / c",
+      "expect": "accept",
+      "tree": "(/ (% a b) c)",
+      "covers": [
+        "multiplicative"
+      ]
+    },
+    {
+      "id": "G08",
+      "source": "-a * b",
+      "expect": "accept",
+      "tree": "(* (neg a) b)",
+      "covers": [
+        "unary",
+        "multiplicative"
+      ]
+    },
+    {
+      "id": "G09",
+      "source": "!a & b",
+      "expect": "accept",
+      "tree": "(& (not a) b)",
+      "covers": [
+        "unary",
+        "bitand"
+      ]
+    },
+    {
+      "id": "G10",
+      "source": "a << b + c",
+      "expect": "accept",
+      "tree": "(<< a (+ b c))",
+      "covers": [
+        "shift",
+        "additive"
+      ]
+    },
+    {
+      "id": "G11",
+      "source": "a & b ^ c | d",
+      "expect": "accept",
+      "tree": "(| (^ (& a b) c) d)",
+      "covers": [
+        "bitand",
+        "bitxor",
+        "bitor"
+      ]
+    },
+    {
+      "id": "G12",
+      "source": "(a & b) > c",
+      "expect": "accept",
+      "tree": "(> (& a b) c)",
+      "covers": [
+        "comparison",
+        "bitand"
+      ]
+    },
+    {
+      "id": "G13",
+      "source": "a + b == c",
+      "expect": "accept",
+      "tree": "(== (+ a b) c)",
+      "covers": [
+        "comparison",
+        "additive"
+      ]
+    },
+    {
+      "id": "G14",
+      "source": "a < b < c",
+      "expect": "reject",
+      "rule": "comparison-chain",
+      "covers": [
+        "comparison-chain"
+      ]
+    },
+    {
+      "id": "G15",
+      "source": "a & b > c",
+      "expect": "reject",
+      "rule": "comparison-bitwise-mix",
+      "covers": [
+        "comparison-bitwise-mix"
+      ]
+    },
+    {
+      "id": "G16",
+      "source": "a > b | c",
+      "expect": "reject",
+      "rule": "comparison-bitwise-mix",
+      "covers": [
+        "comparison-bitwise-mix"
+      ]
+    },
+    {
+      "id": "G17",
+      "source": "a ^ b == c",
+      "expect": "reject",
+      "rule": "comparison-bitwise-mix",
+      "covers": [
+        "comparison-bitwise-mix"
+      ]
+    },
+    {
+      "id": "G18",
+      "source": "a && b",
+      "expect": "reject",
+      "rule": "logical-operator",
+      "covers": [
+        "logical-operator"
+      ]
+    },
+    {
+      "id": "G19",
+      "source": "a || b",
+      "expect": "reject",
+      "rule": "logical-operator",
+      "covers": [
+        "logical-operator"
+      ]
+    },
+    {
+      "id": "G20",
+      "source": "host { xs.iter().map(|x| x || y).collect() }",
+      "expect": "accept",
+      "tree": "(host)",
+      "covers": [
+        "host"
+      ]
+    },
+    {
+      "id": "G21",
+      "source": "rows(|x| x)",
+      "expect": "reject",
+      "rule": "closure-outside-host",
+      "covers": [
+        "closure-outside-host"
+      ]
+    },
+    {
+      "id": "G22",
+      "source": "x |> rows(&centre)",
+      "expect": "accept",
+      "tree": "(|> x (call rows (ref centre)))",
+      "covers": [
+        "pipe",
+        "host-reference"
+      ]
+    },
+    {
+      "id": "G23",
+      "source": "a as F64",
+      "expect": "reject",
+      "rule": "cast-keyword",
+      "covers": [
+        "cast-keyword"
+      ]
+    },
+    {
+      "id": "G24",
+      "source": "a .. b",
+      "expect": "reject",
+      "rule": "range",
+      "covers": [
+        "range"
+      ]
+    },
+    {
+      "id": "G25",
+      "source": "a = b",
+      "expect": "reject",
+      "rule": "assignment",
+      "covers": [
+        "assignment"
+      ]
+    },
+    {
+      "id": "G26",
+      "source": "a += b",
+      "expect": "reject",
+      "rule": "assignment",
+      "covers": [
+        "assignment"
+      ]
+    },
+    {
+      "id": "G27",
+      "source": "measurements |> cast(F64) |> rows(&centre) |> transpose",
+      "expect": "accept",
+      "tree": "(|> (|> (|> measurements (call cast F64)) (call rows (ref centre))) transpose)",
+      "covers": [
+        "pipe",
+        "host-reference"
+      ]
+    },
+    {
+      "id": "G28",
+      "source": "x.sum().axis(1)",
+      "expect": "accept",
+      "tree": "(method (method x sum) axis 1)",
+      "covers": [
+        "method"
+      ]
+    }
+  ]
+}

@@ -13,7 +13,7 @@
       "name": "add",
       "signature": "(numeric, numeric) -> numeric",
       "shape": "Same shape or scalar extension.",
-      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates. Contract: SC-04.",
       "execution": "Pointwise; no reassociation or operand reordering by default.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -52,7 +52,7 @@
       "name": "div",
       "signature": "(numeric, numeric) -> F64",
       "shape": "Same shape or scalar extension.",
-      "contract": "True division; converts numeric inputs to F64; IEEE zero/non-finite behaviour; null propagates.",
+      "contract": "True division; converts numeric inputs to F64; IEEE zero/non-finite behaviour; null propagates. Contract: SC-05.",
       "execution": "Pointwise; use checked_div to make invalid division an error.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -65,7 +65,7 @@
       "name": "idiv",
       "signature": "(I64, I64) -> I64",
       "shape": "Same shape or scalar extension.",
-      "contract": "Truncates towards zero; zero denominator and MIN/-1 fail; null propagates.",
+      "contract": "Truncates towards zero; zero denominator and MIN/-1 fail; null propagates. Contract: SC-03.",
       "execution": "Pointwise, fallible.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -78,7 +78,7 @@
       "name": "rem",
       "signature": "(I64, I64) -> I64",
       "shape": "Same shape or scalar extension.",
-      "contract": "Truncating remainder has dividend sign; reject zero and MIN/-1; null propagates.",
+      "contract": "Truncating remainder has dividend sign; reject zero and MIN/-1; null propagates. Contract: SC-03.",
       "execution": "Pointwise, fallible; not Euclidean modulo.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -182,7 +182,7 @@
       "name": "min",
       "signature": "(numeric, numeric) -> numeric",
       "shape": "Same shape or scalar extension.",
-      "contract": "Binary primitive; propagates null and NaN. Signed-zero ties choose -0 for min and +0 for max.",
+      "contract": "Binary primitive; propagates null and NaN. Signed-zero ties choose -0 for min and +0 for max. Contract: SC-07.",
       "execution": "Not an aggregate; use minimum/maximum for reduction.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -195,7 +195,7 @@
       "name": "max",
       "signature": "(numeric, numeric) -> numeric",
       "shape": "Same shape or scalar extension.",
-      "contract": "Binary primitive; propagates null and NaN. Signed-zero ties choose -0 for min and +0 for max.",
+      "contract": "Binary primitive; propagates null and NaN. Signed-zero ties choose -0 for min and +0 for max. Contract: SC-07.",
       "execution": "Not an aggregate; use minimum/maximum for reduction.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -312,7 +312,7 @@
       "name": "and",
       "signature": "(Bool, Bool) -> Bool",
       "shape": "Same shape or scalar extension.",
-      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion.",
+      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion. Contract: SC-06.",
       "execution": "Both arguments may evaluate; this is not guarded execution.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -325,7 +325,7 @@
       "name": "or",
       "signature": "(Bool, Bool) -> Bool",
       "shape": "Same shape or scalar extension.",
-      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion.",
+      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion. Contract: SC-06.",
       "execution": "Both arguments may evaluate; this is not guarded execution.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -338,7 +338,7 @@
       "name": "xor",
       "signature": "(Bool, Bool) -> Bool",
       "shape": "Same shape or scalar extension.",
-      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion.",
+      "contract": "Kleene and/or; xor is unknown if either operand is unknown. No truthy numeric coercion. Contract: SC-06.",
       "execution": "Both arguments may evaluate; this is not guarded execution.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -351,7 +351,7 @@
       "name": "not",
       "signature": "Bool -> Bool",
       "shape": "Preserved.",
-      "contract": "Negates known truth values; unknown remains unknown.",
+      "contract": "Negates known truth values; unknown remains unknown. Contract: SC-06.",
       "execution": "Pointwise.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -403,7 +403,7 @@
       "name": "cast",
       "signature": "dtype -> Unary",
       "shape": "Preserved.",
-      "contract": "Bool-to-I64/F64 uses 0/1; I64-to-F64 may round. F64-to-I64 requires finite, integral, in-range values; no numeric-to-Bool cast.",
+      "contract": "Bool-to-I64/F64 uses 0/1; I64-to-F64 may round. F64-to-I64 requires finite, integral, in-range values; no numeric-to-Bool cast. Contract: SC-04.",
       "execution": "Explicit pointwise conversion; returns a domain error on invalid active input.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -754,7 +754,7 @@
       "name": "sum",
       "signature": "array -> scalar",
       "shape": "[] by default; selected axes can remain with .keep_dims().",
-      "contract": "All visible axes in row-major order; exact right reduction of add; empty uses zero; null propagates.",
+      "contract": "All visible axes in row-major order; exact right reduction of add; empty uses zero; null propagates. Contracts: SC-02, SC-07.",
       "execution": "No silent backend regrouping; dtype/null/association contract must match.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -767,7 +767,7 @@
       "name": "product",
       "signature": "array -> scalar",
       "shape": "[] by default; selected axes can remain with .keep_dims().",
-      "contract": "All visible axes in row-major order; exact right reduction of mul; empty uses one; null propagates.",
+      "contract": "All visible axes in row-major order; exact right reduction of mul; empty uses one; null propagates. Contract: SC-02.",
       "execution": "No silent backend regrouping; dtype/null/association contract must match.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -780,7 +780,7 @@
       "name": "any",
       "signature": "array -> scalar",
       "shape": "[] by default; selected axes can remain with .keep_dims().",
-      "contract": "All visible axes in row-major order; apply aggregate null policy first (propagate by default; .skip_nulls() removes invalid values), then exact right reduction of or; empty uses false.",
+      "contract": "All visible axes in row-major order; apply aggregate null policy first (propagate by default; .skip_nulls() removes invalid values), then exact right reduction of or; empty uses false. Contracts: SC-02, SC-06.",
       "execution": "No silent backend regrouping; dtype/null/association contract must match.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -793,7 +793,7 @@
       "name": "all",
       "signature": "array -> scalar",
       "shape": "[] by default; selected axes can remain with .keep_dims().",
-      "contract": "All visible axes in row-major order; apply aggregate null policy first (propagate by default; .skip_nulls() removes invalid values), then exact right reduction of and; empty uses true.",
+      "contract": "All visible axes in row-major order; apply aggregate null policy first (propagate by default; .skip_nulls() removes invalid values), then exact right reduction of and; empty uses true. Contracts: SC-02, SC-06.",
       "execution": "No silent backend regrouping; dtype/null/association contract must match.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -806,7 +806,7 @@
       "name": "minimum",
       "signature": "numeric array -> scalar",
       "shape": "[] by default.",
-      "contract": "Whole-cell aggregate of min/max; empty requires explicit .identity(value); null/NaN propagate.",
+      "contract": "Whole-cell aggregate of min/max; empty requires explicit .identity(value); null/NaN propagate. Contracts: SC-02, SC-07.",
       "execution": "Distinct from binary min/max.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -819,7 +819,7 @@
       "name": "maximum",
       "signature": "numeric array -> scalar",
       "shape": "[] by default.",
-      "contract": "Whole-cell aggregate of min/max; empty requires explicit .identity(value); null/NaN propagate.",
+      "contract": "Whole-cell aggregate of min/max; empty requires explicit .identity(value); null/NaN propagate. Contracts: SC-02, SC-07.",
       "execution": "Distinct from binary min/max.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -832,7 +832,7 @@
       "name": "mean",
       "signature": "numeric array -> F64 scalar",
       "shape": "[] by default.",
-      "contract": "Whole-cell aggregate; empty/all-skipped-null input fails. Cast numeric values to F64, exact right sum, then divide by valid count.",
+      "contract": "Whole-cell aggregate; empty/all-skipped-null input fails. Cast numeric values to F64, exact right sum, then divide by valid count. Contracts: SC-02, SC-07.",
       "execution": "Explicit reducer state/finalize contract; count must fit exactly supported range.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1138,7 +1138,7 @@
       "name": "reduce",
       "signature": "Binary -> Unary",
       "shape": "Removes last axis by default.",
-      "contract": "Exact right association without reordering; singleton passes through; empty only uses identity; rank-zero explicit reduction fails.",
+      "contract": "Exact right association without reordering; singleton passes through; empty only uses identity; rank-zero explicit reduction fails. Contract: SC-01.",
       "execution": "May partition independent lanes, not the contracted lane without permission.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1151,7 +1151,7 @@
       "name": "fold_left",
       "signature": "Binary -> Unary",
       "shape": "Removes selected axis.",
-      "contract": "Nonempty unseeded left fold; singleton passes through; empty uses registered/explicit empty identity only.",
+      "contract": "Nonempty unseeded left fold; singleton passes through; empty uses registered/explicit empty identity only. Contract: SC-01.",
       "execution": "Sequential lane state; no implicit injected initial value.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1164,7 +1164,7 @@
       "name": "scan",
       "signature": "Binary -> Unary",
       "shape": "Preserved.",
-      "contract": "Each prefix receives exact right reduction; inclusive; empty output empty; generic opaque case may require quadratic work.",
+      "contract": "Each prefix receives exact right reduction; inclusive; empty output empty; generic opaque case may require quadratic work. Contract: SC-01.",
       "execution": "Never substitute scan_left solely because a backend has cumsum.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1177,7 +1177,7 @@
       "name": "scan_left",
       "signature": "Binary -> Unary",
       "shape": "Preserved.",
-      "contract": "Inclusive left accumulation; no injected identity; empty output empty.",
+      "contract": "Inclusive left accumulation; no injected identity; empty output empty. Contract: SC-01.",
       "execution": "Prefix state across chunk boundaries.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1347,7 +1347,7 @@
       "name": ".axis(axis) / .axes(axes)",
       "signature": "axis-aware operation -> operation",
       "shape": "Operation-specific.",
-      "contract": "Zero-based axes; checked unique indices/names; no implicit negative indices. Multi-axis order is caller-specified.",
+      "contract": "Zero-based axes; checked unique indices/names; no implicit negative indices. Multi-axis order is caller-specified. Contract: SC-08.",
       "execution": "Do not silently sort contraction axes.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1389,7 +1389,7 @@
       "name": ".identity(value)",
       "signature": "reduction/contraction -> operation",
       "shape": "Unchanged output schema.",
-      "contract": "Used for an empty lane only; not an initial seed and not proof of an algebraic identity.",
+      "contract": "Used for an empty lane only; not an initial seed and not proof of an algebraic identity. Contract: SC-02.",
       "execution": "Never inject into nonempty/singleton reduction.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1403,7 +1403,7 @@
       "name": ".skip_nulls()",
       "signature": "aggregate/reduction -> operation",
       "shape": "Same outer shape.",
-      "contract": "Remove invalid elements preserving order; then apply the normal empty-input policy.",
+      "contract": "Remove invalid elements preserving order; then apply the normal empty-input policy. Contract: SC-06.",
       "execution": "Requires matching validity-aware kernel; not global null coercion.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1443,7 +1443,7 @@
       "name": ".reassociate()",
       "signature": "reduction -> operation",
       "shape": "Preserved.",
-      "contract": "Permits alternative grouping only; no operand permutation, skipped failure, or implicit widening. Checked-overflow semantics still hold.",
+      "contract": "Permits alternative grouping only; no operand permutation, skipped failure, or implicit widening. Checked-overflow semantics still hold. Contract: SC-01.",
       "execution": "Planner must prove eligibility or reject the requested route.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1535,7 +1535,7 @@
       "name": "comb!",
       "signature": "input |> stage |> stage",
       "shape": "Expression-derived.",
-      "contract": "Existing left-to-right pipeline; graph arithmetic/comparisons; &/|/! are elementwise; reject array &&/||. Expansion calls specified builders and preserves static descriptors when available; dynamic graphs remain supported.",
+      "contract": "Existing left-to-right pipeline; graph arithmetic/comparisons; &/|/! are elementwise; reject array &&/||. Expansion calls specified builders and preserves static descriptors when available; dynamic graphs remain supported. Contract: SC-10.",
       "execution": "Thin parser and hygienic construction; embedded host expressions evaluate once.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1575,7 +1575,7 @@
       "name": "verb!",
       "signature": "|inputs| graph body",
       "shape": "Inferred schema function.",
-      "contract": "Local lets share nodes; graph calls lower through application protocol; host escape separates Rust evaluation. A descriptor denotes a public logical operation; no automatic compile-time evaluation of host variables.",
+      "contract": "Local lets share nodes; graph calls lower through application protocol; host escape separates Rust evaluation. A descriptor denotes a public logical operation; no automatic compile-time evaluation of host variables. Contract: SC-10.",
       "execution": "Reusable inspectable graph, not callback-per-row.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1614,7 +1614,7 @@
       "name": "host { ... }",
       "signature": "DSL escape",
       "shape": "Host value/configuration.",
-      "contract": "Special syntax inside comb!/verb!, not a Rust macro. Executes once at plan construction.",
+      "contract": "Special syntax inside comb!/verb!, not a Rust macro. Executes once at plan construction. Contract: SC-10.",
       "execution": "No tracing, I/O sandbox, or per-execution resampling.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1743,7 +1743,7 @@
       "name": "execute_into",
       "signature": "plan + sink + context",
       "shape": "Sink-specific result.",
-      "contract": "Caller-owned output/scratch is available on the sequential Core route; Integration adds domain sinks. Success commits once; failure/cancellation before commit leaves the destination unchanged. Partial sinks require a distinct protocol and frame contract.",
+      "contract": "Caller-owned output/scratch is available on the sequential Core route; Integration adds domain sinks. Success commits once; failure/cancellation before commit leaves the destination unchanged. Partial sinks require a distinct protocol and frame contract. Contract: SC-09.",
       "execution": "Initially tile-local commit; native kernels must cooperate with cancellation.",
       "scope": "Core",
       "roadmap_tasks": [

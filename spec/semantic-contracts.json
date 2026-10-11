@@ -1,0 +1,534 @@
+{
+  "revision": "0.2",
+  "error_codes": [
+    "AxisOutOfRange",
+    "CountTooLarge",
+    "DivisionByZero",
+    "DtypeMismatch",
+    "EmptyMean",
+    "EmptyReduction",
+    "IdentityDtype",
+    "IntegerOverflow",
+    "InvalidCast",
+    "MacroSyntax",
+    "NonFinite",
+    "NonIntegral",
+    "OutOfRange",
+    "Propagated"
+  ],
+  "excluded_names": [
+    {
+      "name": "a!",
+      "reason": "Superseded alternative frontend; comb! remains the central spelling (ToR C2)."
+    },
+    {
+      "name": "cells",
+      "reason": "Superseded rank-application spelling; rank application uses the catalogued operations."
+    },
+    {
+      "name": "cells2",
+      "reason": "Superseded rank-application spelling; rank application uses the catalogued operations."
+    },
+    {
+      "name": "id",
+      "reason": "Alias of identity; no aliases for pre-1.0 APIs (D06)."
+    },
+    {
+      "name": ".pipe",
+      "reason": "A .pipe accepting every descriptor was superseded by the application protocol (context.md §6)."
+    },
+    {
+      "name": "&&",
+      "reason": "Array && is rejected; & is elementwise logic (technical design §7)."
+    },
+    {
+      "name": "||",
+      "reason": "Array || is rejected; | is elementwise logic (technical design §7)."
+    }
+  ],
+  "contracts": [
+    {
+      "id": "SC-01",
+      "title": "Exact association of reductions and scans",
+      "decision": "D07",
+      "catalogue_ids": [
+        "M006",
+        "M007",
+        "M008",
+        "M009",
+        "P009"
+      ],
+      "preconditions": [
+        "The binary operation is total or fallible over the lane dtype.",
+        "The lane is rank one after axis selection."
+      ],
+      "success_relation": "reduce(f)([x1, ..., xn]) = f(x1, f(x2, ... f(xn-1, xn))); fold_left(f)([x1, ..., xn]) = f(... f(f(x1, x2), x3) ..., xn); scan(f) and scan_left(f) return those values for each nonempty prefix, inclusive.",
+      "success_conditions": [
+        "Inputs are never permuted.",
+        "A singleton lane returns its element unchanged without applying f.",
+        ".reassociate() permits another grouping only when failure equivalence is proved, an equivalent algorithm is used, or a separately accepted numeric policy applies."
+      ],
+      "error_relation": [
+        {
+          "condition": "An application of f fails.",
+          "error": "Propagated"
+        },
+        {
+          "condition": "An explicit axis reduction is applied to a rank-zero value.",
+          "error": "AxisOutOfRange"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
+      "empty_rule": "Empty reduce and fold_left lanes use only a registered or explicit identity, else EmptyReduction; empty scans return an empty lane without applying f.",
+      "examples": [
+        "EX21",
+        "EX22"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "left-reduce",
+          "description": "Evaluate reduce with left association."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2"
+      ],
+      "proof_sketch": "Verus: define spec fn right_fold(f, s) by structural recursion on the sequence; prove lemma_reduce_refines_right_fold(s) for the executable reduce, and lemma_singleton_passthrough(x) without any application of f. Kani: a harness over symbolic 3-element I64 lanes with checked subtraction asserts reduce equals the right fold, with cover!() for both a success and an overflow, and a negative control in which a left fold is rejected."
+    },
+    {
+      "id": "SC-02",
+      "title": "Empty-lane identities and explicit identity",
+      "decision": "D07",
+      "catalogue_ids": [
+        "V058",
+        "V059",
+        "V060",
+        "V061",
+        "V062",
+        "V063",
+        "V064",
+        "P005"
+      ],
+      "preconditions": [
+        "The aggregate null policy has already been applied.",
+        "An explicit identity, when given, has the output dtype."
+      ],
+      "success_relation": "For a nonempty lane the result is the exact right reduction of the aggregate operation; for an empty lane it is the registered identity (typed zero for sum, one for product, false for any, true for all) or the explicit .identity(value).",
+      "success_conditions": [
+        "An identity is used for an empty lane only and is never a seed.",
+        "Minimum, maximum, and mean have no registered identity."
+      ],
+      "error_relation": [
+        {
+          "condition": "Empty minimum or maximum without .identity(value).",
+          "error": "EmptyReduction"
+        },
+        {
+          "condition": "Empty mean.",
+          "error": "EmptyMean"
+        },
+        {
+          "condition": ".identity(value) whose dtype differs from the output dtype.",
+          "error": "IdentityDtype"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
+      "empty_rule": "This contract is the empty rule for the aggregates it lists.",
+      "examples": [
+        "EX23",
+        "EX24",
+        "EX25",
+        "EX26",
+        "EX27",
+        "EX28",
+        "EX29",
+        "EX30",
+        "EX31",
+        "EX32",
+        "EX33"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "empty-sum-error",
+          "description": "Fail an empty sum instead of returning its typed zero."
+        },
+        {
+          "id": "identity-as-seed",
+          "description": "Combine the explicit identity with nonempty input as an initial seed."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2",
+        "PF07.proof@2.2.3"
+      ],
+      "proof_sketch": "Verus: prove lemma_identity_only_on_empty(s, id): s.len() > 0 implies aggregate_with_identity(s, id) == aggregate(s), and s.len() == 0 implies it equals id. Kani: harnesses over symbolic lanes of length 0 to 3 assert the registered identities and that an identity never changes a nonempty result, with cover!() for each length."
+    },
+    {
+      "id": "SC-03",
+      "title": "Truncating integer division and remainder",
+      "decision": "D07",
+      "catalogue_ids": [
+        "V005",
+        "V006"
+      ],
+      "preconditions": [
+        "Both operands are I64."
+      ],
+      "success_relation": "idiv(a, b) = trunc(a / b) and rem(a, b) = a - b * idiv(a, b), so the remainder takes the dividend's sign.",
+      "success_conditions": [
+        "The result is within I64."
+      ],
+      "error_relation": [
+        {
+          "condition": "b = 0.",
+          "error": "DivisionByZero"
+        },
+        {
+          "condition": "a = I64::MIN and b = -1.",
+          "error": "IntegerOverflow"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: constant work.",
+      "empty_rule": "Not applicable: binary scalar operation; null operands propagate null.",
+      "examples": [
+        "EX34",
+        "EX35",
+        "EX36",
+        "EX37"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "floor-idiv",
+          "description": "Round the quotient towards negative infinity."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2"
+      ],
+      "proof_sketch": "Verus: prove lemma_idiv_truncates(a, b) relating the executable checked division to the mathematical truncated quotient, and lemma_rem_sign(a, b): rem(a, b) == 0 or sign(rem(a, b)) == sign(a). Kani: an exhaustive symbolic harness over all I64 pairs asserts both relations and the two failures, with cover!() for each sign quadrant."
+    },
+    {
+      "id": "SC-04",
+      "title": "Explicit dtype conversion",
+      "decision": "D07",
+      "catalogue_ids": [
+        "V001",
+        "V031"
+      ],
+      "preconditions": [
+        "The target dtype is Bool, I64, or F64."
+      ],
+      "success_relation": "Bool to I64 or F64 yields 0 or 1; I64 to F64 rounds to nearest, ties to even; F64 to I64 yields the same integer for finite, integral, in-range values; mixed-dtype arithmetic requires an explicit cast.",
+      "success_conditions": [
+        "-0.0 converts to the I64 zero.",
+        "Converting to the same dtype returns the value unchanged."
+      ],
+      "error_relation": [
+        {
+          "condition": "F64 to I64 of NaN or an infinity.",
+          "error": "NonFinite"
+        },
+        {
+          "condition": "F64 to I64 of a non-integral value.",
+          "error": "NonIntegral"
+        },
+        {
+          "condition": "F64 to I64 outside [-2^63, 2^63).",
+          "error": "OutOfRange"
+        },
+        {
+          "condition": "Any numeric to Bool.",
+          "error": "InvalidCast"
+        },
+        {
+          "condition": "Arithmetic on operands of different dtypes.",
+          "error": "DtypeMismatch"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: constant work.",
+      "empty_rule": "Not applicable: scalar conversion; null converts to null.",
+      "examples": [
+        "EX38",
+        "EX39",
+        "EX40",
+        "EX41",
+        "EX42",
+        "EX43",
+        "EX44",
+        "EX45",
+        "EX46",
+        "EX47"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "implicit-promotion",
+          "description": "Widen mixed I64 and F64 operands silently."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2"
+      ],
+      "proof_sketch": "Verus: specify cast_f64_to_i64 by the mathematical value of the float and prove lemma_cast_exact(x) for finite integral in-range inputs and lemma_cast_rejects(x) otherwise. Kani: a harness over symbolic f64 bit patterns asserts the error classification for NaN, infinities, 2^63, -2^63, -0.0, and non-integral values, with cover!() for each class."
+    },
+    {
+      "id": "SC-05",
+      "title": "True division converts operands first",
+      "decision": "D14",
+      "catalogue_ids": [
+        "V004"
+      ],
+      "preconditions": [
+        "Operands are I64 or F64."
+      ],
+      "success_relation": "div(a, b) = f64(a) / f64(b), where each operand is first rounded to the nearest F64 (ties to even) and the division is IEEE 754 binary64.",
+      "success_conditions": [
+        "A zero divisor yields a signed infinity or NaN, not an error.",
+        "The result can differ from rounding the exact quotient once."
+      ],
+      "error_relation": [],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: constant work.",
+      "empty_rule": "Not applicable: binary scalar operation; null operands propagate null.",
+      "examples": [
+        "EX48",
+        "EX49",
+        "EX50"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "exact-quotient-div",
+          "description": "Round the exact rational quotient of I64 operands once."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2"
+      ],
+      "proof_sketch": "Verus: define div by composing the operand conversion with IEEE division in the specification and prove the executable refines it; no claim about the exact quotient is made. Kani: a harness over symbolic I64 pairs asserts bit equality with (a as f64) / (b as f64), with cover!() for an operand above 2^53."
+    },
+    {
+      "id": "SC-06",
+      "title": "Validity and three-valued logic",
+      "decision": "D07",
+      "catalogue_ids": [
+        "V024",
+        "V025",
+        "V026",
+        "V027",
+        "V060",
+        "V061",
+        "P006"
+      ],
+      "preconditions": [
+        "Logical operands are Bool or null; no numeric truthiness exists."
+      ],
+      "success_relation": "and, or, and not follow Kleene three-valued logic; xor is unknown when either operand is unknown; aggregates apply the null policy before reducing: propagate by default, or .skip_nulls() removes invalid values in order.",
+      "success_conditions": [
+        "false and unknown is false; true or unknown is true.",
+        "Null is validity, never NaN."
+      ],
+      "error_relation": [],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
+      "empty_rule": ".skip_nulls() that removes every value then applies the normal empty rule (SC-02).",
+      "examples": [
+        "EX51",
+        "EX52",
+        "EX53",
+        "EX54",
+        "EX55",
+        "EX56",
+        "EX57",
+        "EX58",
+        "EX59"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "two-valued-logic",
+          "description": "Treat unknown as false."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2"
+      ],
+      "proof_sketch": "Verus: model a nullable Bool as Option<bool> and prove the Kleene truth tables and lemma_skip_nulls_then_empty(s). Kani: exhaustive harnesses over the nine operand pairs assert the tables, with cover!() for each unknown result."
+    },
+    {
+      "id": "SC-07",
+      "title": "F64 special values in binary min and max, sums, and means",
+      "decision": "D09",
+      "catalogue_ids": [
+        "V014",
+        "V015",
+        "V058",
+        "V062",
+        "V063",
+        "V064"
+      ],
+      "preconditions": [
+        "Operands share a numeric dtype."
+      ],
+      "success_relation": "Binary min and max follow IEEE 754-2019 minimum and maximum: null takes precedence, then NaN propagates, and -0.0 < +0.0; minimum and maximum aggregate them; an empty F64 sum is +0.0 while a singleton passes through, so sum([-0.0]) is -0.0; mean converts to F64, right-sums, and divides by a count of at most 2^53.",
+      "success_conditions": [
+        "The result of min or max is one of its operands, a NaN, or null."
+      ],
+      "error_relation": [
+        {
+          "condition": "A mean count above 2^53.",
+          "error": "CountTooLarge"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
+      "empty_rule": "Empty F64 sum is +0.0; empty minimum, maximum, and mean fail per SC-02.",
+      "examples": [
+        "EX60",
+        "EX61",
+        "EX62",
+        "EX63",
+        "EX64",
+        "EX65",
+        "EX66",
+        "EX67"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "nan-ignoring-min",
+          "description": "Return the non-NaN operand of min or max (IEEE minNum and maxNum)."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.2",
+        "PF07.proof@6.2.1"
+      ],
+      "proof_sketch": "Verus: specify ieee_minimum over f64 bit patterns with explicit NaN and signed-zero cases and prove the executable refines it for nullable operands. Kani: a harness over symbolic f64 pairs asserts NaN propagation, the signed-zero ordering, and null precedence, with cover!() for each case, and a negative control in which f64::min (minNum) is rejected."
+    },
+    {
+      "id": "SC-08",
+      "title": "Cell atomicity",
+      "decision": "D10",
+      "catalogue_ids": [
+        "P002"
+      ],
+      "preconditions": [
+        "A batch has a frame shape and a typed cell schema such as DVec3."
+      ],
+      "success_relation": "A typed cell is one logical element until an explicit component operation: cardinality is the product of the frame shape, and axes index the frame only.",
+      "success_conditions": [
+        "Batch<DVec3> of shape [2,3] has cardinality 6, not 18."
+      ],
+      "error_relation": [
+        {
+          "condition": "An axis at or beyond the frame rank.",
+          "error": "AxisOutOfRange"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "Total: proportional to the frame rank.",
+      "empty_rule": "A frame with a zero extent has cardinality zero.",
+      "examples": [
+        "EX68",
+        "EX69"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "cell-flattening",
+          "description": "Expose cell components as an extra axis."
+        }
+      ],
+      "discharged_by": [
+        "PF01.proof@2.1.1"
+      ],
+      "proof_sketch": "Verus: prove lemma_cardinality_excludes_components(frame, cell) and that every valid axis index is below the frame rank. Kani: a harness over symbolic frame shapes of rank up to 3 asserts cardinality and axis rejection, with cover!() for a zero extent."
+    },
+    {
+      "id": "SC-09",
+      "title": "Atomic output commit",
+      "decision": "D10",
+      "catalogue_ids": [
+        "E010"
+      ],
+      "preconditions": [
+        "An operation writes its result to a destination only at commit."
+      ],
+      "success_relation": "On success the destination holds the complete output; on failure or cancellation before commit the destination is unchanged.",
+      "success_conditions": [
+        "No partial output is observable."
+      ],
+      "error_relation": [
+        {
+          "condition": "Failure or cancellation before commit, leaving the destination unchanged.",
+          "error": "Propagated"
+        }
+      ],
+      "mutation_frame": "Only the destination changes, and only at commit.",
+      "termination": "Total: one commit per successful operation.",
+      "empty_rule": "An empty output commits an empty destination.",
+      "examples": [
+        "EX70",
+        "EX71"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "partial-output",
+          "description": "Write completed elements before the failure."
+        }
+      ],
+      "discharged_by": [
+        "PF05.proof@2.3.5"
+      ],
+      "proof_sketch": "Verus: model the destination as ghost state and prove frame preservation: ensures result.is_err() ==> dest@ == old(dest)@. Kani: a harness injects a failure at a symbolic index and asserts the destination is unchanged, with cover!() for failure at the first and last element."
+    },
+    {
+      "id": "SC-10",
+      "title": "comb! operator precedence and pipeline staging",
+      "decision": "D08",
+      "catalogue_ids": [
+        "X001",
+        "X004",
+        "E001"
+      ],
+      "preconditions": [
+        "Source is a token stream accepted by the macro frontend."
+      ],
+      "success_relation": "The token stream is split on |> first (lowest precedence, left-associative); each stage parses with Rust expression precedence as parsed by syn, restricted to the documented DSL subset in spec/macro-grammar.json.",
+      "success_conditions": [
+        "Comparison mixed unparenthesized with &, |, or ^ is rejected, as are comparison chains.",
+        "Closures and || are accepted only inside host { ... }."
+      ],
+      "error_relation": [
+        {
+          "condition": "A rejected construct in spec/macro-grammar.json; the first-screen diagnostic names the rule.",
+          "error": "MacroSyntax"
+        }
+      ],
+      "mutation_frame": "Pure: macro expansion has no runtime effects.",
+      "termination": "Total: linear in the token count.",
+      "empty_rule": "Not applicable: an empty pipeline is a syntax error.",
+      "examples": [
+        "G01",
+        "G02",
+        "G05",
+        "G14",
+        "G15",
+        "G16",
+        "G18",
+        "G21",
+        "G22"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "right-associative-pipe",
+          "description": "Group a |> b |> c as a |> (b |> c)."
+        }
+      ],
+      "discharged_by": [
+        "task:2.3.1"
+      ],
+      "proof_sketch": "No proof: 2.3.1 replays every grammar corpus entry as a trybuild pass or fail fixture, with a completeness check; the recognizer in tools/docs_validation/grammar.py models the corpus, not the macro."
+    }
+  ]
+}

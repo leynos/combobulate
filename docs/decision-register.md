@@ -217,7 +217,7 @@ Subject: `comb!` operator precedence.
 
 Terms-of-reference questions: none. Authority: technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -231,9 +231,11 @@ Recommendation rationale: Reusing Rust precedence keeps `comb!` readable to
 Rust developers, and rejecting comparison mixed with bitwise operators removes
 the one precedence trap Rust users commonly misread.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0007](adrs/adr-0007-comb-macro-grammar-and-staging.md).
 
 ### D09
 
@@ -241,7 +243,7 @@ Subject: F64 special values in reductions and binary `min` and `max`.
 
 Terms-of-reference questions: none. Authority: technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -254,9 +256,11 @@ Options:
 Recommendation rationale: IEEE 754-2019 `minimum` and `maximum` are total and
 deterministic, unlike the NaN-ignoring `minNum` and `maxNum` operations.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
 
 ### D10
 
@@ -264,7 +268,7 @@ Subject: Typed-cell atomicity.
 
 Terms-of-reference questions: none. Authority: technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -277,9 +281,11 @@ Options:
 Recommendation rationale: The single phrase "typed-cell atomicity" had been
 used for two unrelated guarantees.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
 
 ### D11
 
@@ -362,7 +368,7 @@ Subject: `div` on I64 operands.
 
 Terms-of-reference questions: none. Authority: technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -373,9 +379,11 @@ Options:
 Recommendation rationale: Technical design §6.1 says only "true division to
 F64"; converting operands first matches what every candidate backend computes.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
 
 ### D15
 
