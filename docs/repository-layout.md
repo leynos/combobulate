@@ -24,9 +24,19 @@ request 11. The current crate is a scaffold; the multi-crate architecture in the
 | `docs/`                                  | Design, guides, reference material, and recorded decisions.                                |
 | `docs/contents.md`                       | Canonical documentation index.                                                             |
 | `docs/adrs/`                             | Architectural decision records, named `adr-nnnn-title-slug.md`.                            |
+| `docs/rfcs/`                             | Requests for comments, named `rfc-nnnn-title-slug.md` (none yet).                          |
 | `docs/execplans/`                        | Execution plans for roadmap work, named after their branch.                                |
 | `spec/`                                  | Machine-readable language, roadmap, proof, cost, and backend contracts.                    |
+| `spec/decisions.json`                    | Decision register master, rendered into `docs/decision-register.md`.                       |
+| `spec/semantic-contracts.json`           | Semantic contract records `SC-01` onward, with excluded names.                             |
+| `spec/macro-grammar.json`                | The `comb!` precedence table and grammar corpus.                                           |
+| `spec/acceptance-controls.json`          | Pre-registered acceptance controls `AC-01` onward.                                         |
+| `spec/calibration/`                      | Calibration measurement records behind the control thresholds.                             |
+| `spec/exceptions.json`                   | Trusted-boundary exception register (D02).                                                 |
+| `spec/evidence-reason-codes.json`        | Evidence-gate levels, reason codes, and registered log parsers.                            |
+| `spec/task-completion.json`              | Completion records for ticked roadmap tasks.                                               |
 | `tools/`                                 | Design generators and documentation-model validation.                                      |
+| `tools/calibration/`                     | Standalone calibration probes; not workspace members.                                      |
 | `tools/mold/`                            | Pinned native linker version and archive digest.                                           |
 | `Cargo.toml`, `Cargo.lock`               | Package metadata, dependencies, lint policy, and lockfile.                                 |
 | `rust-toolchain.toml`                    | Pinned nightly and required components.                                                    |

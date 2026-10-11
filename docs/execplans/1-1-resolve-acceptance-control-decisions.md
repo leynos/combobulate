@@ -5,8 +5,9 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (`EP-M0` to `EP-M5` are complete; `EP-M6` reconciliation,
-roadmap closure, and final gates are under way)
+Status: COMPLETE (implementation of `EP-M0` to `EP-M6` on 2026-10-11, in the
+stacked pull requests #11 to #18; local CodeRabbit CLI reviews of `EP-M2`
+onward and the sponsor's review and merge of each pull request remain)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -458,10 +459,23 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   found no remaining in-scope implementation defect and identified the stale
   EP-M5 state in `Plan of work` below; that state is reconciled here. The
   doc-only follow-up confirmation is tracked in the delivery ledger.
-- [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
+- [x] (2026-10-11) `EP-M6` Reconciliation, roadmap closure, and final gates
+  (branch `1-1-reconciliation`, stacked on `EP-M5`). Evidence: D15 accepted and
+  its four details added to tasks 1.2.1, 1.2.3, 1.2.4, and 2.3.1 in the
+  canonical roadmap and re-exported; every decision D01 to D15 is accepted; 73
+  one-way task-to-bet links and one bet-to-task link reconciled, with a two-way
+  check and negative controls (VO-15); repository layout, contents, validation,
+  and developers' guide updated (module ownership, exception renewal, control
+  amendment, report conflicts); full gates pass.
+
 
 ## Surprises & discoveries
 
+- Observation: the hand-edit drift controls edited "Decision: pending.",
+  which vanished once every decision was accepted, so the edit became a no-op
+  and the control passed vacuously. Evidence: `make design-check` on `EP-M6`
+  failed with "AssertionError not raised". Impact: the controls now edit text
+  that is always generated and assert that the edit changed something.
 - Observation: a synchronize run on #16 received `github.base_ref` = `main`
   although the pull request's base is `1-1-semantic-contracts`, so its freeze
   check compared against `main` and found no frozen registers. Evidence: Design
@@ -944,9 +958,55 @@ calibrated controls, proof evidence, and final reconciliation remain for
 
 The staged register and evidence checks keep acceptance separate from
 implementation progress: milestone completion alone does not accept a decision
-or satisfy a roadmap obligation. Continue recording evidence at each milestone
-boundary, then reconcile the remaining outcomes before setting the status to
-`COMPLETE`.
+or satisfy a roadmap obligation. EP-M6 records the final reconciliation below.
+
+Outcome against `Purpose / big picture`, item by item:
+
+1. `docs/decision-register.md` is generated from `spec/decisions.json` and
+   lists D01 to D15 as accepted, each with its chosen option, date, quoted
+   session answer, and ADR, plus the eight candidate ADR subjects with their
+   dispositions. Reinserting a retired sentence, writing "Q4 remains open", or
+   deleting a ToR §9 anchor fails `make design-check` and names the decision.
+2. `spec/semantic-contracts.json` holds `SC-01` to `SC-10` with
+   preconditions, success and error relations, empty rules, 51 executable
+   examples, a 28-entry grammar corpus, seeded mutations that each change an
+   outcome, and proof sketches.
+3. `spec/acceptance-controls.json` registers `AC-01` to `AC-07`, four
+   calibrated from recorded measurements extrapolated to the hosted runner
+   class and three labelled not calibrated; a threshold changed together with
+   its digest fails the freeze check without an amendment.
+4. `scripts/check_evidence.py` rejects timeouts, unsatisfied witnesses,
+   misfiring controls, uncovered or unaudited trust, stale bindings, focused
+   runs, self-reported verifier verdicts, and bad exceptions with specific
+   reason codes, and admits complete records at the level they earn.
+5. Tasks 1.1.1 to 1.1.4 are ticked in `docs/roadmap.md`, and the checker
+   confirms each tick is backed by prerequisites, a completion record, accepted
+   decisions, and satisfied obligation components.
+
+Acceptance criteria (`Validation and acceptance`): 1 to 6 are met; criterion 4
+is demonstrated by `tools/tests/test_freeze.py` (control and decision freezes,
+including a temporary Git repository) and by the hosted `Design contracts`
+runs; criterion 6 by `cargo publish --dry-run` refusing to publish.
+
+Deviations and lessons:
+
+- Tolerances. `EP-M1a`, `EP-M3`, `EP-M4`, and `EP-M5` exceeded the
+  per-milestone line or file tolerance, mostly through indented JSON data and
+  required test suites; each overrun is in the decision log and its pull
+  request. The 80-file estimate held only per milestone; the whole step changed
+  well over 100 files across eight pull requests.
+- Red-first order slipped once (`EP-M3` models before tests); its
+  non-vacuity rests on handwritten expectations and seeded mutations.
+- Calibration found that Kani cannot discharge symbolic 64-bit multiplication
+  on the shared host within 900 s; task 1.2.4 should plan Verus for arithmetic
+  and Kani for structure.
+- Hosted CI exposed two environment assumptions the local gates could not:
+  mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
+  `runner`. A stacked synchronize run also reported `main` as its base branch,
+  which led to choosing the freeze base by commit.
+- Remaining: local CodeRabbit CLI reviews of `EP-M2` to `EP-M6`, hosted
+  reviews, and the sponsor's review and merge of #9 to #18 in stack order.
+
 
 ## Context and orientation
 

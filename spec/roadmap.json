@@ -103,7 +103,9 @@
               ],
               "sections": "§§3, 10, 15, 17-19",
               "success": "Record exact Rust, Kani, Verus, solver, and dependency revisions and target/features. Native-only and Polars-enabled builds compile; proof tooling is optional for ordinary consumers. The semantic kernel imports neither Polars nor glam; select the Rust backend independently of the Python Polars 2 version.",
-              "details": [],
+              "details": [
+                "Build the trust-audit scanner over the ADR-0009 vocabulary and register a verifier log parser only with tests over real logs, including a timeout, an unsatisfied cover, and a skipped harness."
+              ],
               "proof_first": "Record each tool/profile capability and trust boundary first; compile-only evidence is not a theorem.",
               "bets": [
                 "B01",
@@ -136,7 +138,9 @@
               ],
               "sections": "§14, 17",
               "success": "The harness reads the golden-case contract, reports the selected executor, and detects a seeded wrong-result mutation; reference execution does not reuse the optimized operation implementation.",
-              "details": [],
+              "details": [
+                "Replay the semantic contract examples (`contract_cases` in `spec/examples.json`) as `rstest` cases, so the Rust implementation meets the same expectations as the documentation model."
+              ],
               "proof_first": "State the oracle independence boundary first; a seeded wrong result must fail rather than share the same faulty body.",
               "bets": [
                 "B01"
@@ -151,7 +155,9 @@
               ],
               "sections": "§§3, 4, 17-18",
               "success": "The same shipped executable body, or an explicit checked refinement to it, passes runtime/const agreement, Kani machine-width overflow/zero witnesses, and a Verus cardinality invariant. Pin supported targets and reject unsupported static certificates rather than substituting an unchecked checker. Record compile/proof cost against pre-registered limits.",
-              "details": [],
+              "details": [
+                "Replay the evidence-gate rule table (`tools/tests/fixtures/evidence_gate_rules.json`) from Rust over every abstract state, and register the Verus and Kani log parsers for this kernel's evidence."
+              ],
               "proof_first": "Write the mathematical zero-product and representability contract first; require a satisfiable valid-input witness and a seeded multiply-before-zero defect that fails the intended check.",
               "bets": [
                 "B01",
@@ -385,7 +391,9 @@
               ],
               "sections": "§7, 17",
               "success": "Public pipeline and literal examples work; malformed stages/ragged literals point to original tokens; embedded host expressions execute once; no custom Fn implementation is required.",
-              "details": [],
+              "details": [
+                "Replay every `spec/macro-grammar.json` corpus entry as a `trybuild` pass or fail fixture, with a check that no entry is missing; then delete `tools/docs_validation/grammar.py`."
+              ],
               "proof_first": "Specify macro lowering through ordinary builders before parser work; Kani consumer calls and UI tests detect duplicated host evaluation.",
               "bets": [
                 "B02",
@@ -956,6 +964,7 @@
               "proof_first": "Audit proof coverage, non-vacuity, TCB, exact bindings, cost/capability records, and open exceptions before the release decision.",
               "bets": [
                 "B01",
+                "B06",
                 "B08"
               ],
               "status": "open"
