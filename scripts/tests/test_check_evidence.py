@@ -65,6 +65,17 @@ def test_schema_invalid_record_exits_two(tmp_path, capsys):
     assert 'schema-invalid' in capsys.readouterr().err
 
 
+def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
+    broken = tmp_path / 'broken.json'
+    broken.write_text('{not json', encoding='utf-8')
+    missing = tmp_path / 'missing.json'
+    code = run('--as-of', '2026-10-10', *WITH_PARSERS, str(broken), str(missing), fixture('complete-test'))
+    captured = capsys.readouterr()
+    assert code == 2, 'unreadable input exits 2'
+    assert 'broken.json: unreadable' in captured.err and 'missing.json: unreadable' in captured.err
+    assert ': tested []' in captured.out, 'records after an invalid one are still admitted and reported'
+
+
 @pytest.mark.parametrize('args', [('--as-of', 'yesterday', str(EXAMPLE)), ('--as-of', '2026-10-10', '--require',
                                                                              'restricted', str(EXAMPLE))])
 def test_usage_errors_exit_two(args, capsys):

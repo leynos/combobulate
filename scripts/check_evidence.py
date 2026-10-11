@@ -88,18 +88,24 @@ def main(*records: Path, as_of: str, require: str = 'tested', bindings: Path = R
                                      format_checker=Draft202012Validator.FORMAT_CHECKER)
     parsers = frozenset(load_json(log_parsers)['registered_log_parsers'])
     register, current = exception_register(exceptions), load_json(bindings)
-    status = 0
+    status, invalid = 0, False
     for path in records:
-        record = load_json(path)
+        try:
+            record = load_json(path)
+        except (OSError, ValueError) as error:
+            print(f'{path}: unreadable: {error}', file=sys.stderr)
+            invalid = True
+            continue
         errors = sorted(validator.iter_errors(record), key=lambda error: list(error.path))
         if errors:
             print(f'{path}: schema-invalid: {errors[0].message}', file=sys.stderr)
-            return 2
+            invalid = True
+            continue
         admission = admit(abstract_record(record, register, current, date, parsers))
         print(report_line(path, admission.level, admission.reasons))
         if RANK[admission.level] < RANK[wanted]:
             status = 1
-    return status
+    return 2 if invalid else status
 
 
 if __name__ == '__main__':

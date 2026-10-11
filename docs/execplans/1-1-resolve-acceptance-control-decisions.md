@@ -410,6 +410,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M5` milestone review disposition (CodeRabbit CLI):
+  `scripts/check_evidence.py` stopped at the first schema-invalid record and
+  raised on an unreadable file; it now reports every record, names unreadable
+  and invalid files, and exits 2 after the loop. Date/Author: 2026-10-11,
+  implementing agent.
 - Decision: `EP-M5` exceeded both per-milestone tolerances: 39 changed files
   against 25, and about 1,900 net added lines against 1,500, excluding the
   regenerated regions, the export, and the report. The evidence fixtures (six
