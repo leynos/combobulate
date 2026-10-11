@@ -25,7 +25,8 @@ def check_package_policy(context: ValidationContext) -> None:
     """Apply each accepted package decision to the committed `Cargo.toml`."""
     lifecycle = {record['id']: record['lifecycle'] for record in context.load('spec/decisions.json')['decisions']}
     manifest = tomllib.loads((context.root / 'Cargo.toml').read_text(encoding='utf-8'))
-    check_manifest(manifest, require_isc=lifecycle.get('D04') == 'accepted',
-                   require_unpublished=lifecycle.get('D05') == 'accepted')
-    context.record('package-policy', 'Cargo.toml declares the ISC licence (D04) and publish = false (D05) while those '
-                                      'decisions stand accepted.', 1)
+    rules = {'D04': 'the ISC licence', 'D05': 'publish = false'}
+    active = {decision: rule for decision, rule in rules.items() if lifecycle.get(decision) == 'accepted'}
+    check_manifest(manifest, require_isc='D04' in active, require_unpublished='D05' in active)
+    enforced = '; '.join(f'{rule} ({decision})' for decision, rule in active.items()) or 'no package rule'
+    context.record('package-policy', f'Cargo.toml satisfies the accepted package decisions: {enforced}.', len(active))

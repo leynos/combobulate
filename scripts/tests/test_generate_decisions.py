@@ -81,6 +81,13 @@ def test_accepted_decision_renders_its_approval():
     assert '[ADR-0003](adrs/adr-0003-initial-release-scope.md)' in section, 'the ADR is linked from docs/'
 
 
+def test_multi_paragraph_answer_keeps_its_paragraph_break():
+    text = render(REGISTER)
+    section = text[text.index('### D07\n'):text.index('### D08\n')]
+    assert 'Answer, quoted verbatim:' in section, 'the session answer is quoted'
+    assert '\n>\n> This breaks from current DF12 standards' in section, 'the blank line in the answer is kept'
+
+
 def test_splice_rejects_missing_or_repeated_markers():
     with pytest.raises(MarkerError, match='exactly one'):
         splice('# Register\n', 'body')

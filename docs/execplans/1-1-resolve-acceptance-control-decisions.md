@@ -422,6 +422,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M2` milestone review dispositions (CodeRabbit CLI, three
+  minor findings, all fixed). The terms-of-reference handoff now names the ADRs
+  each candidate subject is assigned rather than claiming ADR-0006 and ADR-0007
+  existed before `EP-M3` (fixed in the `EP-M2` layer and the stack restacked;
+  range-diff showed identical patches above it); the register renders session
+  answers as verbatim blockquotes that keep paragraph breaks; the
+  package-policy result names only the rules it enforced. Fixes to rendering
+  and reporting landed in `EP-M6`. Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M5` milestone review disposition (CodeRabbit CLI):
   `scripts/check_evidence.py` stopped at the first schema-invalid record and
   raised on an unreadable file; it now reports every record, names unreadable
