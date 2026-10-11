@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import socket
 import sys
+import tempfile
 import unittest
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -15,7 +17,7 @@ from jsonschema import Draft202012Validator, ValidationError
 
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
-    FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_amendment_chain,
+    FROZEN_FIELDS, OUTCOME_VERDICTS, _load_source_digests, check_acceptance_controls, check_amendment_chain,
     check_completeness, check_measurement_binding, check_registration_declarations, check_sources,
     frozen_digest,
 )
@@ -224,6 +226,39 @@ class Registration(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml is missing',
                                     msg='every registered source must be supplied to the pure rule'):
             check_sources(control, {})
+
+    def test_registered_source_paths_are_confined_to_the_repository(self):
+        """Reject source paths that escape the repository while allowing internal symlinks."""
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            parent = Path(temporary_directory)
+            root = parent / 'repo'
+            root.mkdir()
+            source = root / 'source.yml'
+            source.write_text('workflow: valid\n', encoding='utf-8')
+            (root / 'internal-link.yml').symlink_to(source)
+            outside = parent / 'outside.yml'
+            outside.write_text('workflow: outside\n', encoding='utf-8')
+            (root / 'external-link.yml').symlink_to(outside)
+            context = ValidationContext(root)
+
+            def controls(path: str) -> list[dict]:
+                return [{'id': 'AC-07', 'frozen': {'workload': {'sources': [{'path': path}]}}}]
+
+            digests = _load_source_digests(context, controls('internal-link.yml'))
+            self.assertEqual(digests['internal-link.yml'], hashlib.sha256(source.read_bytes()).hexdigest(),
+                             'an internal symlink must hash its in-repository target')
+
+            invalid_paths = (
+                ('/etc/hostname', 'must be repository-relative'),
+                ('C:\\outside.yml', 'must be repository-relative'),
+                ('../outside.yml', 'contains a parent path component'),
+                ('nested/../source.yml', 'contains a parent path component'),
+                ('..\\outside.yml', 'contains a parent path component'),
+                ('external-link.yml', 'escapes the repository'),
+            )
+            for path, message in invalid_paths:
+                with self.subTest(path=path), self.assertRaisesRegex(AssertionError, message):
+                    _load_source_digests(context, controls(path))
 
     def test_every_frozen_field_changes_the_digest(self):
         """Exercise every frozen field against the digest and chain checks."""

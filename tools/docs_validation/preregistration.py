@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping
+from pathlib import PurePosixPath, PureWindowsPath
 
 from jsonschema import Draft202012Validator
 
@@ -42,19 +43,6 @@ __all__ = [
 HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
     """Adapt parsed CI YAML into AC-07 values; e.g. extract image and job timeout."""
     jobs = workflow.get('jobs', {}) if isinstance(workflow, Mapping) else {}
@@ -68,10 +56,20 @@ def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
 def _load_source_digests(context: ValidationContext, controls: list[dict]) -> dict[str, str]:
     """Hash registered workload sources in the composition path; e.g. bind CI YAML to AC-07."""
     paths = sorted({source['path'] for control in controls for source in control['frozen']['workload']['sources']})
+    root = context.root.resolve()
     digests: dict[str, str] = {}
     for path in paths:
+        posix_path = PurePosixPath(path)
+        windows_path = PureWindowsPath(path)
+        require(not posix_path.is_absolute() and not windows_path.is_absolute() and not windows_path.drive,
+                f'Registered source {path} must be repository-relative')
+        require('..' not in posix_path.parts and '..' not in windows_path.parts,
+                f'Registered source {path} contains a parent path component')
+        resolved_path = (root / path).resolve()
+        require(resolved_path.is_relative_to(root), f'Registered source {path} escapes the repository')
+        relative_path = resolved_path.relative_to(root).as_posix()
         try:
-            digests[path] = hashlib.sha256(context.read_bytes(path)).hexdigest()
+            digests[path] = hashlib.sha256(context.read_bytes(relative_path)).hexdigest()
         except OSError as error:
             raise ValueError(f'Unable to read registered workload source {path}: {error}') from error
     return digests
