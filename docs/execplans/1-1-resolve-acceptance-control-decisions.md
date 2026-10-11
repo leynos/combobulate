@@ -422,6 +422,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: second round of milestone reviews (CodeRabbit CLI, `EP-M2` to
+  `EP-M6`, 7 distinct findings). `EP-M3`: SC-09 cited `.axis` (P002) instead of
+  `execute_into` (E010); fixed in the `EP-M3` layer. `EP-M4` and `EP-M5`: fixed
+  in their layers (see their entries). `EP-M2` re-review: the claim that the
+  ledger still records "All tasks remain open" was invalid (the ledger has
+  computed its detail since `EP-M1b`, and the committed report reads "1 of 72
+  tasks ticked"); the package-policy detail was already fixed in `EP-M6`.
+  `EP-M6`: no findings. The stack was restacked from `EP-M3` upward; the plan's
+  decision log was the only conflict, resolved by keeping both entries.
+  Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M2` milestone review dispositions (CodeRabbit CLI, three
   minor findings, all fixed). The terms-of-reference handoff now names the ADRs
   each candidate subject is assigned rather than claiming ADR-0006 and ADR-0007
