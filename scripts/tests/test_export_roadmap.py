@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ROADMAP_PATH = ROOT / 'docs/roadmap.md'
 EXPORT_PATH = ROOT / 'spec/roadmap.json'
 ROADMAP = ROADMAP_PATH.read_text(encoding='utf-8')
+OPEN_TASK = '- [ ] 2.1.1. Implement'
 REQUIRED_CLASSES = {'multi-phase', 'single-phase', 'has-details', 'no-details', 'has-requires', 'has-done',
                     'all-open'}
 
@@ -56,10 +58,13 @@ def test_export_is_independent_of_paragraph_wrapping():
     assert parse_roadmap(rewrapped) == parse_roadmap(ROADMAP), 'wrapping must not change the export'
 
 
-def test_open_checkboxes_export_as_open_status():
-    statuses = {task['status'] for phase in parse_roadmap(ROADMAP)['phases']
+def test_checkboxes_export_as_task_status():
+    ticked = set(re.findall(r'^- \[x\] (\d+\.\d+\.\d+)\.', ROADMAP, re.MULTILINE))
+    exported = {task['id']: task['status'] for phase in parse_roadmap(ROADMAP)['phases']
                 for step in phase['steps'] for task in step['tasks']}
-    assert statuses == {'open'}, 'every task is open before roadmap step 1.1 completes'
+    assert {task_id for task_id, status in exported.items() if status == 'done'} == ticked, (
+        'exactly the ticked checkboxes export as done')
+    assert set(exported.values()) <= {'open', 'done'}, 'status is open or done'
 
 
 def test_changed_title_changes_export():
@@ -75,8 +80,9 @@ def test_changed_dependency_changes_export():
 
 
 def test_ticked_checkbox_changes_status():
-    edited = replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record')
-    assert first_task(parse_roadmap(edited))['status'] == 'done', 'a tick must export as done'
+    edited = replace_once(ROADMAP, OPEN_TASK, OPEN_TASK.replace('[ ]', '[x]'))
+    task = parse_roadmap(edited)['phases'][1]['steps'][0]['tasks'][0]
+    assert (task['id'], task['status']) == ('2.1.1', 'done'), 'a tick must export as done'
 
 
 def test_missing_markers_are_rejected():
@@ -86,8 +92,8 @@ def test_missing_markers_are_rejected():
 
 @pytest.mark.parametrize(('text', 'line'), [
     pytest.param(f'Revision 0.2, 6 October 2026.\n\n{START}\n\n#### 1. Too deep\n\n{END}\n', 5, id='heading-level'),
-    pytest.param(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'),
-                 line_of(ROADMAP, '- [ ] 1.1.1. Record'), id='task-without-checkbox'),
+    pytest.param(replace_once(ROADMAP, OPEN_TASK, OPEN_TASK.replace('[ ] ', '')),
+                 line_of(ROADMAP, OPEN_TASK), id='task-without-checkbox'),
     pytest.param(replace_once(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.', '  - Mystery note.'),
                  line_of(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.'), id='unlabelled-bullet'),
     pytest.param(replace_once(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.', '  - [x] A ticked detail.'),
@@ -133,9 +139,9 @@ def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
 
 def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
     roadmap, export = workspace
-    roadmap.write_text(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'), encoding='utf-8')
+    roadmap.write_text(replace_once(ROADMAP, OPEN_TASK, OPEN_TASK.replace('[ ] ', '')), encoding='utf-8')
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 2, 'malformed input exits 2'
-    assert f':{line_of(ROADMAP, "- [ ] 1.1.1. Record")}:' in capsys.readouterr().err
+    assert f':{line_of(ROADMAP, OPEN_TASK)}:' in capsys.readouterr().err
 
 
 def test_cli_reads_check_flag_from_environment(workspace, monkeypatch):

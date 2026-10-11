@@ -9,10 +9,12 @@ Decisions that control acceptance, with their authority, options, and status,
 are recorded in the [decision register](decision-register.md).
 
 No entry denotes a released or compiled implementation. The **Core** scope is
-the proposed initial numeric-language release. **Integration** entries belong
-to the explicitly gated typed-cell/segmented workstreams. Their presence in
-this reference does not silently enlarge the first release. Deferred proposals
-appear after the tables rather than masquerading as available operations.
+the initial numeric-language release boundary accepted in
+[D03](decision-register.md#d03); the API within it remains proposed.
+**Integration** entries belong to the explicitly gated typed-cell/segmented
+workstreams. Their presence in this reference does not silently enlarge the
+first release. Deferred proposals appear after the tables rather than
+masquerading as available operations.
 
 ## 1. Reading the signatures and categories
 

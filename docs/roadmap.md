@@ -1,6 +1,7 @@
 # Combobulate roadmap
 
-Revision 0.2, 6 October 2026. All work remains proposed and open.
+Revision 0.2, 6 October 2026. Task 1.1.1 is complete; all other work remains
+proposed and open.
 
 Decisions that control acceptance, with their authority, options, and status,
 are recorded in the [decision register](decision-register.md).
@@ -62,7 +63,7 @@ Which constraints are approved, and which remain experiments? The answer bounds
 every later implementation and prevents retrospective changes to success
 criteria. See `technical-design.md` §§1-2, 15-16.
 
-- [ ] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API
+- [x] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API
   policy.
   - See `technical-design.md` §§1-2, 15-16, 17.
   - Proof first: Write decision and exception authority before accepting claims;

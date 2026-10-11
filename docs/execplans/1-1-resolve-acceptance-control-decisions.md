@@ -260,7 +260,18 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   the base-revision comparison; every obligation has one component per linked
   task, with `PF14.structural@1.1.4` accepting `tested` from
   `checker:evidence-gate`; `make design-check BASE_REV=...` passes.
-- [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
+- [x] (2026-10-11) `EP-M2` Task 1.1.1: authority, scope, licence, and API
+  policy recorded (branch `1-1-governance-decisions`, stacked on `EP-M1b`).
+  Evidence: ADR-0002 to ADR-0005 accepted; D01 to D07 and D13 accepted in
+  `spec/decisions.json` with `kind: session` references quoting the sponsor's
+  answers, D01 and D13 on option B; the five governing documents reconciled,
+  with 12 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
+  Q4, Q7, and Q8 link their register anchors; `Cargo.toml` sets
+  `publish = false` and `cargo publish --dry-run` refuses; 4 cases in
+  `tools/tests/test_package_policy.py` (red first) and 5 real-document VO-6
+  controls pass (reinserting the Q4 sentence, rewrapped or not, writing "Q4
+  remains open", or deleting the Q4 anchor each fails naming D03); task 1.1.1
+  ticked with its completion record, and the checker reports it backed.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
@@ -268,6 +279,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: tests written while nothing was accepted or ticked assumed
+  that state (the exporter's all-open assertion and its 1.1.1 checkbox
+  controls; register tests seeded from the committed register). Evidence: they
+  failed once 1.1.1 was ticked and D01 to D07 accepted. Impact: checkbox
+  controls now target task 2.1.1, the all-open assertion derives the expected
+  ticks from the Markdown, and synthetic register tests start from a
+  `proposed_register()` baseline, so later milestones do not break them.
 - Observation: the hosted `build-test` job failed `make check-fmt` on the
   plan itself for #9, #11, and #12. Evidence: CI pins mdtablefix 0.6.0, whose
   `--renumber` treats a wrapped line beginning "2026." as an ordered-list item;
