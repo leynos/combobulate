@@ -381,6 +381,31 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: the hosted design check failed on #16 because the
+  host-identity test also supplied the user name, which is `runner` on GitHub
+  runners and is an ordinary word in the CI calibration record. Evidence:
+  Design contracts run 38098132965, "spec/calibration/ci-history.json contains
+  host identity 'runner'". Impact: the test supplies only the host name; user
+  names are still caught through the home-path patterns (D11 concerns host
+  names).
+- Observation: symbolic 64-bit multiplication is out of reach for Kani on
+  this host. Evidence: a harness asserting the exact product of three full-width
+  `usize` extents was stopped after 900 s, and one bounded below 2^16 after 18
+  min 46 s (18 min 27 s of CPU), both without a verdict
+  (`spec/calibration/verifier-probe.json`); Verus proved the unbounded
+  specification in under 2 s. Impact: `AC-02` scopes Kani to structural
+  harnesses, and multiplication-heavy properties go to Verus under `AC-01`;
+  task 1.2.4 should plan its proofs accordingly.
+- Observation: a usable Verus release already existed at user level
+  (`0.2026.09.06.8dea4a2`, Rust 1.98.0), but it requires exactly Z3 4.16.0; the
+  locally available Z3 4.12.1 crashed its response parser. Impact: Z3 4.16.0
+  was installed from the upstream release into a user-level directory
+  (`sha256 7288c49a...`), and no repository file names the location.
+- Observation: the shared host was heavily contended during calibration (load
+  average 20 to 41 on 24 threads; four of four compile-admission slots held by
+  other agents). Impact: the factor uses medians of a workload run on both
+  machines, and thresholds round up generously; noisy local wall times inflate
+  thresholds rather than tighten them.
 - Observation: tests written while nothing was accepted or ticked assumed
   that state (the exporter's all-open assertion and its 1.1.1 checkbox
   controls; register tests seeded from the committed register). Evidence: they

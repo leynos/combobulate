@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import copy
-import getpass
 import itertools
 import socket
 import sys
@@ -41,7 +40,9 @@ class Registration(unittest.TestCase):
     """VO-11: every frozen field is digested, and changes need an approved amendment chain."""
 
     def test_committed_register_passes(self):
-        check_acceptance_controls(ValidationContext(ROOT), (socket.gethostname(), getpass.getuser()))
+        # Only the host name is supplied: user names leak through home paths, which the
+        # check always rejects, and a generic CI user such as `runner` is an ordinary word.
+        check_acceptance_controls(ValidationContext(ROOT), (socket.gethostname(),))
 
     def test_register_lists_the_frozen_fields(self):
         self.assertEqual(REGISTER['frozen_fields'], list(FROZEN_FIELDS), 'the register must state its frozen fields')

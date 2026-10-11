@@ -78,7 +78,7 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
 
 
 def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -> None:
-    """Reject home paths and any supplied host or user name in a committed record (D11)."""
+    """Reject home paths, which carry user names, and any supplied host name in a committed record (D11)."""
     for pattern in HOST_PATTERNS:
         require(pattern.search(text) is None, f'{name} contains a home path')
     for value in extra_names:
