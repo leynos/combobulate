@@ -145,5 +145,10 @@ def check_package_policy(context: ValidationContext) -> None:
     manifest = cast(CargoManifest, tomllib.loads((context.root / 'Cargo.toml').read_text(encoding='utf-8')))
     check_manifest(manifest, require_isc=decisions.get('D04', {}).get('lifecycle') == 'accepted',
                    require_unpublished=require_unpublished)
-    context.record('package-policy', 'Cargo.toml meets the D04 licence policy and keeps publication disabled until '
-                                      'an accepted D05 supersession and validated task 4.3.3 closure.', 1)
+    rules = {
+        'D04': ('the ISC licence', decisions.get('D04', {}).get('lifecycle') == 'accepted'),
+        'D05': ('publish = false', require_unpublished),
+    }
+    enforced = {decision: rule for decision, (rule, is_required) in rules.items() if is_required}
+    detail = '; '.join(f'{rule} ({decision})' for decision, rule in enforced.items()) or 'no package rule'
+    context.record('package-policy', f'Cargo.toml satisfies the enforced package rules: {detail}.', len(enforced))

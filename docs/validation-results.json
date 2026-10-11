@@ -137,8 +137,8 @@
     {
       "check": "package-policy",
       "status": "pass",
-      "detail": "Cargo.toml meets the D04 licence policy and keeps publication disabled until an accepted D05 supersession and validated task 4.3.3 closure.",
-      "count": 1
+      "detail": "Cargo.toml satisfies the enforced package rules: the ISC licence (D04); publish = false (D05).",
+      "count": 2
     }
   ],
   "not_run": [
