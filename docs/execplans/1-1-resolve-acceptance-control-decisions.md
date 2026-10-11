@@ -362,7 +362,20 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   <https://github.com/leynos/combobulate/pull/15#issuecomment-6253606767>.
   Sourcery's check was skipped because the diff exceeded its 150,000-character
   limit. The current-head review follow-up is complete.
-- [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
+- [x] (2026-10-11) `EP-M4` Task 1.1.3: calibrated acceptance controls
+  pre-registered (branch `1-1-acceptance-controls`, stacked on `EP-M3`).
+  Evidence: ADR-0008 accepted; D11 and D12 accepted (both option B) with
+  session references; `AC-01` to `AC-07` registered with every frozen field and
+  SHA-256 digests, four calibrated from records in `spec/calibration/` and
+  three labelled not calibrated with reasons; the probe in
+  `tools/calibration/cardinality-probe/` verifies in Verus (8 functions, a
+  seeded mutant rejected) and its structural Kani harnesses satisfy every
+  `cover!`; 29 cases in `tools/tests/test_preregistration.py` and
+  `tools/tests/test_freeze.py` pass, including the exhaustive outcome mapping,
+  a Hypothesis property that exercised every frozen field, a
+  threshold-plus-digest edit rejected without an amendment, and host-identity
+  scans with the local host name supplied at test time; the CI `build-test` job
+  has `timeout-minutes: 8` (`AC-07`); task 1.1.3 ticked and backed.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 

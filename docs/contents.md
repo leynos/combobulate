@@ -23,6 +23,8 @@ implemented API or completed verification.
 - [Source register](references.md): technical sources and evidence limits.
 - [Design validation](validation.md): documentation checks and outstanding
   implementation/verifier obligations.
+- [Acceptance calibration](acceptance-calibration.md): measurements and
+  extrapolation behind the pre-registered acceptance-control thresholds.
 - [Decision register](decision-register.md): decisions that control
   acceptance, their authority, options, approval references, and ADRs.
 - [ADR-0001: repository bootstrap](adrs/adr-0001-repository-bootstrap.md):
