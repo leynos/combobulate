@@ -302,6 +302,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: the hosted design check failed on #16 because the
+  host-identity test also supplied the user name, which is `runner` on GitHub
+  runners and is an ordinary word in the CI calibration record. Evidence:
+  Design contracts run 38098132965, "spec/calibration/ci-history.json contains
+  host identity 'runner'". Impact: the test supplies only the host name; user
+  names are still caught through the home-path patterns (D11 concerns host
+  names).
 - Observation: symbolic 64-bit multiplication is out of reach for Kani on
   this host. Evidence: a harness asserting the exact product of three full-width
   `usize` extents was stopped after 900 s, and one bounded below 2^16 after 18
