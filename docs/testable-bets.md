@@ -241,7 +241,9 @@ specification bindings invalidate the affected evidence and cache entries.
 
 Negative control: Import verification metadata from a different executable
 revision, use focus/skip mode as release evidence, or label bounded Kani
-evidence as unbounded.
+evidence as unbounded. The evidence gate (ADR-0009) rejects these as
+binding-stale, run-focused or outcome-skipped, and admits partial-bounds
+evidence only at bounded.
 
 Falsifier: Consumers depend on private IR layout, relevant source changes do
 not invalidate evidence, or proof CI exceeds agreed limits without an explicit

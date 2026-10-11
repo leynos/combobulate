@@ -170,7 +170,7 @@
         "6.2.4"
       ],
       "success_witness": "An internal refactor preserves public proofs; precondition strengthening, postcondition weakening, backend/profile changes and stale specification bindings invalidate the affected evidence and cache entries.",
-      "negative_control": "Import verification metadata from a different executable revision, use focus/skip mode as release evidence, or label bounded Kani evidence as unbounded.",
+      "negative_control": "Import verification metadata from a different executable revision, use focus/skip mode as release evidence, or label bounded Kani evidence as unbounded. The evidence gate (ADR-0009) rejects these as binding-stale, run-focused or outcome-skipped, and admits partial-bounds evidence only at bounded.",
       "falsifier": "Consumers depend on private IR layout, relevant source changes do not invalidate evidence, or proof CI exceeds agreed limits without an explicit scope decision.",
       "decision_rule": "Refine the public lemma surface, cache keys and verification profiles; no compatibility shim is required for obsolete unreleased APIs, but released proof contracts get deliberate versioning.",
       "measurement": "Record workload, compiler/verifier/backend revisions, target/features, assumptions, and cost against the pre-registered acceptance controls (spec/acceptance-controls.json). Correctness gates are categorical; empirical thresholds are the registered controls.",

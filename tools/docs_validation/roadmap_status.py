@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .context import ValidationContext, require
+from .evidence_gate import Admission
+from .evidence_records import admitted_evidence
 from .markdown import headings
 
 ADMISSION_LEVELS = frozenset({'proof', 'bounded', 'tested'})
@@ -40,6 +42,7 @@ class ClosureInputs:
     components: Mapping[str, list[dict]]
     passed_checks: frozenset[str]
     artefact_problem: Callable[[str], ArtefactProblem | None]
+    evidence: Mapping[str, list[tuple[Admission, dict]]] = field(default_factory=dict)
 
 
 def roadmap_tasks(roadmap: dict) -> dict[str, dict]:
@@ -105,13 +108,24 @@ def index_completions(completion: dict, tasks: Mapping[str, dict], decisions: Ma
     return records
 
 
-def component_failure(component: dict, passed_checks: frozenset[str]) -> str | None:
+def component_failure(component: dict, passed_checks: frozenset[str],
+                      evidence: Mapping[str, list[tuple[Admission, dict]]]) -> str | None:
     """Explain why a component is unsatisfied (MS-3), or return None when it is satisfied."""
     source = component['evidence_source']
     if source.startswith(CHECKER_SOURCE):
         check = source.removeprefix(CHECKER_SOURCE)
         return None if check in passed_checks else f"component {component['id']} needs check {check} to pass"
-    return f"component {component['id']} has no admitted evidence record (fail closed until the evidence gate)"
+    records = evidence.get(component['id'], [])
+    if not records:
+        return f"component {component['id']} has no evidence record"
+    admission, latest = max(records, key=lambda entry: entry[1]['recorded_on'])
+    revision = latest['binding']['source_revision']
+    if any(record['outcome'] == 'counterexample' and record['binding']['source_revision'] == revision
+           for _, record in records):
+        return f"component {component['id']} has a counterexample at source revision {revision}"
+    if admission.level.value not in component['accepts']:
+        return f"component {component['id']} evidence is {admission.level.value} ({', '.join(admission.reasons)})"
+    return None
 
 
 def closure_failures(task_id: str, inputs: ClosureInputs) -> list[str]:
@@ -130,7 +144,7 @@ def closure_failures(task_id: str, inputs: ClosureInputs) -> list[str]:
             if (problem := inputs.artefact_problem(artefact)) is not None
         )
     failures.extend(failure for component in inputs.components.get(task_id, [])
-                    if (failure := component_failure(component, inputs.passed_checks)) is not None)
+                    if (failure := component_failure(component, inputs.passed_checks, inputs.evidence)) is not None)
     return failures
 
 
@@ -216,6 +230,7 @@ def check_task_status(context: ValidationContext, roadmap: dict, decisions: Mapp
         decisions=decisions, components=components,
         passed_checks=frozenset(row['check'] for row in context.results if row['status'] == 'pass'),
         artefact_problem=artefact_resolver(context),
+        evidence=admitted_evidence(context),
     )
     ticked, eligible = task_closure(inputs)
     context.record('roadmap-status',

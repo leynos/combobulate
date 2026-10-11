@@ -1,0 +1,258 @@
+{
+  "description": "ADR-0009 admission rule table (MS-0 to MS-2) as data. Read by an independent interpreter in tools/tests/test_evidence_gate.py and, from task 1.2.4, by Rust tooling. Rules apply in order; every matching blocking rule contributes its reason.",
+  "domains": {
+    "kind": [
+      "deductive",
+      "bounded",
+      "test",
+      "trust-declaration",
+      "none"
+    ],
+    "outcome": [
+      "verified",
+      "counterexample",
+      "resource-exhausted",
+      "solver-unknown",
+      "unsupported",
+      "skipped",
+      "not-run",
+      "tool-error"
+    ],
+    "bounds": [
+      "not-applicable",
+      "type-complete",
+      "partial"
+    ],
+    "witness": [
+      "all-satisfied",
+      "some-unsatisfied",
+      "absent"
+    ],
+    "controls": [
+      "all-required-rejected-as-intended",
+      "some-rejected-otherwise",
+      "some-accepted",
+      "required-missing"
+    ],
+    "trust": [
+      "audited-none",
+      "audited-all-covered",
+      "audited-uncovered",
+      "unaudited"
+    ],
+    "exception": [
+      "none",
+      "active",
+      "expired",
+      "not-yet-valid",
+      "malformed"
+    ],
+    "binding": [
+      "current",
+      "stale",
+      "incomplete"
+    ],
+    "run_mode": [
+      "full-profile",
+      "focused"
+    ],
+    "verdict_source": [
+      "log-parser",
+      "self-reported"
+    ]
+  },
+  "validity": [
+    {
+      "name": "ran-exactly-when-executed",
+      "if": {
+        "field": "kind",
+        "in": [
+          "deductive",
+          "bounded",
+          "test"
+        ]
+      },
+      "then": {
+        "field": "outcome",
+        "not_in": [
+          "not-run"
+        ]
+      },
+      "else": {
+        "field": "outcome",
+        "in": [
+          "not-run"
+        ]
+      }
+    },
+    {
+      "name": "bounds-exactly-for-bounded",
+      "if": {
+        "field": "kind",
+        "in": [
+          "bounded"
+        ]
+      },
+      "then": {
+        "field": "bounds",
+        "not_in": [
+          "not-applicable"
+        ]
+      },
+      "else": {
+        "field": "bounds",
+        "in": [
+          "not-applicable"
+        ]
+      }
+    }
+  ],
+  "invalid": {
+    "level": "rejected",
+    "reasons": [
+      "schema-invalid"
+    ]
+  },
+  "blocking": [
+    {
+      "field": "outcome",
+      "kinds": [
+        "deductive",
+        "bounded",
+        "test"
+      ],
+      "bad": {
+        "counterexample": "outcome-counterexample",
+        "resource-exhausted": "outcome-resource-exhausted",
+        "solver-unknown": "outcome-solver-unknown",
+        "unsupported": "outcome-unsupported",
+        "skipped": "outcome-skipped",
+        "tool-error": "outcome-tool-error"
+      }
+    },
+    {
+      "field": "witness",
+      "kinds": "any",
+      "bad": {
+        "some-unsatisfied": "witness-some-unsatisfied",
+        "absent": "witness-absent"
+      }
+    },
+    {
+      "field": "controls",
+      "kinds": "any",
+      "bad": {
+        "some-rejected-otherwise": "control-some-rejected-otherwise",
+        "some-accepted": "control-some-accepted",
+        "required-missing": "control-required-missing"
+      }
+    },
+    {
+      "field": "trust",
+      "kinds": [
+        "deductive",
+        "bounded"
+      ],
+      "bad": {
+        "audited-uncovered": "trust-uncovered",
+        "unaudited": "trust-unaudited"
+      }
+    },
+    {
+      "field": "exception",
+      "kinds": "any",
+      "bad": {
+        "expired": "exception-expired",
+        "not-yet-valid": "exception-not-yet-valid",
+        "malformed": "exception-malformed"
+      }
+    },
+    {
+      "field": "binding",
+      "kinds": "any",
+      "bad": {
+        "stale": "binding-stale",
+        "incomplete": "binding-incomplete"
+      }
+    },
+    {
+      "field": "run_mode",
+      "kinds": "any",
+      "bad": {
+        "focused": "run-focused"
+      }
+    },
+    {
+      "field": "verdict_source",
+      "kinds": [
+        "deductive",
+        "bounded"
+      ],
+      "bad": {
+        "self-reported": "verdict-self-reported"
+      }
+    },
+    {
+      "field": "kind",
+      "kinds": "any",
+      "bad": {
+        "none": "not-run"
+      }
+    },
+    {
+      "field": "exception",
+      "kinds": [
+        "trust-declaration"
+      ],
+      "bad": {
+        "none": "trust-without-exception",
+        "expired": "trust-without-exception",
+        "not-yet-valid": "trust-without-exception",
+        "malformed": "trust-without-exception"
+      }
+    }
+  ],
+  "blocked": {
+    "level": "rejected"
+  },
+  "exception_active": {
+    "level": "restricted",
+    "reasons": [
+      "exception-active"
+    ]
+  },
+  "base_levels": [
+    {
+      "when": {
+        "kind": "deductive"
+      },
+      "level": "proof"
+    },
+    {
+      "when": {
+        "kind": "bounded",
+        "bounds": "type-complete"
+      },
+      "level": "proof"
+    },
+    {
+      "when": {
+        "kind": "bounded",
+        "bounds": "partial"
+      },
+      "level": "bounded"
+    },
+    {
+      "when": {
+        "kind": "test"
+      },
+      "level": "tested"
+    },
+    {
+      "when": {
+        "kind": "trust-declaration"
+      },
+      "level": "restricted"
+    }
+  ]
+}

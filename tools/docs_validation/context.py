@@ -16,7 +16,7 @@ from types import ModuleType
 import yaml
 
 DESIGN_DOCUMENTS = (
-    'acceptance-calibration.md', 'context.md', 'decision-register.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
+    'acceptance-calibration.md', 'context.md', 'decision-register.md', 'evidence-and-decision-records.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
     'roadmap.md', 'technical-design.md', 'terms-of-reference.md',
     'testable-bets.md', 'validation.md',
 )
