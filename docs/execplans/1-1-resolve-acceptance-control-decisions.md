@@ -422,6 +422,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: re-reviews of the review fixes (CodeRabbit CLI) found three minor
+  items, fixed in `EP-M6`: registered workload sources must resolve inside the
+  repository (absolute paths, `..`, and symlinks fail), a test pattern escapes
+  its dots, and a compound assertion is split so each part has its message.
+  Date/Author: 2026-10-11, implementing agent.
 - Decision: second round of milestone reviews (CodeRabbit CLI, `EP-M2` to
   `EP-M6`, 7 distinct findings). `EP-M3`: SC-09 cited `.axis` (P002) instead of
   `execute_into` (E010); fixed in the `EP-M3` layer. `EP-M4` and `EP-M5`: fixed

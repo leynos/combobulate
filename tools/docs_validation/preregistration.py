@@ -61,9 +61,19 @@ def check_amendment_chain(control: Mapping[str, object], sponsor: str) -> None:
 
 
 def check_sources(control: Mapping[str, object], root: Path) -> None:
-    """Require each registered workload source to match its recorded SHA-256; an edit needs an amendment."""
+    """Require each registered workload source to match its recorded SHA-256; an edit needs an amendment.
+
+    Parameters
+    ----------
+    control
+        One registered control; its `frozen.workload.sources` list paths relative to the repository.
+    root
+        The repository root; a source resolving outside it (absolute, `..`, or a symlink) fails.
+    """
+    base = root.resolve()
     for source in control['frozen']['workload']['sources']:
-        path = root / source['path']
+        path = (root / source['path']).resolve()
+        require(path.is_relative_to(base), f"{control['id']} source {source['path']} escapes the repository")
         require(path.is_file(), f"{control['id']} source {source['path']} is missing")
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         require(digest == source['sha256'],

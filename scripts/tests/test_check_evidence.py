@@ -72,7 +72,8 @@ def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
     code = run('--as-of', '2026-10-10', *WITH_PARSERS, str(broken), str(missing), fixture('complete-test'))
     captured = capsys.readouterr()
     assert code == 2, 'unreadable input exits 2'
-    assert 'broken.json: unreadable' in captured.err and 'missing.json: unreadable' in captured.err
+    assert 'broken.json: unreadable' in captured.err, 'malformed JSON is reported as unreadable'
+    assert 'missing.json: unreadable' in captured.err, 'a missing file is reported as unreadable'
     assert ': tested []' in captured.out, 'records after an invalid one are still admitted and reported'
 
 
