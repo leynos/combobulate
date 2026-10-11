@@ -117,6 +117,9 @@ baseline dependency lock. See `technical-design.md` §§3-4, 7, 10.
     tooling is optional for ordinary consumers. The semantic kernel imports
     neither Polars nor glam; select the Rust backend independently of the Python
     Polars 2 version.
+  - [ ] Build the trust-audit scanner over the ADR-0009 vocabulary and register
+    a verifier log parser only with tests over real logs, including a timeout,
+    an unsatisfied cover, and a skipped harness.
 - [ ] 1.2.2. Implement the minimal values, expression handles, and ordinary
   application path.
   - Requires 1.1.2, 1.2.1.
@@ -136,6 +139,9 @@ baseline dependency lock. See `technical-design.md` §§3-4, 7, 10.
   - Success: The harness reads the golden-case contract, reports the selected
     executor, and detects a seeded wrong-result mutation; reference execution
     does not reuse the optimized operation implementation.
+  - [ ] Replay the semantic contract examples (`contract_cases` in
+    `spec/examples.json`) as `rstest` cases, so the Rust implementation meets
+    the same expectations as the documentation model.
 - [ ] 1.2.4. Deliver one checked cardinality kernel through runtime, constant
   evaluation, Kani, and Verus.
   - Requires 1.2.3.
@@ -148,6 +154,10 @@ baseline dependency lock. See `technical-design.md` §§3-4, 7, 10.
     witnesses, and a Verus cardinality invariant. Pin supported targets and
     reject unsupported static certificates rather than substituting an unchecked
     checker. Record compile/proof cost against pre-registered limits.
+  - [ ] Replay the evidence-gate rule table
+    (`tools/tests/fixtures/evidence_gate_rules.json`) from Rust over every
+    abstract state, and register the Verus and Kani log parsers for this
+    kernel's evidence.
 - [ ] 1.2.5. Export the first collection model and verified dependency for an
   external identity consumer.
   - Requires 1.2.4.
@@ -314,6 +324,9 @@ frontend earns its complexity. See `technical-design.md` §§7, 13.
   - Success: Public pipeline and literal examples work; malformed stages/ragged
     literals point to original tokens; embedded host expressions execute once;
     no custom Fn implementation is required.
+  - [ ] Replay every `spec/macro-grammar.json` corpus entry as a `trybuild` pass
+    or fail fixture, with a check that no entry is missing; then delete
+    `tools/docs_validation/grammar.py`.
 - [ ] 2.3.2. Implement verb!, shared lets, operator composition, sections, and
   flow!.
   - Requires 2.2.4, 2.3.1.
@@ -709,7 +722,7 @@ rather than an assumption of readiness. See `technical-design.md` §§12-16.
   - See `technical-design.md` §§2, 14-16, 17.
   - Proof first: Audit proof coverage, non-vacuity, TCB, exact bindings,
     cost/capability records, and open exceptions before the release decision.
-    Bets: B01, B08.
+    Bets: B01, B06, B08.
   - Success: Every Core catalogue row maps to implementation evidence or an
     explicitly approved scope revision; measurements meet pre-registered gates;
     owner release/publication decisions remain separate from test success. Core

@@ -75,8 +75,15 @@ class Registration(unittest.TestCase):
         check_sources(control, ROOT)
         stale = copy.deepcopy(control)
         stale['frozen']['workload']['sources'][0]['sha256'] = '0' * 64
-        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml changed since registration'):
+        with self.assertRaisesRegex(AssertionError, r'AC-07 source \.github/workflows/ci\.yml changed since registration'):
             check_sources(stale, ROOT)
+
+    def test_source_outside_the_repository_fails(self):
+        control = copy.deepcopy(next(item for item in REGISTER['controls'] if item['id'] == 'AC-07'))
+        for path in ('../outside.yml', '/etc/hostname'):
+            control['frozen']['workload']['sources'][0]['path'] = path
+            with self.subTest(path=path), self.assertRaisesRegex(AssertionError, 'escapes the repository'):
+                check_sources(control, ROOT)
 
     def test_every_frozen_field_changes_the_digest(self):
         exercised: set[str] = set()

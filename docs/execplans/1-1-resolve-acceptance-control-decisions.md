@@ -5,9 +5,9 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (the sponsor approved this revision for implementation on
-2026-10-11 by invoking the implementation workflow; `EP-M0` is complete and
-`EP-M1a` is under way)
+Status: COMPLETE (implementation of `EP-M0` to `EP-M6` on 2026-10-11, in the
+stacked pull requests #11 to #18; local CodeRabbit CLI reviews of `EP-M2`
+onward and the sponsor's review and merge of each pull request remain)
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
 recorded per decision identifier (see `Sponsor decisions`).
@@ -313,10 +313,22 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `proof`), and rejects resource-exhausted and self-reported fixtures with
   their reasons; `PF14.structural@1.1.4` is satisfied by the passing
   `evidence-gate` check and task 1.1.4 is ticked.
-- [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
+- [x] (2026-10-11) `EP-M6` Reconciliation, roadmap closure, and final gates
+  (branch `1-1-reconciliation`, stacked on `EP-M5`). Evidence: D15 accepted and
+  its four details added to tasks 1.2.1, 1.2.3, 1.2.4, and 2.3.1 in the
+  canonical roadmap and re-exported; every decision D01 to D15 is accepted; 73
+  one-way task-to-bet links and one bet-to-task link reconciled, with a two-way
+  check and negative controls (VO-15); repository layout, contents, validation,
+  and developers' guide updated (module ownership, exception renewal, control
+  amendment, report conflicts); full gates pass.
 
 ## Surprises & discoveries
 
+- Observation: the hand-edit drift controls edited "Decision: pending.",
+  which vanished once every decision was accepted, so the edit became a no-op
+  and the control passed vacuously. Evidence: `make design-check` on `EP-M6`
+  failed with "AssertionError not raised". Impact: the controls now edit text
+  that is always generated and assert that the edit changed something.
 - Observation: a synchronize run on #16 received `github.base_ref` = `main`
   although the pull request's base is `1-1-semantic-contracts`, so its freeze
   check compared against `main` and found no frozen registers. Evidence: Design
@@ -410,6 +422,29 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: re-reviews of the review fixes (CodeRabbit CLI) found three minor
+  items, fixed in `EP-M6`: registered workload sources must resolve inside the
+  repository (absolute paths, `..`, and symlinks fail), a test pattern escapes
+  its dots, and a compound assertion is split so each part has its message.
+  Date/Author: 2026-10-11, implementing agent.
+- Decision: second round of milestone reviews (CodeRabbit CLI, `EP-M2` to
+  `EP-M6`, 7 distinct findings). `EP-M3`: SC-09 cited `.axis` (P002) instead of
+  `execute_into` (E010); fixed in the `EP-M3` layer. `EP-M4` and `EP-M5`: fixed
+  in their layers (see their entries). `EP-M2` re-review: the claim that the
+  ledger still records "All tasks remain open" was invalid (the ledger has
+  computed its detail since `EP-M1b`, and the committed report reads "1 of 72
+  tasks ticked"); the package-policy detail was already fixed in `EP-M6`.
+  `EP-M6`: no findings. The stack was restacked from `EP-M3` upward; the plan's
+  decision log was the only conflict, resolved by keeping both entries.
+  Date/Author: 2026-10-11, implementing agent.
+- Decision: `EP-M2` milestone review dispositions (CodeRabbit CLI, three
+  minor findings, all fixed). The terms-of-reference handoff now names the ADRs
+  each candidate subject is assigned rather than claiming ADR-0006 and ADR-0007
+  existed before `EP-M3` (fixed in the `EP-M2` layer and the stack restacked;
+  range-diff showed identical patches above it); the register renders session
+  answers as verbatim blockquotes that keep paragraph breaks; the
+  package-policy result names only the rules it enforced. Fixes to rendering
+  and reporting landed in `EP-M6`. Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M5` milestone review disposition (CodeRabbit CLI):
   `scripts/check_evidence.py` stopped at the first schema-invalid record and
   raised on an unreadable file; it now reports every record, names unreadable
@@ -618,9 +653,52 @@ executable grammar checks to phase 2.
 
 ## Outcomes & retrospective
 
-Not started. Complete at each milestone boundary and at completion, comparing
-the result with `Purpose / big picture` and reconciling every discovery with
-the artefacts in `Conformance basis` before setting the status to `COMPLETE`.
+Outcome against `Purpose / big picture`, item by item:
+
+1. `docs/decision-register.md` is generated from `spec/decisions.json` and
+   lists D01 to D15 as accepted, each with its chosen option, date, quoted
+   session answer, and ADR, plus the eight candidate ADR subjects with their
+   dispositions. Reinserting a retired sentence, writing "Q4 remains open", or
+   deleting a ToR §9 anchor fails `make design-check` and names the decision.
+2. `spec/semantic-contracts.json` holds `SC-01` to `SC-10` with
+   preconditions, success and error relations, empty rules, 51 executable
+   examples, a 28-entry grammar corpus, seeded mutations that each change an
+   outcome, and proof sketches.
+3. `spec/acceptance-controls.json` registers `AC-01` to `AC-07`, four
+   calibrated from recorded measurements extrapolated to the hosted runner
+   class and three labelled not calibrated; a threshold changed together with
+   its digest fails the freeze check without an amendment.
+4. `scripts/check_evidence.py` rejects timeouts, unsatisfied witnesses,
+   misfiring controls, uncovered or unaudited trust, stale bindings, focused
+   runs, self-reported verifier verdicts, and bad exceptions with specific
+   reason codes, and admits complete records at the level they earn.
+5. Tasks 1.1.1 to 1.1.4 are ticked in `docs/roadmap.md`, and the checker
+   confirms each tick is backed by prerequisites, a completion record, accepted
+   decisions, and satisfied obligation components.
+
+Acceptance criteria (`Validation and acceptance`): 1 to 6 are met; criterion 4
+is demonstrated by `tools/tests/test_freeze.py` (control and decision freezes,
+including a temporary Git repository) and by the hosted `Design contracts`
+runs; criterion 6 by `cargo publish --dry-run` refusing to publish.
+
+Deviations and lessons:
+
+- Tolerances. `EP-M1a`, `EP-M3`, `EP-M4`, and `EP-M5` exceeded the
+  per-milestone line or file tolerance, mostly through indented JSON data and
+  required test suites; each overrun is in the decision log and its pull
+  request. The 80-file estimate held only per milestone; the whole step changed
+  well over 100 files across eight pull requests.
+- Red-first order slipped once (`EP-M3` models before tests); its
+  non-vacuity rests on handwritten expectations and seeded mutations.
+- Calibration found that Kani cannot discharge symbolic 64-bit multiplication
+  on the shared host within 900 s; task 1.2.4 should plan Verus for arithmetic
+  and Kani for structure.
+- Hosted CI exposed two environment assumptions the local gates could not:
+  mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
+  `runner`. A stacked synchronize run also reported `main` as its base branch,
+  which led to choosing the freeze base by commit.
+- Remaining: local CodeRabbit CLI reviews of `EP-M2` to `EP-M6`, hosted
+  reviews, and the sponsor's review and merge of #9 to #18 in stack order.
 
 ## Context and orientation
 

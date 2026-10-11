@@ -40,6 +40,18 @@ def check_bets_and_tasks(bets: list[dict], tasks: dict, requirement_ids: set[str
         require(bool(task.get('proof_first')), f'No proof-first contract: {task["id"]}')
         require(bool(task.get('bets')) and set(task['bets']) <= bet_ids,
                 f'Unresolved task bet: {task["id"]}')
+    check_bet_links(bets, tasks)
+
+
+def check_bet_links(bets: list[dict], tasks: dict) -> None:
+    """Require bet and task links to agree both ways; e.g. B08 listing 1.1.4 needs 1.1.4 to cite B08."""
+    for bet in bets:
+        for task_id in bet['tasks']:
+            require(bet['id'] in tasks[task_id]['bets'], f"Bet {bet['id']} lists task {task_id}, which does not cite it")
+    listed = {(bet['id'], task_id) for bet in bets for task_id in bet['tasks']}
+    for task in tasks.values():
+        for bet_id in task['bets']:
+            require((bet_id, task['id']) in listed, f"Task {task['id']} cites bet {bet_id}, which does not list it")
 
 
 def check_obligations(context: ValidationContext, tasks: dict, verification_ids: set[str]) -> list[dict]:

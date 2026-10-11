@@ -1,6 +1,6 @@
 # Combobulate document-pack validation
 
-Revision 0.2. Checked: 6 October 2026. Scope: the Markdown, JSON declarations
+Revision 0.2. Checked: 11 October 2026. Scope: the Markdown, JSON declarations
 and Python documentation models in this pack, not a Combobulate implementation.
 [Machine-readable results](validation-results.json)
 record the executed checks.
@@ -23,10 +23,26 @@ references. This is structural coverage, not evidence that implementation is
 complete or every theorem is proved.
 
 The kernel-contract schema and planned sample validate. Removing mandatory
-validity metadata fails. The scoped proof-evidence schema and planned example
-also validate. Missing success witnesses, a claimed proof without actual
-bindings/results, and unscoped trusted status fail their negative controls.
-Schema validity checks the declaration, not the truth of its contents.
+validity metadata fails. The proof-evidence schema (version 2) and its planned
+example also validate; a missing or empty witness list, a verified outcome for
+nothing run, bounded evidence without bounds, and a log-parser verdict without
+a log fail their negative controls. Schema validity checks the declaration, not
+the truth of its contents.
+
+Governance checks cover the records that control acceptance. The decision
+register validates D01 to D15 and keeps the five governing documents linked to
+it and free of retired or open-status wording for accepted questions. The
+semantic contract register (`SC-01` to `SC-10`) evaluates 51 tagged-scalar
+examples and a 28-entry `comb!` corpus in documentation models, and proves each
+seeded mutation changes an outcome. The acceptance controls (`AC-01` to
+`AC-07`) carry every frozen field, digests that close their amendment chains,
+and host-free calibration records. The evidence gate's reason codes match their
+registry, the exception register satisfies D02, and the package manifest agrees
+with the licence and publication decisions. Roadmap closure accepts a ticked
+task only when its prerequisites, completion record, accepted decisions, and
+obligation components back it; tasks 1.1.1 to 1.1.4 are ticked. With a base
+revision, the freeze check rejects edits to accepted decisions, registered
+controls, and approved exceptions.
 
 A separate small Python documentation model evaluates the original 20 semantic
 cases, including right/left association, empty frames/cells, nulls, broadcasts,

@@ -35,7 +35,7 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 14 of 15 decisions are accepted. Acceptance is not verification.",
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 15 of 15 decisions are accepted. Acceptance is not verification.",
       "count": 15
     },
     {
@@ -113,8 +113,8 @@
     {
       "check": "package-policy",
       "status": "pass",
-      "detail": "Cargo.toml declares the ISC licence (D04) and publish = false (D05) while those decisions stand accepted.",
-      "count": 1
+      "detail": "Cargo.toml satisfies the accepted package decisions: the ISC licence (D04); publish = false (D05).",
+      "count": 2
     },
     {
       "check": "acceptance-controls",

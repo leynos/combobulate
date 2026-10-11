@@ -401,6 +401,45 @@ also describe the Node.js or Bun route with the official Mermaid CLI. Set
 `--no-sandbox`: this disables the Chromium sandbox when using that renderer and
 is inert with `merman-cli`.
 
+## Governance maintenance
+
+The sponsor, `leynos`, owns every governance module below; the right-hand
+column says when each is meant to shrink or go.
+
+| Module                                       | Role                                             | Retirement or hand-over                                  |
+| -------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| `scripts/export_roadmap.py`                  | Canonical roadmap to JSON export and drift check | Replaced when leynos/mapsplice#144 ships a native export |
+| `scripts/generate_decisions.py`              | Decision register rendering                      | Stays                                                    |
+| `scripts/check_evidence.py`                  | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
+| `tools/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
+| `tools/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
+| `tools/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
+| `tools/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
+| `tools/docs_validation/contract_examples.py` | Documentation model of the semantic contracts    | Superseded by `rstest` replay in task 1.2.3              |
+| `tools/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
+| `tools/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
+
+*Table 1: Governance modules, ownership, and retirement.*
+
+To renew an exception before it expires, add a new exception with a new
+identifier, a fresh `approved_on`, an `invalid_from` at most 90 days later, and
+the sponsor's approval reference; point the affected evidence record at it.
+Never edit or delete an approved exception: the freeze check rejects it, and an
+expired one stays as history. The weekly `Design contracts` run surfaces expiry
+on `main` before it reaches an unrelated pull request.
+
+To amend a registered acceptance control, change its frozen fields, compute the
+new digest with `preregistration.frozen_digest`, append an amendment whose
+`replaces` is the previous digest and whose `new_digest` is the new one, with
+the sponsor as `approved_by` and an approval reference, and set `digest` to the
+new value. If any acceptance measurement already exists for the control,
+register a new control identifier instead and keep the original result.
+
+When `docs/validation-results.json` conflicts between stacked branches, take
+either side, rerun the generators and `scripts/export_roadmap.py`, then run
+`python3 tools/check_docs.py --write --as-of <HEAD commit date>` and commit the
+result.
+
 ## Licence and publication
 
 Combobulate is ISC-licensed (decision D04). `Cargo.toml` sets `publish = false`

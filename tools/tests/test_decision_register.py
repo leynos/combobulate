@@ -297,7 +297,8 @@ class RealRegister(unittest.TestCase):
     def test_hand_edited_register_document_fails_the_drift_check(self):
         context = ValidationContext(ROOT)
         text = (ROOT / 'docs/decision-register.md').read_text(encoding='utf-8')
-        edited = text.replace('Decision: pending.', 'Decision: option A.', 1)
+        edited = text.replace('Subject: ', 'Subject: Hand-edited ', 1)
+        self.assertNotEqual(edited, text, 'the control must actually edit the generated region')
         original = Path.read_text
 
         def read_text(path: Path, *args, **kwargs) -> str:

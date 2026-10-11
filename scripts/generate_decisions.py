@@ -68,9 +68,17 @@ def outcome(record: dict) -> str:
     approval = f"[{APPROVAL_NAMES[reference['kind']]}]({reference['url']})"
     text = (f"Decision: option {record['decided_option']}, accepted on {record['accepted_on']} by "
             f"`{record['accepted_by']}` ({approval}).")
-    if 'answer' in reference:
-        text += f" Answer: \"{reference['answer']}\""
     return text
+
+
+def quoted_answer(record: dict) -> str:
+    """Quote a session answer verbatim as a blockquote, keeping its paragraph breaks."""
+    reference = record['approval_reference']
+    if reference is None or 'answer' not in reference:
+        return ''
+    paragraphs = [textwrap.fill(part, 78, initial_indent='> ', subsequent_indent='> ', break_long_words=False,
+                                break_on_hyphens=False) for part in reference['answer'].split('\n\n')]
+    return 'Answer, quoted verbatim:\n\n' + '\n>\n'.join(paragraphs) + '\n\n'
 
 
 def lineage(record: dict) -> str:
@@ -102,6 +110,7 @@ def render_decision(record: dict) -> str:
         'Options:\n\n', options, '\n',
         paragraph(f"Recommendation rationale: {record['rationale']}"),
         paragraph(outcome(record)),
+        quoted_answer(record),
         lineage(record),
         paragraph(f'ADR: {adr}.'),
     ])
