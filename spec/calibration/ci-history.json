@@ -1,0 +1,85 @@
+{
+  "id": "ci-history",
+  "purpose": "calibration",
+  "control_ids": [
+    "AC-07"
+  ],
+  "control_digest": null,
+  "recorded_on": "2026-10-11",
+  "hardware": {
+    "class": "github-hosted-runner",
+    "cpu_model": "unrecorded (standard x64 runner, 4 vCPU)",
+    "cores": 4,
+    "threads": 4,
+    "memory_gib": 16,
+    "os_family": "Ubuntu 24.04",
+    "kernel_major": 6
+  },
+  "toolchains": {
+    "image": "ubuntu-24.04 20261004.327",
+    "python": "3.14 (actions/setup-python)"
+  },
+  "conditions": "Hosted ubuntu-latest (ubuntu-24.04) runners; runs before 2026-10-11 01:00 UTC.",
+  "workloads": [
+    {
+      "id": "ci-build-test",
+      "description": "CI build-test job, last 20 successful runs",
+      "command": "gh run list --workflow ci.yml; gh api .../jobs",
+      "metric": "job wall time excluding queue",
+      "unit": "s",
+      "samples": [
+        241.0,
+        215.0,
+        208.0,
+        192.0,
+        162.0,
+        204.0,
+        212.0,
+        157.0,
+        208.0,
+        169.0,
+        194.0,
+        178.0,
+        187.0,
+        173.0,
+        224.0,
+        176.0,
+        180.0,
+        219.0,
+        179.0,
+        189.0
+      ],
+      "median": 190.5
+    },
+    {
+      "id": "design-check",
+      "description": "Design contracts design-check job, last 20 successful runs",
+      "command": "gh run list --workflow design.yml; gh api .../jobs",
+      "metric": "job wall time excluding queue",
+      "unit": "s",
+      "samples": [
+        66.0,
+        56.0,
+        61.0,
+        41.0,
+        50.0,
+        47.0,
+        51.0,
+        51.0,
+        53.0,
+        47.0,
+        37.0,
+        31.0,
+        31.0,
+        30.0,
+        42.0,
+        43.0,
+        42.0,
+        40.0,
+        33.0,
+        42.0
+      ],
+      "median": 42.5
+    }
+  ]
+}

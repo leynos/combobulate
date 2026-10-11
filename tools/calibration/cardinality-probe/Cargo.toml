@@ -1,0 +1,22 @@
+# Calibration probe for acceptance-control thresholds (ExecPlan EP-M4, decision D12).
+# Not the shipped kernel: task 1.2.4 owns the real cardinality kernel. This crate is
+# deliberately outside the repository package and workspace; its target/ is ignored.
+[package]
+name = "cardinality-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "ISC"
+
+[workspace]
+
+[features]
+# Provisional Polars version that task 1.2.1 is expected to pin; used only to
+# measure a Polars-enabled build profile.
+polars = ["dep:polars"]
+
+[dependencies]
+polars = { version = "0.55.2", optional = true, default-features = false, features = ["lazy"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

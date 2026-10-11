@@ -40,6 +40,23 @@
         "spec/macro-grammar.json",
         "spec/examples.json"
       ]
+    },
+    {
+      "task": "1.1.3",
+      "decisions": [
+        "D11",
+        "D12"
+      ],
+      "artefacts": [
+        "docs/adrs/adr-0008-acceptance-control-pre-registration.md",
+        "docs/acceptance-calibration.md",
+        "spec/acceptance-controls.json",
+        "spec/acceptance-controls.schema.json",
+        "spec/measurement-record.schema.json",
+        "spec/calibration/verifier-probe.json",
+        "spec/calibration/builds.json",
+        "spec/calibration/ci-history.json"
+      ]
     }
   ]
 }

@@ -1,0 +1,187 @@
+{
+  "id": "verifier-probe",
+  "purpose": "calibration",
+  "control_ids": [
+    "AC-01",
+    "AC-02"
+  ],
+  "control_digest": null,
+  "recorded_on": "2026-10-11",
+  "hardware": {
+    "class": "shared-development-host",
+    "cpu_model": "AMD Ryzen 9 3900 12-Core Processor",
+    "cores": 12,
+    "threads": 24,
+    "memory_gib": 125,
+    "os_family": "Rocky Linux 10",
+    "kernel_major": 6
+  },
+  "toolchains": {
+    "rustc": "1.100.0-nightly (bff8e12ff 2026-08-26), channel nightly-2026-08-27, Cranelift dev backend",
+    "verus": "0.2026.09.06.8dea4a2 (release profile; Rust 1.98.0)",
+    "z3": "4.16.0",
+    "kani": "0.67.0 (CBMC with CaDiCaL)",
+    "python": "3.14.7",
+    "polars": "0.55.2 (provisional; lazy feature)"
+  },
+  "conditions": "Shared host; verifiers run single-threaded per harness; compile admission applies to Kani builds.",
+  "workloads": [
+    {
+      "id": "verus-wall",
+      "description": "Verus on tools/calibration/cardinality-probe/verus/cardinality.rs (8 functions verified)",
+      "command": "verus cardinality.rs --num-threads 4 --time-expanded --output-json",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        1.839,
+        1.56,
+        1.772,
+        1.643,
+        1.53
+      ],
+      "median": 1.643
+    },
+    {
+      "id": "verus-rlimit-max-function",
+      "description": "Largest per-function SMT rlimit (checked_cardinality); identical in every run",
+      "command": "verus --output-json, times-ms.smt function-breakdown",
+      "metric": "rlimit",
+      "unit": "rlimit units",
+      "samples": [
+        146824,
+        146824,
+        146824,
+        146824,
+        146824
+      ],
+      "median": 146824
+    },
+    {
+      "id": "verus-rlimit-total",
+      "description": "Total SMT rlimit for the crate",
+      "command": "verus --output-json, times-ms.smt.rlimit-run",
+      "metric": "rlimit",
+      "unit": "rlimit units",
+      "samples": [
+        210066,
+        210066,
+        210066,
+        210066,
+        210066
+      ],
+      "median": 210066
+    },
+    {
+      "id": "verus-memory-peak",
+      "description": "Process-tree peak memory (systemd-run --user scope, cgroup v2 memory.peak)",
+      "command": "systemd-run --user --wait --pipe verus ...",
+      "metric": "peak memory",
+      "unit": "MiB",
+      "samples": [
+        201.8,
+        201.6,
+        201.8,
+        203.3,
+        201.5
+      ],
+      "median": 201.8
+    },
+    {
+      "id": "verus-seeded-mutant",
+      "description": "Mutant returning Some(1) for a zero extent",
+      "command": "verus mutant.rs",
+      "metric": "verification result",
+      "unit": "outcome",
+      "samples": [
+        "1 error: postcondition not satisfied"
+      ],
+      "median": "1 error: postcondition not satisfied"
+    },
+    {
+      "id": "kani-scalar_has_cardinality_one-time",
+      "description": "Kani harness scalar_has_cardinality_one",
+      "command": "cargo kani --harness verification::scalar_has_cardinality_one",
+      "metric": "verification time reported by Kani",
+      "unit": "s",
+      "samples": [
+        0.206,
+        0.218,
+        0.277,
+        0.316,
+        0.298
+      ],
+      "median": 0.277,
+      "notes": "1 of 1 cover properties satisfied in every run."
+    },
+    {
+      "id": "kani-zero_extent_short_circuits-time",
+      "description": "Kani harness zero_extent_short_circuits",
+      "command": "cargo kani --harness verification::zero_extent_short_circuits",
+      "metric": "verification time reported by Kani",
+      "unit": "s",
+      "samples": [
+        1.28,
+        0.866,
+        1.176,
+        0.779,
+        1.014
+      ],
+      "median": 1.014,
+      "notes": "1 of 1 cover properties satisfied in every run."
+    },
+    {
+      "id": "kani-scalar_has_cardinality_one-memory",
+      "description": "Kani harness scalar_has_cardinality_one, process-tree peak memory",
+      "command": "systemd-run --user --wait --pipe cargo kani --harness verification::scalar_has_cardinality_one",
+      "metric": "peak memory",
+      "unit": "MiB",
+      "samples": [
+        34.7,
+        24.8,
+        25.1,
+        24.8,
+        24.8
+      ],
+      "median": 24.8
+    },
+    {
+      "id": "kani-zero_extent_short_circuits-memory",
+      "description": "Kani harness zero_extent_short_circuits, process-tree peak memory",
+      "command": "systemd-run --user --wait --pipe cargo kani --harness verification::zero_extent_short_circuits",
+      "metric": "peak memory",
+      "unit": "MiB",
+      "samples": [
+        53.6,
+        53.8,
+        53.7,
+        54.0,
+        53.7
+      ],
+      "median": 53.7
+    },
+    {
+      "id": "kani-full-width-product",
+      "description": "Kani harness asserting the exact product over three symbolic full-width usize extents (removed from the probe)",
+      "command": "cargo kani --harness verification::cardinality_matches_wide_product",
+      "metric": "outcome",
+      "unit": "outcome",
+      "samples": [
+        "CBMC stopped after 900 s without a verdict (resource-exhausted)"
+      ],
+      "median": "CBMC stopped after 900 s without a verdict (resource-exhausted)",
+      "notes": "Load average about 20 to 40 on 24 threads."
+    },
+    {
+      "id": "kani-product-below-2-16",
+      "description": "Kani harness asserting the exact product over three symbolic extents below 2^16 (removed from the probe)",
+      "command": "cargo kani --harness verification::cardinality_matches_product_below_two_to_the_16",
+      "metric": "outcome",
+      "unit": "outcome",
+      "samples": [
+        "CBMC stopped after 18 min 46 s (18 min 27 s CPU, peak 154.5 MiB) without a verdict (resource-exhausted)"
+      ],
+      "median": "CBMC stopped after 18 min 46 s (18 min 27 s CPU, peak 154.5 MiB) without a verdict (resource-exhausted)",
+      "notes": "Symbolic 64-bit multiplication bit-blasts to large circuits even under tight bounds."
+    }
+  ]
+}

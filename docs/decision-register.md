@@ -293,7 +293,7 @@ Subject: Acceptance measurement environments.
 
 Terms-of-reference questions: Q2. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -307,9 +307,12 @@ Options:
 Recommendation rationale: The hosted paired design needs no dedicated hardware
 and controls drift by interleaving.
 
-Decision: pending.
+Decision: option B, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted, although for local development boxes you'll have to take
+what you're given. Don't leak hostnames into the source documentation."
 
-ADR: none yet.
+ADR: [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md).
 
 ### D12
 
@@ -317,7 +320,7 @@ Subject: Acceptance thresholds and statistics.
 
 Terms-of-reference questions: Q2. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -330,9 +333,13 @@ Options:
 Recommendation rationale: Thresholds govern acceptance, so the planning agent
 did not choose them itself.
 
-Decision: pending.
+Decision: option B, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Make realistic measurements on the current machine and extrapolate to
+a GitHub runner specced above. I'll trust your judgement here, just bring
+reasonable evidence."
 
-ADR: none yet.
+ADR: [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md).
 
 ### D13
 

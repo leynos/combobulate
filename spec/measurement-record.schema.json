@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:combobulate:design:measurement-record:0.2",
+  "title": "Combobulate calibration or acceptance measurement record",
+  "description": "Hardware is described by class only (decision D11): no host names, user names, or paths outside the repository.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "purpose", "control_ids", "control_digest", "recorded_on", "hardware", "toolchains", "workloads"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "purpose": {"enum": ["calibration", "acceptance"]},
+    "control_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^AC-[0-9]{2}$"}},
+    "control_digest": {"oneOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"type": "null"}]},
+    "recorded_on": {"type": "string", "format": "date"},
+    "outcome": {"enum": ["pass", "fail", "budget-exceeded", "resource-exhausted", "inconclusive", "missing"]},
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "cpu_model", "cores", "threads", "memory_gib", "os_family", "kernel_major"],
+      "properties": {
+        "class": {"enum": ["shared-development-host", "github-hosted-runner"]},
+        "cpu_model": {"type": "string", "minLength": 1},
+        "cores": {"type": "integer", "minimum": 1},
+        "threads": {"type": "integer", "minimum": 1},
+        "memory_gib": {"type": "integer", "minimum": 1},
+        "os_family": {"type": "string", "minLength": 1},
+        "kernel_major": {"type": "integer", "minimum": 1}
+      }
+    },
+    "toolchains": {"type": "object", "additionalProperties": {"type": "string"}},
+    "conditions": {"type": "string"},
+    "workloads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "command", "metric", "unit", "samples", "median"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1},
+          "command": {"type": "string", "minLength": 1},
+          "metric": {"type": "string", "minLength": 1},
+          "unit": {"type": "string", "minLength": 1},
+          "samples": {"type": "array", "minItems": 1, "items": {"type": ["number", "string"]}},
+          "median": {"type": ["number", "string"]},
+          "notes": {"type": "string"}
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"purpose": {"const": "acceptance"}}},
+      "then": {"required": ["outcome"], "properties": {"control_digest": {"type": "string"}}},
+      "else": {"not": {"required": ["outcome"]}}
+    }
+  ]
+}

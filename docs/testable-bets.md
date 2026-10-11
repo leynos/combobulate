@@ -8,9 +8,9 @@ register records how the proposed mechanisms can be falsified.
 `spec/bets.json` is the machine-readable master. Each bet names a positive
 witness, a deliberate defect, a falsifier and a response. Categorical
 correctness criteria apply now; performance, proof-runtime and build-cost
-thresholds must be pre-registered under ToR Q2 before acceptance measurements.
-No benchmark result or verification success is implied by a completed design
-document.
+thresholds are pre-registered as controls `AC-01` to `AC-07` in
+`spec/acceptance-controls.json` before any acceptance measurement. No benchmark
+result or verification success is implied by a completed design document.
 
 B01-B05 and the applicable B07/B08 claims require passing evidence for the
 advertised release scope. B06 concerns optional upstream hooks: a supported,
@@ -43,9 +43,9 @@ before stabilization; do not abandon the proof-first requirement or hide a
 duplicate checker.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R8, R10. Tasks: 1.1.4, 1.2.4, 1.2.5, 4.3.3.
 
@@ -72,9 +72,9 @@ Decision rule: Revise public contracts/views and preserve production bindings
 before stabilizing them; record unsupported advanced properties explicitly.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R3, R9. Tasks: 1.2.5, 2.1.4, 2.3.5, 3.2.4, 3.4.1, 5.1.4, 5.3.4,
 6.1.3.
@@ -102,9 +102,9 @@ Decision rule: Reduce static expression/shape scope and retain explicit runtime
 admission; strict certification fails closed without changing comb! ergonomics.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R4, R10. Tasks: 2.4.1, 2.4.2, 2.4.3.
 
@@ -133,9 +133,9 @@ narrow certificates to tracked resources and list external assumptions instead
 of promising process RSS.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R4, R8, R10. Tasks: 2.4.2, 3.3.3, 4.2.5, 4.3.1.
 
@@ -161,9 +161,9 @@ route; keep strict policy failures visible and do not infer support from Python
 versioning.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R5, R11. Tasks: 1.2.6, 4.1.3, 4.2.5, 4.3.2.
 
@@ -190,9 +190,9 @@ Decision rule: Decline that optional hook while retaining the semantic port and
 first-class Polars baseline; capability availability is not a mandate to use it.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R5, R11. Tasks: 1.2.6, 4.2.4, 4.3.3.
 
@@ -221,9 +221,9 @@ route; record continue/revise/decline for trasic separately from proof SDK
 acceptance.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R6, R9. Tasks: 5.1.4, 5.3.4, 6.1.3, 6.2.4, 6.3.4.
 
@@ -252,9 +252,9 @@ profiles; no compatibility shim is required for obsolete unreleased APIs, but
 released proof contracts get deliberate versioning.
 
 Measurement: Record workload, compiler/verifier/backend revisions,
-target/features, assumptions, and cost against ToR Q2 controls agreed before
-execution. Correctness gates are categorical; empirical thresholds remain
-unapproved until recorded.
+target/features, assumptions, and cost against the pre-registered acceptance
+controls (spec/acceptance-controls.json). Correctness gates are categorical;
+empirical thresholds are the registered controls.
 
 Requirements: R7, R8, R9, R11. Tasks: 1.1.4, 3.4.1, 4.3.3, 6.2.4.
 

@@ -1,0 +1,124 @@
+{
+  "id": "builds",
+  "purpose": "calibration",
+  "control_ids": [
+    "AC-03",
+    "AC-04"
+  ],
+  "control_digest": null,
+  "recorded_on": "2026-10-11",
+  "hardware": {
+    "class": "shared-development-host",
+    "cpu_model": "AMD Ryzen 9 3900 12-Core Processor",
+    "cores": 12,
+    "threads": 24,
+    "memory_gib": 125,
+    "os_family": "Rocky Linux 10",
+    "kernel_major": 6
+  },
+  "toolchains": {
+    "rustc": "1.100.0-nightly (bff8e12ff 2026-08-26), channel nightly-2026-08-27, Cranelift dev backend",
+    "verus": "0.2026.09.06.8dea4a2 (release profile; Rust 1.98.0)",
+    "z3": "4.16.0",
+    "kani": "0.67.0 (CBMC with CaDiCaL)",
+    "python": "3.14.7",
+    "polars": "0.55.2 (provisional; lazy feature)"
+  },
+  "conditions": "Shared host with a shared compile-admission queue; parallelism pinned to 4 jobs; sccache unavailable, so every compilation was uncached.",
+  "workloads": [
+    {
+      "id": "native-cold",
+      "description": "Cold build: repository package, native-only dev profile",
+      "command": "CARGO_BUILD_JOBS=4 cargo build",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        2.21,
+        1.95,
+        2.02,
+        2.21,
+        1.96
+      ],
+      "median": 2.02,
+      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+    },
+    {
+      "id": "native-incremental",
+      "description": "Incremental build: repository package, native-only dev profile",
+      "command": "CARGO_BUILD_JOBS=4 cargo build",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        0.39,
+        0.36,
+        0.48,
+        0.42,
+        0.41
+      ],
+      "median": 0.41,
+      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+    },
+    {
+      "id": "proof-cold",
+      "description": "Cold build: calibration probe, Kani codegen (proof-capable profile)",
+      "command": "CARGO_BUILD_JOBS=4 cargo kani --only-codegen",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        4.23,
+        4.08,
+        3.72,
+        3.58,
+        12.8
+      ],
+      "median": 4.08,
+      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+    },
+    {
+      "id": "proof-incremental",
+      "description": "Incremental build: calibration probe, Kani codegen (proof-capable profile)",
+      "command": "CARGO_BUILD_JOBS=4 cargo kani --only-codegen",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        19.02,
+        4.18,
+        3.5,
+        3.32,
+        4.65
+      ],
+      "median": 4.18,
+      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+    },
+    {
+      "id": "polars-cold",
+      "description": "Cold build: calibration probe with --features polars (Polars 0.55.2, lazy)",
+      "command": "CARGO_BUILD_JOBS=4 cargo build --features polars",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        381.84,
+        231.47,
+        163.21
+      ],
+      "median": 231.47,
+      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+    },
+    {
+      "id": "polars-incremental",
+      "description": "Incremental build: calibration probe with --features polars (Polars 0.55.2, lazy)",
+      "command": "CARGO_BUILD_JOBS=4 cargo build --features polars",
+      "metric": "wall time",
+      "unit": "s",
+      "samples": [
+        0.47,
+        0.48,
+        0.96,
+        0.48,
+        0.52
+      ],
+      "median": 0.48,
+      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+    }
+  ]
+}
