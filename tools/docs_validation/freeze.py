@@ -9,8 +9,8 @@ with the head's own claims. CI passes the merge base; without a base revision
 the check does not run and says so.
 
 `FROZEN_DOCUMENTS` lists the registers compared. Each governance register
-joins it in the commit that creates the register: decisions and acceptance
-controls (with their amendment chain) now; exceptions when they are added.
+joins it in the commit that creates the register: decisions, acceptance
+controls (with their amendment chain), and exceptions.
 """
 from __future__ import annotations
 
@@ -66,9 +66,18 @@ def check_controls_frozen(base: dict, head: dict) -> None:
                     f"{control['digest'][:12]}")
 
 
+def check_exceptions_frozen(base: dict, head: dict) -> None:
+    """Forbid altering or deleting an approved exception; a change is a new exception."""
+    head_entries = {entry['id']: entry for entry in head['exceptions']}
+    for entry in base['exceptions']:
+        require(head_entries.get(entry['id']) == entry,
+                f"Approved exception {entry['id']} was altered or deleted; add a replacement instead")
+
+
 FROZEN_DOCUMENTS: Mapping[str, Callable[[dict, dict], None]] = {
     'spec/decisions.json': check_decisions_frozen,
     'spec/acceptance-controls.json': check_controls_frozen,
+    'spec/exceptions.json': check_exceptions_frozen,
 }
 
 

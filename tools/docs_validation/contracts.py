@@ -153,23 +153,40 @@ def check_revision_contracts(context: ValidationContext) -> None:
 
 
 def check_proof_evidence_envelope(context: ValidationContext) -> None:
-    """Validate planned evidence; proof claims without witnesses must fail."""
+    """Validate the planned record against schema version 2; records breaking the validity predicate fail."""
     import copy
     schema = context.load('spec/proof-evidence.schema.json')
     Draft202012Validator.check_schema(schema)
-    validator = Draft202012Validator(schema)
+    validator = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
     example = context.load('spec/proof-evidence.example.json')
     validator.validate(example)
-    mutations = []
-    missing = copy.deepcopy(example)
-    missing.pop('success_witness')
-    mutations.append(missing)
-    unsupported_claim = copy.deepcopy(example)
-    unsupported_claim['status'] = 'proved'
-    mutations.append(unsupported_claim)
-    missing_trust = copy.deepcopy(example)
-    missing_trust['status'] = 'trusted'
-    mutations.append(missing_trust)
+
+    def mutant(**changes: object) -> dict:
+        record = copy.deepcopy(example)
+        for path, value in changes.items():
+            target = record
+            *parents, leaf = path.split('__')
+            for parent in parents:
+                target = target[parent]
+            if value is KeyError:
+                del target[leaf]
+            else:
+                target[leaf] = value
+        return record
+
+    mutations = [
+        mutant(success_witnesses=KeyError),
+        mutant(success_witnesses=[]),
+        mutant(outcome='verified'),
+        mutant(evidence_kind='deductive'),
+        mutant(evidence_kind='bounded', outcome='verified'),
+        mutant(verdict_source__kind='log-parser'),
+        mutant(status='proved'),
+    ]
     for mutation in mutations:
         require(not validator.is_valid(mutation), 'Invalid proof-evidence mutation accepted')
-    context.record('proof-evidence-envelope', 'The planned record validates; missing witness, proof status without actual bindings/results, and unscoped trust mutations fail. Schema validity does not establish a proposition.', len(mutations))
+    context.record('proof-evidence-envelope', 'The planned record validates against schema version 2; a missing or empty '
+                                              'witness list, a verified outcome for nothing run, an executed kind with '
+                                              'no run, bounded evidence without bounds, a log-parser verdict without a '
+                                              'log, and the retired status field all fail. Schema validity does not '
+                                              'establish a proposition.', len(mutations))

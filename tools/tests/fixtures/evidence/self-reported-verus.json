@@ -1,0 +1,61 @@
+{
+  "schema_version": 2,
+  "id": "EV-0104",
+  "component": "PF01.proof@2.1.1",
+  "claim": "Checked cardinality meets its specification.",
+  "recorded_on": "2026-10-11",
+  "evidence_kind": "deductive",
+  "outcome": "verified",
+  "outcome_detail": "Fixture.",
+  "bounds": {
+    "kind": "not-applicable",
+    "statement": "All values of the input types."
+  },
+  "binding": {
+    "executable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "specification_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "target": "x86_64-unknown-linux-gnu",
+    "features": [],
+    "semantic_policy": "checked shape/cost arithmetic",
+    "backend_profile": null,
+    "implementation_relation": "Must bind to the shipped analyser; no implementation exists in this pack."
+  },
+  "method": {
+    "tool": "verus",
+    "version": "fixture",
+    "solver": null,
+    "solver_version": null,
+    "command": "verus fixture",
+    "run_mode": "full-profile"
+  },
+  "declared_assumptions": [
+    "Pinned compiler, verifier and solver soundness.",
+    "External kernel cost contracts remain explicit assumptions until justified or enforced."
+  ],
+  "trust_audit": {
+    "status": "audited",
+    "items": []
+  },
+  "success_witnesses": [
+    {
+      "id": "cover-nontrivial",
+      "description": "A nontrivial product is reachable.",
+      "status": "satisfied"
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "zero-first-removed",
+      "required": true,
+      "expected_failure": "Fails when the zero check is removed.",
+      "observed": "rejected-as-intended"
+    }
+  ],
+  "verdict_source": {
+    "kind": "self-reported",
+    "log": null
+  },
+  "exception": null,
+  "result_artefacts": []
+}

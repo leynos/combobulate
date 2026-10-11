@@ -25,6 +25,9 @@ implemented API or completed verification.
   implementation/verifier obligations.
 - [Acceptance calibration](acceptance-calibration.md): measurements and
   extrapolation behind the pre-registered acceptance-control thresholds.
+- [Evidence and decision records](evidence-and-decision-records.md): schemas,
+  admission levels, reason codes, and producer obligations for governance
+  records.
 - [Decision register](decision-register.md): decisions that control
   acceptance, their authority, options, approval references, and ADRs.
 - [ADR-0001: repository bootstrap](adrs/adr-0001-repository-bootstrap.md):

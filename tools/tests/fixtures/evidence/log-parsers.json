@@ -1,0 +1,7 @@
+{
+  "description": "Test-only parser registry: pretends a Kani log parser exists so the bounded level is reachable in tests. The repository registry, spec/evidence-reason-codes.json, registers none.",
+  "registered_log_parsers": [
+    "kani",
+    "proptest"
+  ]
+}

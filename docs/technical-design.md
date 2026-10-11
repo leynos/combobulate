@@ -900,17 +900,17 @@ earn its custom layer through reusable rank composition, domain diagnostics,
 and collection coordination, not through an unsupported claim that alternatives
 cannot perform the calculations.
 
-| Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                     |
-| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                               |
-| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); no acceptance measurement exists yet.                        |
-| GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                   |
-| GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Foundational probe and Q3 before publishing manifests or claiming stable compilation.                                                                                                 |
-| GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3.                                                                                |
-| GAP6 | R1-R11      | GitHub publication destination unresolved.                                                                        | Q6; provide repository-ready files without creating unrelated remote records.                                                                                                         |
-| GAP7 | R8-R10      | Shared const/runtime/verifier subset and public proof dependencies untested.                                      | B01/B02 and tasks 1.2.4-1.2.5; narrow representation or certified subset without substituting an unproved body.                                                                       |
-| GAP8 | R11         | Polars 2-era Rust hooks, streaming/spill controls and benefit untested; final release/upgrade refresh incomplete. | PC probes, B05/B06 and task 1.2.6; document capabilities and refusal scope before eligibility.                                                                                        |
-| GAP9 | R8-R9       | Specification-compatibility evidence and the proof-first evidence gate.                                           | Authority (D01), exception policy (D02), and proof-interface policy (D06) are accepted; Q9 and task 1.1.4 remain. Exceptions cannot count as proof or remove ordinary runtime safety. |
+| Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                                                                                                          |
+| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                                                                                                                    |
+| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); no acceptance measurement exists yet.                                                                                                             |
+| GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                                                                                                        |
+| GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Foundational probe and Q3 before publishing manifests or claiming stable compilation.                                                                                                                                                                                      |
+| GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3.                                                                                                                                                                     |
+| GAP6 | R1-R11      | GitHub publication destination unresolved.                                                                        | Q6; provide repository-ready files without creating unrelated remote records.                                                                                                                                                                                              |
+| GAP7 | R8-R10      | Shared const/runtime/verifier subset and public proof dependencies untested.                                      | B01/B02 and tasks 1.2.4-1.2.5; narrow representation or certified subset without substituting an unproved body.                                                                                                                                                            |
+| GAP8 | R11         | Polars 2-era Rust hooks, streaming/spill controls and benefit untested; final release/upgrade refresh incomplete. | PC probes, B05/B06 and task 1.2.6; document capabilities and refusal scope before eligibility.                                                                                                                                                                             |
+| GAP9 | R8-R9       | Specification-compatibility evidence and the proof-first evidence gate.                                           | Authority (D01), exception policy (D02), proof-interface policy (D06), and the evidence gate ([ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md), task 1.1.4) are in place; Q9 remains. Exceptions cannot count as proof or remove ordinary runtime safety. |
 
 Candidate ADRs cover numerical/array semantics, macro staging and stable-Rust
 application, backend/cell separation, initial feature/release scope, the shared
@@ -977,7 +977,9 @@ implementing task, not a late project-wide proving phase.
 
 A verifier timeout, unsupported feature, failed unwinding assertion, skipped
 harness, unsatisfied bound, or empty generator is inconclusive or failed
-evidence. It is never success. A Kani bound describes the admitted proof
+evidence. It is never success: the evidence gate
+([ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md)) rejects
+each with its own reason code. A Kani bound describes the admitted proof
 domain, not an implementation limit unless the API enforces that limit.
 Harnesses keep unwinding checks and report their bounds [E-KANI-UNWIND]. A
 large symbolic extent can exercise checked arithmetic without allocating an
@@ -991,24 +993,31 @@ obligations hold. Unverified external kernels may remain available through
 explicitly weaker contracts. Required core proofs cannot disappear into an
 unrestricted exception list. The release decision must inspect outstanding
 exceptions and either resolve them or approve a truthful scope revision without
-dropping C-11.
+dropping C-11. Exceptions follow D02 and live in `spec/exceptions.json`; an
+active exception admits a record only at `restricted`, which satisfies no
+proof-obligation component.
 
 ### 17.2. Obligations, evidence, and the trusted basis
 
 [The proof-obligation ledger](../spec/proof-obligations.json) defines
 PF01-PF14, links them to V1-V20 and implementing tasks, and records tool
-selection, non-vacuity controls, and scope. All entries remain planned. The
-existing scalar reference evaluator, Miri/audit work, fault injection, and
-backend conformance remain necessary; formal verification complements rather
-than renames them.
+selection, non-vacuity controls, and scope. Each obligation lists one component
+per implementing task (`PFnn.<method>@<task>`) with the admission levels it
+accepts; only `PF14.structural@1.1.4` is satisfied, by the `evidence-gate`
+design check. Every obligation itself remains planned. The existing scalar
+reference evaluator, Miri/audit work, fault injection, and backend conformance
+remain necessary; formal verification complements rather than renames them.
 
-The [proof-evidence schema](../spec/proof-evidence.schema.json) separates
-planned, proved, bounded-checked, tested, trusted, failed, and inconclusive
-records. A record identifies the proposition, executable and specification
-bindings, source revision, tool/solver versions, command, target/features,
-numerical policy, backend profile, bounds, assumptions, termination scope,
-positive witness, negative control, and result artefacts. A schema-valid record
-establishes only that these fields exist. It does not establish the proposition.
+The [proof-evidence schema](../spec/proof-evidence.schema.json), version 2,
+separates the evidence kind (deductive, bounded, test, trust declaration, or
+none) from the outcome, and the evidence gate admits each record at `proof`,
+`bounded`, `tested`, `restricted`, or `rejected`
+([evidence and decision records](evidence-and-decision-records.md)). A record
+identifies the proposition, executable and specification bindings, source
+revision, tool/solver versions, command, target/features, numerical policy,
+backend profile, bounds, assumptions, termination scope, positive witness,
+negative control, and result artefacts. A schema-valid record establishes only
+that these fields exist. It does not establish the proposition.
 
 Public claims distinguish successful-result correctness from success
 conditions. An implementation that always returns `Err` must fail a success

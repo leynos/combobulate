@@ -504,6 +504,14 @@ evidence gate admits a proof-evidence record for it. A task that meets every
 condition but is not ticked is reported, not failed, so ticking stays a
 deliberate act.
 
+Proof evidence for a record-sourced component goes in `spec/evidence/` as a
+schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
+before committing, and see
+[evidence and decision records](evidence-and-decision-records.md) for the
+fields, levels, reason codes, and log-parser obligations. Until a log parser is
+registered for a verifier, its records are self-reported and cannot satisfy a
+`proof` or `bounded` component.
+
 Accepted decisions are frozen. `make design-check BASE_REV=<revision>` compares
 `spec/decisions.json` with that revision and rejects an accepted record that
 was deleted or edited other than by becoming superseded; recomputing a stored
