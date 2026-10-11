@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
+from docs_validation.evidence_gate import Admission, Level
 from check_docs import collect_checks
 from docs_validation.roadmap_status import (
     ClosureInputs, artefact_resolver, closure_failures, index_completions, index_components, task_closure,
@@ -102,7 +103,7 @@ class TaskClosure(unittest.TestCase):
     def test_record_sourced_component_fails_closed(self):
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components)
-        self.assert_rejected(closure, 'component PF14.proof@1.1.1 has no admitted evidence record')
+        self.assert_rejected(closure, 'component PF14.proof@1.1.1 has no evidence record')
 
     def test_checker_component_needs_its_check_to_pass_in_this_run(self):
         components = {'1.1.1': [component('PF14.structural@1.1.1', 'checker:evidence-gate')]}
@@ -110,6 +111,24 @@ class TaskClosure(unittest.TestCase):
                          'a passing evidence-gate check satisfies the structural component')
         closure = inputs(ticked(chain(), '1.1.1'), components=components, passed_checks=frozenset())
         self.assert_rejected(closure, 'component PF14.structural@1.1.1 needs check evidence-gate to pass')
+
+    def test_admitted_record_satisfies_and_a_counterexample_reopens(self):
+        components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
+        verified = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
+        evidence = {'PF14.proof@1.1.1': [(Admission(Level.PROOF, ()), verified)]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
+        self.assertEqual(task_closure(closure)[0], ['1.1.1'], 'an admitted proof record satisfies the component')
+        counterexample = {'recorded_on': '2026-10-09', 'outcome': 'counterexample', 'binding': {'source_revision': 'r1'}}
+        evidence['PF14.proof@1.1.1'].append((Admission(Level.REJECTED, ('outcome-counterexample',)), counterexample))
+        self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
+                             'has a counterexample at source revision r1')
+
+    def test_record_below_the_accepted_level_fails(self):
+        components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
+        bounded = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
+        evidence = {'PF14.proof@1.1.1': [(Admission(Level.BOUNDED, ()), bounded)]}
+        self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
+                             'evidence is bounded')
 
     def test_supported_but_unticked_task_is_reported_not_failed(self):
         ticks, eligible = task_closure(inputs(ticked(chain(), '1.1.1')))

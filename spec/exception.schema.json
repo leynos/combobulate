@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:combobulate:design:exceptions:0.2",
+  "title": "Combobulate trusted-boundary exception register",
+  "description": "Exceptions under decision D02. Content rules (lifetime, approver, owner, narrowed claim, release gate) are checked by tools/docs_validation/exceptions.py so each problem has its own reason.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revision", "exceptions"],
+  "properties": {
+    "revision": {"const": "0.2"},
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "component", "owner", "approved_by", "approval_reference", "approved_on", "invalid_from",
+          "narrowed_claim", "release_gate", "reason"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^EXC-[0-9]{4}$"},
+          "component": {"type": "string", "pattern": "^PF[0-9]{2}\\.[a-z][a-z0-9-]*@[0-9]+\\.[0-9]+\\.[0-9]+$"},
+          "owner": {"type": "string"},
+          "approved_by": {"type": "string"},
+          "approval_reference": {"type": "string", "pattern": "^https://"},
+          "approved_on": {"type": "string", "format": "date"},
+          "invalid_from": {"type": "string", "format": "date"},
+          "narrowed_claim": {"type": "string"},
+          "release_gate": {"enum": ["4.3.3", "6.3.4"]},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

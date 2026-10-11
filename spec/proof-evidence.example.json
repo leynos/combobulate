@@ -1,35 +1,61 @@
 {
-  "revision": "0.2",
-  "claim_id": "PF09",
+  "schema_version": 2,
+  "id": "EV-0001",
+  "component": "PF09.proof@2.4.1",
   "claim": "The shared analyser never understates the abstract quantity it claims to bound; static/preparation/runtime evaluations agree for equal facts and target profiles.",
-  "status": "planned",
+  "recorded_on": "2026-10-11",
+  "evidence_kind": "none",
+  "outcome": "not-run",
+  "outcome_detail": "Planned evidence: no analyser exists yet.",
+  "bounds": {
+    "kind": "not-applicable",
+    "statement": "Conservative cost bounds in the declared abstract tracked-resource model."
+  },
   "binding": {
-    "executable": null,
-    "specification": null,
+    "executable_digest": null,
+    "specification_digest": null,
     "source_revision": null,
     "target": null,
     "features": [],
     "semantic_policy": "checked shape/cost arithmetic",
-    "backend_profile": null
-  },
-  "method": {
-    "tool": "Verus and Kani",
-    "version": null,
-    "solver": null,
-    "command": null
-  },
-  "scope": {
-    "statement": "Conservative cost bounds in the declared abstract tracked-resource model.",
-    "bounds": null,
-    "termination": "Prove analyser termination within configured expression size; no claim of termination of arbitrary native callbacks.",
+    "backend_profile": null,
     "implementation_relation": "Must bind to the shipped analyser; no implementation exists in this pack."
   },
-  "assumptions": [
+  "method": {
+    "tool": "Verus",
+    "version": null,
+    "solver": null,
+    "solver_version": null,
+    "command": null,
+    "run_mode": "full-profile"
+  },
+  "declared_assumptions": [
     "Pinned compiler, verifier and solver soundness.",
     "External kernel cost contracts remain explicit assumptions until justified or enforced."
   ],
-  "success_witness": "A small exact static output is admitted and an at-most bound remains conditional.",
-  "negative_control": "Unknown-as-zero and reversed upper-bound comparisons must fail.",
-  "result_artifacts": [],
-  "exception": null
+  "trust_audit": {
+    "status": "unaudited",
+    "items": []
+  },
+  "success_witnesses": [
+    {
+      "id": "exact-static-output",
+      "description": "A small exact static output is admitted and an at-most bound remains conditional.",
+      "status": "not-observed"
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "unknown-as-zero",
+      "required": true,
+      "expected_failure": "Unknown-as-zero and reversed upper-bound comparisons must fail.",
+      "observed": "not-run"
+    }
+  ],
+  "verdict_source": {
+    "kind": "self-reported",
+    "log": null
+  },
+  "exception": null,
+  "result_artefacts": []
 }

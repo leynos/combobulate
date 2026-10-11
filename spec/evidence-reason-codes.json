@@ -1,0 +1,42 @@
+{
+  "revision": "0.2",
+  "levels": [
+    "proof",
+    "bounded",
+    "tested",
+    "restricted",
+    "rejected"
+  ],
+  "satisfying_levels": [
+    "proof",
+    "bounded",
+    "tested"
+  ],
+  "registered_log_parsers": [],
+  "reason_codes": {
+    "schema-invalid": "The record breaks the validity predicate (evidence kind, outcome, and bounds disagree).",
+    "outcome-counterexample": "The verifier or test found a counterexample.",
+    "outcome-resource-exhausted": "A time, memory, or solver resource limit was reached.",
+    "outcome-solver-unknown": "The solver returned unknown.",
+    "outcome-unsupported": "The tool does not support a construct the claim depends on.",
+    "outcome-skipped": "The harness or test was skipped.",
+    "outcome-tool-error": "The tool failed before reaching a verdict.",
+    "witness-some-unsatisfied": "A declared success witness (for example a Kani cover) was not reached.",
+    "witness-absent": "No success witness was observed.",
+    "control-some-rejected-otherwise": "A negative control failed, but for a reason other than the intended one.",
+    "control-some-accepted": "A negative control that must fail was accepted.",
+    "control-required-missing": "A required negative control did not run.",
+    "trust-uncovered": "A trusted item (assume, admit, external_body, stub, and similar) is not covered by a declared assumption or exception.",
+    "trust-unaudited": "The trusted items were not audited.",
+    "exception-expired": "The cited exception passed its invalid_from date.",
+    "exception-not-yet-valid": "The cited exception is not yet approved on the evaluation date.",
+    "exception-malformed": "The cited exception is unknown or breaks D02.",
+    "binding-stale": "The executable, specification, or source revision differs from the current binding.",
+    "binding-incomplete": "The record lacks an executable, specification, or source identity.",
+    "run-focused": "The run used a focused or partial profile.",
+    "verdict-self-reported": "No registered log parser re-derived the verdict from a committed log (C-EP-10).",
+    "not-run": "The record is planned only; nothing ran.",
+    "trust-without-exception": "A trust declaration has no active exception.",
+    "exception-active": "Informational: an active exception restricts the admission level."
+  }
+}
