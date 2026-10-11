@@ -398,7 +398,7 @@ Subject: Prospective details for later roadmap tasks.
 
 Terms-of-reference questions: none. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -411,7 +411,12 @@ Options:
 Recommendation rationale: Fixing the replay obligations before those tasks
 start prevents their success criteria from being chosen after the fact.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted. Note that `docs/roadmap.md` is canonical. If you really
+want a JSON roadmap representation, submit a GitHub issue to `leynos/mapsplice`
+for a JSON export and an export validator to detect drift. For now, add Python
+scripts to do this using Wenmode in a separate stacked PR."
 
 ADR: none yet.
 

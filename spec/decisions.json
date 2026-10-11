@@ -622,11 +622,19 @@
       ],
       "recommendation": "A",
       "rationale": "Fixing the replay obligations before those tasks start prevents their success criteria from being chosen after the fact.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
+      "lifecycle": "accepted",
+      "decided_option": "A",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D15"
+        ],
+        "answer": "Accepted. Note that `docs/roadmap.md` is canonical. If you really want a JSON roadmap representation, submit a GitHub issue to `leynos/mapsplice` for a JSON export and an export validator to detect drift. For now, add Python scripts to do this using Wenmode in a separate stacked PR."
+      },
       "adr": null,
       "supersedes": [],
       "superseded_by": null,

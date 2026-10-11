@@ -103,7 +103,9 @@ def test_check_tolerates_rewrapping(workspace):
 def test_check_reports_a_hand_edit(workspace, capsys):
     register, document = workspace
     text = document.read_text(encoding='utf-8')
-    document.write_text(text.replace('Decision: pending.', 'Decision: option A.', 1), encoding='utf-8')
+    edited = text.replace('Subject: ', 'Subject: Hand-edited ', 1)
+    assert edited != text, 'the control must actually edit the generated region'
+    document.write_text(edited, encoding='utf-8')
     assert run_cli('--check', '--register', str(register), '--document', str(document)) == 1, 'hand edits fail'
     assert 'scripts/generate_decisions.py' in capsys.readouterr().err, 'the failure names the generator'
 
