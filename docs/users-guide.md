@@ -13,3 +13,22 @@ become supported functionality.
 
 For building and checking the current source, follow the
 [developer guide](developers-guide.md).
+
+## Project status, licence, and stability
+
+Combobulate is ISC-licensed. It is not published to crates.io: publication
+waits until the Core acceptance dossier (roadmap task 4.3.3) passes and the
+sponsor approves release
+([ADR-0004](adrs/adr-0004-licence-and-publication.md)). Until then, use it
+from the Git repository only.
+
+Before version 1.0, any release may change the API without compatibility shims,
+following Cargo's rule that a change to the leftmost non-zero version component
+is breaking. The public proof interface (logical models, pre- and
+postconditions, lemmas, and trust declarations) is versioned with the crate: a
+strengthened precondition or weakened postcondition is a breaking change even
+when no Rust signature changes
+([ADR-0005](adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md)). The
+initial release covers the Core scope class of the
+[language reference](language-reference.md)
+([ADR-0003](adrs/adr-0003-initial-release-scope.md)).

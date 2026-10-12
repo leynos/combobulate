@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 12
+      "count": 16
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 40
+      "count": 67
     },
     {
       "check": "catalogue",
@@ -23,7 +23,7 @@
     {
       "check": "roadmap",
       "status": "pass",
-      "detail": "0 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
+      "detail": "1 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
       "count": 72
     },
     {
@@ -35,7 +35,7 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 0 of 15 decisions are accepted. Acceptance is not verification.",
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 8 of 15 decisions are accepted. Acceptance is not verification.",
       "count": 15
     },
     {
@@ -90,13 +90,19 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 39
+      "count": 41
+    },
+    {
+      "check": "package-policy",
+      "status": "pass",
+      "detail": "Cargo.toml declares the ISC licence (D04) and publish = false (D05) while those decisions stand accepted.",
+      "count": 1
     },
     {
       "check": "roadmap-status",
       "status": "pass",
-      "detail": "0 of 72 tasks ticked (none); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
-      "count": 0
+      "detail": "1 of 72 tasks ticked (1.1.1); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 1
     }
   ],
   "not_run": [

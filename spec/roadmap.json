@@ -1,6 +1,6 @@
 {
   "revision": "0.2",
-  "status": "proposed-all-tasks-open",
+  "status": "tasks-in-progress",
   "phases": [
     {
       "number": 1,
@@ -33,7 +33,7 @@
               "bets": [
                 "B01"
               ],
-              "status": "open"
+              "status": "done"
             },
             {
               "id": "1.1.2",

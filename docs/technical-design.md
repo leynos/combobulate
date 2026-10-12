@@ -64,7 +64,9 @@ refer to §14. The roadmap is the execution sequence, not evidence of discharge.
 | R11 | Probe and exploit Polars 2-era Rust capabilities through explicit engine, order, validity, spill/effect and evidence contracts without depending on version-number assumptions. | G2, G4, G8 | §§10, 19       | V18, V20               |
 
 Three scope classes prevent the reference catalogue becoming an accidental
-single-release promise. The classes remain proposed pending ToR Q4.
+single-release promise. [D03](decision-register.md#d03) accepts these classes
+as the initial release boundary
+([ADR-0003](adrs/adr-0003-initial-release-scope.md)).
 
 | Scope       | Designed deliverable                                                                                                                                                                                                        | Boundary                                                                                                                                                       |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -881,23 +883,26 @@ earn its custom layer through reusable rank composition, domain diagnostics,
 and collection coordination, not through an unsupported claim that alternatives
 cannot perform the calculations.
 
-| Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                       |
-| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope. |
-| GAP2 | R4, R7      | Unknown performance, memory, CI, compile-cost, and proof-cost acceptance numbers.                                 | ToR Q2; owner records controls and thresholds before acceptance experiments.                                                            |
-| GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                     |
-| GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Foundational probe and Q3 before publishing manifests or claiming stable compilation.                                                   |
-| GAP5 | R7          | Initial release boundary, licence, and authorities unratified.                                                    | Q1/Q4/Q7; docs stay proposed and unreleased.                                                                                            |
-| GAP6 | R1-R11      | GitHub publication destination unresolved.                                                                        | Q6; provide repository-ready files without creating unrelated remote records.                                                           |
-| GAP7 | R8-R10      | Shared const/runtime/verifier subset and public proof dependencies untested.                                      | B01/B02 and tasks 1.2.4-1.2.5; narrow representation or certified subset without substituting an unproved body.                         |
-| GAP8 | R11         | Polars 2-era Rust hooks, streaming/spill controls and benefit untested; final release/upgrade refresh incomplete. | PC probes, B05/B06 and task 1.2.6; document capabilities and refusal scope before eligibility.                                          |
-| GAP9 | R8-R9       | Proof-exception and specification-compatibility authority unassigned.                                             | Q8/Q9 and task 1.1.4; exceptions cannot count as proof or remove ordinary runtime safety.                                               |
+| Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                     |
+| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                               |
+| GAP2 | R4, R7      | Unknown performance, memory, CI, compile-cost, and proof-cost acceptance numbers.                                 | ToR Q2; owner records controls and thresholds before acceptance experiments.                                                                                                          |
+| GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                   |
+| GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Foundational probe and Q3 before publishing manifests or claiming stable compilation.                                                                                                 |
+| GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3.                                                                                |
+| GAP6 | R1-R11      | GitHub publication destination unresolved.                                                                        | Q6; provide repository-ready files without creating unrelated remote records.                                                                                                         |
+| GAP7 | R8-R10      | Shared const/runtime/verifier subset and public proof dependencies untested.                                      | B01/B02 and tasks 1.2.4-1.2.5; narrow representation or certified subset without substituting an unproved body.                                                                       |
+| GAP8 | R11         | Polars 2-era Rust hooks, streaming/spill controls and benefit untested; final release/upgrade refresh incomplete. | PC probes, B05/B06 and task 1.2.6; document capabilities and refusal scope before eligibility.                                                                                        |
+| GAP9 | R8-R9       | Specification-compatibility evidence and the proof-first evidence gate.                                           | Authority (D01), exception policy (D02), and proof-interface policy (D06) are accepted; Q9 and task 1.1.4 remain. Exceptions cannot count as proof or remove ordinary runtime safety. |
 
 Candidate ADRs cover numerical/array semantics, macro staging and stable-Rust
 application, backend/cell separation, initial feature/release scope, the shared
 semantic kernel, public proof compatibility, resource certification, and
 backend I/O control scope. No ADR is marked accepted merely because this table
-names it. Domain adapters are necessary integration boundaries, not prohibited
+names it; the disposition of each subject is decided by D07 and listed among
+the register's
+[candidate ADR subjects](decision-register.md#candidate-adr-subjects). Domain
+adapters are necessary integration boundaries, not prohibited
 obsolete-interface shims. No durable execution-plan wire format exists to
 migrate in this baseline.
 

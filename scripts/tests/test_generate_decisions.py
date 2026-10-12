@@ -63,7 +63,11 @@ def test_rendering_is_deterministic():
 
 
 def test_proposed_decision_renders_as_pending_with_its_recommendation():
-    text = render(REGISTER)
+    register = copy.deepcopy(REGISTER)
+    record = next(entry for entry in register['decisions'] if entry['id'] == 'D03')
+    record.update({'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+                   'approval_reference': None, 'adr': None})
+    text = render(register)
     section = text[text.index('### D03\n'):text.index('### D04\n')]
     assert 'Decision: pending.' in section, 'a proposed record has no decision'
     assert '(recommended)' in section, 'the recommended option is marked'
