@@ -23,6 +23,8 @@ request 11. The current crate is a scaffold; the multi-crate architecture in the
 | `.github/dependabot.yml`                 | Cargo and GitHub Actions dependency updates.                                               |
 | `docs/`                                  | Design, guides, reference material, and recorded decisions.                                |
 | `docs/contents.md`                       | Canonical documentation index.                                                             |
+| `docs/adrs/`                             | Architectural decision records, named `adr-nnnn-title-slug.md`.                            |
+| `docs/execplans/`                        | Execution plans for roadmap work, named after their branch.                                |
 | `spec/`                                  | Machine-readable language, roadmap, proof, cost, and backend contracts.                    |
 | `tools/`                                 | Design generators and documentation-model validation.                                      |
 | `tools/mold/`                            | Pinned native linker version and archive digest.                                           |

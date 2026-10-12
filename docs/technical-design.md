@@ -5,6 +5,9 @@ implementers, reviewers, backend and domain-extension authors. Companions:
 `terms-of-reference.md`, `context.md`, `language-reference.md`, `roadmap.md`,
 `references.md`, and `validation.md`.
 
+Decisions that control acceptance, with their authority, options, and status,
+are recorded in the [decision register](decision-register.md).
+
 All API examples are proposed, uncompiled sketches. Requirement identifiers
 below express this draft's design response, not independent approval.
 
