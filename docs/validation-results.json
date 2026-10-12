@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 18
+      "count": 20
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 82
+      "count": 97
     },
     {
       "check": "catalogue",
@@ -23,7 +23,7 @@
     {
       "check": "roadmap",
       "status": "pass",
-      "detail": "2 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
+      "detail": "3 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
       "count": 72
     },
     {
@@ -35,7 +35,7 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 12 of 15 decisions are accepted. Acceptance is not verification.",
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 14 of 15 decisions are accepted. Acceptance is not verification.",
       "count": 15
     },
     {
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 46
+      "count": 48
     },
     {
       "check": "contract-examples",
@@ -117,10 +117,16 @@
       "count": 1
     },
     {
+      "check": "acceptance-controls",
+      "status": "pass",
+      "detail": "Controls carry every frozen field, digests close their amendment chains, calibration records are cited and host-free, and no calibration record counts as acceptance evidence.",
+      "count": 7
+    },
+    {
       "check": "roadmap-status",
       "status": "pass",
-      "detail": "2 of 72 tasks ticked (1.1.1, 1.1.2); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
-      "count": 2
+      "detail": "3 of 72 tasks ticked (1.1.1, 1.1.2, 1.1.3); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 3
     }
   ],
   "not_run": [

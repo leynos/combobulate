@@ -1,0 +1,61 @@
+{
+  "id": "shared-workloads-local",
+  "purpose": "calibration",
+  "control_ids": [
+    "AC-01",
+    "AC-02",
+    "AC-04"
+  ],
+  "control_digest": null,
+  "recorded_on": "2026-10-11",
+  "hardware": {
+    "class": "shared-development-host",
+    "cpu_model": "AMD Ryzen 9 3900 12-Core Processor",
+    "cores": 12,
+    "threads": 24,
+    "memory_gib": 125,
+    "os_family": "Rocky Linux 10",
+    "kernel_major": 6
+  },
+  "toolchains": {
+    "rustc": "1.100.0-nightly (bff8e12ff 2026-08-26), channel nightly-2026-08-27, Cranelift dev backend",
+    "verus": "0.2026.09.06.8dea4a2 (release profile; Rust 1.98.0)",
+    "z3": "4.16.0",
+    "kani": "0.67.0 (CBMC with CaDiCaL)",
+    "python": "3.14.7",
+    "polars": "0.55.2 (provisional; lazy feature)"
+  },
+  "conditions": "Shared host under other agents' load (load average about 20 to 25 on 24 threads); single-threaded workloads.",
+  "workloads": [
+    {
+      "id": "design-unittest",
+      "description": "tools/tests unittest suite (211 tests) at commit 398d2f6",
+      "command": "python3 -m unittest discover -s tools/tests",
+      "metric": "wall time reported by unittest",
+      "unit": "s",
+      "samples": [
+        27.483,
+        28.661,
+        31.281,
+        30.881,
+        31.725
+      ],
+      "median": 30.881
+    },
+    {
+      "id": "design-pytest",
+      "description": "scripts/tests pytest suite (30 tests) at commit 398d2f6",
+      "command": "python3 -m pytest -q scripts/tests",
+      "metric": "wall time reported by pytest",
+      "unit": "s",
+      "samples": [
+        3.51,
+        2.97,
+        3.19,
+        3.13,
+        3.36
+      ],
+      "median": 3.19
+    }
+  ]
+}

@@ -451,15 +451,28 @@
       ],
       "recommendation": "B",
       "rationale": "The hosted paired design needs no dedicated hardware and controls drift by interleaving.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "B",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D11"
+        ],
+        "answer": "Accepted, although for local development boxes you'll have to take what you're given. Don't leak hostnames into the source documentation."
+      },
+      "adr": "docs/adrs/adr-0008-acceptance-control-pre-registration.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/technical-design.md",
+          "text": "Pre-register proof runtime, solver memory, build latency, runner size, and cache policy under ToR Q2."
+        }
+      ]
     },
     {
       "id": "D12",
@@ -483,15 +496,40 @@
       ],
       "recommendation": "A",
       "rationale": "Thresholds govern acceptance, so the planning agent did not choose them itself.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
-      "adr": null,
+      "lifecycle": "accepted",
+      "decided_option": "B",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-10",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D12"
+        ],
+        "answer": "Make realistic measurements on the current machine and extrapolate to a GitHub runner specced above. I'll trust your judgement here, just bring reasonable evidence."
+      },
+      "adr": "docs/adrs/adr-0008-acceptance-control-pre-registration.md",
       "supersedes": [],
       "superseded_by": null,
-      "retired_statements": []
+      "retired_statements": [
+        {
+          "document": "docs/terms-of-reference.md",
+          "text": "Quantitative performance/compile-cost/proof-cost thresholds require resolution of Q2 before any benchmark-dependent acceptance decision."
+        },
+        {
+          "document": "docs/technical-design.md",
+          "text": "Budget numbers, supported target matrix, and performance thresholds remain ToR Q2/Q3."
+        },
+        {
+          "document": "docs/technical-design.md",
+          "text": "No thresholds or benchmark outcomes currently exist."
+        },
+        {
+          "document": "docs/technical-design.md",
+          "text": "ToR Q2; owner records controls and thresholds before acceptance experiments."
+        }
+      ]
     },
     {
       "id": "D13",

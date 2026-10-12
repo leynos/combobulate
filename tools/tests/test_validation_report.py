@@ -25,8 +25,9 @@ class ValidationReport(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        for folder in ('docs', 'scripts', 'spec', 'tools'):
-            shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__'))
+        # `.github` holds registered acceptance-control sources; build outputs stay behind.
+        for folder in ('.github', 'docs', 'scripts', 'spec', 'tools'):
+            shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__', 'target'))
         for path in ROOT.iterdir():
             if path.is_file():
                 shutil.copy2(path, self.root / path.name)

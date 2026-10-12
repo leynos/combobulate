@@ -776,9 +776,12 @@ between workers under their declared synchronization guarantees. Mutable sinks
 have an explicit ownership/commit discipline; no shared mutation hides behind a
 nominally pure verb.
 
-Budget numbers, supported target matrix, and performance thresholds remain ToR
-Q2/Q3. The project must record them before gathering acceptance evidence, not
-lower a target after observing a disappointing result.
+Budget numbers and performance thresholds are pre-registered as controls
+`AC-01` to `AC-07`
+([D11](decision-register.md#d11), [D12](decision-register.md#d12), [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md));
+the supported target matrix remains ToR Q3. The project must record them
+before gathering acceptance evidence, not lower a target after observing a
+disappointing result.
 
 ## 13. Diagnostics and explainability
 
@@ -842,7 +845,7 @@ validate a few examples only; they are not that future evaluator.
 | V10 | Curated user mistakes point to the original operation and a valid fix, even after fusion.                                         | UI/runtime snapshots plus reviewer tasks; faulty provenance and incorrect broadcast-hint mutations must fail acceptance.                                                                                       | Human comprehension evidence is local to reviewers/tasks, not a universal UX score.              |
 | V11 | Independent extension crates can supply typed/native operations and lowerings without editing core.                               | External public-only numeric and typed fixtures, including downstream Kani/Verus contracts and a consumer-defined kernel; no private imports, assumed whole-executor body, or registry patch.                  | Does not imply ABI stability or safety of malicious native code.                                 |
 | V12 | Selected trasic adapters preserve domain outputs, sample identity, segment provenance, and sink policy.                           | Three pre-registered experiments, scalar and external/domain oracles where applicable, partition and cancellation controls.                                                                                    | Actual trasic source and oracle selection remain unavailable in this commission.                 |
-| V13 | Packaging and measured execution costs satisfy agreed acceptance boundaries.                                                      | Feature/target and proof-profile matrix, separately measured planning/execution/compilation/proving cost and actual allocation controls against pre-registered thresholds.                                     | No thresholds or benchmark outcomes currently exist.                                             |
+| V13 | Packaging and measured execution costs satisfy agreed acceptance boundaries.                                                      | Feature/target and proof-profile matrix, separately measured planning/execution/compilation/proving cost and actual allocation controls against pre-registered thresholds.                                     | Thresholds are pre-registered (`AC-01` to `AC-07`); no benchmark outcome exists.                 |
 | V14 | Required changes follow proof-first delivery and evidence binds to actual executable/specification identities.                    | PF ledger, pinned Kani/Verus profiles, positive witnesses, negative controls and TCB audit; timeout/skip/unsupported cannot count as proved.                                                                   | Compiler/solver assumptions remain explicit; a valid evidence schema is not a theorem.           |
 | V15 | Downstream public contracts connect collection and graph models to production execution and meaningful successful/error outcomes. | External Kani/Verus consumers call comb! and only public APIs; wrong denotation, always-Err and substitute-executor mutations fail.                                                                            | Initial certified subset is explicit; opaque callbacks require their own evidence or trust.      |
 | V16 | Static/preparation/runtime costing agrees for equal facts and target profiles and distinguishes certainty from unknowns.          | Shared checked analyser, Verus bound rules, Kani overflow checks, actual compile-pass/fail fixtures, and target-width cases.                                                                                   | Wall time and unknown backend allocations are estimates, not certified quantities.               |
@@ -900,7 +903,7 @@ cannot perform the calculations.
 | Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                     |
 | ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                               |
-| GAP2 | R4, R7      | Unknown performance, memory, CI, compile-cost, and proof-cost acceptance numbers.                                 | ToR Q2; owner records controls and thresholds before acceptance experiments.                                                                                                          |
+| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); no acceptance measurement exists yet.                        |
 | GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                   |
 | GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Foundational probe and Q3 before publishing manifests or claiming stable compilation.                                                                                                 |
 | GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3.                                                                                |
@@ -1213,12 +1216,14 @@ Backend upgrades invalidate backend-dependent evidence, not unrelated
 structural proofs. A report lists the remaining assumptions, rather than
 exposing a single `verified` Boolean.
 
-Pre-register proof runtime, solver memory, build latency, runner size, and
-cache policy under ToR Q2. Use pinned tools, bounded jobs, cached artefacts,
-and change-aware checks; perform full required-profile verification before
-release. Timeouts and exhausted budgets trigger an explicit scope or
-implementation decision, not suppressed assertions. Test the downstream
-fixtures before stabilizing their API, not only after internal proofs succeed.
+Proof runtime, solver memory, build latency, runner class, and cache policy are
+pre-registered as controls `AC-01`, `AC-02`, `AC-04`, and `AC-07`
+([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)). Use pinned
+tools, bounded jobs, cached artefacts, and change-aware checks; perform full
+required-profile verification before release. Timeouts and exhausted budgets
+trigger an explicit scope or implementation decision, not suppressed
+assertions. Test the downstream fixtures before stabilizing their API, not only
+after internal proofs succeed.
 
 ## 18. Compile-time costing and staged resource certification
 

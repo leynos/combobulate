@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.freeze import check_decisions_frozen, check_frozen
+from docs_validation.freeze import check_controls_frozen, check_decisions_frozen, check_frozen
 
 ACCEPTED = {'id': 'D04', 'subject': 'Package licence', 'lifecycle': 'accepted', 'decided_option': 'A',
             'supersedes': [], 'superseded_by': None}
@@ -52,6 +52,47 @@ class DecisionFreeze(unittest.TestCase):
         superseded = ACCEPTED | {'lifecycle': 'superseded', 'superseded_by': 'D16'}
         with self.assertRaisesRegex(AssertionError, r'was edited \(superseded_by\)'):
             check_decisions_frozen(register(superseded), register(superseded | {'superseded_by': 'D17'}))
+
+
+CONTROL = {'id': 'AC-03', 'registered_digest': 'a' * 64, 'digest': 'a' * 64, 'amendments': [],
+           'frozen': {'decision_rule': {'thresholds': {'upper_bound_ratio': 1.25}}}}
+
+
+def controls(*entries: dict) -> dict:
+    """Wrap control records in a minimal register."""
+    return {'controls': [copy.deepcopy(entry) for entry in entries]}
+
+
+def amendment(replaces: str, new_digest: str) -> dict:
+    """Build one sponsor-approved amendment."""
+    return {'date': '2026-10-12', 'approved_by': 'leynos', 'approval_reference': 'https://example.org/approval',
+            'replaces': replaces, 'new_digest': new_digest, 'reason': 'Test.'}
+
+
+class ControlFreeze(unittest.TestCase):
+    """VO-7 for controls: frozen fields change only through an appended amendment."""
+
+    def test_threshold_and_digest_edited_together_fail(self):
+        edited = copy.deepcopy(CONTROL)
+        edited['frozen']['decision_rule']['thresholds']['upper_bound_ratio'] = 1.5
+        edited['digest'] = 'b' * 64
+        with self.assertRaisesRegex(AssertionError, 'AC-03 changed frozen fields without an amendment'):
+            check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_appended_amendment_passes(self):
+        edited = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
+        check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_edited_amendment_fails(self):
+        base = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
+        head = copy.deepcopy(base)
+        head['amendments'][0]['reason'] = 'Rewritten.'
+        with self.assertRaisesRegex(AssertionError, 'AC-03 edited or removed an amendment'):
+            check_controls_frozen(controls(base), controls(head))
+
+    def test_deleted_control_fails(self):
+        with self.assertRaisesRegex(AssertionError, 'Registered control AC-03 was deleted'):
+            check_controls_frozen(controls(CONTROL), controls())
 
 
 class BaseRevisionIntegration(unittest.TestCase):
