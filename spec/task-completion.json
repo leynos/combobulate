@@ -57,6 +57,25 @@
         "spec/calibration/builds.json",
         "spec/calibration/ci-history.json"
       ]
+    },
+    {
+      "task": "1.1.4",
+      "decisions": [
+        "D01",
+        "D02",
+        "D06"
+      ],
+      "artefacts": [
+        "docs/adrs/adr-0009-proof-first-policy-and-evidence-gate.md",
+        "docs/evidence-and-decision-records.md",
+        "spec/proof-evidence.schema.json",
+        "spec/exceptions.json",
+        "spec/exception.schema.json",
+        "spec/evidence-reason-codes.json",
+        "tools/docs_validation/evidence_gate.py",
+        "tools/tests/fixtures/evidence_gate_rules.json",
+        "scripts/check_evidence.py"
+      ]
     }
   ]
 }

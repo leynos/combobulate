@@ -24,6 +24,8 @@ from docs_validation.contracts import (
 )
 from docs_validation.costs import check_cost_examples
 from docs_validation.decisions import check_decision_register
+from docs_validation.evidence_records import check_evidence_gate
+from docs_validation.exceptions import check_exceptions
 from docs_validation.freeze import check_frozen
 from docs_validation.ledger import check_catalogue_and_roadmap
 from docs_validation.markdown import check_markdown
@@ -71,7 +73,8 @@ def collect_checks(context: ValidationContext) -> None:
         check_examples, check_revision_contracts,
         check_proof_evidence_envelope, check_cost_examples, check_tool_sources,
         check_contract_examples, check_semantic_contracts, check_macro_grammar,
-        check_package_policy, check_acceptance_controls, check_roadmap_status,
+        check_package_policy, check_acceptance_controls, check_exceptions, check_evidence_gate,
+        check_roadmap_status,
     ):
         check(context)
 

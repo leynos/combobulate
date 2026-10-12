@@ -297,11 +297,33 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   threshold-plus-digest edit rejected without an amendment, and host-identity
   scans with the local host name supplied at test time; the CI `build-test` job
   has `timeout-minutes: 8` (`AC-07`); task 1.1.3 ticked and backed.
-- [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
+- [x] (2026-10-11) `EP-M5` Task 1.1.4: proof-first policy and evidence gate
+  (branch `1-1-evidence-gate`, stacked on `EP-M4`). Evidence: ADR-0009 accepted
+  under D02 and D06; the rule-table fixture and gate tests written first (red:
+  module missing); the gate agrees with an independent interpreter of the
+  fixture on all 345,600 states (86,400 valid), every level and reason occurs
+  alone, P1 to P4 hold over the enumeration, the upstream scenario corpus (B01,
+  B02, B08, PF14, §17) passes, and five seeded rule-table faults are each
+  caught; VO-2 round-trips every valid state through a concrete schema version
+  2 record, and the schema agrees with the validity predicate on all 120 kind,
+  outcome, and bounds combinations; VO-3 checks the exception window
+  boundaries, each D02 violation, and P5; P6 and record-sourced closure pass;
+  `scripts/check_evidence.py` rejects the planned example (exit 1), admits the
+  complete test fixture at `tested`, reports partial bounds at `bounded` (never
+  `proof`), and rejects resource-exhausted and self-reported fixtures with
+  their reasons; `PF14.structural@1.1.4` is satisfied by the passing
+  `evidence-gate` check and task 1.1.4 is ticked.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
 ## Surprises & discoveries
 
+- Observation: a synchronize run on #16 received `github.base_ref` = `main`
+  although the pull request's base is `1-1-semantic-contracts`, so its freeze
+  check compared against `main` and found no frozen registers. Evidence: Design
+  contracts run 38098734956 ("Freeze check against 2f856b0 passed for no frozen
+  registers"); earlier runs on #13 to #16 used their stacked bases. Impact: from
+  `EP-M5` the workflow takes the merge base with the event's
+  `pull_request.base.sha` and prints the selected base.
 - Observation: the hosted design check failed on #16 because the
   host-identity test also supplied the user name, which is `runner` on GitHub
   runners and is an ordinary word in the CI calibration record. Evidence:
@@ -388,6 +410,28 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M5` milestone review disposition (CodeRabbit CLI):
+  `scripts/check_evidence.py` stopped at the first schema-invalid record and
+  raised on an unreadable file; it now reports every record, names unreadable
+  and invalid files, and exits 2 after the loop. Date/Author: 2026-10-11,
+  implementing agent.
+- Decision: `EP-M5` exceeded both per-milestone tolerances: 39 changed files
+  against 25, and about 1,900 net added lines against 1,500, excluding the
+  regenerated regions, the export, and the report. The evidence fixtures (six
+  JSON files under `tools/tests/fixtures/evidence/` plus the rule-table
+  fixture), the version 2 schema, and the five test suites the plan requires
+  (VO-1 to VO-4 and the command) account for most of it. Escalated to the
+  sponsor in the milestone pull request. Date/Author: 2026-10-11, implementing
+  agent.
+- Decision: in `EP-M5`, P1's order for the exception field depends on the
+  kind: for a trust declaration an active exception is better than none,
+  because a declaration exists only to carry one (the enumeration found this).
+  `outcome-not-run` is not a reason code, because an executed kind that did not
+  run fails the validity predicate first. Without an evaluation date the gate
+  treats every exception as malformed (fail closed). The parser registry under
+  `tools/tests/fixtures/evidence/` is test-only; the repository registry
+  registers no parser, so verifier evidence stays self-reported until tasks
+  1.2.1 and 1.2.4 (C-EP-10). Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M4` milestone review dispositions (CodeRabbit CLI). Fixed in
   this layer before any merge or acceptance measurement: `verdict` read a
   `control_id` field that the measurement-record schema names `control_ids`

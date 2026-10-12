@@ -1,7 +1,7 @@
 # Combobulate roadmap
 
-Revision 0.2, 6 October 2026. Tasks 1.1.1 to 1.1.3 are complete; all other work
-remains proposed and open.
+Revision 0.2, 6 October 2026. Step 1.1 (tasks 1.1.1 to 1.1.4) is complete; all
+other work remains proposed and open.
 
 Decisions that control acceptance, with their authority, options, and status,
 are recorded in the [decision register](decision-register.md).
@@ -87,7 +87,7 @@ criteria. See `technical-design.md` §§1-2, 15-16.
   - Success: ToR Q2 has named workloads, controls, target environments, budgets,
     uncertainty handling, and thresholds recorded before acceptance
     measurements.
-- [ ] 1.1.4. Record the proof-first policy, public proof contract, and
+- [x] 1.1.4. Record the proof-first policy, public proof contract, and
   trusted-boundary authority.
   - Requires 1.1.1, 1.1.2, 1.1.3.
   - See `technical-design.md` §§14, 16-19, 17.

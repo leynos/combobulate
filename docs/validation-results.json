@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 20
+      "count": 22
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 97
+      "count": 105
     },
     {
       "check": "catalogue",
@@ -23,7 +23,7 @@
     {
       "check": "roadmap",
       "status": "pass",
-      "detail": "3 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
+      "detail": "4 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
       "count": 72
     },
     {
@@ -77,8 +77,8 @@
     {
       "check": "proof-evidence-envelope",
       "status": "pass",
-      "detail": "The planned record validates; missing witness, proof status without actual bindings/results, and unscoped trust mutations fail. Schema validity does not establish a proposition.",
-      "count": 3
+      "detail": "The planned record validates against schema version 2; a missing or empty witness list, a verified outcome for nothing run, an executed kind with no run, bounded evidence without bounds, a log-parser verdict without a log, and the retired status field all fail. Schema validity does not establish a proposition.",
+      "count": 7
     },
     {
       "check": "cost-documentation-examples",
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 48
+      "count": 57
     },
     {
       "check": "contract-examples",
@@ -123,10 +123,22 @@
       "count": 7
     },
     {
+      "check": "exceptions",
+      "status": "pass",
+      "detail": "Every exception has an owner, a narrowed claim, sponsor approval, a lifetime of at most 90 days, and an unpassed release gate.",
+      "count": 0
+    },
+    {
+      "check": "evidence-gate",
+      "status": "pass",
+      "detail": "Gate reason codes and levels match the registry; P3 and P4 hold over all valid abstract states; every committed evidence record validates against schema version 2, and the planned example is rejected as not run.",
+      "count": 1
+    },
+    {
       "check": "roadmap-status",
       "status": "pass",
-      "detail": "3 of 72 tasks ticked (1.1.1, 1.1.2, 1.1.3); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
-      "count": 3
+      "detail": "4 of 72 tasks ticked (1.1.1, 1.1.2, 1.1.3, 1.1.4); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 4
     }
   ],
   "not_run": [
