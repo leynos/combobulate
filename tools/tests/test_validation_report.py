@@ -25,7 +25,7 @@ class ValidationReport(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        for folder in ('docs', 'spec', 'tools'):
+        for folder in ('docs', 'scripts', 'spec', 'tools'):
             shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__'))
         for path in ROOT.iterdir():
             if path.is_file():

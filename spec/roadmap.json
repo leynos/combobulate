@@ -32,7 +32,8 @@
               "proof_first": "Write decision and exception authority before accepting claims; approval is not verification.",
               "bets": [
                 "B01"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.1.2",
@@ -47,7 +48,8 @@
               "bets": [
                 "B01",
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.1.3",
@@ -62,7 +64,8 @@
               "bets": [
                 "B01",
                 "B03"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.1.4",
@@ -80,7 +83,8 @@
                 "B01",
                 "B02",
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -104,7 +108,8 @@
               "bets": [
                 "B01",
                 "B05"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.2.2",
@@ -120,7 +125,8 @@
               "bets": [
                 "B01",
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.2.3",
@@ -134,7 +140,8 @@
               "proof_first": "State the oracle independence boundary first; a seeded wrong result must fail rather than share the same faulty body.",
               "bets": [
                 "B01"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.2.4",
@@ -149,7 +156,8 @@
               "bets": [
                 "B01",
                 "B03"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.2.5",
@@ -164,7 +172,8 @@
               "bets": [
                 "B01",
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "1.2.6",
@@ -180,7 +189,8 @@
               "bets": [
                 "B05",
                 "B06"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
@@ -221,7 +231,8 @@
               "bets": [
                 "B01",
                 "B03"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.1.2",
@@ -235,7 +246,8 @@
               "proof_first": "Specify coordinate mapping first; Verus proves reshape/permutation relations, Kani checks executable bounds, and Miri/audit covers applicable unsafe gaps.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.1.3",
@@ -250,7 +262,8 @@
               "bets": [
                 "B03",
                 "B04"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.1.4",
@@ -265,7 +278,8 @@
               "proof_first": "Declare representation, lifetime, error, and successful-result relations first. Verify constructors and index observers against the actual body; test non-null and null-parent counterexamples.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -288,7 +302,8 @@
               "proof_first": "Prove/check integer and validity primitives with Kani; separate structural/policy claims from floating accuracy and document unsupported models before coding.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.2.2",
@@ -302,7 +317,8 @@
               "proof_first": "Verus proves sequence association and empty/singleton traversal; Kani checks signed-zero bits and checked-overflow counterexamples on executable paths.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.2.3",
@@ -317,7 +333,8 @@
               "proof_first": "State right-prefix semantics and work count before loops; Verus proves sequence/count rules and Kani distinguishes left-scan substitution and overflow.",
               "bets": [
                 "B03"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.2.4",
@@ -331,7 +348,8 @@
               "proof_first": "Specify accumulator/finalizer invariant first; verify control/count arithmetic, and disclose floating primitive assumptions instead of modelling IEEE values as reals silently.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.2.5",
@@ -347,7 +365,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -371,7 +390,8 @@
               "bets": [
                 "B02",
                 "B03"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.3.2",
@@ -386,7 +406,8 @@
               "proof_first": "Specify composition denotation and shared-node/effect relations first; prove builder rules and Kani-check bounded graph construction.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.3.3",
@@ -401,7 +422,8 @@
               "proof_first": "Specify error category/provenance preservation first; test UI spans and Kani-check bounded provenance transformations, not human readability as a theorem.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.3.4",
@@ -417,7 +439,8 @@
               "proof_first": "Publish public-only successful/error witnesses; test comprehension empirically and identify which semantic claims the chosen verifier establishes.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.3.5",
@@ -434,7 +457,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -457,7 +481,8 @@
               "proof_first": "State the abstract work/payload model and checked arithmetic before implementation. Verus establishes conservative composition and Kani checks machine overflow; no mandatory solver runs in downstream macros.",
               "bets": [
                 "B03"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.4.2",
@@ -473,7 +498,8 @@
               "bets": [
                 "B03",
                 "B04"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "2.4.3",
@@ -488,7 +514,8 @@
               "bets": [
                 "B03",
                 "B04"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
@@ -527,7 +554,8 @@
               "proof_first": "Verus proves frame/cell shape composition without evaluation; Kani verifies empty-frame zero-call and empty-cell failure witnesses.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "3.1.2",
@@ -541,7 +569,8 @@
               "proof_first": "Specify successful schema and failure relations before assembly; Kani rejects nonuniform outputs and Verus preserves logical-cell correspondence.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -565,7 +594,8 @@
               "proof_first": "Prove coordinate/selection relations with Verus and Kani-check bounds, MIN counts, unknown masks, and checked casts before unsafe access.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "3.2.2",
@@ -580,7 +610,8 @@
               "proof_first": "State ordering/stability and exceptional-key equivalence first; Verus supplies permutation/stability obligations and Kani checks bounded equal-key cases.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "3.2.3",
@@ -597,7 +628,8 @@
               "bets": [
                 "B03",
                 "B04"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "3.2.4",
@@ -612,7 +644,8 @@
               "proof_first": "State applicability and frame conditions first; prove generic element movement in Verus and bounded executable invalid-map cases in Kani, including empty selections.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -635,7 +668,8 @@
               "proof_first": "Verus proves coordinate/boundary mappings; Kani exercises even anchors, extent-one and zero cases. The flattened-wrap mutation must fail.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "3.3.2",
@@ -651,7 +685,8 @@
               "proof_first": "State halo/snapshot invariants before optimization; prove partition equivalence in Verus and Kani-check bounded alias/halo and reservation paths.",
               "bets": [
                 "B04"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "3.3.3",
@@ -667,7 +702,8 @@
               "proof_first": "Prove checker soundness relative to the explicit schedule/kernel resource contracts with Verus; Kani checks allocation transitions and rejected malformed schedules. No whole-process RSS guarantee follows.",
               "bets": [
                 "B04"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -691,7 +727,8 @@
               "bets": [
                 "B02",
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
@@ -730,7 +767,8 @@
               "proof_first": "Specify the relational-to-positional contract first; check the adapter locally and force backend ordering counterexamples in integration tests.",
               "bets": [
                 "B05"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.1.2",
@@ -745,7 +783,8 @@
               "proof_first": "Prove local parent-validity/index mapping where expressible; Kani checks small chunk/slice cases and audit/Miri covers unsafe representation obligations.",
               "bets": [
                 "B05"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.1.3",
@@ -760,7 +799,8 @@
               "proof_first": "Specify index/validity obligations in the adapter before lowering. Verify local validators with Kani or Verus, and run backend conformance with row-shuffle, lost-parent-validity, and split-segment negative controls.",
               "bets": [
                 "B05"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -786,7 +826,8 @@
               "bets": [
                 "B05",
                 "B06"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.2.2",
@@ -802,7 +843,8 @@
               "proof_first": "Prove region-boundary and exact-association checks before enabling routes; forced-engine tests must not compare two uses of the same fallback.",
               "bets": [
                 "B05"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.2.3",
@@ -818,7 +860,8 @@
               "bets": [
                 "B04",
                 "B06"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.2.4",
@@ -833,7 +876,8 @@
               "proof_first": "Prove local eligibility rules with Kani or Verus; a deterministic-but-fallible guarded callback must not gain speculative execution permission. Compare enabled/disabled routes for benefit under pre-registered controls.",
               "bets": [
                 "B06"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.2.5",
@@ -849,7 +893,8 @@
               "bets": [
                 "B05",
                 "B04"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -875,7 +920,8 @@
               "bets": [
                 "B04",
                 "B05"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.3.2",
@@ -894,7 +940,8 @@
                 "B02",
                 "B05",
                 "B08"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "4.3.3",
@@ -910,7 +957,8 @@
               "bets": [
                 "B01",
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
@@ -948,7 +996,8 @@
               "proof_first": "Specify cell models and runtime-safe contract validation first; Verus/Kani check owned schema boundaries without trusting metadata for unchecked safety.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.1.2",
@@ -963,7 +1012,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.1.3",
@@ -977,7 +1027,8 @@
               "proof_first": "Use external consumer proof fixtures without private imports or assumed executor bodies; demonstrate a wrong user contract is rejected.",
               "bets": [
                 "B02"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.1.4",
@@ -993,7 +1044,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -1018,7 +1070,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.2.2",
@@ -1033,7 +1086,8 @@
               "proof_first": "Prove/check eligibility arithmetic and lifetime boundaries; Kani coverage does not replace unsafe audit or certify an untested SIMD route.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -1057,7 +1111,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.3.2",
@@ -1072,7 +1127,8 @@
               "proof_first": "State active-only callable preconditions and no-inactive-invocation before implementation; verify guard lowering and its negative controls with both tools at their stated scope.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.3.3",
@@ -1089,7 +1145,8 @@
               "bets": [
                 "B04",
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "5.3.4",
@@ -1106,7 +1163,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
@@ -1146,7 +1204,8 @@
               "proof_first": "Prove segment invariants with Verus and check malformed offsets/expansion in Kani; no first-segment schema sampling.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.1.2",
@@ -1161,7 +1220,8 @@
               "proof_first": "Specify count and key-equivalence rules first; Verus proves maps and Kani checks checked sums/empty cycles and stable equivalence cases.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.1.3",
@@ -1177,7 +1237,8 @@
               "bets": [
                 "B02",
                 "B07"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -1202,7 +1263,8 @@
               "proof_first": "Specify accumulator history and collision order before loops; Verus proves reduction/merge obligations and Kani checks executable bounds/failure paths.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.2.2",
@@ -1217,7 +1279,8 @@
               "proof_first": "Write atomic commit/frame conditions first; prove the sequential transition relation and Kani-check success, precommit failure, and cancellation reachability.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.2.3",
@@ -1235,7 +1298,8 @@
               "bets": [
                 "B07",
                 "B08"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.2.4",
@@ -1252,7 +1316,8 @@
               "bets": [
                 "B07",
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -1275,7 +1340,8 @@
               "proof_first": "State which application properties follow from collection contracts and which need domain/oracle evidence before measuring adoption.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.3.2",
@@ -1291,7 +1357,8 @@
               "proof_first": "Compose the packet consumer contract first; verify structural correspondence independently of the trusted numerical intersection implementation.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.3.3",
@@ -1307,7 +1374,8 @@
               "proof_first": "Prove segment ownership through public contracts; geometric coincidence/tie correctness needs its own domain proof or external evidence.",
               "bets": [
                 "B07"
-              ]
+              ],
+              "status": "open"
             },
             {
               "id": "6.3.4",
@@ -1325,7 +1393,8 @@
               "bets": [
                 "B07",
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
@@ -1363,7 +1432,8 @@
               "proof_first": "Any promoted backend requires a proof-first contract and refinement/TCB disposition before implementation, including numeric equivalence.",
               "bets": [
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -1385,7 +1455,8 @@
               "proof_first": "Specify termination, effects and scalar model before promotion; an unsupported proof domain cannot become an implicit trusted primitive.",
               "bets": [
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         },
@@ -1407,7 +1478,8 @@
               "proof_first": "Promotion requires a new execution/refinement and concurrency proof plan; scalar evidence cannot certify the accelerator by association.",
               "bets": [
                 "B08"
-              ]
+              ],
+              "status": "open"
             }
           ]
         }
