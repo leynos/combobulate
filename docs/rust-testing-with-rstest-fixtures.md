@@ -532,26 +532,33 @@ reference to this shared instance.
 use rstest::*;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+static EXPENSIVE_SETUP_CALLS: AtomicUsize = AtomicUsize::new(0);
+
 #[fixture]
 #[once]
-fn expensive_setup() -> AtomicUsize {
+fn expensive_setup() -> String {
     // Simulate expensive setup
     println!("Performing expensive_setup once…");
-    let counter = AtomicUsize::new(0);
-    counter.fetch_add(1, Ordering::Relaxed); // To demonstrate it's called once
-    counter
+    EXPENSIVE_SETUP_CALLS.fetch_add(1, Ordering::Relaxed);
+    "ready".to_string()
 }
 
 #[rstest]
-fn test_once_1(expensive_setup: &'static AtomicUsize) {
-    assert_eq!(expensive_setup.load(Ordering::Relaxed), 1);
+fn test_once_1(expensive_setup: &'static String) {
+    assert_eq!(EXPENSIVE_SETUP_CALLS.load(Ordering::Relaxed), 1);
+    assert_eq!(expensive_setup, "ready");
 }
 
 #[rstest]
-fn test_once_2(expensive_setup: &'static AtomicUsize) {
-    assert_eq!(expensive_setup.load(Ordering::Relaxed), 1);
+fn test_once_2(expensive_setup: &'static String) {
+    assert_eq!(EXPENSIVE_SETUP_CALLS.load(Ordering::Relaxed), 1);
+    assert_eq!(expensive_setup, "ready");
 }
 ```
+
+The module-level atomic counter persists independently of the fixture's return
+value. Both tests verify that the fixture was invoked once and that the shared
+fixture value is available.
 
 When using `#[once]`, there are critical warnings:
 
@@ -567,10 +574,8 @@ When using `#[once]`, there are critical warnings:
    using `impl Trait` in arguments or return types).
 3. **Attribute Propagation:** `rstest` macros currently drop `#[expect]`
    attributes from fixtures and test functions. If a test relies on a lint
-   expectation, restructure it so the lint-triggering code and its narrowly
-   scoped `#[expect]` are in an ordinary helper outside the macro expansion.
-   Prefer removing the lint-triggering pattern when possible. Do not replace
-   expectations with `#[allow]`; repository policy forbids that suppression.
+   expectation, use `#[allow]` instead and note the workaround in a comment
+   referencing this upstream limitation.
 
 The "never dropped" behaviour arises because `rstest` typically creates a
 `static` variable to hold the result of the `#[once]` fixture. `static`
@@ -833,12 +838,14 @@ These attributes significantly reduce boilerplate associated with async code,
 making the test logic appear more synchronous and easier to read by abstracting
 away some of the explicit `async`/`.await` mechanics.
 
-### D. Test timeouts for async tests (`#[timeout]`)
+### D. Test timeouts for synchronous and asynchronous tests (`#[timeout]`)
 
-Long-running, or stalled, asynchronous operations can cause tests to hang
-indefinitely. `rstest` provides a `#[timeout(…)]` attribute to set a maximum
-execution time for async tests. This feature typically relies on the
-`async-timeout` feature of `rstest`, which is enabled by default.
+Long-running or stalled operations can cause tests to hang indefinitely.
+`rstest` provides a `#[timeout(…)]` attribute to set a maximum execution time
+for both synchronous and asynchronous tests. Async tests use the
+`async-timeout` feature of `rstest`, which is enabled by default. The examples
+below show asynchronous tests; the same timeout attribute also applies to
+synchronous tests.
 
 ```rust,no_run
 use rstest::*;
@@ -865,16 +872,16 @@ async fn test_operation_exceeds_timeout() {
 }
 ```
 
-A default timeout for all `rstest` async tests can also be set using the
-`RSTEST_TIMEOUT` environment variable (value in seconds), evaluated at test
-compile time. This built-in timeout support is a practical feature for ensuring
-test suite stability.
+A default timeout for `rstest` tests can also be set using the `RSTEST_TIMEOUT`
+environment variable. Its value is in seconds and is evaluated at test compile
+time. This built-in timeout support is a practical feature for ensuring test
+suite stability.
 
 Table: Environment variables for `rstest` fixture execution
 
-| Variable name    | Meaning                                                          | Default or rule                                                  |
-| ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `RSTEST_TIMEOUT` | Sets a default timeout, in seconds, for all `rstest` async tests | Value in seconds; evaluated at compile time; no default if unset |
+| Variable name    | Meaning                                                | Default or rule                                                  |
+| ---------------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| `RSTEST_TIMEOUT` | Sets a default timeout, in seconds, for `rstest` tests | Value in seconds; evaluated at compile time; no default if unset |
 
 ## VII. Working with external resources and test data
 
@@ -913,21 +920,19 @@ fn temp_directory() -> TempDir {
 #[fixture]
 fn temp_file_with_content(
     #[from(temp_directory)] // Use #[from] if name differs or for clarity
-    temp_dir: TempDir,
+    temp_dir: &TempDir, // Take a reference to ensure TempDir outlives this fixture's direct use
     #[default("Hello, rstest from a temp file!")] content: &str
-) -> (TempDir, PathBuf) {
+) -> PathBuf {
     let file_path = temp_dir.path().join("my_temp_file.txt");
     let mut file = File::create(&file_path).expect("Failed to create temporary file");
     file.write_all(content.as_bytes()).expect("Failed to write to temporary file");
-    (temp_dir, file_path)
+    file_path
 }
 
 #[rstest]
-fn test_read_from_temp_file(temp_file_with_content: (TempDir, PathBuf)) {
-    // Keep the owner alive until the file has been read and checked.
-    let (_temp_dir, file_path) = temp_file_with_content;
-    assert!(file_path.exists());
-    let mut file = File::open(file_path).expect("Failed to open temp file");
+fn test_read_from_temp_file(temp_file_with_content: PathBuf) {
+    assert!(temp_file_with_content.exists());
+    let mut file = File::open(temp_file_with_content).expect("Failed to open temp file");
     let mut read_content = String::new();
     file.read_to_string(&mut read_content).expect("Failed to read temp file");
     assert_eq!(read_content, "Hello, rstest from a temp file!");
@@ -1392,7 +1397,7 @@ provided by `rstest`:
 | #[from(original_name)]     | Allows renaming an injected fixture argument in the test function.                           |
 | #[with(…)]                 | Overrides default arguments of a fixture for a specific test.                                |
 | #[default(…)]              | Provides default values for arguments within a fixture function.                             |
-| #[timeout(…)]              | Sets a timeout for an asynchronous test.                                                     |
+| #[timeout(…)]              | Sets a timeout for a synchronous or asynchronous test.                                       |
 | #[files("glob_pattern",…)] | Injects file paths (or contents, with mode=) matching a glob pattern as test arguments.      |
 
 By mastering `rstest`, Rust developers can significantly elevate the quality
