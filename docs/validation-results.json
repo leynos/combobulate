@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 16
+      "count": 18
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 67
+      "count": 82
     },
     {
       "check": "catalogue",
@@ -23,7 +23,7 @@
     {
       "check": "roadmap",
       "status": "pass",
-      "detail": "1 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
+      "detail": "2 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
       "count": 72
     },
     {
@@ -35,7 +35,7 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 8 of 15 decisions are accepted. Acceptance is not verification.",
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 12 of 15 decisions are accepted. Acceptance is not verification.",
       "count": 15
     },
     {
@@ -90,7 +90,25 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 41
+      "count": 46
+    },
+    {
+      "check": "contract-examples",
+      "status": "pass",
+      "detail": "Tagged-scalar examples of the accepted numeric, validity, reduction, cell, and commit contracts evaluate as recorded in the documentation model.",
+      "count": 51
+    },
+    {
+      "check": "semantic-contracts",
+      "status": "pass",
+      "detail": "Contract records are complete, cite accepted decisions, registered errors, owned examples, and real discharge targets; every seeded mutation changes an outcome; superseded names stay out of the catalogue.",
+      "count": 10
+    },
+    {
+      "check": "macro-grammar",
+      "status": "pass",
+      "detail": "The comb! corpus parses as recorded in the documentation model, covers every precedence level and rejection rule, and agrees with ADR-0007. Task 2.3.1 replays it through trybuild.",
+      "count": 28
     },
     {
       "check": "package-policy",
@@ -101,8 +119,8 @@
     {
       "check": "roadmap-status",
       "status": "pass",
-      "detail": "1 of 72 tasks ticked (1.1.1); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
-      "count": 1
+      "detail": "2 of 72 tasks ticked (1.1.1, 1.1.2); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 2
     }
   ],
   "not_run": [

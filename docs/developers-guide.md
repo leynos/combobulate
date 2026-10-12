@@ -468,6 +468,27 @@ superseding record and link both directions with `supersedes` and
 `superseded_by`. ADRs live in `docs/adrs/` as `adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
 
+Semantic contracts live in `spec/semantic-contracts.json`
+(`spec/semantic-contract.schema.json`): one record per public primitive's
+logical contract, independent of any implementation, with preconditions,
+success and error relations, the empty rule, examples, seeded mutations, the
+obligation component that discharges it, and a proof sketch. Its examples are
+the tagged-scalar `contract_cases` in `spec/examples.json` (`{"f64": "-0.0"}`,
+`{"f64_bits": "0x..."}`, `{"i64": "..."}`), evaluated by
+`tools/docs_validation/contract_examples.py`, and the `comb!` corpus in
+`spec/macro-grammar.json`, recognized by `tools/docs_validation/grammar.py`.
+Both models describe the contracts, not the Rust code; tasks 1.2.3 and 2.3.1
+replay them as `rstest` cases and `trybuild` fixtures, after which the grammar
+recognizer is deleted. `spec/kernel-contract.schema.json` does not fit
+primitive contracts: it declares a native kernel's capabilities, layout, and
+evidence status for one implementation. A kernel contract's `outcomes` use the
+same field names (`success_relation`, `success_conditions`, `error_relation`,
+`mutation_frame`, `termination`), and a kernel contract cites the semantic
+contract identifiers it implements. Each catalogue entry's `contract` text
+cites its record (for example `Contract: SC-03.`), and the design checks reject
+a missing citation, an unregistered error code, an example no record owns, or a
+seeded mutation that changes no outcome.
+
 A ticked roadmap checkbox is a claim, and
 `tools/docs_validation/roadmap_status.py` is the single owner of what backs it.
 Before ticking a task, add its entry to `spec/task-completion.json`, naming the

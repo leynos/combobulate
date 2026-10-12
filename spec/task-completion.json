@@ -22,6 +22,24 @@
         "docs/developers-guide.md#licence-and-publication",
         "Cargo.toml"
       ]
+    },
+    {
+      "task": "1.1.2",
+      "decisions": [
+        "D07",
+        "D08",
+        "D09",
+        "D10",
+        "D14"
+      ],
+      "artefacts": [
+        "docs/adrs/adr-0006-numeric-validity-and-reduction-contracts.md",
+        "docs/adrs/adr-0007-comb-macro-grammar-and-staging.md",
+        "spec/semantic-contracts.json",
+        "spec/semantic-contract.schema.json",
+        "spec/macro-grammar.json",
+        "spec/examples.json"
+      ]
     }
   ]
 }

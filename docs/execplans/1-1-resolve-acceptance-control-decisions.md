@@ -272,7 +272,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   controls pass (reinserting the Q4 sentence, rewrapped or not, writing "Q4
   remains open", or deleting the Q4 anchor each fails naming D03); task 1.1.1
   ticked with its completion record, and the checker reports it backed.
-- [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
+- [x] (2026-10-11) `EP-M3` Task 1.1.2: semantic and macro contract records
+  (branch `1-1-semantic-contracts`, stacked on `EP-M2`). Evidence: ADR-0006 and
+  ADR-0007 accepted; D08, D09, D10, and D14 accepted with session references
+  (D08 and D09 share one answer); `spec/semantic-contracts.json` holds `SC-01`
+  to `SC-10` with 51 handwritten tagged-scalar examples (`EX21` to `EX71`) and
+  a 28-entry `comb!` corpus (`G01` to `G28`); 29 catalogue contracts cite their
+  records; seven superseded names are excluded; 211 `unittest` cases pass,
+  including 26 new ones (VO-8 to VO-10 negative controls, four Hypothesis
+  properties, and the ADR-0007 table agreement); every seeded mutation changes
+  at least one outcome; the recognizer is 198 lines; task 1.1.2 ticked and
+  backed.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
@@ -340,6 +350,28 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M3` exceeded the per-milestone line tolerance (about 2,800
+  net added lines against 1,500, excluding the regenerated reference table, the
+  register region, the export, and the report; 24 files, within the file
+  tolerance). About 1,480 lines are the three JSON data files the milestone
+  exists to create (`spec/examples.json` additions, 562;
+  `spec/semantic-contracts.json`, 534; `spec/macro-grammar.json`, 385), written
+  with the repository's indented JSON style. Escalated to the sponsor in the
+  milestone pull request; splitting the contracts from their examples would
+  have left either half unverifiable. Date/Author: 2026-10-11, implementing
+  agent.
+- Decision: in `EP-M3`, contract records whose rules come from technical
+  design §6 rather than from D08 to D14 (association, empty identities,
+  conversion, integer division, Kleene logic) cite D07, the accepted decision
+  that assigned numerical and array semantics to ADR-0006. Error relations name
+  registered codes only; `Propagated` marks an operation's own failure passing
+  through unchanged, and `MacroSyntax` a grammar rejection. The examples were
+  written by hand from the contracts, not generated from the model, so the
+  model is checked against them. Deviation: the two models
+  (`contract_examples.py`, `grammar.py`) were written before their test suites
+  rather than after a red run; non-vacuity rests on the handwritten
+  expectations, the seeded mutations each changing an outcome, and the
+  in-memory negative controls. Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M1b` milestone review dispositions. Fixed: completion
   artefacts must resolve inside the repository; the real-roadmap closure test
   runs the full check sequence so a tick that relies on a checker-sourced

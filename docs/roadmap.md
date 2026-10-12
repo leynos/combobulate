@@ -1,7 +1,7 @@
 # Combobulate roadmap
 
-Revision 0.2, 6 October 2026. Task 1.1.1 is complete; all other work remains
-proposed and open.
+Revision 0.2, 6 October 2026. Tasks 1.1.1 and 1.1.2 are complete; all other
+work remains proposed and open.
 
 Decisions that control acceptance, with their authority, options, and status,
 are recorded in the [decision register](decision-register.md).
@@ -70,7 +70,7 @@ criteria. See `technical-design.md` §§1-2, 15-16.
     approval is not verification. Bets: B01.
   - Success: ToR Q1/Q4/Q7 have explicit owner decisions; the Core/Integration
     boundary and candidate ADR disposition match all five documents.
-- [ ] 1.1.2. Record the numeric, validity, reduction, and macro-staging
+- [x] 1.1.2. Record the numeric, validity, reduction, and macro-staging
   contracts.
   - Requires 1.1.1.
   - See `technical-design.md` §§4-7, 17.

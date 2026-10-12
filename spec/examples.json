@@ -279,5 +279,567 @@
       "expected_error": "IntegerOverflow"
     }
   ],
+  "scalar_encoding": "Plain JSON integers are I64, booleans are Bool, and null is invalid. F64 values are tagged {\"f64\": \"<decimal>\"} or {\"f64_bits\": \"<hex>\"}, and wide I64 values {\"i64\": \"<decimal>\"}, so signed zeros, NaN payloads, and 64-bit integers survive JSON.",
+  "contract_cases": [
+    {
+      "id": "EX21",
+      "contract": "SC-01",
+      "operation": "reduce",
+      "binary": "sub",
+      "input": [
+        10,
+        3,
+        2
+      ],
+      "expected": 9
+    },
+    {
+      "id": "EX22",
+      "contract": "SC-01",
+      "operation": "reduce",
+      "binary": "sub",
+      "input": [
+        5
+      ],
+      "expected": 5
+    },
+    {
+      "id": "EX23",
+      "contract": "SC-02",
+      "operation": "sum",
+      "input": [],
+      "dtype": "I64",
+      "expected": 0
+    },
+    {
+      "id": "EX24",
+      "contract": "SC-02",
+      "operation": "sum",
+      "input": [],
+      "dtype": "F64",
+      "expected": {
+        "f64": "0.0"
+      }
+    },
+    {
+      "id": "EX25",
+      "contract": "SC-02",
+      "operation": "product",
+      "input": [],
+      "dtype": "I64",
+      "expected": 1
+    },
+    {
+      "id": "EX26",
+      "contract": "SC-02",
+      "operation": "any",
+      "input": [],
+      "dtype": "Bool",
+      "expected": false
+    },
+    {
+      "id": "EX27",
+      "contract": "SC-02",
+      "operation": "all",
+      "input": [],
+      "dtype": "Bool",
+      "expected": true
+    },
+    {
+      "id": "EX28",
+      "contract": "SC-02",
+      "operation": "minimum",
+      "input": [],
+      "dtype": "I64",
+      "expected_error": "EmptyReduction"
+    },
+    {
+      "id": "EX29",
+      "contract": "SC-02",
+      "operation": "maximum",
+      "input": [],
+      "dtype": "F64",
+      "expected_error": "EmptyReduction"
+    },
+    {
+      "id": "EX30",
+      "contract": "SC-02",
+      "operation": "mean",
+      "input": [],
+      "dtype": "F64",
+      "expected_error": "EmptyMean"
+    },
+    {
+      "id": "EX31",
+      "contract": "SC-02",
+      "operation": "minimum",
+      "input": [
+        5
+      ],
+      "dtype": "I64",
+      "identity": 0,
+      "expected": 5
+    },
+    {
+      "id": "EX32",
+      "contract": "SC-02",
+      "operation": "minimum",
+      "input": [],
+      "dtype": "I64",
+      "identity": 0,
+      "expected": 0
+    },
+    {
+      "id": "EX33",
+      "contract": "SC-02",
+      "operation": "minimum",
+      "input": [],
+      "dtype": "I64",
+      "identity": {
+        "f64": "0.0"
+      },
+      "expected_error": "IdentityDtype"
+    },
+    {
+      "id": "EX34",
+      "contract": "SC-03",
+      "operation": "idiv",
+      "args": [
+        -7,
+        2
+      ],
+      "expected": -3
+    },
+    {
+      "id": "EX35",
+      "contract": "SC-03",
+      "operation": "rem",
+      "args": [
+        -7,
+        2
+      ],
+      "expected": -1
+    },
+    {
+      "id": "EX36",
+      "contract": "SC-03",
+      "operation": "idiv",
+      "args": [
+        {
+          "i64": "-9223372036854775808"
+        },
+        -1
+      ],
+      "expected_error": "IntegerOverflow"
+    },
+    {
+      "id": "EX37",
+      "contract": "SC-03",
+      "operation": "idiv",
+      "args": [
+        1,
+        0
+      ],
+      "expected_error": "DivisionByZero"
+    },
+    {
+      "id": "EX38",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": 9007199254740993,
+      "to": "F64",
+      "expected": {
+        "f64": "9007199254740992.0"
+      }
+    },
+    {
+      "id": "EX39",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": {
+        "f64": "9223372036854775808.0"
+      },
+      "to": "I64",
+      "expected_error": "OutOfRange"
+    },
+    {
+      "id": "EX40",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": {
+        "f64": "-9223372036854775808.0"
+      },
+      "to": "I64",
+      "expected": {
+        "i64": "-9223372036854775808"
+      }
+    },
+    {
+      "id": "EX41",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": {
+        "f64": "-0.0"
+      },
+      "to": "I64",
+      "expected": 0
+    },
+    {
+      "id": "EX42",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": {
+        "f64_bits": "0x7ff8000000000000"
+      },
+      "to": "I64",
+      "expected_error": "NonFinite"
+    },
+    {
+      "id": "EX43",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": {
+        "f64": "1.5"
+      },
+      "to": "I64",
+      "expected_error": "NonIntegral"
+    },
+    {
+      "id": "EX44",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": true,
+      "to": "I64",
+      "expected": 1
+    },
+    {
+      "id": "EX45",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": false,
+      "to": "F64",
+      "expected": {
+        "f64": "0.0"
+      }
+    },
+    {
+      "id": "EX46",
+      "contract": "SC-04",
+      "operation": "cast",
+      "input": 1,
+      "to": "Bool",
+      "expected_error": "InvalidCast"
+    },
+    {
+      "id": "EX47",
+      "contract": "SC-04",
+      "operation": "add",
+      "args": [
+        1,
+        {
+          "f64": "2.0"
+        }
+      ],
+      "expected_error": "DtypeMismatch"
+    },
+    {
+      "id": "EX48",
+      "contract": "SC-05",
+      "operation": "div",
+      "args": [
+        9007199254740993,
+        3
+      ],
+      "expected": {
+        "f64": "3002399751580330.5"
+      }
+    },
+    {
+      "id": "EX49",
+      "contract": "SC-05",
+      "operation": "div",
+      "args": [
+        1,
+        0
+      ],
+      "expected": {
+        "f64": "inf"
+      }
+    },
+    {
+      "id": "EX50",
+      "contract": "SC-05",
+      "operation": "div",
+      "args": [
+        -7,
+        2
+      ],
+      "expected": {
+        "f64": "-3.5"
+      }
+    },
+    {
+      "id": "EX51",
+      "contract": "SC-06",
+      "operation": "and",
+      "args": [
+        false,
+        null
+      ],
+      "expected": false
+    },
+    {
+      "id": "EX52",
+      "contract": "SC-06",
+      "operation": "and",
+      "args": [
+        true,
+        null
+      ],
+      "expected": null
+    },
+    {
+      "id": "EX53",
+      "contract": "SC-06",
+      "operation": "or",
+      "args": [
+        true,
+        null
+      ],
+      "expected": true
+    },
+    {
+      "id": "EX54",
+      "contract": "SC-06",
+      "operation": "or",
+      "args": [
+        false,
+        null
+      ],
+      "expected": null
+    },
+    {
+      "id": "EX55",
+      "contract": "SC-06",
+      "operation": "xor",
+      "args": [
+        true,
+        null
+      ],
+      "expected": null
+    },
+    {
+      "id": "EX56",
+      "contract": "SC-06",
+      "operation": "any",
+      "input": [
+        true,
+        null
+      ],
+      "dtype": "Bool",
+      "expected": null
+    },
+    {
+      "id": "EX57",
+      "contract": "SC-06",
+      "operation": "any",
+      "input": [
+        true,
+        null
+      ],
+      "dtype": "Bool",
+      "skip_nulls": true,
+      "expected": true
+    },
+    {
+      "id": "EX58",
+      "contract": "SC-06",
+      "operation": "sum",
+      "input": [
+        null
+      ],
+      "dtype": "I64",
+      "skip_nulls": true,
+      "expected": 0
+    },
+    {
+      "id": "EX59",
+      "contract": "SC-06",
+      "operation": "minimum",
+      "input": [
+        null
+      ],
+      "dtype": "I64",
+      "skip_nulls": true,
+      "expected_error": "EmptyReduction"
+    },
+    {
+      "id": "EX60",
+      "contract": "SC-07",
+      "operation": "min",
+      "args": [
+        {
+          "f64_bits": "0x7ff8000000000000"
+        },
+        {
+          "f64": "1.0"
+        }
+      ],
+      "expected": {
+        "f64_bits": "0x7ff8000000000000"
+      }
+    },
+    {
+      "id": "EX61",
+      "contract": "SC-07",
+      "operation": "min",
+      "args": [
+        {
+          "f64": "0.0"
+        },
+        {
+          "f64": "-0.0"
+        }
+      ],
+      "expected": {
+        "f64": "-0.0"
+      }
+    },
+    {
+      "id": "EX62",
+      "contract": "SC-07",
+      "operation": "max",
+      "args": [
+        {
+          "f64": "-0.0"
+        },
+        {
+          "f64": "0.0"
+        }
+      ],
+      "expected": {
+        "f64": "0.0"
+      }
+    },
+    {
+      "id": "EX63",
+      "contract": "SC-07",
+      "operation": "min",
+      "args": [
+        null,
+        {
+          "f64_bits": "0x7ff8000000000000"
+        }
+      ],
+      "expected": null
+    },
+    {
+      "id": "EX64",
+      "contract": "SC-07",
+      "operation": "sum",
+      "input": [
+        {
+          "f64": "-0.0"
+        }
+      ],
+      "dtype": "F64",
+      "expected": {
+        "f64": "-0.0"
+      }
+    },
+    {
+      "id": "EX65",
+      "contract": "SC-07",
+      "operation": "mean",
+      "input": [
+        1,
+        2
+      ],
+      "dtype": "I64",
+      "expected": {
+        "f64": "1.5"
+      }
+    },
+    {
+      "id": "EX66",
+      "contract": "SC-07",
+      "operation": "mean_count",
+      "count": 9007199254740992,
+      "expected": true
+    },
+    {
+      "id": "EX67",
+      "contract": "SC-07",
+      "operation": "mean_count",
+      "count": 9007199254740993,
+      "expected_error": "CountTooLarge"
+    },
+    {
+      "id": "EX68",
+      "contract": "SC-08",
+      "operation": "batch_axis",
+      "cell": "DVec3",
+      "shape": [
+        2,
+        3
+      ],
+      "axis": 2,
+      "expected_error": "AxisOutOfRange"
+    },
+    {
+      "id": "EX69",
+      "contract": "SC-08",
+      "operation": "batch_axis",
+      "cell": "DVec3",
+      "shape": [
+        2,
+        3
+      ],
+      "axis": 1,
+      "expected": 6
+    },
+    {
+      "id": "EX70",
+      "contract": "SC-09",
+      "operation": "atomic_commit",
+      "destination": [
+        1,
+        2,
+        3
+      ],
+      "output": [
+        7,
+        8,
+        9
+      ],
+      "fail_at": 2,
+      "expected": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "EX71",
+      "contract": "SC-09",
+      "operation": "atomic_commit",
+      "destination": [
+        1,
+        2,
+        3
+      ],
+      "output": [
+        7,
+        8,
+        9
+      ],
+      "fail_at": null,
+      "expected": [
+        7,
+        8,
+        9
+      ]
+    }
+  ],
   "semantic_changes_from_0_1": "none"
 }
