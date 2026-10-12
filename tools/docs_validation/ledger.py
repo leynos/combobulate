@@ -122,10 +122,9 @@ def check_generated_documents(context: ValidationContext, catalogue: list[dict])
 
 
 def check_task_links(context: ValidationContext, tasks: dict[str, dict]) -> None:
-    """Require open roadmap checkboxes and valid trace links; invented completion fails."""
-    text = (context.root / 'docs/roadmap.md').read_text()
-    require(not re.search(r'^- \[[xX]\]', text, re.M), 'Roadmap has fabricated completed tasks')
-    actual = re.findall(r'^- \[ \] (\d+\.\d+\.\d+)\.', text, re.M)
+    """Require one checkbox per task and valid trace links; ticks are judged by roadmap_status."""
+    text = (context.root / 'docs/roadmap.md').read_text(encoding='utf-8')
+    actual = re.findall(r'^- \[[ xX]\] (\d+\.\d+\.\d+)\.', text, re.M)
     require(set(actual) == set(tasks) and len(actual) == len(tasks), 'Checkbox/task ledger mismatch')
     trace = context.load('spec/traceability.json')
     for group in ['requirements', 'verification']:
@@ -147,5 +146,7 @@ def check_catalogue_and_roadmap(context: ValidationContext) -> None:
     check_roadmap_export(context)
     check_task_links(context, tasks)
     context.record('catalogue', 'Unique IDs, scope labels, semantic table regeneration, and task mappings pass.', len(catalogue))
-    context.record('roadmap', 'All tasks remain open, have success/design contracts, and form an acyclic earlier-dependency graph.', len(tasks))
+    ticked = sum(task['status'] == 'done' for task in tasks.values())
+    context.record('roadmap', f'{ticked} of {len(tasks)} tasks ticked; every task has success/design contracts, and the '
+                              'dependencies form an acyclic earlier-dependency graph.', len(tasks))
     context.record('design-coverage', 'All 19 numbered design sections occur in task references; this is referential coverage, not proof of complete implementation scope.', len(sections))

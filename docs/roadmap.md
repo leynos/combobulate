@@ -7,9 +7,12 @@ are recorded in the [decision register](decision-register.md).
 
 This roadmap translates `terms-of-reference.md`, `technical-design.md`,
 `context.md`, and `language-reference.md` into proposed delivery work. It makes
-no date or duration commitments. Every checkbox is open: this pack documents
-work, not implementation evidence. Read `technical-design.md` §1 and
-`references.md` for the inspected baseline and source limitations.
+no date or duration commitments. A ticked checkbox is a claim the design checks
+verify: the task's prerequisites are ticked, its completion record in
+`spec/task-completion.json` cites accepted decisions and resolvable artefacts,
+and every proof-obligation component linked to it is satisfied. Read
+`technical-design.md` §1 and `references.md` for the inspected baseline and
+source limitations.
 
 GIST means Goals, Ideas, Steps, and Tasks. ToR goals G1-G8 supply the outcomes;
 phases state falsifiable ideas; steps answer delivery questions; tasks are

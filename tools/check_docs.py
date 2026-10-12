@@ -11,6 +11,8 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import sys
+from datetime import date
 from pathlib import Path
 
 from jsonschema import ValidationError
@@ -21,8 +23,10 @@ from docs_validation.contracts import (
 )
 from docs_validation.costs import check_cost_examples
 from docs_validation.decisions import check_decision_register
+from docs_validation.freeze import check_frozen
 from docs_validation.ledger import check_catalogue_and_roadmap
 from docs_validation.markdown import check_markdown
+from docs_validation.roadmap_status import check_roadmap_status
 from docs_validation.semantics import check_examples
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -62,6 +66,7 @@ def collect_checks(context: ValidationContext) -> None:
         check_markdown, check_catalogue_and_roadmap, check_decision_register, check_kernel_envelope,
         check_examples, check_revision_contracts,
         check_proof_evidence_envelope, check_cost_examples, check_tool_sources,
+        check_roadmap_status,
     ):
         check(context)
 
@@ -77,10 +82,13 @@ def main(argv: list[str] | None = None) -> int:
     """Check sources and committed evidence; --write explicitly regenerates valid evidence."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--write', action='store_true', help='Regenerate the evidence report after checks pass')
+    parser.add_argument('--as-of', type=date.fromisoformat, help='Evaluation date (YYYY-MM-DD); no wall clock is read')
+    parser.add_argument('--base-rev', help='Git revision whose frozen registers the working tree must not edit')
     args = parser.parse_args(argv)
-    context = ValidationContext(ROOT)
+    context = ValidationContext(ROOT, as_of=args.as_of)
     try:
         collect_checks(context)
+        freeze_summary = check_frozen(context, args.base_rev)
         report = report_data(context, 'pass')
         if args.write:
             (context.root / 'docs/validation-results.json').write_text(
@@ -93,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report_data(context, 'fail'), indent=2))
         raise SystemExit(str(error)) from error
     print(json.dumps(report, indent=2))
+    print(freeze_summary, file=sys.stderr)
     return 0
 
 

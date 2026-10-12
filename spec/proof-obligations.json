@@ -20,6 +20,28 @@
       ],
       "scope": "Verus proves structural arithmetic; Kani checks the shipped finite-width checker over symbolic dimensions without allocating those dimensions.",
       "non_vacuity": "Positive scalar and nonzero shapes plus zero-times-large extents; mutate the zero-first and overflow checks.",
+      "components": [
+        {
+          "id": "PF01.proof@1.2.4",
+          "method": "proof",
+          "task": "1.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF01.proof@2.1.1",
+          "method": "proof",
+          "task": "2.1.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -44,6 +66,48 @@
       ],
       "scope": "Generic sequence/cell proofs plus bounded executable mapping and machine-width checks; unsafe pointer refinements need separate audit/Miri evidence.",
       "non_vacuity": "Nonempty rectangular values, null cells and repeated legal gathers; mutate a stride, domain generation or permutation uniqueness check.",
+      "components": [
+        {
+          "id": "PF02.proof@2.1.2",
+          "method": "proof",
+          "task": "2.1.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF02.proof@3.1.1",
+          "method": "proof",
+          "task": "3.1.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF02.proof@3.2.1",
+          "method": "proof",
+          "task": "3.2.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF02.proof@3.2.4",
+          "method": "proof",
+          "task": "3.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -65,6 +129,28 @@
       ],
       "scope": "Prove the schema relation; count actual kernel calls in bounded cases.",
       "non_vacuity": "[0,3] rows(mean) has zero calls, [3,0] errors, [0,3,4] rank-2 transpose yields [0,4,3]; no first-cell sampling.",
+      "components": [
+        {
+          "id": "PF03.proof@3.1.1",
+          "method": "proof",
+          "task": "3.1.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF03.proof@3.1.2",
+          "method": "proof",
+          "task": "3.1.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -90,6 +176,38 @@
       ],
       "scope": "Verus establishes local semantic/refinement rules; Kani checks bounded graph compositions and executable guards. Rust macro correctness also needs compile/UI checks.",
       "non_vacuity": "Shared host expression executes once; intentionally change flow ordering or move a fallible node across its guard.",
+      "components": [
+        {
+          "id": "PF04.proof@2.3.2",
+          "method": "proof",
+          "task": "2.3.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF04.proof@2.3.5",
+          "method": "proof",
+          "task": "2.3.5",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF04.proof@4.2.3",
+          "method": "proof",
+          "task": "4.2.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -114,6 +232,38 @@
       ],
       "scope": "State safety separately from termination/progress. Verus proves sequential state/frame invariants; Kani explores bounded errors and commit transitions.",
       "non_vacuity": "Reach successful commit and error/cancellation paths; always-Err, early-write and duplicate-commit mutations fail.",
+      "components": [
+        {
+          "id": "PF05.proof@2.3.5",
+          "method": "proof",
+          "task": "2.3.5",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF05.proof@6.2.2",
+          "method": "proof",
+          "task": "6.2.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF05.proof@6.2.4",
+          "method": "proof",
+          "task": "6.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -138,6 +288,38 @@
       ],
       "scope": "Use call_requires/call_ensures-style universal postcondition reasoning and typed executable bindings; captures/effects/termination remain explicit.",
       "non_vacuity": "Nonempty active and inactive cells, faulting inactive input and a consumer-defined kernel; rejecting eager select must not rely on an all-false mask.",
+      "components": [
+        {
+          "id": "PF06.proof@2.2.5",
+          "method": "proof",
+          "task": "2.2.5",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF06.proof@5.1.4",
+          "method": "proof",
+          "task": "5.1.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF06.proof@5.3.4",
+          "method": "proof",
+          "task": "5.3.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -162,6 +344,48 @@
       ],
       "scope": "Prove traversal/association and integer checks. IEEE bit/policy reasoning is distinct from real arithmetic or transcendental accuracy.",
       "non_vacuity": "Right subtraction 9 versus left 5, singleton -0, MAX grouping, wrong-count finalizer and unapproved merge mutations.",
+      "components": [
+        {
+          "id": "PF07.proof@2.2.2",
+          "method": "proof",
+          "task": "2.2.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF07.proof@2.2.3",
+          "method": "proof",
+          "task": "2.2.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF07.proof@2.2.5",
+          "method": "proof",
+          "task": "2.2.5",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF07.proof@6.2.1",
+          "method": "proof",
+          "task": "6.2.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -184,6 +408,38 @@
       ],
       "scope": "Verus proves partition composition for owned kernels; Kani checks bounded halos/segments. Upstream backend conformance remains separate.",
       "non_vacuity": "One-cell and awkward chunks, zero extents and empty segments; omit a halo or reset prefix state at a chunk boundary.",
+      "components": [
+        {
+          "id": "PF08.proof@3.3.1",
+          "method": "proof",
+          "task": "3.3.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF08.proof@3.3.2",
+          "method": "proof",
+          "task": "3.3.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF08.proof@6.1.3",
+          "method": "proof",
+          "task": "6.1.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -208,6 +464,48 @@
       ],
       "scope": "Verus proves cost-expression and admission soundness; Kani checks finite-width overflow and branch outcomes. No theorem about elapsed time or untracked backend allocation.",
       "non_vacuity": "Exact, interval and unknown examples including 4096^2 F64, zero products and cross-width overflow; mutate upper/lower direction or unknown handling.",
+      "components": [
+        {
+          "id": "PF09.proof@1.2.4",
+          "method": "proof",
+          "task": "1.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF09.proof@2.4.1",
+          "method": "proof",
+          "task": "2.4.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF09.proof@2.4.2",
+          "method": "proof",
+          "task": "2.4.2",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF09.proof@2.4.3",
+          "method": "proof",
+          "task": "2.4.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -230,6 +528,28 @@
       ],
       "scope": "Prove the small checker, not planner optimality. Scope the theorem to named buffers, scratch, metadata and permitted concurrency.",
       "non_vacuity": "Admit a small allocation then reject next growth; omit halo, reuse stale schedule identity or conflate aliased handles with distinct allocations.",
+      "components": [
+        {
+          "id": "PF10.proof@3.3.3",
+          "method": "proof",
+          "task": "3.3.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF10.proof@4.3.1",
+          "method": "proof",
+          "task": "4.3.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -254,6 +574,48 @@
       ],
       "scope": "Verify owned capability and policy checking; explicitly trust/test upstream execution. Python version and documentation alone do not constitute Rust conformance evidence.",
       "non_vacuity": "Attempt Python-only capability admission, deterministic-fallible speculation, stale backend cache and concurrent global-control mutation.",
+      "components": [
+        {
+          "id": "PF11.proof@1.2.6",
+          "method": "proof",
+          "task": "1.2.6",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF11.proof@4.1.3",
+          "method": "proof",
+          "task": "4.1.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF11.proof@4.2.4",
+          "method": "proof",
+          "task": "4.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF11.proof@4.2.5",
+          "method": "proof",
+          "task": "4.2.5",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -278,6 +640,48 @@
       ],
       "scope": "Verus verified dependencies and Kani public executable/contract harnesses retain precise implementation identity and scope.",
       "non_vacuity": "Run correct and incorrect application fixtures; fake trusted executor and private-method stubs cannot satisfy acceptance.",
+      "components": [
+        {
+          "id": "PF12.proof@1.2.5",
+          "method": "proof",
+          "task": "1.2.5",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF12.proof@3.4.1",
+          "method": "proof",
+          "task": "3.4.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF12.proof@5.3.4",
+          "method": "proof",
+          "task": "5.3.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF12.proof@6.2.4",
+          "method": "proof",
+          "task": "6.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -302,6 +706,38 @@
       ],
       "scope": "Prove applicability and frame conditions; executable checks protect unverified safe callers, including interior-mutability or generation boundaries.",
       "non_vacuity": "Same-length different source, stale generation and partial validity cases fail; legal reuse against unchanged bindings succeeds.",
+      "components": [
+        {
+          "id": "PF13.proof@3.2.4",
+          "method": "proof",
+          "task": "3.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF13.proof@5.3.1",
+          "method": "proof",
+          "task": "5.3.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF13.proof@5.3.3",
+          "method": "proof",
+          "task": "5.3.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null
@@ -327,6 +763,48 @@
       ],
       "scope": "Typed binding and dependency verification support semantic review; hashes identify artefacts but do not prove correspondence.",
       "non_vacuity": "Strengthen a precondition, weaken a postcondition, swap a compiled body or import stale verification metadata; dependent gates fail.",
+      "components": [
+        {
+          "id": "PF14.structural@1.1.4",
+          "method": "structural",
+          "task": "1.1.4",
+          "accepts": [
+            "tested"
+          ],
+          "evidence_source": "checker:evidence-gate",
+          "evidence": []
+        },
+        {
+          "id": "PF14.proof@3.4.1",
+          "method": "proof",
+          "task": "3.4.1",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF14.proof@4.3.3",
+          "method": "proof",
+          "task": "4.3.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF14.proof@6.2.4",
+          "method": "proof",
+          "task": "6.2.4",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        }
+      ],
       "status": "planned-not-run",
       "implementation_binding": null,
       "evidence": null

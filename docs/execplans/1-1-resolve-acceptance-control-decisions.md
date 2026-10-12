@@ -251,7 +251,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   mutations (open-status pattern disabled, supersession check removed) each
   fail their control; a hand edit of `docs/decision-register.md` fails the
   drift check (VO-14).
-- [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
+- [x] (2026-10-11) `EP-M1b` Roadmap status, obligation components, and freeze
+  check (branch `1-1-roadmap-closure`, stacked on `EP-M1a`). Evidence: 27
+  `unittest` cases in `tools/tests/test_roadmap_status.py` and
+  `tools/tests/test_freeze.py` (red first: modules missing) pass, covering a
+  chain and a diamond, every MS-4 failure reason, fail-closed record
+  components, a checker-sourced component, and a temporary Git repository for
+  the base-revision comparison; every obligation has one component per linked
+  task, with `PF14.structural@1.1.4` accepting `tested` from
+  `checker:evidence-gate`; `make design-check BASE_REV=...` passes.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
@@ -260,6 +268,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: the hosted `build-test` job failed `make check-fmt` on the
+  plan itself for #9, #11, and #12. Evidence: CI pins mdtablefix 0.6.0, whose
+  `--renumber` treats a wrapped line beginning "2026." as an ordered-list item;
+  the local 0.6.1 does not. Impact: the line was reworded in the plan branch
+  and the stack rebased (range-diff showed identical patches); local formatting
+  checks now also run mdtablefix 0.6.0 before publication.
 - Observation: generated register text containing `Batch<DVec3>` failed
   `make fmt` (markdownlint MD033, inline HTML). Evidence: `make fmt` exit 2
   naming `docs/decision-register.md`. Impact: register master text puts code
@@ -308,6 +322,30 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M1b` milestone review dispositions. Fixed: completion
+  artefacts must resolve inside the repository; the real-roadmap closure test
+  runs the full check sequence so a tick that relies on a checker-sourced
+  component is judged with that check's result; the scheduled workflow passes
+  its run date as `AS_OF` so expiry surfaces while `main` is idle; the two
+  public checker functions gained parameter documentation. Declined: annotating
+  every `unittest` method's return type, because the existing `tools/tests/`
+  suites do not, and the one untyped helper parameter was annotated instead.
+  The re-review's request to require at least one decision in every completion
+  record was declined: MS-4 requires each cited decision to be accepted, and
+  many later tasks (for example 2.1.1) are governed by no register decision, so
+  a mandatory citation would invite invented ones. The second re-review noted
+  that the freeze check covers only decisions; that is the intended `EP-M1b`
+  scope, because the control and exception registers do not exist yet. `EP-M4`
+  and `EP-M5` now state that each register joins `freeze.FROZEN_DOCUMENTS` in
+  the commit that creates it, and the module docstring says so. Date/Author:
+  2026-10-11, implementing agent.
+- Decision: the freeze check's result is printed, not recorded in
+  `docs/validation-results.json`, so the committed report is identical with and
+  without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
+  accepting only `proof` with `evidence_source: record`; the owning task may
+  refine a component before any evidence exists. `spec/task-completion.json`
+  starts empty; each closing milestone adds its task's record. Date/Author:
+  2026-10-11, implementing agent.
 - Decision: `EP-M1a` exceeded the per-milestone line tolerance (about 1,600
   net added lines against 1,500, excluding the generated register region and
   the validation report). The overrun is the register master itself
@@ -1021,7 +1059,10 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
 - Add `spec/acceptance-controls.schema.json`, `spec/acceptance-controls.json`,
   `spec/measurement-record.schema.json` (binding `control_id` and
   `control_digest`; a `purpose` of `calibration` or `acceptance`), and
-  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16).
+  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
+  `spec/acceptance-controls.json` in `freeze.FROZEN_DOCUMENTS` with its
+  amendment-chain rule, so VO-7 covers controls from the commit that creates
+  them.
 
 Calibration (D12), recorded in `docs/acceptance-calibration.md` and machine
 records under `spec/calibration/`:
@@ -1124,7 +1165,9 @@ and the bet register's measurement sentences.
   spelling the gate enforces).
 - Add `spec/exceptions.json` with its schema, update the example and
   `check_proof_evidence_envelope`, and single-source reason codes in
-  `spec/evidence-reason-codes.json`, in one change.
+  `spec/evidence-reason-codes.json`, in one change. Register
+  `spec/exceptions.json` in `freeze.FROZEN_DOCUMENTS` (an accepted exception is
+  replaced, never altered).
 - Implement the pure `tools/docs_validation/evidence_gate.py`
   (`abstract_record`, `admit`), have `roadmap_status.py` consume it, and add
   `scripts/check_evidence.py`. Tests: VO-1 to VO-4.
