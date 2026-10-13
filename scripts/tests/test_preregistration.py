@@ -249,6 +249,7 @@ class Registration(unittest.TestCase):
                              'an internal symlink must hash its in-repository target')
 
             invalid_paths = (
+                (str(source), 'must be repository-relative'),
                 ('/etc/hostname', 'must be repository-relative'),
                 ('C:\\outside.yml', 'must be repository-relative'),
                 ('../outside.yml', 'contains a parent path component'),

@@ -85,7 +85,7 @@ def outcome(record: dict) -> str:
 
 
 def quoted_answer(record: dict) -> str:
-    """Quote a session answer verbatim as a blockquote, keeping its paragraph breaks."""
+    """Quote unchanged answer words and paragraph breaks, rewrapping Markdown soft breaks."""
     reference = record['approval_reference']
     if reference is None or 'answer' not in reference:
         return ''

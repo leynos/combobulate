@@ -91,6 +91,16 @@ def test_multi_paragraph_answer_keeps_its_paragraph_break():
     assert '\n>\n> This breaks from current DF12 standards' in section, 'the blank line in the answer is kept'
 
 
+def test_answer_soft_line_break_keeps_words_in_one_paragraph():
+    register = accepted(REGISTER, 'D03')
+    record = next(entry for entry in register['decisions'] if entry['id'] == 'D03')
+    record['approval_reference']['answer'] = 'First line.\nSecond line.'
+    text = render(register)
+    section = text[text.index('### D03\n'):text.index('### D04\n')]
+    assert '> First line. Second line.\n' in section, 'a soft break may reflow without changing the quoted words'
+    assert record['approval_reference']['answer'] == 'First line.\nSecond line.', 'the approval answer stays intact'
+
+
 def test_splice_rejects_missing_or_repeated_markers():
     with pytest.raises(MarkerError, match='exactly one'):
         splice('# Register\n', 'body')

@@ -54,7 +54,11 @@ def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
 
 
 def _load_source_digests(context: ValidationContext, controls: list[dict]) -> dict[str, str]:
-    """Hash registered workload sources in the composition path; e.g. bind CI YAML to AC-07."""
+    """Hash sources while requiring repository-relative paths; e.g. bind CI YAML to AC-07.
+
+    Absolute paths and literal parent components are rejected before resolution.
+    Resolved paths must remain beneath the repository root, including symlink targets.
+    """
     paths = sorted({source['path'] for control in controls for source in control['frozen']['workload']['sources']})
     root = context.root.resolve()
     digests: dict[str, str] = {}
