@@ -5,10 +5,11 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN_PROGRESS (milestones `EP-M0` to `EP-M6` delivered; review repair).
-Two milestone CLI review rounds are recorded below. The 2026-10-13 current-head
-review found an absolute-source-path defect being repaired; hosted assessments,
-formal reviews, and the sponsor's stack merges remain.
+Status: COMPLETE (implementation of `EP-M0` to `EP-M6` and review repair). The
+2026-10-13 repair passed all seven local gates, and CodeRabbit reassessment of
+`b4e2c14..b079f72` completed with zero findings. Delivery remains pending:
+publication, hosted assessments and formal review, then sponsor-owned stack
+merges.
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -485,7 +486,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   removing the guard and dropping quoted words each failed their designated
   test with exit 1. Evidence:
   `/tmp/mutation-99861d46-f6f5-48d6-acfb-658bee9364bf-1-1-reconciliation.out`.
-- [ ] (2026-10-13) Run all repair gates and reassess locally before publication.
+- [x] (2026-10-13) All seven repair gates passed before commit `b079f72`:
+  formatting, documentation/Clippy/Whitaker lint, typecheck, Rust tests and
+  doctest, design checks with the #17 freeze base, Markdown lint/spelling, and
+  Mermaid validation. Rust: 329 passed, 1 skipped; doctest: 1 passed. Python:
+  266 unittest and 310 pytest tests, including 573 subtests, passed.
+- [x] (2026-10-13) CodeRabbit reassessment of `b4e2c14..b079f72` completed
+  with zero findings across all 90 changed paths. Its result applies to that
+  candidate; the final documentation-only delivery record is validated
+  separately, and hosted assessment remains required.
 - [ ] (2026-10-13) Publish PR #18's validated candidate, obtain its hosted
   completeness/correctness assessment, and reconcile formal review. Sponsor
   review and merge of the preserved stack remain.
@@ -1058,10 +1067,10 @@ Deviations and lessons:
   mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
   `runner`. A stacked synchronize run also reported `main` as its base branch,
   which led to choosing the freeze base by commit.
-- Remaining: reassess the 2026-10-13 source-path repair, publish the current
-  reconciliation candidate, obtain hosted assessments and formal reviews, and
-  leave the sponsor's review and merge of #9 to #18 in stack order. The two
-  earlier milestone CLI review rounds are recorded in `Decision log`.
+- Remaining: publish the validated reconciliation candidate, obtain hosted
+  assessments and formal reviews, and leave the sponsor's review and merge of
+  #9 to #18 in stack order. The two earlier milestone CLI review rounds are
+  recorded in `Decision log`.
 
 
 ## Context and orientation
@@ -2159,6 +2168,15 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   evidence, and recorded the local review's valid and invalid findings.
   Remaining work is repair validation, publication, hosted assessment, formal
   review, and sponsor-owned stack merging.
+- 2026-10-13, completed the source-path repair: all seven local gates passed
+  and CodeRabbit reassessment reported zero findings for `b079f72`. Updated the
+  implementation status and acceptance record without treating local review as
+  hosted assessment, readiness, or a merged stack.
+- 2026-10-14, resumed delivery after the sponsor reported that memory
+  pressure had been alleviated. The validated code candidate remains `b079f72`,
+  with comparison base `b4e2c14`. Refreshed PR #18 metadata confirms the
+  existing draft and stack base. Final documentation checks, publication,
+  hosted assessment, and formal review remain pending.
 - 2026-10-19, EP-M5 completeness follow-up: validate that `--bindings` decodes
   to a JSON object before constructing the admission context. The old candidate
   assessment identified uncaught array and `null` inputs; dedicated CLI
