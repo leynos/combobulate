@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Resolve and behaviourally check the actual pinned Whitaker action before use.
 
-Example: ``python tools/whitaker_probe.py --workflow .github/workflows/ci.yml``.
+Example: ``python scripts/whitaker_probe.py --workflow .github/workflows/ci.yml``.
 Only approved-source acquisition uses the network; capability probes use private
 fake executors. Complete content approval precedes the selected boundary probes.
 """
@@ -25,7 +25,7 @@ ACTION_PATH = 'leynos/shared-actions/.github/actions/install-whitaker'
 MAX_MANIFEST_BYTES = 128 * 1024
 NETWORK_TIMEOUT_SECONDS = 10
 NETWORK_DEADLINE_SECONDS = 30
-APPROVAL = Path(__file__).with_name('whitaker-approved.json')
+APPROVAL = Path(__file__).resolve().parents[1] / 'tools' / 'whitaker-approved.json'
 
 
 class UniqueSafeLoader(yaml.SafeLoader):

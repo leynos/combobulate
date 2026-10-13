@@ -6,7 +6,7 @@
 """Admit proof-evidence records through the evidence gate and report their levels.
 
 Each record is validated against `spec/proof-evidence.schema.json` (schema
-version 2) and then admitted by the gate in `tools/docs_validation/` on the
+version 2) and then admitted by the gate in `scripts/docs_validation/` on the
 date given by ``--as-of``; the wall clock is never read. Exit codes: 0 when every
 record reaches ``--require`` (default `tested`), 1 when any falls short, and 2
 for a schema-invalid record or a usage error. Exceptions come from
@@ -31,7 +31,6 @@ from cyclopts import App, Parameter
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'tools'))
 
 if TYPE_CHECKING:
     from docs_validation.evidence_gate import AdmissionContext

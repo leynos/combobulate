@@ -77,7 +77,7 @@ Term definitions used throughout:
   `PFnn.<method>@<task>` (for example `PF14.structural@1.1.4`). A component
   states which admission levels satisfy it.
 - Evidence gate: the pure admission function in
-  `tools/docs_validation/evidence_gate.py` that maps one evidence record to an
+  `scripts/docs_validation/evidence_gate.py` that maps one evidence record to an
   admission level and a set of reason codes.
 - Negative control: a deliberately broken input that a check must reject for
   the intended reason. A check with no failing negative control is vacuous.
@@ -106,10 +106,10 @@ Term definitions used throughout:
   `docs/decision-register.md` remain generated from their JSON masters.
 - C-EP-6. The design-model checker remains a documentation-model checker. It
   must not claim Rust compilation, Kani, Verus, or Polars results; the
-  `NOT_RUN` list in `tools/check_docs.py` stays truthful.
-- C-EP-7. Checker logic lives in `tools/docs_validation/` and follows the
+  `NOT_RUN` list in `scripts/check_docs.py` stays truthful.
+- C-EP-7. Checker logic lives in `scripts/docs_validation/` and follows the
   existing `tools/` conventions (`unittest` plus pinned Hypothesis with
-  `derandomize=True`, dependencies pinned in `tools/requirements.txt`).
+  `derandomize=True`, dependencies pinned in `scripts/requirements.txt`).
   Runnable helper scripts live in `scripts/` and follow
   `docs/scripting-standards.md` (`uv` shebang, PEP 723 block, Python 3.14,
   Cyclopts with `INPUT_*` environment support, pytest suites in
@@ -168,7 +168,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `tests/` pins edited Makefile or workflow text, update that test in the same
   commit; if the change would alter a tested contract's meaning, escalate.
 - Dependencies: Wenmode 0.15.2 is sponsor-directed (D15). Any other Python
-  dependency beyond `tools/requirements.txt` triggers escalation.
+  dependency beyond `scripts/requirements.txt` triggers escalation.
 - Calibration: if a calibration workload cannot run locally (for example a
   Verus release incompatible with the pinned nightly), record the gap, use the
   nearest runnable proxy with its limitation stated, and report it; do not
@@ -181,7 +181,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Risk: the gate tests its inputs' self-description, so a fabricated record
   passes. Severity: high. Likelihood: high without mitigation. Mitigation:
   C-EP-10; provenance and log digests in the schema; the complete
-  admit-at-`proof` fixture lives only under `tools/tests/fixtures/`.
+  admit-at-`proof` fixture lives only under `scripts/tests/fixtures/`.
 - Risk: a threshold and its digest are edited together in one commit.
   Severity: high. Likelihood: medium. Mitigation: the base-revision freeze
   check (VO-7) compares against the merge base in CI. Without CODEOWNERS (D13),
@@ -258,7 +258,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   exporter cases pass, including `INPUT_CHECK`, malformed-input line reporting,
   and a 60-example derandomized round-trip property that observes every
   structural class; 3 checker-gate cases pass in
-  `tools/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
+  `scripts/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
   ignored ticks) fail the suite. The script runs through its `uv` shebang, and
   `make design-check` passes with the documented `uv` requirements environment.
   The full local gates pass after moving block-node validation to the
@@ -271,14 +271,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   updated and the style guide amended (D07); `spec/decisions.json` holds D01 to
   D15 (all `proposed`) and the eight candidate ADR subjects; 11 pytest cases in
   `scripts/tests/test_generate_decisions.py` (red first: module missing) and 33
-  `unittest` cases in `tools/tests/test_decision_register.py` pass; seeded
+  `unittest` cases in `scripts/tests/test_decision_register.py` pass; seeded
   mutations (open-status pattern disabled, supersession check removed) each
   fail their control; a hand edit of `docs/decision-register.md` fails the
   drift check (VO-14).
 - [x] (2026-10-11) `EP-M1b` Roadmap status, obligation components, and freeze
   check (branch `1-1-roadmap-closure`, stacked on `EP-M1a`). Evidence: 27
-  `unittest` cases in `tools/tests/test_roadmap_status.py` and
-  `tools/tests/test_freeze.py` (red first: modules missing) pass, covering a
+  `unittest` cases in `scripts/tests/test_roadmap_status.py` and
+  `scripts/tests/test_freeze.py` (red first: modules missing) pass, covering a
   chain and a diamond, every MS-4 failure reason, fail-closed record
   components, a checker-sourced component, and a temporary Git repository for
   the base-revision comparison; every obligation has one component per linked
@@ -292,7 +292,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   with 13 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
   Q4, Q7, and Q8 link their register anchors; `Cargo.toml` sets
   `publish = false` and `cargo publish --dry-run` refuses; 4 cases in
-  `tools/tests/test_package_policy.py` (red first) and 6 real-document VO-6
+  `scripts/tests/test_package_policy.py` (red first) and 6 real-document VO-6
   controls pass for the retired Q4 sentence (including a wrapped form), the
   restored roadmap preamble while task 1.1.1 remains checked, "Q4 remains
   open", and removal of the Q4 anchor; each failure names D03. Task 1.1.1 is
@@ -371,8 +371,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   three labelled not calibrated with reasons; the probe in
   `tools/calibration/cardinality-probe/` verifies in Verus (8 functions, a
   seeded mutant rejected) and its structural Kani harnesses satisfy every
-  `cover!`; 29 cases in `tools/tests/test_preregistration.py` and
-  `tools/tests/test_freeze.py` pass, including the exhaustive outcome mapping,
+  `cover!`; 29 cases in `scripts/tests/test_preregistration.py` and
+  `scripts/tests/test_freeze.py` pass, including the exhaustive outcome mapping,
   a Hypothesis property that exercised every frozen field, a
   threshold-plus-digest edit rejected without an amendment, and host-identity
   scans with the local host name supplied at test time; the CI `build-test` job
@@ -393,7 +393,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   checks attempt timestamps, medians, and the registered p90 budget. This
   follow-up remains under review until its candidate gates and sponsor
   assessment pass. CodeScene complexity findings moved AC-07 attempt checks to
-  `tools/docs_validation/ci_controls.py`; `_CiAttemptSummary` carries only the
+  `scripts/docs_validation/ci_controls.py`; `_CiAttemptSummary` carries only the
   facts those checks compose, and the developer guide records the boundary.
   `cs delta origin/main` reports no issues after that refactor. The attempt
   data yield p90 220 s (rank 18 of 20); the draft registration retains that
@@ -531,11 +531,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make fmt` (markdownlint MD033, inline HTML). Evidence: `make fmt` exit 2
   naming `docs/decision-register.md`. Impact: register master text puts code
   identifiers in backticks.
-- Observation: `tools/tests/test_docs_validation.py` pinned the checked
+- Observation: `scripts/tests/test_docs_validation.py` pinned the checked
   Markdown count at 10. Impact: it now derives the count from
   `DESIGN_DOCUMENTS`, so adding a design document needs no test edit.
 - Observation: the checker forbids any completed roadmap task.
-  Evidence: `tools/docs_validation/ledger.py` `check_task_links` fails with
+  Evidence: `scripts/docs_validation/ledger.py` `check_task_links` fails with
   "Roadmap has fabricated completed tasks"; `tools/generate_roadmap.py` always
   emits `- [ ]`. Impact: `EP-M1b` replaces the ban with an evidence check.
 - Observation: PF14 already links task 1.1.4, with methods Verus, Kani, and
@@ -552,7 +552,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Impact: the D08 rule is a syntax-tree check plus a translated parse error.
 - Observation: the system Python lacks `markdown-it-py`, so `make design-check`
   fails without a prepared environment. Impact: concrete steps use
-  `uv run --python 3.14 --with-requirements tools/requirements.txt`.
+  `uv run --python 3.14 --with-requirements scripts/requirements.txt`.
 - Observation: `make spelling` checks only tracked files, and the gate
   rejects the existing schema field spelling `result_art...` (American
   spelling). Impact: commit before relying on the gate; schema version 2
@@ -620,7 +620,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Decision: `EP-M5` exceeded both per-milestone tolerances: 39 changed files
   against 25, and about 1,900 net added lines against 1,500, excluding the
   regenerated regions, the export, and the report. The evidence fixtures (six
-  JSON files under `tools/tests/fixtures/evidence/` plus the rule-table
+  JSON files under `scripts/tests/fixtures/evidence/` plus the rule-table
   fixture), the version 2 schema, and the five test suites the plan requires
   (VO-1 to VO-4 and the command) account for most of it. Escalated to the
   sponsor in the milestone pull request. Date/Author: 2026-10-11, implementing
@@ -631,7 +631,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `outcome-not-run` is not a reason code, because an executed kind that did not
   run fails the validity predicate first. Without an evaluation date the gate
   treats every exception as malformed (fail closed). The parser registry under
-  `tools/tests/fixtures/evidence/` is test-only; the repository registry
+  `scripts/tests/fixtures/evidence/` is test-only; the repository registry
   registers no parser, so verifier evidence stays self-reported until tasks
   1.2.1 and 1.2.4 (C-EP-10). Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M4` milestone review dispositions (CodeRabbit CLI). Fixed in
@@ -717,7 +717,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   component is judged with that check's result; the scheduled workflow passes
   its run date as `AS_OF` so expiry surfaces while `main` is idle; the two
   public checker functions gained parameter documentation. Declined: annotating
-  every `unittest` method's return type, because the existing `tools/tests/`
+  every `unittest` method's return type, because the existing `scripts/tests/`
   suites do not, and the one untyped helper parameter was annotated instead.
   The re-review's request to require at least one decision in every completion
   record was declined: MS-4 requires each cited decision to be accepted, and
@@ -735,12 +735,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Date/Author: 2026-10-15, implementing agent.
 - EP-M1b review conformance repair: the [CodeRabbit completeness
   assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6182674988)
-  found `tools/tests/test_decision_register.py` over the 400-line limit. Move
-  supersession lifecycle cases to `tools/tests/test_supersession_lifecycle.py`.
+  found `scripts/tests/test_decision_register.py` over the 400-line limit. Move
+  supersession lifecycle cases to `scripts/tests/test_supersession_lifecycle.py`.
   Rebasing onto the updated parent added generator-catalogue coverage and
   raised the invariant module above the limit again, so move composed-checker
   and generated-document tests to
-  `tools/tests/test_decision_register_integration.py`. Preserve all regression
+  `scripts/tests/test_decision_register_integration.py`. Preserve all regression
   cases and update the generated Python-source count. Date/Author: 2026-10-15,
   implementing agent.
 - EP-M1b follow-up review: add a composed test for a ticked roadmap with valid
@@ -756,7 +756,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - EP-M2 rebase integration: keep the roadmap-closure parser and revision-reader
   seams, preserve the governance package-policy check at the repository-root
   boundary, and move generated supersession cases into
-  `tools/tests/test_supersession_properties.py`. This retains the parent
+  `scripts/tests/test_supersession_properties.py`. This retains the parent
   branch's parser and freeze improvements, keeps the governance check narrow,
   and preserves all cases within the per-file line limit. Date/Author:
   2026-10-15, implementing agent.
@@ -851,7 +851,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `docs/acceptance-calibration.md`; the registered values cite them.
   Date/Author: 2026-10-10, sponsor.
 - Decision: implement validators and the evidence gate in Python inside
-  `tools/docs_validation/`. Rationale: the design-contract checker, its JSON
+  `scripts/docs_validation/`. Rationale: the design-contract checker, its JSON
   Schema validation, its Hypothesis tests, and its CI workflow live there. Rust
   contract tests over repository files exist (`tests/markdown_wiring.rs`), so
   Rust was credible, but JSON Schema validation would stay in Python, splitting
@@ -894,7 +894,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Date/Author: 2026-10-10.
 - Decision: runnable helper scripts go in `scripts/` under
   `docs/scripting-standards.md`, with pytest suites in `scripts/tests/`;
-  checker modules stay in `tools/docs_validation/` under `unittest`. The
+  checker modules stay in `scripts/docs_validation/` under `unittest`. The
   roadmap exporter is `scripts/export_roadmap.py`;
   `scripts/generate_decisions.py` and `scripts/check_evidence.py` follow the
   same rule. Existing `tools/generate_*.py` generators are not moved in this
@@ -1007,7 +1007,7 @@ Outcome against `Purpose / big picture`, item by item:
    decisions, and satisfied obligation components.
 
 Acceptance criteria (`Validation and acceptance`): 1 to 6 are met; criterion 4
-is demonstrated by `tools/tests/test_freeze.py` (control and decision freezes,
+is demonstrated by `scripts/tests/test_freeze.py` (control and decision freezes,
 including a temporary Git repository) and by the hosted `Design contracts`
 runs; criterion 6 by `cargo publish --dry-run` refusing to publish.
 
@@ -1054,14 +1054,14 @@ Companion artefacts: `docs/testable-bets.md` (generated from `spec/bets.json`),
 example, `spec/kernel-contract.schema.json` (native kernel declarations), and
 `spec/cost-cases.json`.
 
-The checker is `tools/check_docs.py`. It runs the checks in
-`tools/docs_validation/` and requires `docs/validation-results.json` to equal
+The checker is `scripts/check_docs.py`. It runs the checks in
+`scripts/docs_validation/` and requires `docs/validation-results.json` to equal
 the freshly computed report; after a deliberate change, run
 `check_docs.py --write` and commit the report. `make design-check` runs the
 checker and `python3 -m unittest discover -s tools/tests`;
 `.github/workflows/design.yml` runs it on every pull request. Markdown checks
 cover the files listed in `DESIGN_DOCUMENTS` in
-`tools/docs_validation/context.py`.
+`scripts/docs_validation/context.py`.
 
 ADR format (after `EP-M1a`): `docs/adrs/adr-nnnn-title-slug.md`, title
 `# Architectural decision record (ADR) nnnn: <title>`, sections `Status`,
@@ -1089,16 +1089,16 @@ ADR format (after `EP-M1a`): `docs/adrs/adr-nnnn-title-slug.md`, title
 Trace chains:
 
 ```plaintext
-ToR Q1, Q8 -> TD GAP5, GAP9 -> D01, D02, D13 -> EP-M2 -> ADR-0002 -> tools/tests/test_decision_register.py
+ToR Q1, Q8 -> TD GAP5, GAP9 -> D01, D02, D13 -> EP-M2 -> ADR-0002 -> scripts/tests/test_decision_register.py
 ToR Q4 -> TD §2 scope classes -> D03 -> EP-M2 -> ADR-0003 -> register anchors in five documents
-ToR Q7 -> TD GAP5 -> D04, D05 -> EP-M2 -> ADR-0004 -> tools/tests/test_package_policy.py
+ToR Q7 -> TD GAP5 -> D04, D05 -> EP-M2 -> ADR-0004 -> scripts/tests/test_package_policy.py
 ToR C5 -> TD §15 row 10, §17.8 -> D06 -> EP-M2 -> ADR-0005
 TD §15 candidate ADRs -> D07 -> EP-M1a, EP-M2 -> docs/decision-register.md disposition table; docs/adrs/
-TD §§4-7, §17.3, §17.5 -> R2 -> D08-D10, D14 -> SC-* -> EP-M3 -> ADR-0006, ADR-0007 -> tools/tests/test_semantic_contracts.py
-ToR Q2, S7 -> TD §12, §14 V13, §17.8, §18.5 -> D11, D12 -> AC-* -> EP-M4 -> ADR-0008 -> tools/tests/test_preregistration.py
-TD §17.1-17.2, V14, V20 -> R8 -> PF14.structural@1.1.4 -> EP-M5 -> ADR-0009 -> tools/tests/test_evidence_gate.py
+TD §§4-7, §17.3, §17.5 -> R2 -> D08-D10, D14 -> SC-* -> EP-M3 -> ADR-0006, ADR-0007 -> scripts/tests/test_semantic_contracts.py
+ToR Q2, S7 -> TD §12, §14 V13, §17.8, §18.5 -> D11, D12 -> AC-* -> EP-M4 -> ADR-0008 -> scripts/tests/test_preregistration.py
+TD §17.1-17.2, V14, V20 -> R8 -> PF14.structural@1.1.4 -> EP-M5 -> ADR-0009 -> scripts/tests/test_evidence_gate.py
 D15 -> EP-M0 -> docs/roadmap.md canonical -> scripts/tests/test_export_roadmap.py
-Roadmap 1.1.1-1.1.4 -> EP-M6 -> ticked in docs/roadmap.md -> tools/tests/test_roadmap_status.py
+Roadmap 1.1.1-1.1.4 -> EP-M6 -> ticked in docs/roadmap.md -> scripts/tests/test_roadmap_status.py
 ```
 
 Gaps addressed: GAP2 (thresholds recorded, not met), GAP5 (scope, licence,
@@ -1308,7 +1308,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   test-only renderer (the former generator's layout) and exports them back;
   parameterized malformed-input cases; command-line exit codes. Artefacts:
   `scripts/tests/test_export_roadmap.py` (pytest) and
-  `tools/tests/test_roadmap_export_gate.py` (the checker rejects a stale
+  `scripts/tests/test_roadmap_export_gate.py` (the checker rejects a stale
   export). Non-vacuity: a changed task title, a changed `Requires` reference,
   and a changed checkbox in an in-memory roadmap each make the drift check fail
   and name the item; a heading at the wrong level is rejected rather than
@@ -1317,10 +1317,10 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
 - VO-1 (admission correctness, MS-0 to MS-2, P1 to P4). Method: exhaustive
   enumeration of all 345,600 abstract states against an independent interpreter
   of the ADR-0009 rule table in
-  `tools/tests/fixtures/evidence_gate_rules.json`; P1 to P4 over the full
+  `scripts/tests/fixtures/evidence_gate_rules.json`; P1 to P4 over the full
   enumeration against both; the scenario corpus against both. Artefacts:
-  `tools/tests/test_evidence_gate.py`,
-  `tools/docs_validation/evidence_gate.py`. Evidence: red is
+  `scripts/tests/test_evidence_gate.py`,
+  `scripts/docs_validation/evidence_gate.py`. Evidence: red is
   `ModuleNotFoundError`; green is full agreement. Non-vacuity: every level and
   reason occurs; the valid-state count is asserted. The reachable reason
   catalogue excludes `outcome-not-run`, and each reachable reason occurs as the
@@ -1348,7 +1348,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   schema-invalid; a Hypothesis property checks that abstraction depends only on
   documented fields. Include the fully specified valid trust-declaration state
   from VO-1 and require a concrete record to round-trip to that exact abstract
-  state. Artefact: `tools/tests/test_evidence_records.py`. Non-vacuity: fails
+  state. Artefact: `scripts/tests/test_evidence_records.py`. Non-vacuity: fails
   if any kind or outcome class is never generated; a seeded mapping fault must
   fail.
 - VO-3 (exception register validity, P5). Method: boundary tests on the
@@ -1356,12 +1356,12 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   before `invalid_from`: active; `invalid_from`: expired); malformed cases
   (lifetime beyond D02's maximum, approver other than `leynos`, missing
   narrowed claim, missing owner); a Hypothesis property that `as_of` changes
-  only the exception state. Artefact: `tools/tests/test_exceptions.py`.
+  only the exception state. Artefact: `scripts/tests/test_exceptions.py`.
   Non-vacuity: each malformed variant has its own reason; a complete active
   exception yields `restricted`.
 - VO-4 (components and closure, MS-3, MS-4, P6). Method: parameterized tests
   over synthetic roadmaps (a chain and a diamond) and the real roadmap.
-  Artefact: `tools/tests/test_roadmap_status.py`. Non-vacuity: a tick with an
+  Artefact: `scripts/tests/test_roadmap_status.py`. Non-vacuity: a tick with an
   open prerequisite fails; a tick citing a proposed or superseded decision
   fails; a tick with an unsatisfied component or unresolvable completion
   artefact fails; a counterexample at the current revision reopens a component;
@@ -1383,8 +1383,8 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   D01-authorized acceptance, and terminate at an accepted replacement; each
   cited ADR exists under `docs/adrs/` with an agreeing `Status` line; dates are
   validated with the `jsonschema` format checker. Artefacts:
-  `tools/tests/test_decision_register.py` and
-  `tools/tests/test_supersession_lifecycle.py`. Non-vacuity includes
+  `scripts/tests/test_decision_register.py` and
+  `scripts/tests/test_supersession_lifecycle.py`. Non-vacuity includes
   coordinated authority-map and approval changes, a non-D01 source, proposed
   and withdrawn replacements; each negative control has its own message.
 - VO-6 (five-document consistency). Invariants: each governing document links
@@ -1393,8 +1393,8 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `retired_statements` text of an accepted decision appears; no governing
   document matches `(pending|open|unresolved|remains? proposed)` within 60
   characters of an accepted question's identifier. Artefact:
-  `tools/tests/test_decision_register.py` and
-  `tools/tests/test_decision_register_integration.py`. Non-vacuity: after D03's
+  `scripts/tests/test_decision_register.py` and
+  `scripts/tests/test_decision_register_integration.py`. Non-vacuity: after D03's
   acceptance, reinserting "The classes remain proposed pending ToR Q4." (also
   rewrapped across two lines), restoring "All work remains proposed and open."
   while task 1.1.1 stays checked, writing "Q4 remains open", or deleting the
@@ -1406,7 +1406,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   an accepted exception altered rather than replaced. Method: in-memory base
   and head documents, plus one integration test against a temporary Git
   repository in the test's temporary directory. Artefact:
-  `tools/tests/test_freeze.py`. Non-vacuity: changing a threshold and its
+  `scripts/tests/test_freeze.py`. Non-vacuity: changing a threshold and its
   digest together is rejected; a correct amendment passes.
 - VO-8 (semantic contract coherence and examples). Invariants: every contract
   record names existing catalogue identifiers; has preconditions, success
@@ -1428,7 +1428,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `sum([-0.0])` negative zero; `skip_nulls` then empty; `Batch<DVec3>` of shape
   `[2,3]` with cardinality 6 rejecting `.axis(2)`; an injected failure leaving
   the destination unchanged. Artefact:
-  `tools/tests/test_semantic_contracts.py`. Non-vacuity: each seeded mutation
+  `scripts/tests/test_semantic_contracts.py`. Non-vacuity: each seeded mutation
   must change at least one outcome (left association for `reduce`; floor
   division for `idiv`; error instead of identity for empty `sum`; identity as a
   seed; implicit promotion in `add`; NaN-ignoring `min`; two-valued null logic;
@@ -1442,8 +1442,8 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   accepted and outside rejected; `rows(&centre)` as host construction; `as`,
   `..`, `=`, `+=` rejected; token-level entries tagged `phase2-only`. Method: a
   precedence-climbing recognizer under 200 lines in
-  `tools/docs_validation/grammar.py`. Artefact:
-  `tools/tests/test_macro_grammar.py`. Non-vacuity: swapping `*` and `+`,
+  `scripts/docs_validation/grammar.py`. Artefact:
+  `scripts/tests/test_macro_grammar.py`. Non-vacuity: swapping `*` and `+`,
   right-associative `|>`, accepting `&&`, or allowing comparison mixing each
   fail an entry; a mechanical check requires an entry per precedence level and
   rejection rule. Residual gap: the recognizer models the corpus, not the
@@ -1452,7 +1452,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
 - VO-10 (no superseded-name shims). Invariant: no name in the
   `excluded_names` register (`a!`, `cells`, `cells2`, `id` aliasing `identity`,
   `.pipe` accepting descriptors, array `&&` and `||`) appears as a catalogue
-  name or alias. Artefact: `tools/tests/test_semantic_contracts.py`.
+  name or alias. Artefact: `scripts/tests/test_semantic_contracts.py`.
   Non-vacuity: adding `cells` in memory fails.
 - VO-11 (pre-registration completeness and amendment chain). Invariants: a
   registered control has every frozen field listed in `EP-M4`, including its
@@ -1461,28 +1461,28 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   current digest equals the last `new_digest`); a measurement record cites a
   current or historical digest. Method: a Hypothesis property mutating each
   frozen field in turn; parameterized completeness controls. Artefact:
-  `tools/tests/test_preregistration.py`. Non-vacuity: fails unless every frozen
+  `scripts/tests/test_preregistration.py`. Non-vacuity: fails unless every frozen
   field was exercised; a correct amendment passes.
 - VO-12 (measurement outcomes cannot be relabelled). Invariant:
   `resource-exhausted`, `budget-exceeded`, `inconclusive`, and a missing record
   from a killed job map to fail or inconclusive, never pass; retries are all
   recorded and all count; calibration records can never satisfy an acceptance
   control. Method: exhaustive enumeration of the outcome mapping. Artefact:
-  `tools/tests/test_preregistration.py`. Non-vacuity: a seeded mapping treating
+  `scripts/tests/test_preregistration.py`. Non-vacuity: a seeded mapping treating
   `resource-exhausted` as pass, or admitting a calibration record, must fail.
 - VO-13 (package policy). Invariant: `Cargo.toml` `license` is `ISC` and
   `publish` is `false`, per accepted D04 and D05. Artefact:
-  `tools/tests/test_package_policy.py`. Non-vacuity: an in-memory manifest
+  `scripts/tests/test_package_policy.py`. Non-vacuity: an in-memory manifest
   without `publish = false` fails.
 - VO-14 (drift and idempotence for every generator and export). Invariant:
   every generator and the roadmap exporter are covered by the checker; rerun on
   a clean tree, they yield no diff. Artefact:
-  `tools/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity: a
+  `scripts/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity: a
   hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails. The
   generator CLI rejects a word-preserving loss of a decision heading while
   permitting ordinary paragraph rewrapping.
 - VO-15 (bet and task links are two-way). Artefact:
-  `tools/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
+  `scripts/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
   memory fails.
 - VO-16 (no host identity leaks). Invariant: committed calibration and
   measurement records contain no hostname, host-local username, or absolute
@@ -1490,7 +1490,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   check over `docs/acceptance-calibration.md` and measurement records using the
   hardware-class schema (no free-form host fields) plus a pattern scan for
   `/home/`, `/Users/`, and the local hostname supplied at test time only.
-  Artefact: `tools/tests/test_preregistration.py`. Non-vacuity: an in-memory
+  Artefact: `scripts/tests/test_preregistration.py`. Non-vacuity: an in-memory
   record containing a home path fails.
 
 ### Axioms
@@ -1529,7 +1529,7 @@ full gates (Stage D).
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
 - Add `wenmode==0.15.2`, `cyclopts==5.2.0`, and `pytest==9.1.1` to
-  `tools/requirements.txt`, and run `pytest -q scripts/tests` from
+  `scripts/requirements.txt`, and run `pytest -q scripts/tests` from
   `make design-check`.
 - Add `scripts/export_roadmap.py` (a `uv` script with a PEP 723 block and a
   Cyclopts command line) whose parser parses the region between
@@ -1545,7 +1545,7 @@ full gates (Stage D).
   (or `INPUT_CHECK=true`) exits 1 and prints a unified diff when the committed
   export has drifted. The checker loads it by path through
   `ValidationContext.load_script`.
-- In `tools/docs_validation/ledger.py`, replace the JSON-to-Markdown drift
+- In `scripts/docs_validation/ledger.py`, replace the JSON-to-Markdown drift
   comparison for the roadmap with the export drift comparison. Remove
   `tools/generate_roadmap.py`. Move its rendering layout into
   `scripts/tests/roadmap_render.py` as the independent test-only renderer used
@@ -1577,7 +1577,7 @@ full gates (Stage D).
   between `<!-- decisions:start -->` and `<!-- decisions:end -->` with one
   anchored heading per decision.
 - Turn the generator list in `ledger.check_generated_documents` into a table
-  including the decisions generator. Add `tools/docs_validation/decisions.py`
+  including the decisions generator. Add `scripts/docs_validation/decisions.py`
   (VO-5, VO-6) and register it. Add the register and all ADRs to
   `DESIGN_DOCUMENTS`.
 - Link the register from the five governing documents and `docs/contents.md`.
@@ -1587,7 +1587,7 @@ full gates (Stage D).
 ### EP-M1b. Roadmap status, obligation components, and freeze check
 
 - Add `spec/task-completion.json` (task identifier to completion artefact
-  references) and `tools/docs_validation/roadmap_status.py` as the single owner
+  references) and `scripts/docs_validation/roadmap_status.py` as the single owner
   of MS-3 and MS-4, reading tick state from the roadmap export. Replace the
   blanket ban in `ledger.py` with a call to it. Compute the export's `status`
   string and the checker's roadmap detail from tick state.
@@ -1597,7 +1597,7 @@ full gates (Stage D).
   evidence while obligation-level status stays `planned-not-run` until every
   component is satisfied. Until `EP-M5`, a task with a component cannot be
   ticked.
-- Add `tools/docs_validation/freeze.py` (VO-7) and `--base-rev` to
+- Add `scripts/docs_validation/freeze.py` (VO-7) and `--base-rev` to
   `check_docs.py`. In the `Makefile`, add
   `AS_OF ?= $(shell git log -1 --format=%cs)` and an optional `BASE_REV` to
   `design-check`. In `.github/workflows/design.yml`, set `fetch-depth: 0`, pass
@@ -1620,7 +1620,7 @@ full gates (Stage D).
   `docs/language-reference.md` prose outside the generated region is updated.
   Record each replaced sentence in `retired_statements`.
 - Add `publish = false` to `Cargo.toml`; add
-  `tools/docs_validation/package_policy.py` (VO-13). Add a "Licence and
+  `scripts/docs_validation/package_policy.py` (VO-13). Add a "Licence and
   publication" section to `docs/developers-guide.md` stating plainly that the
   crate is ISC-licensed, that `publish = false` blocks crates.io publication
   until the Core acceptance dossier (task 4.3.3) passes and `leynos` approves
@@ -1655,8 +1655,8 @@ full gates (Stage D).
 - Make affected `spec/vocabulary.json` contracts cite their identifiers;
   regenerate the reference; add the `excluded_names` register.
 - Add tagged-scalar examples to `spec/examples.json`; extend the
-  documentation model in a new `tools/docs_validation/contract_examples.py`. Add
-  `spec/macro-grammar.json` and `tools/docs_validation/grammar.py`.
+  documentation model in a new `scripts/docs_validation/contract_examples.py`. Add
+  `spec/macro-grammar.json` and `scripts/docs_validation/grammar.py`.
 - Tests: VO-8, VO-9, VO-10. Update technical design §§6-7 and §17.3 to cite
   the ADRs and record the proof-influenced choices; reconcile accepted rows of
   `docs/context.md` §6. Tick task 1.1.2.
@@ -1672,7 +1672,7 @@ full gates (Stage D).
 - Add `spec/acceptance-controls.schema.json`, `spec/acceptance-controls.json`,
   `spec/measurement-record.schema.json` (binding `control_id` and
   `control_digest`; a `purpose` of `calibration` or `acceptance`), and
-  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
+  `scripts/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
   `spec/acceptance-controls.json` in `freeze.FROZEN_DOCUMENTS` with its
   amendment-chain rule, so VO-7 covers controls from the commit that creates
   them.
@@ -1766,7 +1766,7 @@ and the bet register's measurement sentences.
   per technical design §17.8 and D06; the `check_evidence.py` exit codes). It
   is drafted under the accepted D02 and D06 policies and reviewed by the
   sponsor in the milestone pull request before merge.
-- Red: write `tools/tests/fixtures/evidence_gate_rules.json`, the scenario
+- Red: write `scripts/tests/fixtures/evidence_gate_rules.json`, the scenario
   corpus, and the tests first.
 - Revise `spec/proof-evidence.schema.json` to `schema_version` 2: `id` and
   `component`; `evidence_kind` and `outcome` with `outcome_detail`; structured
@@ -1784,7 +1784,7 @@ and the bet register's measurement sentences.
   `spec/evidence-reason-codes.json`, in one change. Register
   `spec/exceptions.json` in `freeze.FROZEN_DOCUMENTS` (an accepted exception is
   replaced, never altered).
-- Implement the pure `tools/docs_validation/evidence_gate.py`
+- Implement the pure `scripts/docs_validation/evidence_gate.py`
   (`abstract_record`, `admit`), have `roadmap_status.py` consume it, and add
   `scripts/check_evidence.py`. Tests: VO-1 to VO-4.
 - Add `docs/evidence-and-decision-records.md` (the component document for
@@ -1858,7 +1858,7 @@ and the bet register's measurement sentences.
 Run all commands from the repository root.
 
 ```bash
-export PY="uv run --python 3.14 --with-requirements tools/requirements.txt python3"
+export PY="uv run --python 3.14 --with-requirements scripts/requirements.txt python3"
 make design-check PYTHON="$PY" 2>&1 | tee /tmp/design-check-combobulate-1-1-resolve-acceptance-control-decisions.out
 ```
 
@@ -1880,7 +1880,7 @@ $PY -m unittest discover -s tools/tests
 $PY scripts/export_roadmap.py
 for g in reference bets; do $PY tools/generate_$g.py; done
 $PY scripts/generate_decisions.py
-$PY tools/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
+$PY scripts/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
 $PY scripts/export_roadmap.py --check
 for g in reference bets; do $PY tools/generate_$g.py; done
 $PY scripts/generate_decisions.py
@@ -1983,7 +1983,7 @@ New specification files: `spec/decision-register.schema.json`,
 
 New tooling: helper scripts `scripts/export_roadmap.py`,
 `scripts/generate_decisions.py`, and `scripts/check_evidence.py`; the probe
-`tools/calibration/cardinality-probe/`; and `tools/docs_validation/` modules
+`tools/calibration/cardinality-probe/`; and `scripts/docs_validation/` modules
 `decisions.py`, `roadmap_status.py`, `freeze.py`, `package_policy.py`,
 `contract_examples.py`, `grammar.py`, `preregistration.py`, `evidence_gate.py`.
 Removed: `tools/generate_roadmap.py`.
@@ -1991,7 +1991,7 @@ Removed: `tools/generate_roadmap.py`.
 New pytest suites in `scripts/tests/`: `test_export_roadmap.py` (with
 `conftest.py` and the test-only `roadmap_render.py`),
 `test_generate_decisions.py`, and `test_check_evidence.py`. New `unittest`
-modules in `tools/tests/`: `test_roadmap_export_gate.py`,
+modules in `scripts/tests/`: `test_roadmap_export_gate.py`,
 `test_decision_register.py`, `test_roadmap_status.py`, `test_freeze.py`,
 `test_package_policy.py`, `test_semantic_contracts.py`, `test_macro_grammar.py`,
 `test_preregistration.py`, `test_exceptions.py`, `test_evidence_gate.py`,
@@ -2004,7 +2004,7 @@ New dependency: `wenmode==0.15.2` (sponsor-directed). Otherwise the standard
 library (`tomllib`, `hashlib`, `subprocess` only in `freeze.py` for `git show`)
 plus the pinned `jsonschema`, `hypothesis`, `markdown-it-py`, and `PyYAML`.
 
-In `tools/docs_validation/evidence_gate.py`:
+In `scripts/docs_validation/evidence_gate.py`:
 
 ```python
 class Level(enum.Enum):
@@ -2110,7 +2110,17 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   `scripts/export_roadmap.py` under the scripting standards (Cyclopts, PEP 723,
   pytest suites in `scripts/tests/`), and the planned decision generator and
   evidence checker follow the same rule. Checker modules stay in
-  `tools/docs_validation/`. Remaining milestones are unchanged.
+  `scripts/docs_validation/`. Remaining milestones are unchanged.
+- 2026-10-12, all remaining Python scripts, the documentation-validation
+  package, tests, fixtures, and requirements relocated from `tools/` to
+  `scripts/`. Make targets, CI workflows, and documentation use the new paths;
+  existing `unittest`, Hypothesis, and pytest suites retain their test styles.
+- 2026-10-12, AC-07 amended under the sponsor's relocation instruction to
+  bind the CI workflow with the new probe path. Its original registration,
+  thresholds, and measurement protocol are preserved.
+- 2026-10-13, corrected the stale completed-task-ban observation and added
+  confirmatory export and full-checker tests. All three source mutations were
+  killed; the unmutated three-test baseline passed.
 - 2026-10-19, EP-M5 completeness follow-up: validate that `--bindings` decodes
   to a JSON object before constructing the admission context. The old candidate
   assessment identified uncaught array and `null` inputs; dedicated CLI

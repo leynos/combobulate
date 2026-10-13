@@ -27,11 +27,11 @@ jobs:
         with:
           python-version: '3.14'
           cache: pip
-          cache-dependency-path: tools/requirements.txt
+          cache-dependency-path: scripts/requirements.txt
       - name: Setup uv
         uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
       - name: Install documentation dependencies
-        run: python3 -m pip install -r tools/requirements.txt
+        run: python3 -m pip install -r scripts/requirements.txt
       - name: Select the freeze-check base revision
         id: base
         env:

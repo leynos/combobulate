@@ -10,7 +10,7 @@ import pytest
 from check_evidence import app
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / 'tools/tests/fixtures/evidence'
+FIXTURES = ROOT / 'scripts/tests/fixtures/evidence'
 EXAMPLE = ROOT / 'spec/proof-evidence.example.json'
 WITH_BINDINGS = ('--bindings', str(FIXTURES / 'bindings.json'),)
 

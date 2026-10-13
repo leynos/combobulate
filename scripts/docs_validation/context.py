@@ -113,7 +113,7 @@ class ValidationContext:
 
     def load_generator(self, name: str) -> ModuleType:
         """Load a local generator; e.g. context.load_generator('generate_bets.py')."""
-        return self.load_module(self.root / 'tools' / name)
+        return self.load_module(self.root / 'scripts' / name)
 
     def load_script(self, name: str) -> ModuleType:
         """Load a helper script's functions; e.g. context.load_script('export_roadmap.py').

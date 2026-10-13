@@ -2,7 +2,7 @@
 
 Run this module directly with::
 
-    python tools/tests/test_allocation_properties.py
+    python scripts/tests/test_allocation_properties.py
 """
 from __future__ import annotations
 

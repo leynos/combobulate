@@ -330,7 +330,7 @@ capable revision. Remove that literal revision assertion once the probe exists.
 Before installing Whitaker, CI runs:
 
 ```sh
-uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py \
+uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py \
   --workflow .github/workflows/ci.yml
 ```
 
@@ -412,13 +412,13 @@ column says when each is meant to shrink or go.
 | `scripts/export_roadmap.py`                  | Canonical roadmap to JSON export and drift check | Replaced when leynos/mapsplice#144 ships a native export |
 | `scripts/generate_decisions.py`              | Decision register rendering                      | Stays                                                    |
 | `scripts/check_evidence.py`                  | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
-| `tools/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
-| `tools/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
-| `tools/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
-| `tools/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
-| `tools/docs_validation/contract_examples.py` | Documentation model of the semantic contracts    | Superseded by `rstest` replay in task 1.2.3              |
-| `tools/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
-| `tools/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
+| `scripts/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
+| `scripts/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
+| `scripts/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
+| `scripts/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
+| `scripts/docs_validation/contract_examples.py` | Documentation model of the semantic contracts    | Superseded by `rstest` replay in task 1.2.3              |
+| `scripts/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
+| `scripts/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
 
 *Table 1: Governance modules, ownership, and retirement.*
 
@@ -438,7 +438,7 @@ register a new control identifier instead and keep the original result.
 
 When `docs/validation-results.json` conflicts between stacked branches, take
 either side, rerun the generators and `scripts/export_roadmap.py`, then run
-`python3 tools/check_docs.py --write --as-of <HEAD commit date>` and commit the
+`python3 scripts/check_docs.py --write --as-of <HEAD commit date>` and commit the
 result.
 
 ## Licence and publication
@@ -458,7 +458,7 @@ the crate.
 
 ## Design contract checks
 
-Install `tools/requirements.txt`, then run `make design-check`. The dedicated
+Install `scripts/requirements.txt`, then run `make design-check`. The dedicated
 `Design contracts` workflow runs the same target for pull requests and main.
 These checks cover specification links, generated reference, bet, and
 decision-register drift, roadmap export drift, decision-register integrity,
@@ -466,14 +466,14 @@ example semantics, schemas, proof-evidence envelopes, and cost-model negative
 controls. They do not execute Kani, Verus, proposed Rust macros, or Polars
 probes. The default checker also verifies the committed validation report
 without changing it. After deliberate design or validator changes, run
-`python3 tools/check_docs.py --write`, review the report diff, then run
+`python3 scripts/check_docs.py --write`, review the report diff, then run
 `make design-check`. Failed source checks leave the existing report untouched.
 
 The system Python may lack the pinned dependencies. A disposable environment
 works without installing anything globally:
 
 ```bash
-make design-check PYTHON="uv run --python 3.14 --with-requirements tools/requirements.txt python3"
+make design-check PYTHON="uv run --python 3.14 --with-requirements scripts/requirements.txt python3"
 ```
 
 `docs/roadmap.md` is the canonical roadmap. Edit it directly, preferably with
@@ -526,8 +526,8 @@ success and error relations, the empty rule, examples, seeded mutations, the
 obligation component that discharges it, and a proof sketch. Its examples are
 the tagged-scalar `contract_cases` in `spec/examples.json` (`{"f64": "-0.0"}`,
 `{"f64_bits": "0x..."}`, `{"i64": "..."}`), evaluated by
-`tools/docs_validation/contract_examples.py`, and the `comb!` corpus in
-`spec/macro-grammar.json`, recognized by `tools/docs_validation/grammar.py`.
+`scripts/docs_validation/contract_examples.py`, and the `comb!` corpus in
+`spec/macro-grammar.json`, recognized by `scripts/docs_validation/grammar.py`.
 Both models describe the contracts, not the Rust code; tasks 1.2.3 and 2.3.1
 replay them as `rstest` cases and `trybuild` fixtures, after which the grammar
 recognizer is deleted. `spec/kernel-contract.schema.json` does not fit
@@ -541,7 +541,7 @@ a missing citation, an unregistered error code, an example no record owns, or a
 seeded mutation that changes no outcome.
 
 A ticked roadmap checkbox is a claim, and
-`tools/docs_validation/roadmap_status.py` is the single owner of what backs it.
+`scripts/docs_validation/roadmap_status.py` is the single owner of what backs it.
 Before ticking a task, add its entry to `spec/task-completion.json`, naming the
 decisions it relies on and the artefacts that complete it (a path, optionally
 with a `#heading` anchor). The design checks then require every prerequisite to
@@ -571,7 +571,7 @@ bindings and parser results. Its exception-register adapter receives the
 decisions and roadmap paths explicitly; it must not load those policy files
 through a module-level repository root.
 
-`tools/docs_validation/closure_evidence.py` owns the immutable
+`scripts/docs_validation/closure_evidence.py` owns the immutable
 `ClosureEvidence` projection used only for roadmap closure. The
 `evidence_records.admitted_evidence` adapter constructs it from schema-v2
 records and their admission. Its fields are component id, recorded date, source
@@ -604,7 +604,7 @@ MS-2 rules and returns an admission level with reason codes. Neither function
 reads files, the clock, the environment, or the network. Add producers at the
 adapter boundary and pass explicit inputs into the gate.
 
-The `tools/check_docs.py` composition root resolves the checked-out source
+The `scripts/check_docs.py` composition root resolves the checked-out source
 revision through the Git adapter and places it in
 `ValidationContext.source_revision` before running checks. The roadmap adapter
 uses that injected value to bind earlier check results in `CheckResult` values.
@@ -634,24 +634,24 @@ script, such as `scripts/tests/test_export_roadmap.py`. `make design-check`
 runs those suites. When the design checker needs a helper's logic, it loads the
 script by path with `ValidationContext.load_script` rather than keeping a
 second copy, so the script's dependencies are also pinned in
-`tools/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
+`scripts/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
 
-`tools/tests/markdown_examples.py` is the shared loader for marked JSON fences
+`scripts/tests/markdown_examples.py` is the shared loader for marked JSON fences
 in migration documents. It requires each fence to have a unique adjacent
 `tested-example` marker and reads the example from the published Markdown. Use
 it from documentation contract tests; it is not a general Markdown parser.
 
-The `tools/docs_validation/` modules belong only to the documentation-pack
+The `scripts/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
 validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout
 formatting can preserve the contract without creating false generator drift.
 
 Acceptance-control rule checks in
-`tools/docs_validation/acceptance_registration.py`,
-`tools/docs_validation/acceptance_evidence.py`, and
-`tools/docs_validation/ci_controls.py` belong only to the documentation-pack
+`scripts/docs_validation/acceptance_registration.py`,
+`scripts/docs_validation/acceptance_evidence.py`, and
+`scripts/docs_validation/ci_controls.py` belong only to the documentation-pack
 checker. They accept parsed values and source digests, and do not read
 repository files. The `preregistration.py` composition path scans serialized
 JSON evidence for host identities and then recursively scans its decoded string
@@ -659,7 +659,7 @@ keys and values, so escaped characters cannot hide an identity from the check.
 The Markdown calibration report is scanned as raw text. Keep this recursive
 scan private to the acceptance-control composition path. Keep filesystem reads
 and schema loading in the composition path rooted at
-`check_acceptance_controls` in `tools/docs_validation/preregistration.py` and
+`check_acceptance_controls` in `scripts/docs_validation/preregistration.py` and
 its shared `ValidationContext`. `ValidationContext.load_yaml` converts parser
 failures into checker errors, and `ValidationContext.read_bytes` supplies
 source data for composition-time digest calculation. The composition path
@@ -685,7 +685,7 @@ for methodology, tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
 Kani calibration artefacts.
 
-`check_manifest` in `tools/docs_validation/package_policy.py` is an internal
+`check_manifest` in `scripts/docs_validation/package_policy.py` is an internal
 package-policy helper. `check_package_policy` is its only production caller and
 supplies the D04/D05 decision state. The checker runs after roadmap closure:
 publication remains disabled until an accepted D05 supersession and a
@@ -701,7 +701,7 @@ receives a `RevisionJsonReader`. The roadmap check composes its filesystem
 adapter from the validation context; the command-line composition root supplies
 the current source revision and Git-backed register reader. `roadmap_status`
 uses the injected revision and does not resolve Git state itself. These ports
-belong only to `tools/docs_validation/`: keep their domain rules independent of
+belong only to `scripts/docs_validation/`: keep their domain rules independent of
 I/O, and do not reuse them as general repository file or Git APIs. Unit tests
 inject deterministic readers, while a temporary Git integration test covers
 actual revision reads.

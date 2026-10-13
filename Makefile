@@ -220,6 +220,6 @@ BASE_REV ?=
 .PHONY: design-check
 
 design-check: ## Validate design documents, fixtures, and generator contracts
-	$(PYTHON) tools/check_docs.py --as-of $(AS_OF) $(if $(BASE_REV),--base-rev $(BASE_REV))
-	$(PYTHON) -m unittest discover -s tools/tests
+	$(PYTHON) scripts/check_docs.py --as-of $(AS_OF) $(if $(BASE_REV),--base-rev $(BASE_REV))
+	$(PYTHON) -m unittest discover -s scripts/tests
 	$(PYTHON) -m pytest -q scripts/tests

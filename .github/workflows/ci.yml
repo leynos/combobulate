@@ -79,7 +79,7 @@ jobs:
       - name: Verify Whitaker capability
         timeout-minutes: 3
         run: >-
-          uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py
+          uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py
           --workflow .github/workflows/ci.yml
       - name: Install Whitaker
         uses: leynos/shared-actions/.github/actions/install-whitaker@6dea5677a84fec60ca51b07202570e3af12ffdb4

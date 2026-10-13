@@ -354,5 +354,22 @@ class ValidationReport(unittest.TestCase):
                 self.run_main(['--base-rev', 'HEAD'])
 
 
+    def test_evidence_backed_completed_tasks_pass_the_full_checker(self):
+        self.assertEqual(self.run_main([]), 0, 'supported completed tasks must pass the full checker')
+        report = json.loads(self.report.read_text())
+        closure = next(row for row in report['checks'] if row['check'] == 'roadmap-status')
+        self.assertEqual(closure['count'], 4, 'all four completed acceptance-control tasks must be validated')
+        self.assertEqual(closure['status'], 'pass', 'completion requires a passing evidence check')
+
+    def test_completed_task_without_its_completion_record_fails_the_full_checker(self):
+        path = self.root / 'spec/task-completion.json'
+        completion = json.loads(path.read_text())
+        completion['tasks'] = [record for record in completion['tasks'] if record['task'] != '1.1.1']
+        path.write_text(json.dumps(completion), encoding='utf-8')
+        before = self.report.read_bytes()
+        with self.assertRaisesRegex(SystemExit, 'Task 1.1.1 is ticked but no completion record'):
+            self.run_main(['--write'])
+        self.assertEqual(self.report.read_bytes(), before, 'rejected completion must not overwrite the report')
+
 if __name__ == '__main__':
     unittest.main()

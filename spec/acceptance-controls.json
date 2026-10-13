@@ -70,7 +70,7 @@
           },
           "pass_when": "Every function verifies within the rlimit, and the run stays within the wall-time and memory budgets.",
           "inconclusive": "Never: above a budget is budget-exceeded; above the hard timeout or out of memory is resource-exhausted; both fail.",
-          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
@@ -157,7 +157,7 @@
           },
           "pass_when": "Every harness verifies with unwinding assertions on and every declared kani::cover! satisfied, within the per-harness and per-job budgets.",
           "inconclusive": "Never: an unsatisfied cover, a timeout, or a missing harness record fails; a per-harness wrapper writes a record even when killed.",
-          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
@@ -312,7 +312,7 @@
           },
           "pass_when": "Every profile and phase median is within its ceiling.",
           "inconclusive": "Inconclusive is not a pass; a killed job with no record is a failure.",
-          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None for cold builds; one discarded incremental build.",
         "interleaving": "Profiles alternate run by run.",
@@ -442,7 +442,7 @@
           },
           "pass_when": "No execution exceeds its admitted bound, and the counting allocator reports no untracked allocation.",
           "inconclusive": "Inconclusive is not a pass; a killed job with no record is a failure.",
-          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
@@ -489,7 +489,7 @@
           "sources": [
             {
               "path": ".github/workflows/ci.yml",
-              "sha256": "88b934ae8f51125f9ce83c3b22faa2e83c17457d8e86989827efa3428e0e8c31"
+              "sha256": "a7df05458bc84d1b74b6496d3eca0d2ae381eb461b05733d6f4821f7b07a6545"
             }
           ]
         },
@@ -508,7 +508,7 @@
           },
           "pass_when": "All 20 attempts conclude success and their nearest-rank p90 is within the 8-minute budget; any failed, timed-out, cancelled, resource-exhausted, or missing attempt fails independently of p90.",
           "inconclusive": "Fewer than 20 eligible attempts is inconclusive; an unsuccessful or missing attempt is a failure, even if the p90 is within budget.",
-          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
+          "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
@@ -538,8 +538,17 @@
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
       "registered_digest": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
-      "digest": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
-      "amendments": []
+      "digest": "8504ab3401c2c281f0a97d31b0467a3b40617224cf6150af4a52acbfa11a639b",
+      "amendments": [
+        {
+          "date": "2026-10-12",
+          "approved_by": "leynos",
+          "approval_reference": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+          "replaces": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
+          "new_digest": "8504ab3401c2c281f0a97d31b0467a3b40617224cf6150af4a52acbfa11a639b",
+          "reason": "Sponsor requested all Python scripts under scripts/. Update the CI workflow probe path; retain the workload, thresholds, and measurement protocol."
+        }
+      ]
     }
   ]
 }

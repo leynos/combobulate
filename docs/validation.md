@@ -68,12 +68,12 @@ status.
 From the repository root:
 
 ```bash
-python -m pip install -r tools/requirements.txt
-python tools/generate_reference.py --check
+python -m pip install -r scripts/requirements.txt
+python scripts/generate_reference.py --check
 uv run --python 3.14 --script scripts/export_roadmap.py --check
-python tools/generate_bets.py --check
+python scripts/generate_bets.py --check
 scripts/generate_decisions.py --check
-python tools/check_docs.py
+python scripts/check_docs.py
 ```
 
 The generators update only their marked Markdown regions when called without
@@ -84,7 +84,7 @@ invalid, stale or falsified reports without changing files. To regenerate the
 report after a deliberate source change, run:
 
 ```bash
-python tools/check_docs.py --write
+python scripts/check_docs.py --write
 make design-check
 ```
 
