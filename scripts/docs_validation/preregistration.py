@@ -68,10 +68,12 @@ def check_sources(control: Mapping[str, object], root: Path) -> None:
     control
         One registered control; its `frozen.workload.sources` list paths relative to the repository.
     root
-        The repository root; a source resolving outside it (absolute, `..`, or a symlink) fails.
+        The repository root; absolute paths fail, as do relative paths or symlinks escaping it.
     """
     base = root.resolve()
     for source in control['frozen']['workload']['sources']:
+        require(not Path(source['path']).is_absolute(),
+                f"{control['id']} source {source['path']} must be repository-relative")
         path = (root / source['path']).resolve()
         require(path.is_relative_to(base), f"{control['id']} source {source['path']} escapes the repository")
         require(path.is_file(), f"{control['id']} source {source['path']} is missing")

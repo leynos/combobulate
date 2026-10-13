@@ -80,10 +80,18 @@ class Registration(unittest.TestCase):
 
     def test_source_outside_the_repository_fails(self):
         control = copy.deepcopy(next(item for item in REGISTER['controls'] if item['id'] == 'AC-07'))
-        for path in ('../outside.yml', '/etc/hostname'):
+        for path, diagnostic in (('../outside.yml', 'escapes the repository'),
+                                 ('/etc/hostname', 'must be repository-relative')):
             control['frozen']['workload']['sources'][0]['path'] = path
-            with self.subTest(path=path), self.assertRaisesRegex(AssertionError, 'escapes the repository'):
+            with self.subTest(path=path), self.assertRaisesRegex(AssertionError, diagnostic):
                 check_sources(control, ROOT)
+
+    def test_absolute_source_inside_the_repository_fails(self):
+        control = copy.deepcopy(next(item for item in REGISTER['controls'] if item['id'] == 'AC-07'))
+        source = control['frozen']['workload']['sources'][0]
+        source['path'] = str(ROOT / source['path'])
+        with self.assertRaisesRegex(AssertionError, 'must be repository-relative'):
+            check_sources(control, ROOT)
 
     def test_every_frozen_field_changes_the_digest(self):
         exercised: set[str] = set()

@@ -5,9 +5,10 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: COMPLETE (implementation of `EP-M0` to `EP-M6` on 2026-10-11, in the
-stacked pull requests #11 to #18; local CodeRabbit CLI reviews of `EP-M2`
-onward and the sponsor's review and merge of each pull request remain)
+Status: IN_PROGRESS (milestones `EP-M0` to `EP-M6` delivered; review repair).
+Two milestone CLI review rounds are recorded below. The 2026-10-13 current-head
+review found an absolute-source-path defect being repaired; hosted assessments,
+formal reviews, and the sponsor's stack merges remain.
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
 recorded per decision identifier (see `Sponsor decisions`).
@@ -322,6 +323,26 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   and developers' guide updated (module ownership, exception renewal, control
   amendment, report conflicts); full gates pass.
 
+- [x] (2026-10-13) Reconciled the current implementation on PR #18 and kept
+  its `1-1-reconciliation` branch stacked on #17. All six behavioural
+  acceptance criteria have source and test evidence; `c6063b5` passed the six
+  repository gates and typecheck. Fresh generator checks passed, and
+  `cargo publish --dry-run` refused publication (`publish = false`).
+- [x] (2026-10-13) Current-head CodeRabbit CLI review inspected the committed
+  `b4e2c14..c6063b5` diff (90 paths). Two minor findings: absolute paths inside
+  the repository were accepted (valid; regression failed first); the single
+  soft-newline quote concern is invalid under the existing Markdown semantic
+  wrapping contract (confirmatory test passed).
+- [x] (2026-10-13) Repair the source-path guard and validate the two affected
+  suites (32 tests, 6 subtests). The isolated two-test baseline passed;
+  removing the guard and dropping quoted words each failed their designated
+  test with exit 1. Evidence:
+  `/tmp/mutation-99861d46-f6f5-48d6-acfb-658bee9364bf-1-1-reconciliation.out`.
+- [ ] (2026-10-13) Run all repair gates and reassess locally before publication.
+- [ ] (2026-10-13) Publish PR #18's validated candidate, obtain its hosted
+  completeness/correctness assessment, and reconcile formal review. Sponsor
+  review and merge of the preserved stack remain delivery work.
+
 ## Surprises & discoveries
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
@@ -429,6 +450,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: the 2026-10-13 CLI absolute-path finding is valid: source paths
+  must be repository-relative even when an absolute path resolves inside the
+  repository. Preserve the containment and digest checks and add an absolute
+  path guard. The newline finding is invalid under the established Markdown
+  contract: soft breaks may reflow, while words and paragraph boundaries stay
+  unchanged; the raw approval answer is retained. Add a confirmatory test for
+  that distinction rather than changing approval identity. No accepted record,
+  threshold, dependency, public API, or proof artefact changes. Date/Author:
+  2026-10-13, implementing agent.
 - Decision: re-reviews of the review fixes (CodeRabbit CLI) found three minor
   items, fixed in `EP-M6`: registered workload sources must resolve inside the
   repository (absolute paths, `..`, and symlinks fail), a test pattern escapes
@@ -706,8 +736,10 @@ Deviations and lessons:
   mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
   `runner`. A stacked synchronize run also reported `main` as its base branch,
   which led to choosing the freeze base by commit.
-- Remaining: local CodeRabbit CLI reviews of `EP-M2` to `EP-M6`, hosted
-  reviews, and the sponsor's review and merge of #9 to #18 in stack order.
+- Remaining: reassess the 2026-10-13 source-path repair, publish the current
+  reconciliation candidate, obtain hosted assessments and formal reviews, and
+  leave the sponsor's review and merge of #9 to #18 in stack order. The two
+  earlier milestone CLI review rounds are recorded in `Decision log`.
 
 ## Context and orientation
 
@@ -1722,3 +1754,8 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
 - 2026-10-13, corrected the stale completed-task-ban observation and added
   confirmatory export and full-checker tests. All three source mutations were
   killed; the unmutated three-test baseline passed.
+- 2026-10-13, resumed the approved implementation workflow, mapped all six
+  acceptance criteria, collected current consistency and publication-policy
+  evidence, and recorded the local review's valid and invalid findings.
+  Remaining work is repair validation, publication, hosted assessment, formal
+  review, and sponsor-owned stack merging.

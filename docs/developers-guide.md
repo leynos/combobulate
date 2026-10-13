@@ -507,6 +507,10 @@ superseding record and link both directions with `supersedes` and
 `superseded_by`. ADRs live in `docs/adrs/` as `adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
 
+The generated quote preserves the answer's words and blank-line paragraph
+boundaries; Markdown soft line breaks may be rewrapped to meet the prose
+formatting policy. The original approval answer in the register stays intact.
+
 Semantic contracts live in `spec/semantic-contracts.json`
 (`spec/semantic-contract.schema.json`): one record per public primitive's
 logical contract, independent of any implementation, with preconditions,
