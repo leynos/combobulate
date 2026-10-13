@@ -6,47 +6,49 @@ request 11. The current crate is a scaffold; the multi-crate architecture in the
 
 ## Paths and responsibilities
 
-| Path                                     | Responsibility                                                                             |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `src/lib.rs`                             | Current crate root and disposable greeting stub.                                           |
-| `tests/`                                 | Integration tests for build routes, workflow policy, Make commands, and shell preflights.  |
-| `tests/support/`                         | Private helpers owned by the corresponding integration test modules.                       |
-| `scripts/`                               | Toolchain installation, build preflights, native Clang linker wrapper, and helper scripts. |
-| `scripts/tests/`                         | Pytest suites for helper scripts, named after the script they cover.                       |
-| `.cargo/config.toml`                     | Development compiler/backend/linker defaults.                                              |
-| `.github/workflows/ci.yml`               | Authoritative hosted Rust and build-contract gate.                                         |
-| `.github/workflows/design.yml`           | Design-fixture and documentation-generator validation.                                     |
-| `.github/workflows/coverage-main.yml`    | Main-branch coverage publication and ratchet baseline.                                     |
-| `.github/workflows/act-validation.yml`   | Manually dispatched full Act compatibility check.                                          |
-| `.github/workflows/audit.yml`            | Scheduled dependency audit.                                                                |
-| `.github/workflows/mutation-testing.yml` | Scheduled shared Rust mutation workflow.                                                   |
-| `.github/dependabot.yml`                 | Cargo and GitHub Actions dependency updates.                                               |
-| `docs/`                                  | Design, guides, reference material, and recorded decisions.                                |
-| `docs/contents.md`                       | Canonical documentation index.                                                             |
-| `docs/adrs/`                             | Architectural decision records, named `adr-nnnn-title-slug.md`.                            |
-| `docs/rfcs/`                             | Requests for comments, named `rfc-nnnn-title-slug.md` (none yet).                          |
-| `docs/execplans/`                        | Execution plans for roadmap work, named after their branch.                                |
-| `spec/`                                  | Machine-readable language, roadmap, proof, cost, and backend contracts.                    |
-| `spec/decisions.json`                    | Decision register master, rendered into `docs/decision-register.md`.                       |
-| `spec/semantic-contracts.json`           | Semantic contract records `SC-01` onward, with excluded names.                             |
-| `spec/macro-grammar.json`                | The `comb!` precedence table and grammar corpus.                                           |
-| `spec/acceptance-controls.json`          | Pre-registered acceptance controls `AC-01` onward.                                         |
-| `spec/calibration/`                      | Calibration measurement records behind the control thresholds.                             |
-| `spec/exceptions.json`                   | Trusted-boundary exception register (D02).                                                 |
-| `spec/evidence-reason-codes.json`        | Evidence-gate levels, reason codes, and registered log parsers.                            |
-| `spec/task-completion.json`              | Completion records for ticked roadmap tasks.                                               |
-| `tools/`                                 | Design generators and documentation-model validation.                                      |
-| `tools/calibration/`                     | Standalone calibration probes; not workspace members.                                      |
-| `tools/mold/`                            | Pinned native linker version and archive digest.                                           |
-| `Cargo.toml`, `Cargo.lock`               | Package metadata, dependencies, lint policy, and lockfile.                                 |
-| `rust-toolchain.toml`                    | Pinned nightly and required components.                                                    |
-| `Makefile`                               | Public build, test, lint, coverage, and documentation entrypoints.                         |
-| `AGENTS.md`                              | Contributor and agent instructions.                                                        |
-| `clippy.toml`, `.rustfmt.toml`           | Rust lint and formatting configuration.                                                    |
-| `.markdownlint-cli2.jsonc`               | Markdown lint policy.                                                                      |
-| `typos.local.toml`, `typos.toml`         | Local spelling overlay and generated dictionary configuration.                             |
-| `codecov.yml`                            | Coverage service configuration.                                                            |
-| `README.md`, `LICENSE`                   | Project introduction and ISC licence.                                                      |
+| Path                                     | Responsibility                                                                                 |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `src/lib.rs`                             | Current crate root and disposable greeting stub.                                               |
+| `tests/`                                 | Integration tests for build routes, workflow policy, Make commands, and shell preflights.      |
+| `tests/support/`                         | Private helpers owned by the corresponding integration test modules.                           |
+| `scripts/`                               | Toolchain installation, build preflights, native Clang linker wrapper, and all Python scripts. |
+| `scripts/tests/`                         | Python unittest and pytest suites, supporting helpers, and fixtures.                           |
+| `scripts/docs_validation/`               | Documentation-model checker package.                                                           |
+| `scripts/requirements.txt`               | Shared Python validation and test dependencies.                                                |
+| `.cargo/config.toml`                     | Development compiler/backend/linker defaults.                                                  |
+| `.github/workflows/ci.yml`               | Authoritative hosted Rust and build-contract gate.                                             |
+| `.github/workflows/design.yml`           | Design-fixture and documentation-generator validation.                                         |
+| `.github/workflows/coverage-main.yml`    | Main-branch coverage publication and ratchet baseline.                                         |
+| `.github/workflows/act-validation.yml`   | Manually dispatched full Act compatibility check.                                              |
+| `.github/workflows/audit.yml`            | Scheduled dependency audit.                                                                    |
+| `.github/workflows/mutation-testing.yml` | Scheduled shared Rust mutation workflow.                                                       |
+| `.github/dependabot.yml`                 | Cargo and GitHub Actions dependency updates.                                                   |
+| `docs/`                                  | Design, guides, reference material, and recorded decisions.                                    |
+| `docs/contents.md`                       | Canonical documentation index.                                                                 |
+| `docs/adrs/`                             | Architectural decision records, named `adr-nnnn-title-slug.md`.                                |
+| `docs/rfcs/`                             | Requests for comments, named `rfc-nnnn-title-slug.md` (none yet).                              |
+| `docs/execplans/`                        | Execution plans for roadmap work, named after their branch.                                    |
+| `spec/`                                  | Machine-readable language, roadmap, proof, cost, and backend contracts.                        |
+| `spec/decisions.json`                    | Decision register master, rendered into `docs/decision-register.md`.                           |
+| `spec/semantic-contracts.json`           | Semantic contract records `SC-01` onward, with excluded names.                                 |
+| `spec/macro-grammar.json`                | The `comb!` precedence table and grammar corpus.                                               |
+| `spec/acceptance-controls.json`          | Pre-registered acceptance controls `AC-01` onward.                                             |
+| `spec/calibration/`                      | Calibration measurement records behind the control thresholds.                                 |
+| `spec/exceptions.json`                   | Trusted-boundary exception register (D02).                                                     |
+| `spec/evidence-reason-codes.json`        | Evidence-gate levels, reason codes, and registered log parsers.                                |
+| `spec/task-completion.json`              | Completion records for ticked roadmap tasks.                                                   |
+| `tools/`                                 | Calibration probes, linker pins, and reviewed tool metadata.                                   |
+| `tools/calibration/`                     | Standalone calibration probes; not workspace members.                                          |
+| `tools/mold/`                            | Pinned native linker version and archive digest.                                               |
+| `Cargo.toml`, `Cargo.lock`               | Package metadata, dependencies, lint policy, and lockfile.                                     |
+| `rust-toolchain.toml`                    | Pinned nightly and required components.                                                        |
+| `Makefile`                               | Public build, test, lint, coverage, and documentation entrypoints.                             |
+| `AGENTS.md`                              | Contributor and agent instructions.                                                            |
+| `clippy.toml`, `.rustfmt.toml`           | Rust lint and formatting configuration.                                                        |
+| `.markdownlint-cli2.jsonc`               | Markdown lint policy.                                                                          |
+| `typos.local.toml`, `typos.toml`         | Local spelling overlay and generated dictionary configuration.                                 |
+| `codecov.yml`                            | Coverage service configuration.                                                                |
+| `README.md`, `LICENSE`                   | Project introduction and ISC licence.                                                          |
 
 ## Ownership boundaries
 

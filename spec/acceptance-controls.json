@@ -455,7 +455,7 @@
           "sources": [
             {
               "path": ".github/workflows/ci.yml",
-              "sha256": "c4f72ddbc4e86fe7578b6c0f27f5a86d962c8e0275efb3f1283584596655b280"
+              "sha256": "04da24103ec114f4be4423aba21ff8927df13a32a6447ff532bf5b8bc8db7e0d"
             }
           ]
         },
@@ -504,8 +504,17 @@
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
       "registered_digest": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
-      "digest": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
-      "amendments": []
+      "digest": "c4beb2d38cfa5c6e551c7393e7fb22e0884ca54effd59a239d55756edb53f7ef",
+      "amendments": [
+        {
+          "date": "2026-10-12",
+          "approved_by": "leynos",
+          "approval_reference": "https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf",
+          "replaces": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
+          "new_digest": "c4beb2d38cfa5c6e551c7393e7fb22e0884ca54effd59a239d55756edb53f7ef",
+          "reason": "Sponsor requested all Python scripts under scripts/. Update the CI workflow probe path; retain the workload, thresholds, and measurement protocol."
+        }
+      ]
     }
   ]
 }

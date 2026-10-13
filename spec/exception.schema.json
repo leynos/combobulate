@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:combobulate:design:exceptions:0.2",
   "title": "Combobulate trusted-boundary exception register",
-  "description": "Exceptions under decision D02. Content rules (lifetime, approver, owner, narrowed claim, release gate) are checked by tools/docs_validation/exceptions.py so each problem has its own reason.",
+  "description": "Exceptions under decision D02. Content rules (lifetime, approver, owner, narrowed claim, release gate) are checked by scripts/docs_validation/exceptions.py so each problem has its own reason.",
   "type": "object",
   "additionalProperties": false,
   "required": ["revision", "exceptions"],

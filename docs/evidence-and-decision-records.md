@@ -73,7 +73,7 @@ The command prints `path: level [reasons]` for each record. It exits 0 when
 every record reaches `--require` (default `tested`), 1 when any falls short,
 and 2 for a schema-invalid record or a usage error. Options name other binding,
 parser, or exception files; the test fixtures in
-`tools/tests/fixtures/evidence/` use a test-only parser registry so the
+`scripts/tests/fixtures/evidence/` use a test-only parser registry so the
 `bounded` level is reachable.
 
 ## Exceptions

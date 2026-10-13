@@ -55,7 +55,7 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
         Some("Install test runner") => "cargo binstall --no-confirm --locked cargo-nextest",
         Some("Install cargo-audit") => "cargo binstall --no-confirm cargo-audit",
         Some("Verify Whitaker capability") => concat!(
-            "uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py ",
+            "uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py ",
             "--workflow .github/workflows/ci.yml"
         ),
         Some("Audit dependencies") => "make audit",

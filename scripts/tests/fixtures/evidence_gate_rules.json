@@ -1,5 +1,5 @@
 {
-  "description": "ADR-0009 admission rule table (MS-0 to MS-2) as data. Read by an independent interpreter in tools/tests/test_evidence_gate.py and, from task 1.2.4, by Rust tooling. Rules apply in order; every matching blocking rule contributes its reason.",
+  "description": "ADR-0009 admission rule table (MS-0 to MS-2) as data. Read by an independent interpreter in scripts/tests/test_evidence_gate.py and, from task 1.2.4, by Rust tooling. Rules apply in order; every matching blocking rule contributes its reason.",
   "domains": {
     "kind": [
       "deductive",

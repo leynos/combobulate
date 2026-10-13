@@ -6,7 +6,7 @@ abstract record, and `admit` maps that record to an admission level and reason
 codes by the ordered rule table MS-0 to MS-2. It never reads the clock, the
 environment, or the network. A record whose verdict is not re-derived by a
 registered log parser is self-reported and cannot reach `proof` or `bounded`
-(C-EP-10). `tools/tests/fixtures/evidence_gate_rules.json` restates the rules
+(C-EP-10). `scripts/tests/fixtures/evidence_gate_rules.json` restates the rules
 as data, and the tests enumerate every abstract state against both.
 """
 from __future__ import annotations

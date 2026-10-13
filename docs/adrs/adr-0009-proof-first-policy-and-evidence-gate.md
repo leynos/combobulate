@@ -85,8 +85,8 @@ _Table 1: Admission rules, applied in order._
 The base level is `proof` for deductive evidence and for bounded evidence with
 type-complete bounds. It is `bounded` for bounded evidence with partial bounds,
 `tested` for tests, and `restricted` for trust declarations.
-`tools/tests/fixtures/evidence_gate_rules.json` states the same table as data;
-reason codes are single-sourced in `spec/evidence-reason-codes.json`.
+`scripts/tests/fixtures/evidence_gate_rules.json` states the same table as
+data; reason codes are single-sourced in `spec/evidence-reason-codes.json`.
 
 ## Components and closure
 

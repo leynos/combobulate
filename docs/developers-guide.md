@@ -329,7 +329,7 @@ capable revision. Remove that literal revision assertion once the probe exists.
 Before installing Whitaker, CI runs:
 
 ```sh
-uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py \
+uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py \
   --workflow .github/workflows/ci.yml
 ```
 
@@ -406,18 +406,18 @@ is inert with `merman-cli`.
 The sponsor, `leynos`, owns every governance module below; the right-hand
 column says when each is meant to shrink or go.
 
-| Module                                       | Role                                             | Retirement or hand-over                                  |
-| -------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
-| `scripts/export_roadmap.py`                  | Canonical roadmap to JSON export and drift check | Replaced when leynos/mapsplice#144 ships a native export |
-| `scripts/generate_decisions.py`              | Decision register rendering                      | Stays                                                    |
-| `scripts/check_evidence.py`                  | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
-| `tools/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
-| `tools/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
-| `tools/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
-| `tools/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
-| `tools/docs_validation/contract_examples.py` | Documentation model of the semantic contracts    | Superseded by `rstest` replay in task 1.2.3              |
-| `tools/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
-| `tools/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
+| Module                                         | Role                                             | Retirement or hand-over                                  |
+| ---------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| `scripts/export_roadmap.py`                    | Canonical roadmap to JSON export and drift check | Replaced when leynos/mapsplice#144 ships a native export |
+| `scripts/generate_decisions.py`                | Decision register rendering                      | Stays                                                    |
+| `scripts/check_evidence.py`                    | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
+| `scripts/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
+| `scripts/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
+| `scripts/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
+| `scripts/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
+| `scripts/docs_validation/contract_examples.py` | Documentation model of the semantic contracts    | Superseded by `rstest` replay in task 1.2.3              |
+| `scripts/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
+| `scripts/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
 
 *Table 1: Governance modules, ownership, and retirement.*
 
@@ -437,8 +437,8 @@ register a new control identifier instead and keep the original result.
 
 When `docs/validation-results.json` conflicts between stacked branches, take
 either side, rerun the generators and `scripts/export_roadmap.py`, then run
-`python3 tools/check_docs.py --write --as-of <HEAD commit date>` and commit the
-result.
+`python3 scripts/check_docs.py --write --as-of <HEAD commit date>` and commit
+the result.
 
 ## Licence and publication
 
@@ -457,7 +457,7 @@ the crate.
 
 ## Design contract checks
 
-Install `tools/requirements.txt`, then run `make design-check`. The dedicated
+Install `scripts/requirements.txt`, then run `make design-check`. The dedicated
 `Design contracts` workflow runs the same target for pull requests and main.
 These checks cover specification links, generated reference, bet, and
 decision-register drift, roadmap export drift, decision-register integrity,
@@ -465,14 +465,14 @@ example semantics, schemas, proof-evidence envelopes, and cost-model negative
 controls. They do not execute Kani, Verus, proposed Rust macros, or Polars
 probes. The default checker also verifies the committed validation report
 without changing it. After deliberate design or validator changes, run
-`python3 tools/check_docs.py --write`, review the report diff, then run
+`python3 scripts/check_docs.py --write`, review the report diff, then run
 `make design-check`. Failed source checks leave the existing report untouched.
 
 The system Python may lack the pinned dependencies. A disposable environment
 works without installing anything globally:
 
 ```bash
-make design-check PYTHON="uv run --python 3.14 --with-requirements tools/requirements.txt python3"
+make design-check PYTHON="uv run --python 3.14 --with-requirements scripts/requirements.txt python3"
 ```
 
 `docs/roadmap.md` is the canonical roadmap. Edit it directly, preferably with
@@ -514,8 +514,8 @@ success and error relations, the empty rule, examples, seeded mutations, the
 obligation component that discharges it, and a proof sketch. Its examples are
 the tagged-scalar `contract_cases` in `spec/examples.json` (`{"f64": "-0.0"}`,
 `{"f64_bits": "0x..."}`, `{"i64": "..."}`), evaluated by
-`tools/docs_validation/contract_examples.py`, and the `comb!` corpus in
-`spec/macro-grammar.json`, recognized by `tools/docs_validation/grammar.py`.
+`scripts/docs_validation/contract_examples.py`, and the `comb!` corpus in
+`spec/macro-grammar.json`, recognized by `scripts/docs_validation/grammar.py`.
 Both models describe the contracts, not the Rust code; tasks 1.2.3 and 2.3.1
 replay them as `rstest` cases and `trybuild` fixtures, after which the grammar
 recognizer is deleted. `spec/kernel-contract.schema.json` does not fit
@@ -529,19 +529,19 @@ a missing citation, an unregistered error code, an example no record owns, or a
 seeded mutation that changes no outcome.
 
 A ticked roadmap checkbox is a claim, and
-`tools/docs_validation/roadmap_status.py` is the single owner of what backs it.
-Before ticking a task, add its entry to `spec/task-completion.json`, naming the
-decisions it relies on and the artefacts that complete it (a path, optionally
-with a `#heading` anchor). The design checks then require every prerequisite to
-be ticked, every cited decision to be accepted, every artefact to resolve, and
-every proof-obligation component linked to the task to be satisfied. Components
-live in `spec/proof-obligations.json` as `PFnn.<method>@<task>`, each listing
-the admission levels (`proof`, `bounded`, `tested`) that satisfy it. A
-component whose `evidence_source` is `checker:<check>` is satisfied when that
-check passes in the same run; a `record` component fails closed until the
-evidence gate admits a proof-evidence record for it. A task that meets every
-condition but is not ticked is reported, not failed, so ticking stays a
-deliberate act.
+`scripts/docs_validation/roadmap_status.py` is the single owner of what backs
+it. Before ticking a task, add its entry to `spec/task-completion.json`, naming
+the decisions it relies on and the artefacts that complete it (a path,
+optionally with a `#heading` anchor). The design checks then require every
+prerequisite to be ticked, every cited decision to be accepted, every artefact
+to resolve, and every proof-obligation component linked to the task to be
+satisfied. Components live in `spec/proof-obligations.json` as
+`PFnn.<method>@<task>`, each listing the admission levels (`proof`, `bounded`,
+`tested`) that satisfy it. A component whose `evidence_source` is
+`checker:<check>` is satisfied when that check passes in the same run; a
+`record` component fails closed until the evidence gate admits a proof-evidence
+record for it. A task that meets every condition but is not ticked is reported,
+not failed, so ticking stays a deliberate act.
 
 Proof evidence for a record-sourced component goes in `spec/evidence/` as a
 schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
@@ -564,7 +564,7 @@ checks themselves never read the wall clock. The freeze result is printed
 rather than recorded in `docs/validation-results.json`, so the committed report
 does not depend on which base revision was supplied.
 
-Python helper scripts live in `scripts/` and follow
+All Python scripts and packages live in `scripts/`. New helper scripts follow
 [the scripting standards](scripting-standards.md): a `uv` shebang with a PEP
 723 dependency block, Cyclopts for the command line (so `INPUT_*` environment
 variables work in CI), and pytest suites in `scripts/tests/` named after the
@@ -572,9 +572,9 @@ script, such as `scripts/tests/test_export_roadmap.py`. `make design-check`
 runs those suites. When the design checker needs a helper's logic, it loads the
 script by path with `ValidationContext.load_script` rather than keeping a
 second copy, so the script's dependencies are also pinned in
-`tools/requirements.txt`.
+`scripts/requirements.txt`.
 
-The `tools/docs_validation/` modules belong only to the documentation-pack
+The `scripts/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
 validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout

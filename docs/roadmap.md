@@ -155,7 +155,7 @@ baseline dependency lock. See `technical-design.md` §§3-4, 7, 10.
     reject unsupported static certificates rather than substituting an unchecked
     checker. Record compile/proof cost against pre-registered limits.
   - [ ] Replay the evidence-gate rule table
-    (`tools/tests/fixtures/evidence_gate_rules.json`) from Rust over every
+    (`scripts/tests/fixtures/evidence_gate_rules.json`) from Rust over every
     abstract state, and register the Verus and Kani log parsers for this
     kernel's evidence.
 - [ ] 1.2.5. Export the first collection model and verified dependency for an
@@ -326,7 +326,7 @@ frontend earns its complexity. See `technical-design.md` §§7, 13.
     no custom Fn implementation is required.
   - [ ] Replay every `spec/macro-grammar.json` corpus entry as a `trybuild` pass
     or fail fixture, with a check that no entry is missing; then delete
-    `tools/docs_validation/grammar.py`.
+    `scripts/docs_validation/grammar.py`.
 - [ ] 2.3.2. Implement verb!, shared lets, operator composition, sections, and
   flow!.
   - Requires 2.2.4, 2.3.1.
