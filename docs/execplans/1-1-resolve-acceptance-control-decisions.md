@@ -233,17 +233,31 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   approval, calibration, host identity, and evidence-state expectations.
 - [x] (2026-10-15) R2 clarified checker-backed component satisfaction in MS-3
   and VO-4; implementation alignment remains pending in PRs #17 and #18.
-- [x] (2026-10-10) `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode
 - [x] (2026-10-11) `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode
+  exporter and drift validator (separate stacked pull request,
+  sponsor-directed). Evidence: the fresh export equals the previous
+  `spec/roadmap.json` exactly apart from the new per-task `status` field. On
+  2026-10-11 the exporter moved to `scripts/export_roadmap.py` (Cyclopts, PEP
+  723) per the sponsor. 18 pytest cases in
+       `scripts/tests/test_export_roadmap.py`
+  pass, including the command line, `INPUT_CHECK`, and a 60-example
+  derandomized round-trip property that observed every required structural
+  class; 2 checker-gate cases pass in
+  `tools/tests/test_roadmap_export_gate.py`; seeded faults (dropped details,
+  ignored ticks) each fail the suite; the script runs through its own `uv`
+  shebang; `make design-check` passes.
   exporter and drift validator (sponsor-directed, delivered in PR #11). The
   export matches the previous `spec/roadmap.json` apart from the intended
   per-task `status` field. The exporter moved to `scripts/export_roadmap.py`
-  (Cyclopts, PEP 723) per the sponsor. Its 18 pytest cases cover the command
-  line, `INPUT_CHECK`, and a 60-example derandomized round-trip property that
-  observes every required structural class; 2 checker-gate cases pass in
-  `tools/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
-  ignored ticks) fail the suite, the script runs through its `uv` shebang, and
-  `make design-check` passes. Validation evidence is recorded in PR #11.
+  (Cyclopts, PEP 723) per the sponsor. Review repair rejects missing or
+  repeated task fields and empty roadmaps or phases. Its 24 pytest cases cover
+  the command line, `INPUT_CHECK`, malformed-input line reporting, and a
+  60-example derandomized round-trip property that observes every structural
+  class; 2 checker-gate cases pass in `tools/tests/test_roadmap_export_gate.py`.
+  Seeded faults (dropped details, ignored ticks) fail the suite, the script
+  runs through its `uv` shebang, and `make design-check` passes with the
+  documented `uv` requirements environment. Validation evidence is recorded in
+  PR #11.
 - [ ] Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.

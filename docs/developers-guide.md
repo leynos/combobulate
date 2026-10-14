@@ -427,7 +427,10 @@ run `scripts/export_roadmap.py` to refresh `spec/roadmap.json`, the derived
 JSON view the design checks consume. Commit both files together. The exporter
 parses the marked roadmap region with Wenmode and fails, naming the source
 line, on structure it does not recognize: an unexpected heading level, a task
-without a checkbox, an unlabelled task bullet, or a ticked detail checkbox.
+without a checkbox, an empty roadmap or phase, a missing or repeated task
+field, an unlabelled task bullet, a ticked detail checkbox, or a proof-first
+bullet without a bet. Required task fields are its design reference,
+proof-first obligation, and success criterion.
 `scripts/export_roadmap.py --check` exits 1 and prints a diff when the
 committed export is stale, and the design checks reject the same drift.
 Upstream request leynos/mapsplice#144 tracks a native export that will replace

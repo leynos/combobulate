@@ -116,7 +116,7 @@ def item_paragraph(item: Node, source: Source) -> tuple[str, list[Node]]:
     return inline_text(lead, source), rest
 
 
-def apply_bullet(task: dict, item: Node, source: Source) -> None:
+def apply_bullet(task: dict, item: Node, source: Source, seen_fields: set[str]) -> None:
     """Fold one labelled task sub-bullet into the task record."""
     text, nested = item_paragraph(item, source)
     if nested:
@@ -125,19 +125,25 @@ def apply_bullet(task: dict, item: Node, source: Source) -> None:
         if item.checked:
             raise source.fail(item, 'detail checkboxes are not tracked; tick the task instead')
         task['details'].append(text)
-    elif text.startswith('Requires '):
-        task['requires'] = id_list(text.removeprefix('Requires '))
+        return
+    if text.startswith('Requires '):
+        field, value = 'requires', id_list(text.removeprefix('Requires '))
     elif text.startswith('See `technical-design.md` '):
-        task['sections'] = text.removeprefix('See `technical-design.md` ').removesuffix('.')
+        field, value = 'sections', text.removeprefix('See `technical-design.md` ').removesuffix('.')
     elif text.startswith('Proof first: '):
         proof, marker, bets = text.removeprefix('Proof first: ').rpartition(' Bets: ')
-        if not marker:
-            raise source.fail(item, 'proof-first bullet must end with its bets')
-        task['proof_first'], task['bets'] = proof, id_list(bets)
+        if not marker or not proof or not id_list(bets):
+            raise source.fail(item, 'proof-first bullet must include its proof and at least one bet')
+        field, value = 'proof_first', proof
+        task['bets'] = id_list(bets)
     elif text.startswith('Success: '):
-        task['success'] = text.removeprefix('Success: ')
+        field, value = 'success', text.removeprefix('Success: ')
     else:
         raise source.fail(item, f'unrecognized task bullet {text[:40]!r}')
+    if field in seen_fields:
+        raise source.fail(item, f'duplicate task {field} bullet')
+    seen_fields.add(field)
+    task[field] = value
 
 
 def parse_task(item: Node, source: Source) -> dict:
@@ -148,9 +154,18 @@ def parse_task(item: Node, source: Source) -> dict:
     task_id, title = numbered(text, r'\d+\.\d+\.\d+', item, source)
     task = {'id': task_id, 'title': title, 'requires': [], 'sections': '', 'success': '', 'details': [],
             'proof_first': '', 'bets': [], 'status': TASK_STATUS[item.checked]}
+    seen_fields: set[str] = set()
     for sub_list in nested:
         for sub_item in sub_list.children:
-            apply_bullet(task, sub_item, source)
+            apply_bullet(task, sub_item, source, seen_fields)
+    required_fields = (
+        ('sections', 'technical-design reference'),
+        ('proof_first', 'proof-first'),
+        ('success', 'success'),
+    )
+    for field, label in required_fields:
+        if field not in seen_fields:
+            raise source.fail(item, f'task is missing its {label} bullet')
     return task
 
 
@@ -224,13 +239,21 @@ def parse_roadmap(text: str) -> dict:
     if revision is None:
         raise RoadmapStructureError('docs/roadmap.md needs a "Revision N.N," preamble line')
     phases: list[dict] = []
+    phase_headings: list[Node] = []
     for heading, body in blocks(PARSER.parse(region), source):
         if heading.depth == 2:
+            if phases and not phases[-1]['steps']:
+                raise source.fail(phase_headings[-1], f'phase {phases[-1]["number"]} needs at least one step')
             phases.append(parse_phase_header(heading, body, source))
+            phase_headings.append(heading)
         elif not phases:
             raise source.fail(heading, 'step heading before any phase heading')
         else:
             phases[-1]['steps'].append(parse_step(heading, body, phases[-1], source))
+    if not phases:
+        raise RoadmapStructureError('docs/roadmap.md needs at least one phase')
+    if not phases[-1]['steps']:
+        raise source.fail(phase_headings[-1], f'phase {phases[-1]["number"]} needs at least one step')
     return {'revision': revision.group(1), 'status': overall_status(phases), 'phases': phases}
 
 

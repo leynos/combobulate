@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 ROADMAP_PATH = ROOT / 'docs/roadmap.md'
 EXPORT_PATH = ROOT / 'spec/roadmap.json'
 ROADMAP = ROADMAP_PATH.read_text(encoding='utf-8')
-REQUIRED_CLASSES = {'multi-phase', 'single-phase', 'has-details', 'no-details', 'has-requires', 'has-done',
-                    'all-open'}
+REQUIRED_CLASSES = {'multi-phase', 'single-phase', 'has-details', 'no-details', 'has-requires', 'no-requires',
+                    'has-done', 'all-open'}
 
 
 def committed_export() -> dict:
@@ -28,6 +28,21 @@ def replace_once(text: str, old: str, new: str) -> str:
     """Edit one exact occurrence so each negative control changes one item."""
     assert text.count(old) == 1, f'expected exactly one occurrence of {old!r}'
     return text.replace(old, new)
+
+
+def remove_first_task_bullet(text: str, label: str) -> str:
+    """Remove one first-task bullet and its wrapped lines for malformed-input tests."""
+    start = text.index('- [ ] 1.1.1.')
+    end = text.index('- [ ] 1.1.2.')
+    task_lines = text[start:end].splitlines(keepends=True)
+    bullet_index = next((index for index, line in enumerate(task_lines)
+                         if line.startswith('  - ') and label in line), None)
+    assert bullet_index is not None, f'expected first task to contain {label!r}'
+    after_bullet = bullet_index + 1
+    while after_bullet < len(task_lines) and task_lines[after_bullet].startswith('    '):
+        after_bullet += 1
+    retained = task_lines[:bullet_index] + task_lines[after_bullet:]
+    return text[:start] + ''.join(retained) + text[end:]
 
 
 def first_task(roadmap: dict) -> dict:
@@ -82,6 +97,43 @@ def test_ticked_checkbox_changes_status():
 def test_missing_markers_are_rejected():
     with pytest.raises(RoadmapStructureError, match='exactly one'):
         parse_roadmap('# Roadmap\n')
+
+
+def test_empty_marked_region_is_rejected():
+    text = f'Revision 0.2, 6 October 2026.\n\n{START}\n\n{END}\n'
+    with pytest.raises(RoadmapStructureError, match='at least one phase'):
+        parse_roadmap(text)
+
+
+def test_phase_without_steps_is_rejected_at_its_heading():
+    text = (f'Revision 0.2, 6 October 2026.\n\n{START}\n\n'
+            '## 1. Empty phase\n\nIdea: A phase without steps.\n\n'
+            'Goals: G1 in `terms-of-reference.md` §6.\n\nContext.\n\nGate: Not ready.\n\n'
+            f'{END}\n')
+    with pytest.raises(RoadmapStructureError) as raised:
+        parse_roadmap(text)
+    assert raised.value.line == line_of(text, '## 1. Empty phase'), 'empty phase error must name its heading'
+
+
+@pytest.mark.parametrize(('label', 'expected'), [
+    ('See `technical-design.md`', 'technical-design reference'),
+    ('Proof first:', 'proof-first'),
+    ('Success:', 'success'),
+])
+def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
+    edited = remove_first_task_bullet(ROADMAP, label)
+    with pytest.raises(RoadmapStructureError) as raised:
+        parse_roadmap(edited)
+    assert raised.value.line == line_of(edited, '- [ ] 1.1.1.'), 'missing task detail must name its task'
+    assert expected in str(raised.value), f'error must identify missing {expected}'
+
+
+def test_duplicate_task_success_bullet_is_rejected():
+    edited = replace_once(ROADMAP, '- [ ] 1.1.2.', '  - Success: duplicate.\n- [ ] 1.1.2.')
+    with pytest.raises(RoadmapStructureError) as raised:
+        parse_roadmap(edited)
+    assert raised.value.line == line_of(edited, '  - Success: duplicate.'), 'duplicate error must name its bullet'
+    assert 'duplicate task success bullet' in str(raised.value), 'error must identify the duplicate task field'
 
 
 @pytest.mark.parametrize(('text', 'line'), [
