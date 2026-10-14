@@ -5,14 +5,14 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (generated property coverage and replay after `EP-M5`
-merged). The follow-up adds generated properties for decision-answer rendering
-and registered-source confinement. Prior receipts record both properties and
-five isolated mutants passing against the former base `b4e2c14`; they do
-not cover this replay. The merged `EP-M5` base is `a246aac`; current-candidate
-gates, hosted checks, review, and merge remain pending. Historical receipts
-below retain their original candidate scope. Current delivery state is recorded
-on [PR #18](https://github.com/leynos/combobulate/pull/18).
+Status: IN PROGRESS (property and helper-documentation follow-ups replayed onto
+merged `EP-M5`). Prior receipts record both generated properties, five isolated
+mutants, and the helper documentation correction passing against the former
+base `b4e2c14`; they do not cover this replay. The merged `EP-M5` base is
+`a246aac`; current-candidate gates, hosted checks, review, and merge remain
+pending. Historical receipts below retain their original candidate scope.
+Current delivery state is recorded on
+[PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -561,9 +561,29 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   date and distinguished confirmed historical assessment from pending affected
   assessment. Review log:
   `/tmp/coderabbit-combobulate-1-1-reconciliation-formal-repair.out`.
-- [ ] (2026-10-14) Validate and publish the documentation follow-up, then
-  reconcile every formal finding and pre-merge row on the published candidate.
-  Sponsor review and merge of the preserved stack remain delivery work.
+- [x] (2026-10-14) The configured pre-merge command produced 13 passes and two
+  warnings. Added generated properties for quote words, paragraph boundaries,
+  long tokens, source components, parent placements, absolute forms, and
+  internal/external symlink targets. The dependency was already pinned and
+  production code is unchanged. Focused tests and the isolated two-test
+  baseline passed; five mutants failed at their intended assertions (word loss,
+  collapsed paragraphs, and removal of each absolute, parent, or containment
+  guard). Logs: `/tmp/pytest-combobulate-1-1-reconciliation-properties.out`
+  and `/tmp/mutation-combobulate-1-1-reconciliation-properties.out`.
+- [x] (2026-10-14) Property follow-up `3ed0593` passed all seven gates: 331
+  Rust tests, one skipped, one doctest, 270 unittest tests, 315 pytest tests,
+  and 589 subtests. The fresh committed CLI review inspected all 93 paths and
+  identified two helper documentation gaps. Added input, return, failure, and
+  executable success/failure examples to `check_bet_links` and `quoted_answer`;
+  AST comparison confirmed no executable changes after removing docstrings.
+- [x] (2026-10-14) Helper documentation correction `d0460a8` changed only two
+  docstrings and this plan. Both executable doctests passed; formatting,
+  exact-base design checks (270/315/589), Markdown/spelling, and diagram checks
+  passed. The old aggregate docstring percentage remains inconclusive.
+- [ ] (2026-10-20) Revalidate the property and helper-documentation follow-ups
+  against merged base `a246aac`, then publish and reconcile current hosted CI,
+  assessment, formal review, and pre-merge evidence. Sponsor review and merge
+  remain delivery work.
 
 ## Surprises & discoveries
 
@@ -582,6 +602,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   source-path boundaries. Impact: preserve the independent documentation
   inventory, validate the properties against the active source, and do not
   infer a refreshed checker result from chat analysis.
+
+- Observation: a successful CodeRabbit status can coexist with a
+  `CHANGES_REQUESTED` review and failed pre-merge rows. Formal review 5511956210
+  on `804a38f` has an inline finding, two testing errors, and two documentation
+  warnings. Impact: inspect the review, threads, and full walkthrough instead
+  of treating wrapper status as approval.
+- Observation: the 48.89% docstring report does not expose its 45-function
+  inventory. Clarification 6158784579 verified a separate changed-line Python
+  inventory with 15 missing test docstrings; its 23 unsupported skips are not
+  missing documentation. Impact: document verified changed functions and do
+  not invent the original denominator.
 
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
@@ -2229,10 +2260,11 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
 
-- 2026-10-20, replayed the property-coverage follow-up onto merged `EP-M5`
-  (`a246aac`). Preserved the parent-side parser-admission and decision-register
-  regressions while adapting generated path checks to the source-loading
-  boundary. Current-candidate validation and delivery remain pending.
+- 2026-10-20, replayed the property and helper-documentation follow-ups onto
+  merged `EP-M5` (`a246aac`). Preserved the parent-side parser-admission and
+  decision-register regressions while adapting generated path checks to the
+  source-loading boundary. Current-candidate validation and delivery remain
+  pending.
 - 2026-10-10, initial draft.
 - 2026-10-10, revised after the community-of-experts review (verdict
   "revise"): per-component evidence, `evidence_kind` split from `outcome`, new
