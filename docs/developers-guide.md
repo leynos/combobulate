@@ -233,9 +233,11 @@ with its required components, including rust-analyzer. On x86_64 GNU Linux,
 `make check-build-tools` asks Clang which `ld.mold` it will execute, checks its
 link plan and version against `tools/mold/VERSION`, and fails if Clang selects
 a different executable. It also checks that the nightly and every pinned
-component are installed. It checks clang for native Linux builds, and
-`make coverage` also checks clang and lld. Development Make targets run this
-check before Cargo. The Makefile exports `BUILD_TOOLS_PREFIX` (default
+component are installed. Component checks consume the full installed-component
+listing so an early reader exit cannot falsely report a missing component when
+the shell checks every pipeline exit status. It checks clang for native Linux
+builds, and `make coverage` also checks clang and lld. Development Make targets
+run this check before Cargo. The Makefile exports `BUILD_TOOLS_PREFIX` (default
 `~/.local`) for the native Clang wrapper and prepends its `bin` directory to
 `PATH` for direct tools. The installer and checker belong to the root build
 workflow. Callers may use them directly or through Make targets. CI, Act,

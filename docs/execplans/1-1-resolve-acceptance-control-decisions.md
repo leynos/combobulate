@@ -5,11 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: COMPLETE (implementation of `EP-M0` to `EP-M6` and review repair). The
-2026-10-13 repair passed all seven local gates, and CodeRabbit reassessment of
-`b4e2c14..b079f72` completed with zero findings. Delivery remains pending:
-publication, hosted assessments and formal review, then sponsor-owned stack
-merges.
+Status: IN PROGRESS (hosted CI preflight repair). Implementation of `EP-M0` to
+`EP-M6` and the 2026-10-13 review repair passed all seven local gates;
+CodeRabbit reassessment of `b4e2c14..b079f72` completed with zero findings.
+Published head `1f48268` exposed a build-tools pipeline failure in hosted CI.
+The repair requires fresh validation before publication, hosted assessments and
+formal review, then sponsor-owned stack merges.
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -495,11 +496,32 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   with zero findings across all 90 changed paths. Its result applies to that
   candidate; the final documentation-only delivery record is validated
   separately, and hosted assessment remains required.
+- [x] (2026-10-14) Published documentation receipt `1f48268` on PR #18;
+  hosted Design contracts passed, while CI exposed a false missing-component
+  diagnostic in build-tools preflight. Both long-list regression cases failed
+  before repair. The red log is
+  `/tmp/test-red-combobulate-1-1-reconciliation-preflight.out`.
+- [x] (2026-10-14) The full-consuming component reader passed all 12
+  preflight tests, including both new long-list cases and genuine
+  missing-component checks; the doctest passed. Make and tee exited 0. Evidence:
+  `/tmp/test-green-combobulate-1-1-reconciliation-preflight.out`.
+- [ ] (2026-10-14) Run all code gates and fresh local review, then publish
+  the CI repair.
 - [ ] (2026-10-13) Publish PR #18's validated candidate, obtain its hosted
   completeness/correctness assessment, and reconcile formal review. Sponsor
   review and merge of the preserved stack remain.
 
 ## Surprises & discoveries
+
+- Observation: hosted CI run 38486818299 falsely reported the installed
+  `llvm-tools-preview` component as missing. The checker pipes `printf` into
+  quiet `grep` under `pipefail`; an early match closes the reader and can give
+  the producer `SIGPIPE`. Evidence: a long-list probe returned pipeline statuses
+  `141 0`; a consuming reader returned `0 0`. Both new development and
+  coverage regression cases failed before repair, reporting all installed
+  components as missing. Impact: consume the complete listing and retain exact
+  matching, missing-component diagnostics, and `pipefail`.
+
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
   which vanished once every decision was accepted, so the edit became a no-op
@@ -618,6 +640,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   keeps task 1.1.1 checked.
 
 ## Decision log
+
+- Decision: repair the preflight reader instead of changing installed tools
+  or weakening pipeline failure checks. Use full-consuming exact-line `grep`
+  with output redirected to `/dev/null`; validate both build routes and the
+  existing genuine missing-component cases. This is a shell command-contract
+  correction, with no change to the pinned toolchain or acceptance controls.
+
 
 - Decision: re-reviews of the review fixes (CodeRabbit CLI) found three minor
   items, fixed in `EP-M6`: registered workload sources must resolve inside the
@@ -2177,6 +2206,12 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   with comparison base `b4e2c14`. Refreshed PR #18 metadata confirms the
   existing draft and stack base. Final documentation checks, publication,
   hosted assessment, and formal review remain pending.
+- 2026-10-14, published `1f48268` and observed hosted CI run 38486818299 fail
+  its coverage-backend preflight assertion; Design contracts run 38486818460
+  passed. Reopened implementation status for the in-scope pipeline repair. Both
+  long-list regression cases failed before repair (Make exit 2, Nextest exit
+  100), with no compilation error. Focused green validation and all code gates
+  remain pending; the earlier gates retain their original candidate scope.
 - 2026-10-19, EP-M5 completeness follow-up: validate that `--bindings` decodes
   to a JSON object before constructing the admission context. The old candidate
   assessment identified uncaught array and `null` inputs; dedicated CLI
