@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import example, given, settings, strategies as st
 from jsonschema import Draft202012Validator, ValidationError
 
 from docs_validation.context import ValidationContext
@@ -260,6 +260,49 @@ class Registration(unittest.TestCase):
             for path, message in invalid_paths:
                 with self.subTest(path=path), self.assertRaisesRegex(AssertionError, message):
                     _load_source_digests(context, controls(path))
+
+    @example(components=['plain'], symlink_outside=True)
+    @given(components=st.lists(st.text(alphabet='abcXYZ09_-', min_size=1, max_size=12),
+                               min_size=1, max_size=4), symlink_outside=st.booleans())
+    def test_generated_source_paths_preserve_the_repository_boundary(self, components, symlink_outside):
+        """Check generated relative paths, parent placements, absolute forms, and link targets."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repo'
+            relative = Path(*(f'node-{component}' for component in components)) / 'source.txt'
+            source = root / relative
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b'registered source\n')
+            outside = Path(directory) / 'outside.txt'
+            outside.write_bytes(source.read_bytes())
+            control = copy.deepcopy(CONTROL)
+            binding = {'path': relative.as_posix(), 'sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
+            control['frozen']['workload']['sources'] = [binding]
+            context = ValidationContext(root)
+
+            def validate_binding() -> None:
+                digests = _load_source_digests(context, [control])
+                check_sources(control, digests)
+
+            validate_binding()
+            binding['path'] = str(source.resolve())
+            with self.assertRaisesRegex(AssertionError, 'must be repository-relative'):
+                validate_binding()
+
+            for position in range(len(components) + 1):
+                prefix, suffix = relative.parts[:position], relative.parts[position:]
+                (root.joinpath(*prefix) / 'anchor').mkdir(exist_ok=True)
+                binding['path'] = Path(*prefix, 'anchor', '..', *suffix).as_posix()
+                with self.assertRaisesRegex(AssertionError, 'contains a parent path component'):
+                    validate_binding()
+
+            link = root / 'registered-link'
+            link.symlink_to(outside if symlink_outside else source)
+            binding['path'] = link.name
+            if symlink_outside:
+                with self.assertRaisesRegex(AssertionError, 'escapes the repository'):
+                    validate_binding()
+            else:
+                validate_binding()
 
     def test_every_frozen_field_changes_the_digest(self):
         """Exercise every frozen field against the digest and chain checks."""

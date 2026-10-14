@@ -5,15 +5,12 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: COMPLETE (implementation and formal-review repairs after `EP-M0` to
-`EP-M6`). Repair `0656e00` passed all seven applicable local gates. A fresh
-CodeRabbit CLI review of `b4e2c14..0656e00` completed across 93 paths with two
-minor documentation findings; this follow-up corrects the validation date and
-clarifies delivery status. The hosted assessment confirmed the prior
-corrections on `804a38f` in
-[reply](https://github.com/leynos/combobulate/pull/18#issuecomment-6158621418).
-Affected hosted assessment and formal-review confirmation for the repaired
-candidate remain pending, as do sponsor-owned stack merges. Historical receipts
+Status: IN PROGRESS (generated property coverage and replay after `EP-M5`
+merged). The follow-up adds generated properties for decision-answer rendering
+and registered-source confinement. Prior receipts record both properties and
+five isolated mutants passing against the former base `b4e2c14`; they do
+not cover this replay. The merged `EP-M5` base is `a246aac`; current-candidate
+gates, hosted checks, review, and merge remain pending. Historical receipts
 below retain their original candidate scope. Current delivery state is recorded
 on [PR #18](https://github.com/leynos/combobulate/pull/18).
 
@@ -579,6 +576,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   components as missing. Impact: consume the complete listing and retain exact
   matching, missing-component diagnostics, and `pipefail`.
 
+- Observation: configured pre-merge checks identified a generated-invariant
+  coverage gap while retaining an inconclusive historical docstring aggregate.
+  Two generated properties now cover quoted decision answers and registered
+  source-path boundaries. Impact: preserve the independent documentation
+  inventory, validate the properties against the active source, and do not
+  infer a refreshed checker result from chat analysis.
+
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
   which vanished once every decision was accepted, so the edit became a no-op
@@ -697,6 +701,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   keeps task 1.1.1 checked.
 
 ## Decision log
+
+- Decision: add generated invariant tests using the existing pinned Hypothesis
+  dependency and default settings. Construct word/paragraph inputs and normal
+  path components directly, preserve fixed regressions, and isolate each
+  filesystem example. Vary two symlink topologies rather than inventing an
+  arbitrary graph. The finite package-policy matrix remains exhaustive and
+  needs no additional property framework.
 
 - Decision: repair the preflight reader instead of changing installed tools
   or weakening pipeline failure checks. Use full-consuming exact-line `grep`
@@ -2218,6 +2229,10 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
 
+- 2026-10-20, replayed the property-coverage follow-up onto merged `EP-M5`
+  (`a246aac`). Preserved the parent-side parser-admission and decision-register
+  regressions while adapting generated path checks to the source-loading
+  boundary. Current-candidate validation and delivery remain pending.
 - 2026-10-10, initial draft.
 - 2026-10-10, revised after the community-of-experts review (verdict
   "revise"): per-component evidence, `evidence_kind` split from `outcome`, new
