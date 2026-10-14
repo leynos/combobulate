@@ -66,6 +66,7 @@ def test_schema_invalid_record_exits_two(tmp_path, capsys):
 
 
 def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
+    """Report every supplied record even when an earlier one is schema-invalid."""
     broken = tmp_path / 'broken.json'
     broken.write_text('{not json', encoding='utf-8')
     missing = tmp_path / 'missing.json'

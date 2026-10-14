@@ -5,8 +5,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: COMPLETE (implementation of `EP-M0` to `EP-M6` and CI/review repairs).
-The preflight repair `2bf668f` passed all seven local gates; CodeRabbit
+Status: IN PROGRESS (formal-review repair after `EP-M0` to `EP-M6`). The
+preflight repair `2bf668f` passed all seven local gates; CodeRabbit
 reassessment of `b4e2c14..2bf668f` completed with zero findings across 92
 paths. Delivery receipt (2026-10-14): published `5bf739a` passed
 [CI](https://github.com/leynos/combobulate/actions/runs/38492308721) and
@@ -378,11 +378,52 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   corrections: use the #17 control-containing freeze base and refresh delivery
   receipts. See
   [the assessment](https://github.com/leynos/combobulate/pull/18#issuecomment-6158476454).
-- [ ] (2026-10-14) Obtain confirmation of the documentation corrections and
-  reconcile formal review. Sponsor review and merge of the preserved stack
-  remain delivery work.
+- [x] (2026-10-14) Hosted assessment confirmation on `804a38f` found both
+  documentation corrections resolved and no remaining work within its scope.
+  Both current workflows passed; PR #18 was marked ready with unchanged
+  base/head. The subsequent formal review remains a separate inspection.
+- [x] (2026-10-14) Verified formal review 5511956210 against current source:
+  in-root `..` source paths were accepted contrary to the documented contract.
+  The new regression failed with "AssertionError not raised" before repair.
+  Pre-merge testing rows also identify valid lifecycle/report and symlink
+  coverage gaps; developer documentation needs source rules and an ADR
+  amendment. The docstring aggregate lacks a recoverable function inventory;
+  clarification independently identified 15 changed test functions to document.
+- [x] (2026-10-14) Focused formal-repair suites passed: 25 tests and 22
+  subtests. The isolated three-test mutation baseline passed with 16 subtests;
+  removing parent rejection, removing symlink confinement, forcing either
+  inactive package rule, and recording constant count 1 each failed its
+  designated control for the intended reason. Logs:
+  `/tmp/pytest-green-combobulate-1-1-reconciliation-formal-repair.out` and
+  `/tmp/mutation-combobulate-1-1-reconciliation-formal-repair.out`.
+- [x] (2026-10-14) Added meaningful docstrings for all 15 independently
+  identified changed tests and the new regression cases. The artisan's 12
+  additions across six files preserve their test ASTs after removing function
+  docstrings. Preserved ADR-0009's original fixture reference and recorded the
+  current location in its dated amendment; documented registered-source paths
+  and digest amendments in the developers' guide.
+- [x] (2026-10-14) Full repair gates passed formatting, lint, typechecking,
+  331 Rust tests (one skipped), and one doctest. The design check then detected
+  report drift: the ADR amendment adds one local link, raising the generated
+  count from 105 to 106. Regenerated and reviewed that single-field change;
+  remaining design, Markdown, and diagram validation is pending.
+- [ ] (2026-10-14) Complete and validate the source-path, coverage, and
+  documentation repairs; publish and reconcile every formal finding and
+  pre-merge row. Sponsor review and merge of the preserved stack remain
+  delivery work.
 
 ## Surprises & discoveries
+
+- Observation: a successful CodeRabbit status can accompany a
+  `CHANGES_REQUESTED` review and failed pre-merge rows. Evidence: formal review
+  5511956210 on `804a38f` has one inline finding, two testing errors, and two
+  documentation warnings. Impact: inspect the review, threads, and full
+  walkthrough rather than treating the wrapper status as approval.
+- Observation: the 48.89% docstring report does not expose its 45-function
+  inventory. Clarification 6158784579 verified a separate changed-line Python
+  inventory with 15 missing test docstrings; its 23 unsupported skips are not
+  missing documentation. Impact: document verified changed functions and
+  request warning reconciliation without inventing the original denominator.
 
 - Observation: hosted CI run 38486818299 falsely reported the installed
   `llvm-tools-preview` component as missing. The checker pipes `printf` into
@@ -497,6 +538,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `README.md` through ADR 001; D04 ratifies it.
 
 ## Decision log
+
+- Decision: reject literal `..` source-path components before resolution,
+  retaining absolute-path, containment, file, and digest checks. Add the
+  in-root parent regression, escaping-symlink regression, and all four
+  package-policy activation states with enforcement and report assertions. The
+  two testing rows share one lifecycle gap; both retain separate dispositions.
+- Decision: preserve ADR-0009's accepted fixture-path text and record its
+  clerical relocation in a dated amendment to the same ADR. The style guide
+  requires an ADR-numbered amendment banner but does not require a distinct
+  identifier. A banner linked to the dated section records this interpretation
+  without inventing a new accepted decision or changing the rule table.
 
 - Decision: repair the preflight reader instead of changing installed tools
   or weakening pipeline failure checks. Use full-consuming exact-line `grep`
@@ -1780,6 +1832,13 @@ and `pr-creation`. Agents: `scrutineer` runs every gate; `scribe` makes
 mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
+
+- 2026-10-14, reopened implementation for verified formal-review findings.
+  Added a failing in-root parent-component regression before the source guard,
+  lifecycle/report cases, and a symlink-escape control. Recorded ADR history,
+  source-path guidance, and the independent docstring inventory. Focused green
+  and five mutation controls passed; remaining full gates and affected hosted
+  review are pending.
 
 - 2026-10-14, corrected both hosted assessment findings: the stacked gate
   example and AC-03 acceptance recipe now name the exact #17 base that contains

@@ -22,6 +22,7 @@ class BetLinks(unittest.TestCase):
     """VO-15: bet and task links agree in both directions."""
 
     def setUp(self):
+        """Load independent roadmap and bet records for each traceability test."""
         context = ValidationContext(ROOT)
         self.bets = context.load('spec/bets.json')['bets']
         roadmap = context.load('spec/roadmap.json')
@@ -29,15 +30,18 @@ class BetLinks(unittest.TestCase):
                       for task in step['tasks']}
 
     def test_committed_links_agree(self):
+        """Require committed task-to-bet links to agree in both directions."""
         check_bet_links(self.bets, self.tasks)
 
     def test_bet_dropping_a_citing_task_fails(self):
+        """Reject a bet that omits a task citing it."""
         b08 = next(bet for bet in self.bets if bet['id'] == 'B08')
         b08['tasks'].remove('1.1.4')
         with self.assertRaisesRegex(AssertionError, 'Task 1.1.4 cites bet B08, which does not list it'):
             check_bet_links(self.bets, self.tasks)
 
     def test_task_dropping_a_listed_bet_fails(self):
+        """Reject a task that omits a bet listing it."""
         self.tasks['1.1.4']['bets'].remove('B08')
         with self.assertRaisesRegex(AssertionError, 'Bet B08 lists task 1.1.4, which does not cite it'):
             check_bet_links(self.bets, self.tasks)

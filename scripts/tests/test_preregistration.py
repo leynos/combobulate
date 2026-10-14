@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import itertools
 import socket
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -71,6 +73,7 @@ class Registration(unittest.TestCase):
             check_amendment_chain(control, SPONSOR)
 
     def test_changed_source_needs_an_amendment(self):
+        """Reject a source digest that no longer binds the registered content."""
         control = next(item for item in REGISTER['controls'] if item['id'] == 'AC-07')
         check_sources(control, ROOT)
         stale = copy.deepcopy(control)
@@ -79,19 +82,43 @@ class Registration(unittest.TestCase):
             check_sources(stale, ROOT)
 
     def test_source_outside_the_repository_fails(self):
+        """Reject parent components and absolute paths before reading source content."""
         control = copy.deepcopy(next(item for item in REGISTER['controls'] if item['id'] == 'AC-07'))
-        for path, diagnostic in (('../outside.yml', 'escapes the repository'),
+        for path, diagnostic in (('../outside.yml', 'contains a parent component'),
                                  ('/etc/hostname', 'must be repository-relative')):
             control['frozen']['workload']['sources'][0]['path'] = path
             with self.subTest(path=path), self.assertRaisesRegex(AssertionError, diagnostic):
                 check_sources(control, ROOT)
 
     def test_absolute_source_inside_the_repository_fails(self):
+        """Require repository-relative spelling even for an otherwise valid source."""
         control = copy.deepcopy(next(item for item in REGISTER['controls'] if item['id'] == 'AC-07'))
         source = control['frozen']['workload']['sources'][0]
         source['path'] = str(ROOT / source['path'])
         with self.assertRaisesRegex(AssertionError, 'must be repository-relative'):
             check_sources(control, ROOT)
+
+    def test_parent_component_inside_the_repository_fails(self):
+        """Reject a parent component even when resolution preserves the source and digest."""
+        control = copy.deepcopy(next(item for item in REGISTER['controls'] if item['id'] == 'AC-07'))
+        control['frozen']['workload']['sources'][0]['path'] = 'scripts/../.github/workflows/ci.yml'
+        with self.assertRaisesRegex(AssertionError, 'contains a parent component'):
+            check_sources(control, ROOT)
+
+    def test_symlink_source_outside_the_repository_fails(self):
+        """Reject an internal source link whose matching content lies outside the repository."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repo'
+            root.mkdir()
+            outside = Path(directory) / 'outside.yml'
+            outside.write_bytes(b'fixture source\n')
+            (root / 'source.yml').symlink_to(outside)
+            control = copy.deepcopy(CONTROL)
+            control['frozen']['workload']['sources'] = [
+                {'path': 'source.yml', 'sha256': hashlib.sha256(outside.read_bytes()).hexdigest()},
+            ]
+            with self.assertRaisesRegex(AssertionError, 'escapes the repository'):
+                check_sources(control, root)
 
     def test_every_frozen_field_changes_the_digest(self):
         exercised: set[str] = set()

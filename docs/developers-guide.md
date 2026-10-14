@@ -437,6 +437,13 @@ the sponsor as `approved_by` and an approval reference, and set `digest` to the
 new value. If any acceptance measurement already exists for the control,
 register a new control identifier instead and keep the original result.
 
+Registered workload sources use repository-relative paths, such as
+`.github/workflows/ci.yml`, with no `..` components. Absolute paths are
+rejected. Each source file, including any resolved symlink target, must remain
+inside the repository and match its recorded SHA-256 digest. When source
+content changes, update its source digest and follow the control amendment
+procedure above; after an acceptance measurement, register a new control.
+
 When `docs/validation-results.json` conflicts between stacked branches, take
 either side, rerun the generators and `scripts/export_roadmap.py`, then run
 `python3 scripts/check_docs.py --write --as-of <HEAD commit date>` and commit

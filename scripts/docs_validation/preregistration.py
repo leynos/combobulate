@@ -68,13 +68,19 @@ def check_sources(control: Mapping[str, object], root: Path) -> None:
     control
         One registered control; its `frozen.workload.sources` list paths relative to the repository.
     root
-        The repository root; absolute paths fail, as do relative paths or symlinks escaping it.
+        The repository root; absolute paths, parent components, and escaping symlinks fail.
+
+    For example, ``check_sources(control, Path('/repo'))`` accepts the registered
+    ``.github/workflows/ci.yml`` when its digest matches. The spelling
+    ``scripts/../.github/workflows/ci.yml`` fails even with the same digest.
     """
     base = root.resolve()
     for source in control['frozen']['workload']['sources']:
-        require(not Path(source['path']).is_absolute(),
+        relative = Path(source['path'])
+        require(not relative.is_absolute(),
                 f"{control['id']} source {source['path']} must be repository-relative")
-        path = (root / source['path']).resolve()
+        require('..' not in relative.parts, f"{control['id']} source {source['path']} contains a parent component")
+        path = (root / relative).resolve()
         require(path.is_relative_to(base), f"{control['id']} source {source['path']} escapes the repository")
         require(path.is_file(), f"{control['id']} source {source['path']} is missing")
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
