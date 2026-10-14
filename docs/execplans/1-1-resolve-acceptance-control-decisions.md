@@ -11,7 +11,7 @@ CodeRabbit CLI review of `b4e2c14..0656e00` completed across 93 paths with two
 minor documentation findings; this follow-up corrects the validation date and
 clarifies delivery status. The hosted assessment confirmed the prior
 corrections on `804a38f` in
-[its reply](https://github.com/leynos/combobulate/pull/18#issuecomment-6158621418).
+[reply](https://github.com/leynos/combobulate/pull/18#issuecomment-6158621418).
 Affected hosted assessment and formal-review confirmation for the repaired
 candidate remain pending, as do sponsor-owned stack merges. Historical receipts
 below retain their original candidate scope. Current delivery state is recorded
