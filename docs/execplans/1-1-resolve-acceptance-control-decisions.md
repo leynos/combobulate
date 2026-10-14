@@ -422,9 +422,13 @@ reference could be discarded and that non-paragraph phase nodes could escape
 the structured malformed-input error. The review repair now validates the
 complete Goals reference and rejects non-paragraph phase nodes at their source
 line. It also adds independent all-open, mixed, and all-done status checks. The
-focused exporter suite passes 30 cases; full verification of the candidate is
-pending. The later milestones remain approval-gated, and the exporter is
-expected to retire when mapsplice#144 adds native JSON export and validation.
+focused exporter suite passes 30 cases. All seven local gates pass on
+`722d140a9fd170233d020b1f761d437dd7180d1d`: 329 tests (one skipped) and one
+doctest, 115 design-check unit cases, 30 pytest cases, and a clean CodeScene
+delta. Hosted `build-test` and `design-check` pass at that head; the optional
+`Test under Act` step is skipped. The later milestones remain approval-gated,
+and the exporter is expected to retire when mapsplice#144 adds native JSON
+export and validation.
 
 ## Context and orientation
 
