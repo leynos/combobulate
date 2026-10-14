@@ -246,7 +246,7 @@ const STUB: &str = concat!(
     "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm \
      cargo-audit') ;;\n",
     "  'rustc:--version') printf '%s\\n' 'rustc fixture'; exit 0 ;;\n",
-    "  'uv:run --with PyYAML==6.0.3 python tools/whitaker_probe.py --workflow \
+    "  'uv:run --with PyYAML==6.0.3 python scripts/whitaker_probe.py --workflow \
      .github/workflows/ci.yml') ;;\n",
     "  'sudo:apt-get update'|'sudo:apt-get install --yes --no-install-recommends clang lld mold') \
      ;;\n",

@@ -14,7 +14,7 @@ from docs_validation import evidence_gate as gate
 from docs_validation.evidence_gate import AbstractRecord, Admission, Level, admit, all_states, is_valid
 
 ROOT = Path(__file__).resolve().parents[2]
-RULES = json.loads((ROOT / 'tools/tests/fixtures/evidence_gate_rules.json').read_text(encoding='utf-8'))
+RULES = json.loads((ROOT / 'scripts/tests/fixtures/evidence_gate_rules.json').read_text(encoding='utf-8'))
 VALID_STATES = 86_400
 RANK = {'proof': 4, 'bounded': 3, 'tested': 2, 'restricted': 1, 'rejected': 0}
 # Worse values per field, for P1 (degradation monotonicity). Kind is excluded: it names the evidence type.

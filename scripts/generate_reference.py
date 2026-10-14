@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate reference tables from the proposed JSON catalogue.
 
-Usage: python tools/generate_reference.py [--check]
+Usage: python scripts/generate_reference.py [--check]
 The human-authored preamble and semantic cases remain outside generated markers.
 """
 from __future__ import annotations

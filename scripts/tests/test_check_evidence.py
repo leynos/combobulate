@@ -9,7 +9,7 @@ import pytest
 from check_evidence import app
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / 'tools/tests/fixtures/evidence'
+FIXTURES = ROOT / 'scripts/tests/fixtures/evidence'
 EXAMPLE = ROOT / 'spec/proof-evidence.example.json'
 WITH_PARSERS = ('--bindings', str(FIXTURES / 'bindings.json'), '--log-parsers', str(FIXTURES / 'log-parsers.json'))
 
@@ -66,13 +66,15 @@ def test_schema_invalid_record_exits_two(tmp_path, capsys):
 
 
 def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
+    """Report every supplied record even when an earlier one is schema-invalid."""
     broken = tmp_path / 'broken.json'
     broken.write_text('{not json', encoding='utf-8')
     missing = tmp_path / 'missing.json'
     code = run('--as-of', '2026-10-10', *WITH_PARSERS, str(broken), str(missing), fixture('complete-test'))
     captured = capsys.readouterr()
     assert code == 2, 'unreadable input exits 2'
-    assert 'broken.json: unreadable' in captured.err and 'missing.json: unreadable' in captured.err
+    assert 'broken.json: unreadable' in captured.err, 'malformed JSON is reported as unreadable'
+    assert 'missing.json: unreadable' in captured.err, 'a missing file is reported as unreadable'
     assert ': tested []' in captured.out, 'records after an invalid one are still admitted and reported'
 
 

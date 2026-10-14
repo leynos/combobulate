@@ -61,9 +61,27 @@ def check_amendment_chain(control: Mapping[str, object], sponsor: str) -> None:
 
 
 def check_sources(control: Mapping[str, object], root: Path) -> None:
-    """Require each registered workload source to match its recorded SHA-256; an edit needs an amendment."""
+    """Require each registered workload source to match its recorded SHA-256; an edit needs an amendment.
+
+    Parameters
+    ----------
+    control
+        One registered control; its `frozen.workload.sources` list paths relative to the repository.
+    root
+        The repository root; absolute paths, parent components, and escaping symlinks fail.
+
+    For example, ``check_sources(control, Path('/repo'))`` accepts the registered
+    ``.github/workflows/ci.yml`` when its digest matches. The spelling
+    ``scripts/../.github/workflows/ci.yml`` fails even with the same digest.
+    """
+    base = root.resolve()
     for source in control['frozen']['workload']['sources']:
-        path = root / source['path']
+        relative = Path(source['path'])
+        require(not relative.is_absolute(),
+                f"{control['id']} source {source['path']} must be repository-relative")
+        require('..' not in relative.parts, f"{control['id']} source {source['path']} contains a parent component")
+        path = (root / relative).resolve()
+        require(path.is_relative_to(base), f"{control['id']} source {source['path']} escapes the repository")
         require(path.is_file(), f"{control['id']} source {source['path']} is missing")
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         require(digest == source['sha256'],

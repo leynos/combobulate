@@ -37,7 +37,7 @@ fn assert_capability_order(trace: &[Vec<String>]) {
                 "--with",
                 "PyYAML==6.0.3",
                 "python",
-                "tools/whitaker_probe.py",
+                "scripts/whitaker_probe.py",
                 "--workflow",
                 ".github/workflows/ci.yml",
             ]

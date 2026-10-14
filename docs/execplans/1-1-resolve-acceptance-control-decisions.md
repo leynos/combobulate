@@ -5,9 +5,18 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (the sponsor approved this revision for implementation on
-2026-10-11 by invoking the implementation workflow; `EP-M0` is complete and
-`EP-M1a` is under way)
+Status: BLOCKED (CodeRabbit CLI reassessment cannot start). Implementation and
+generated invariant coverage are validated: `3ed0593` passed all seven local
+gates. Its full 93-path CLI inspection found two helper documentation gaps,
+corrected in `d0460a8` without executable AST changes. Both doctests and all
+documentation/design gates pass. Two focused reassessment attempts and one
+full-base attempt failed before inspection with "Failed to start review. Please
+try again." Authentication, repository readiness, backend/WebSocket
+connectivity, and review allowance diagnostics pass; the startup failure's
+cause is unknown. No completed reassessment or approval is claimed. Publication
+and hosted confirmation continue independently; current delivery state and the
+remaining CLI blocker are recorded on
+[PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
 recorded per decision identifier (see `Sponsor decisions`).
@@ -71,8 +80,8 @@ Term definitions used throughout:
   `PFnn.<method>@<task>` (for example `PF14.structural@1.1.4`). A component
   states which admission levels satisfy it.
 - Evidence gate: the pure admission function in
-  `tools/docs_validation/evidence_gate.py` that maps one evidence record to an
-  admission level and a set of reason codes.
+  `scripts/docs_validation/evidence_gate.py` that maps one evidence record to
+  an admission level and a set of reason codes.
 - Negative control: a deliberately broken input that a check must reject for
   the intended reason. A check with no failing negative control is vacuous.
 
@@ -100,10 +109,10 @@ Term definitions used throughout:
   `docs/decision-register.md` remain generated from their JSON masters.
 - C-EP-6. The design-model checker remains a documentation-model checker. It
   must not claim Rust compilation, Kani, Verus, or Polars results; the
-  `NOT_RUN` list in `tools/check_docs.py` stays truthful.
-- C-EP-7. Checker logic lives in `tools/docs_validation/` and follows the
-  existing `tools/` conventions (`unittest` plus pinned Hypothesis with
-  `derandomize=True`, dependencies pinned in `tools/requirements.txt`).
+  `NOT_RUN` list in `scripts/check_docs.py` stays truthful.
+- C-EP-7. Checker logic lives in `scripts/docs_validation/` and follows the
+  existing checker conventions (`unittest` plus pinned Hypothesis with
+  `derandomize=True`, dependencies pinned in `scripts/requirements.txt`).
   Runnable helper scripts live in `scripts/` and follow
   `docs/scripting-standards.md` (`uv` shebang, PEP 723 block, Python 3.14,
   Cyclopts with `INPUT_*` environment support, pytest suites in
@@ -153,7 +162,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `tests/` pins edited Makefile or workflow text, update that test in the same
   commit; if the change would alter a tested contract's meaning, escalate.
 - Dependencies: Wenmode 0.15.2 is sponsor-directed (D15). Any other Python
-  dependency beyond `tools/requirements.txt` triggers escalation.
+  dependency beyond `scripts/requirements.txt` triggers escalation.
 - Calibration: if a calibration workload cannot run locally (for example a
   Verus release incompatible with the pinned nightly), record the gap, use the
   nearest runnable proxy with its limitation stated, and report it; do not
@@ -166,7 +175,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Risk: the gate tests its inputs' self-description, so a fabricated record
   passes. Severity: high. Likelihood: high without mitigation. Mitigation:
   C-EP-10; provenance and log digests in the schema; the complete
-  admit-at-`proof` fixture lives only under `tools/tests/fixtures/`.
+  admit-at-`proof` fixture lives only under `scripts/tests/fixtures/`.
 - Risk: a threshold and its digest are edited together in one commit.
   Severity: high. Likelihood: medium. Mitigation: the base-revision freeze
   check (VO-7) compares against the merge base in CI. Without CODEOWNERS (D13),
@@ -236,7 +245,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   pass, including the command line, `INPUT_CHECK`, and a 60-example
   derandomized round-trip property that observed every required structural
   class; 2 checker-gate cases pass in
-  `tools/tests/test_roadmap_export_gate.py`; seeded faults (dropped details,
+  `scripts/tests/test_roadmap_export_gate.py`; seeded faults (dropped details,
   ignored ticks) each fail the suite; the script runs through its own `uv`
   shebang; `make design-check` passes.
 - [x] (2026-10-11) Sponsor approval of this revision (implementation workflow
@@ -247,14 +256,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   updated and the style guide amended (D07); `spec/decisions.json` holds D01 to
   D15 (all `proposed`) and the eight candidate ADR subjects; 11 pytest cases in
   `scripts/tests/test_generate_decisions.py` (red first: module missing) and 33
-  `unittest` cases in `tools/tests/test_decision_register.py` pass; seeded
+  `unittest` cases in `scripts/tests/test_decision_register.py` pass; seeded
   mutations (open-status pattern disabled, supersession check removed) each
   fail their control; a hand edit of `docs/decision-register.md` fails the
   drift check (VO-14).
 - [x] (2026-10-11) `EP-M1b` Roadmap status, obligation components, and freeze
   check (branch `1-1-roadmap-closure`, stacked on `EP-M1a`). Evidence: 27
-  `unittest` cases in `tools/tests/test_roadmap_status.py` and
-  `tools/tests/test_freeze.py` (red first: modules missing) pass, covering a
+  `unittest` cases in `scripts/tests/test_roadmap_status.py` and
+  `scripts/tests/test_freeze.py` (red first: modules missing) pass, covering a
   chain and a diamond, every MS-4 failure reason, fail-closed record
   components, a checker-sourced component, and a temporary Git repository for
   the base-revision comparison; every obligation has one component per linked
@@ -268,7 +277,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   with 12 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
   Q4, Q7, and Q8 link their register anchors; `Cargo.toml` sets
   `publish = false` and `cargo publish --dry-run` refuses; 4 cases in
-  `tools/tests/test_package_policy.py` (red first) and 5 real-document VO-6
+  `scripts/tests/test_package_policy.py` (red first) and 5 real-document VO-6
   controls pass (reinserting the Q4 sentence, rewrapped or not, writing "Q4
   remains open", or deleting the Q4 anchor each fails naming D03); task 1.1.1
   ticked with its completion record, and the checker reports it backed.
@@ -291,9 +300,9 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   three labelled not calibrated with reasons; the probe in
   `tools/calibration/cardinality-probe/` verifies in Verus (8 functions, a
   seeded mutant rejected) and its structural Kani harnesses satisfy every
-  `cover!`; 29 cases in `tools/tests/test_preregistration.py` and
-  `tools/tests/test_freeze.py` pass, including the exhaustive outcome mapping,
-  a Hypothesis property that exercised every frozen field, a
+  `cover!`; 29 cases in `scripts/tests/test_preregistration.py` and
+  `scripts/tests/test_freeze.py` pass, including the exhaustive outcome
+  mapping, a Hypothesis property that exercised every frozen field, a
   threshold-plus-digest edit rejected without an amendment, and host-identity
   scans with the local host name supplied at test time; the CI `build-test` job
   has `timeout-minutes: 8` (`AC-07`); task 1.1.3 ticked and backed.
@@ -313,10 +322,193 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `proof`), and rejects resource-exhausted and self-reported fixtures with
   their reasons; `PF14.structural@1.1.4` is satisfied by the passing
   `evidence-gate` check and task 1.1.4 is ticked.
-- [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
+- [x] (2026-10-11) `EP-M6` Reconciliation, roadmap closure, and final gates
+  (branch `1-1-reconciliation`, stacked on `EP-M5`). Evidence: D15 accepted and
+  its four details added to tasks 1.2.1, 1.2.3, 1.2.4, and 2.3.1 in the
+  canonical roadmap and re-exported; every decision D01 to D15 is accepted; 73
+  one-way task-to-bet links and one bet-to-task link reconciled, with a two-way
+  check and negative controls (VO-15); repository layout, contents, validation,
+  and developers' guide updated (module ownership, exception renewal, control
+  amendment, report conflicts); full gates pass.
+
+- [x] (2026-10-13) Reconciled the current implementation on PR #18 and kept
+  its `1-1-reconciliation` branch stacked on #17. All six behavioural
+  acceptance criteria have source and test evidence; `c6063b5` passed the six
+  repository gates and typecheck. Fresh generator checks passed, and
+  `cargo publish --dry-run` refused publication (`publish = false`).
+- [x] (2026-10-13) Current-head CodeRabbit CLI review inspected the committed
+  `b4e2c14..c6063b5` diff (90 paths). Two minor findings: absolute paths inside
+  the repository were accepted (valid; regression failed first); the single
+  soft-newline quote concern is invalid under the existing Markdown semantic
+  wrapping contract (confirmatory test passed).
+- [x] (2026-10-13) Repair the source-path guard and validate the two affected
+  suites (32 tests, 6 subtests). The isolated two-test baseline passed;
+  removing the guard and dropping quoted words each failed their designated
+  test with exit 1. Evidence:
+  `/tmp/mutation-99861d46-f6f5-48d6-acfb-658bee9364bf-1-1-reconciliation.out`.
+- [x] (2026-10-13) All seven repair gates passed before commit `b079f72`:
+  formatting, documentation/Clippy/Whitaker lint, typecheck, Rust tests and
+  doctest, design checks with the #17 freeze base, Markdown lint/spelling, and
+  Mermaid validation. Rust: 329 passed, 1 skipped; doctest: 1 passed. Python:
+  266 unittest and 310 pytest tests, including 573 subtests, passed.
+- [x] (2026-10-13) CodeRabbit reassessment of `b4e2c14..b079f72` completed
+  with zero findings across all 90 changed paths. Its result applies to that
+  candidate; the final documentation-only delivery record is validated
+  separately, and hosted assessment remains required.
+- [x] (2026-10-14) Published documentation receipt `1f48268` on PR #18;
+  hosted Design contracts passed, while CI exposed a false missing-component
+  diagnostic in build-tools preflight. Both long-list regression cases failed
+  before repair. The red log is
+  `/tmp/test-red-combobulate-1-1-reconciliation-preflight.out`.
+- [x] (2026-10-14) The full-consuming component reader passed all 12
+  preflight tests, including both new long-list cases and genuine
+  missing-component checks; the doctest passed. Make and tee exited 0. Evidence:
+  `/tmp/test-green-combobulate-1-1-reconciliation-preflight.out`.
+- [x] (2026-10-14) All seven code gates passed for repair `2bf668f`:
+  formatting, documentation/Clippy/Whitaker lint, typecheck, full tests,
+  design-check against the #17 freeze base, Markdown lint/spelling, and Mermaid
+  validation. Rust: 331 passed, 1 skipped; doctest: 1 passed. Python: 266
+  unittest tests, 310 pytest tests, and 573 subtests passed. Logs:
+  `/tmp/{action}-combobulate-1-1-reconciliation-preflight-repair.out`.
+- [x] (2026-10-14) Fresh CodeRabbit CLI review of `b4e2c14..2bf668f`
+  completed with zero findings across 92 committed paths. Evidence:
+  `/tmp/coderabbit-combobulate-1-1-reconciliation-preflight-repair.out`.
+- [x] (2026-10-14) Published `5bf739a`; CI run 38492308721 and Design
+  contracts run 38492308682 both passed on attempt 1. The CI run supersedes the
+  earlier preflight failure; its optional Act step was skipped. The hosted
+  assessment confirmed implementation completeness, with two documentation
+  corrections: use the #17 control-containing freeze base and refresh delivery
+  receipts. See
+  [the assessment](https://github.com/leynos/combobulate/pull/18#issuecomment-6158476454).
+- [x] (2026-10-14) Hosted assessment confirmation on `804a38f` found both
+  documentation corrections resolved and no remaining work within its scope.
+  Both current workflows passed; PR #18 was marked ready with unchanged
+  base/head. The subsequent formal review remains a separate inspection.
+- [x] (2026-10-14) Verified formal review 5511956210 against current source:
+  in-root `..` source paths were accepted contrary to the documented contract.
+  The new regression failed with "AssertionError not raised" before repair.
+  Pre-merge testing rows also identify valid lifecycle/report and symlink
+  coverage gaps; developer documentation needs source rules and an ADR
+  amendment. The docstring aggregate lacks a recoverable function inventory;
+  clarification independently identified 15 changed test functions to document.
+- [x] (2026-10-14) Focused formal-repair suites passed: 25 tests and 22
+  subtests. The isolated three-test mutation baseline passed with 16 subtests;
+  removing parent rejection, removing symlink confinement, forcing either
+  inactive package rule, and recording constant count 1 each failed its
+  designated control for the intended reason. Logs:
+  `/tmp/pytest-green-combobulate-1-1-reconciliation-formal-repair.out` and
+  `/tmp/mutation-combobulate-1-1-reconciliation-formal-repair.out`.
+- [x] (2026-10-14) Added meaningful docstrings for all 15 independently
+  identified changed tests and the new regression cases. The artisan's 12
+  additions across six files preserve their test ASTs after removing function
+  docstrings. Preserved ADR-0009's original fixture reference and recorded the
+  current location in its dated amendment; documented registered-source paths
+  and digest amendments in the developers' guide.
+- [x] (2026-10-14) Full repair gates passed formatting, lint, typechecking,
+  331 Rust tests (one skipped), and one doctest. The design check then detected
+  report drift: the ADR amendment adds one local link, raising the generated
+  count from 105 to 106. Regenerated and reviewed that single-field change;
+  subsequent formatting, design, Markdown/spelling, and diagram checks passed.
+  Python validation passed 269 unittest tests, 313 pytest tests, and 589
+  subtests against the exact frozen #17 base. The initial failure and rerun
+  remain separate evidence; code gates retain their unchanged source scope.
+- [x] (2026-10-14) Committed source-path, coverage, documentation, and report
+  repairs as `0656e00`. Fresh CodeRabbit CLI review completed 93 paths with two
+  minor documentation findings and no source findings; corrected the checked
+  date and distinguished confirmed historical assessment from pending affected
+  assessment. Review log:
+  `/tmp/coderabbit-combobulate-1-1-reconciliation-formal-repair.out`.
+- [x] (2026-10-14) Validated and published the documentation follow-up as
+  `a7d6a43`. The source thread and three substantive rows are confirmed below;
+  current property coverage and docstring-report reconciliation remain separate
+  delivery work. Sponsor-owned stack merges remain pending.
+
+- [x] (2026-10-14) Published `a7d6a43`; CI 38500252800 and Design contracts
+  38500252779 passed. Affected assessment 6159481081 found no remaining
+  implementation defect. Inline response 4266123896 resolved the source-path
+  thread; response 6159504364 resolved both testing rows and developer
+  documentation. Its separate rename-aware inventories found all 27
+  changed-line and all 28 new/AST-changed Python functions documented.
+- [x] (2026-10-14) The supported configured-check command produced 13 passes
+  and two warnings. Added two Hypothesis properties for generated quote words,
+  paragraph boundaries, long tokens, source components, parent placements,
+  absolute forms, and internal/external symlink targets. The dependency was
+  already pinned; production code is unchanged. Focused tests and the isolated
+  two-test baseline passed; all five mutants failed at their intended
+  assertions (word loss, collapsed paragraphs, and removal of each absolute,
+  parent, or containment guard). Logs:
+  `/tmp/pytest-combobulate-1-1-reconciliation-properties.out` and
+  `/tmp/mutation-combobulate-1-1-reconciliation-properties.out`.
+- [ ] (2026-10-14) Validate, review, and publish the property follow-up. Obtain
+  affected hosted confirmation and current pre-merge evidence; retain the old
+  docstring aggregate as inconclusive until its checker provenance is known.
+
+- [x] (2026-10-14) Committed property coverage as `3ed0593` after all seven
+  gates passed: 331 Rust tests, one skipped, one doctest, 270 unittest tests,
+  315 pytest tests, and 589 subtests. Fresh committed CLI review inspected all
+  93 paths and found only two helper documentation gaps. Added structured
+  input/return descriptions and executable success/failure examples for
+  `check_bet_links` and `quoted_answer`; AST equivalence confirms no executable
+  changes after removing function docstrings.
+- [ ] (2026-10-14) Validate and reassess the helper documentation, then publish
+  the property and documentation follow-ups and obtain affected hosted
+  assessment and pre-merge confirmation.
+
+- [x] (2026-10-14) Validated and committed helper documentation as `d0460a8`.
+  Both executable doctests, formatting, design/freeze checks, 270 unittest
+  tests, 315 pytest tests with 589 subtests, Markdown/spelling, and diagram
+  checks passed. Two focused CLI attempts and one actual-base attempt each
+  failed before inspection; original logs are preserved separately.
+- [x] (2026-10-14) Read-only CLI diagnostics found signed-in authentication,
+  repository readiness, reachable backend/WebSocket, and available included
+  reviews. No rate-limit or cooldown advice was given. The comparison-specific
+  startup hypothesis was falsified by the full-base failure. No credentials,
+  accounts, configuration, services, or billing settings were changed.
+- [ ] (2026-10-14) Publish the validated follow-up and establish its hosted
+  evidence. Resume the missing CLI reassessment only after service recovery;
+  keep this blocker and stale docstring-report provenance explicit. Sponsor
+  review and stack merges remain separate delivery work.
 
 ## Surprises & discoveries
 
+- Observation: CLI review startup failed despite passing readiness and usage
+  diagnostics. Evidence: the helper-docs, helper-docs-retry, and
+  helper-docs-full CLI logs all report a non-recoverable start error without
+  findings or completion. Impact: stop retries, preserve the missing review,
+  and continue independent publication/hosted evidence without substituting it
+  for the required CLI result.
+
+- Observation: configured pre-merge checks can run independently of a full PR
+  review. The supported command refreshed the testing and developer rows but
+  retained the old docstring percentage and introduced a valid generated-test
+  gap. Impact: verify each new warning against source, preserve independent
+  inventory counts, and do not infer a current checker pass from chat analysis.
+
+- Observation: a successful CodeRabbit status can accompany a
+  `CHANGES_REQUESTED` review and failed pre-merge rows. Evidence: formal review
+  5511956210 on `804a38f` has one inline finding, two testing errors, and two
+  documentation warnings. Impact: inspect the review, threads, and full
+  walkthrough rather than treating the wrapper status as approval.
+- Observation: the 48.89% docstring report does not expose its 45-function
+  inventory. Clarification 6158784579 verified a separate changed-line Python
+  inventory with 15 missing test docstrings; its 23 unsupported skips are not
+  missing documentation. Impact: document verified changed functions and
+  request warning reconciliation without inventing the original denominator.
+
+- Observation: hosted CI run 38486818299 falsely reported the installed
+  `llvm-tools-preview` component as missing. The checker pipes `printf` into
+  quiet `grep` under `pipefail`; an early match closes the reader and can give
+  the producer `SIGPIPE`. Evidence: a long-list probe returned pipeline statuses
+  `141 0`; a consuming reader returned `0 0`. Both new development and
+  coverage regression cases failed before repair, reporting all installed
+  components as missing. Impact: consume the complete listing and retain exact
+  matching, missing-component diagnostics, and `pipefail`.
+
+- Observation: the hand-edit drift controls edited "Decision: pending.",
+  which vanished once every decision was accepted, so the edit became a no-op
+  and the control passed vacuously. Evidence: `make design-check` on `EP-M6`
+  failed with "AssertionError not raised". Impact: the controls now edit text
+  that is always generated and assert that the edit changed something.
 - Observation: a synchronize run on #16 received `github.base_ref` = `main`
   although the pull request's base is `1-1-semantic-contracts`, so its freeze
   check compared against `main` and found no frozen registers. Evidence: Design
@@ -366,13 +558,20 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make fmt` (markdownlint MD033, inline HTML). Evidence: `make fmt` exit 2
   naming `docs/decision-register.md`. Impact: register master text puts code
   identifiers in backticks.
-- Observation: `tools/tests/test_docs_validation.py` pinned the checked
+- Observation: `scripts/tests/test_docs_validation.py` pinned the checked
   Markdown count at 10. Impact: it now derives the count from
   `DESIGN_DOCUMENTS`, so adding a design document needs no test edit.
-- Observation: the checker forbids any completed roadmap task.
-  Evidence: `tools/docs_validation/ledger.py` `check_task_links` fails with
-  "Roadmap has fabricated completed tasks"; `tools/generate_roadmap.py` always
-  emits `- [ ]`. Impact: `EP-M1b` replaces the ban with an evidence check.
+- Observation: the original checker banned completed tasks and its roadmap
+  generator always emitted unchecked boxes. Resolved in `EP-M1b`:
+  `scripts/docs_validation/ledger.py` validates task links without banning
+  ticks; `scripts/export_roadmap.py` preserves checked status; and
+  `scripts/docs_validation/roadmap_status.py` requires completion records,
+  accepted decisions, artefacts, prerequisites, and satisfied components.
+  Confirmatory tests cover supported completion, preserved export status, and
+  rejection when a completion record is removed. On 2026-10-13 the three
+  confirmatory tests passed; each isolated source mutation (restore the ban,
+  discard completed status, bypass closure) failed its designated test with
+  exit 1. Evidence: `/tmp/roadmap-mutations-combobulate-1-1-reconciliation.out`.
 - Observation: PF14 already links task 1.1.4, with methods Verus, Kani, and
   "structural validation". Impact: obligations gain per-task components; 1.1.4
   discharges only `PF14.structural@1.1.4`, at level `tested`.
@@ -387,7 +586,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Impact: the D08 rule is a syntax-tree check plus a translated parse error.
 - Observation: the system Python lacks `markdown-it-py`, so `make design-check`
   fails without a prepared environment. Impact: concrete steps use
-  `uv run --python 3.14 --with-requirements tools/requirements.txt`.
+  `uv run --python 3.14 --with-requirements scripts/requirements.txt`.
 - Observation: `make spelling` checks only tracked files, and the gate
   rejects the existing schema field spelling `result_art...` (American
   spelling). Impact: commit before relying on the gate; schema version 2
@@ -410,6 +609,75 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: preserve the CLI startup failure as a delivery blocker after two
+  focused attempts, healthy read-only diagnostics, and one full-base diagnostic
+  attempt. Do not rotate credentials, alter service configuration, infer a
+  cooldown, or claim a clean reassessment. Publish only the already gated
+  source/documentation and distinguish hosted assessment from local review.
+
+- Decision: clarify only the two helper docstrings identified by CLI review.
+  The repository requires usage/outcome examples, but the review's claimed
+  repository-wide NumPy-style mandate is not present in tracked instructions.
+  Structured descriptions make these two interfaces clearer without adding a
+  global style rule or changing runtime behaviour. Verify examples as doctests
+  and preserve the earlier full code gates at their actual source scope.
+
+- Decision: add generated invariant tests using the existing pinned Hypothesis
+  dependency and default settings. Construct word/paragraph inputs and normal
+  path components directly, preserve fixed regressions, and isolate each
+  filesystem example. Vary two symlink topologies rather than inventing an
+  arbitrary graph. The finite package-policy matrix remains exhaustive and
+  needs no additional property framework.
+
+- Decision: reject literal `..` source-path components before resolution,
+  retaining absolute-path, containment, file, and digest checks. Add the
+  in-root parent regression, escaping-symlink regression, and all four
+  package-policy activation states with enforcement and report assertions. The
+  two testing rows share one lifecycle gap; both retain separate dispositions.
+- Decision: preserve ADR-0009's accepted fixture-path text and record its
+  clerical relocation in a dated amendment to the same ADR. The style guide
+  requires an ADR-numbered amendment banner but does not require a distinct
+  identifier. A banner linked to the dated section records this interpretation
+  without inventing a new accepted decision or changing the rule table.
+
+- Decision: repair the preflight reader instead of changing installed tools
+  or weakening pipeline failure checks. Use full-consuming exact-line `grep`
+  with output redirected to `/dev/null`; validate both build routes and the
+  existing genuine missing-component cases. This is a shell command-contract
+  correction, with no change to the pinned toolchain or acceptance controls.
+
+- Decision: the 2026-10-13 CLI absolute-path finding is valid: source paths
+  must be repository-relative even when an absolute path resolves inside the
+  repository. Preserve the containment and digest checks and add an absolute
+  path guard. The newline finding is invalid under the established Markdown
+  contract: soft breaks may reflow, while words and paragraph boundaries stay
+  unchanged; the raw approval answer is retained. Add a confirmatory test for
+  that distinction rather than changing approval identity. No accepted record,
+  threshold, dependency, public API, or proof artefact changes. Date/Author:
+  2026-10-13, implementing agent.
+- Decision: re-reviews of the review fixes (CodeRabbit CLI) found three minor
+  items, fixed in `EP-M6`: registered workload sources must resolve inside the
+  repository (absolute paths, `..`, and symlinks fail), a test pattern escapes
+  its dots, and a compound assertion is split so each part has its message.
+  Date/Author: 2026-10-11, implementing agent.
+- Decision: second round of milestone reviews (CodeRabbit CLI, `EP-M2` to
+  `EP-M6`, 7 distinct findings). `EP-M3`: SC-09 cited `.axis` (P002) instead of
+  `execute_into` (E010); fixed in the `EP-M3` layer. `EP-M4` and `EP-M5`: fixed
+  in their layers (see their entries). `EP-M2` re-review: the claim that the
+  ledger still records "All tasks remain open" was invalid (the ledger has
+  computed its detail since `EP-M1b`, and the committed report reads "1 of 72
+  tasks ticked"); the package-policy detail was already fixed in `EP-M6`.
+  `EP-M6`: no findings. The stack was restacked from `EP-M3` upward; the plan's
+  decision log was the only conflict, resolved by keeping both entries.
+  Date/Author: 2026-10-11, implementing agent.
+- Decision: `EP-M2` milestone review dispositions (CodeRabbit CLI, three
+  minor findings, all fixed). The terms-of-reference handoff now names the ADRs
+  each candidate subject is assigned rather than claiming ADR-0006 and ADR-0007
+  existed before `EP-M3` (fixed in the `EP-M2` layer and the stack restacked;
+  range-diff showed identical patches above it); the register renders session
+  answers as verbatim blockquotes that keep paragraph breaks; the
+  package-policy result names only the rules it enforced. Fixes to rendering
+  and reporting landed in `EP-M6`. Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M5` milestone review disposition (CodeRabbit CLI):
   `scripts/check_evidence.py` stopped at the first schema-invalid record and
   raised on an unreadable file; it now reports every record, names unreadable
@@ -418,7 +686,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Decision: `EP-M5` exceeded both per-milestone tolerances: 39 changed files
   against 25, and about 1,900 net added lines against 1,500, excluding the
   regenerated regions, the export, and the report. The evidence fixtures (six
-  JSON files under `tools/tests/fixtures/evidence/` plus the rule-table
+  JSON files under `scripts/tests/fixtures/evidence/` plus the rule-table
   fixture), the version 2 schema, and the five test suites the plan requires
   (VO-1 to VO-4 and the command) account for most of it. Escalated to the
   sponsor in the milestone pull request. Date/Author: 2026-10-11, implementing
@@ -429,7 +697,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `outcome-not-run` is not a reason code, because an executed kind that did not
   run fails the validity predicate first. Without an evaluation date the gate
   treats every exception as malformed (fail closed). The parser registry under
-  `tools/tests/fixtures/evidence/` is test-only; the repository registry
+  `scripts/tests/fixtures/evidence/` is test-only; the repository registry
   registers no parser, so verifier evidence stays self-reported until tasks
   1.2.1 and 1.2.4 (C-EP-10). Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M4` milestone review dispositions (CodeRabbit CLI). Fixed in
@@ -487,7 +755,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   component is judged with that check's result; the scheduled workflow passes
   its run date as `AS_OF` so expiry surfaces while `main` is idle; the two
   public checker functions gained parameter documentation. Declined: annotating
-  every `unittest` method's return type, because the existing `tools/tests/`
+  every `unittest` method's return type, because the existing `scripts/tests/`
   suites do not, and the one untyped helper parameter was annotated instead.
   The re-review's request to require at least one decision in every completion
   record was declined: MS-4 requires each cited decision to be accepted, and
@@ -551,7 +819,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   extrapolation factors are recorded in `docs/acceptance-calibration.md`; the
   registered values cite them. Date/Author: 2026-10-10, sponsor.
 - Decision: implement validators and the evidence gate in Python inside
-  `tools/docs_validation/`. Rationale: the design-contract checker, its JSON
+  `scripts/docs_validation/`. Rationale: the design-contract checker, its JSON
   Schema validation, its Hypothesis tests, and its CI workflow live there. Rust
   contract tests over repository files exist (`tests/markdown_wiring.rs`), so
   Rust was credible, but JSON Schema validation would stay in Python, splitting
@@ -580,13 +848,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Date/Author: 2026-10-10.
 - Decision: runnable helper scripts go in `scripts/` under
   `docs/scripting-standards.md`, with pytest suites in `scripts/tests/`;
-  checker modules stay in `tools/docs_validation/` under `unittest`. The
+  checker modules stay in `scripts/docs_validation/` under `unittest`. The
   roadmap exporter is `scripts/export_roadmap.py`;
   `scripts/generate_decisions.py` and `scripts/check_evidence.py` follow the
-  same rule. Existing `tools/generate_*.py` generators are not moved in this
-  step. Rationale: the sponsor named `scripts/` as the expected home for helper
-  scripts (2026-10-11), replacing the planning agent's earlier choice to follow
-  `tools/` conventions. Date/Author: 2026-10-11, sponsor.
+  same rule. All Python generators, checker modules, tests, and fixtures now
+  live under `scripts/`. Rationale: the sponsor named `scripts/` as the
+  expected home for helper scripts (2026-10-11), replacing the planning agent's
+  earlier choice to follow checker conventions. Date/Author: 2026-10-11,
+  sponsor; updated 2026-10-12.
 - Decision: milestones land sequentially on stacked branches. Date/Author:
   2026-10-10.
 - Decision: the kernel-contract `evidence.status` vocabulary is unchanged;
@@ -618,9 +887,64 @@ executable grammar checks to phase 2.
 
 ## Outcomes & retrospective
 
-Not started. Complete at each milestone boundary and at completion, comparing
-the result with `Purpose / big picture` and reconciling every discovery with
-the artefacts in `Conformance basis` before setting the status to `COMPLETE`.
+Outcome against `Purpose / big picture`, item by item:
+
+1. `docs/decision-register.md` is generated from `spec/decisions.json` and
+   lists D01 to D15 as accepted, each with its chosen option, date, quoted
+   session answer, and ADR, plus the eight candidate ADR subjects with their
+   dispositions. Reinserting a retired sentence, writing "Q4 remains open", or
+   deleting a ToR §9 anchor fails `make design-check` and names the decision.
+2. `spec/semantic-contracts.json` holds `SC-01` to `SC-10` with
+   preconditions, success and error relations, empty rules, 51 executable
+   examples, a 28-entry grammar corpus, seeded mutations that each change an
+   outcome, and proof sketches.
+3. `spec/acceptance-controls.json` registers `AC-01` to `AC-07`, four
+   calibrated from recorded measurements extrapolated to the hosted runner
+   class and three labelled not calibrated; a threshold changed together with
+   its digest fails the freeze check without an amendment.
+4. `scripts/check_evidence.py` rejects timeouts, unsatisfied witnesses,
+   misfiring controls, uncovered or unaudited trust, stale bindings, focused
+   runs, self-reported verifier verdicts, and bad exceptions with specific
+   reason codes, and admits complete records at the level they earn.
+5. Tasks 1.1.1 to 1.1.4 are ticked in `docs/roadmap.md`, and the checker
+   confirms each tick is backed by prerequisites, a completion record, accepted
+   decisions, and satisfied obligation components.
+
+Acceptance criteria (`Validation and acceptance`): 1 to 6 are met; criterion 4
+is demonstrated by `scripts/tests/test_freeze.py` (control and decision
+freezes, including a temporary Git repository) and by the hosted
+`Design contracts` runs; criterion 6 by `cargo publish --dry-run` refusing to
+publish.
+
+Deviations and lessons:
+
+- Tolerances. `EP-M1a`, `EP-M3`, `EP-M4`, and `EP-M5` exceeded the
+  per-milestone line or file tolerance, mostly through indented JSON data and
+  required test suites; each overrun is in the decision log and its pull
+  request. The 80-file estimate held only per milestone; the whole step changed
+  well over 100 files across eight pull requests.
+- Red-first order slipped once (`EP-M3` models before tests); its
+  non-vacuity rests on handwritten expectations and seeded mutations.
+- Calibration found that Kani cannot discharge symbolic 64-bit multiplication
+  on the shared host within 900 s; task 1.2.4 should plan Verus for arithmetic
+  and Kani for structure.
+- Hosted CI exposed two environment assumptions the local gates could not:
+  mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
+  `runner`. A stacked synchronize run also reported `main` as its base branch,
+  which led to choosing the freeze base by commit.
+- Historical delivery evidence at `5bf739a`: that candidate was published, with
+  successful hosted CI and Design contracts runs recorded above. The hosted
+  assessment found no blocking code defect; its documentation corrections
+  require confirmation. Formal review remains pending. Leave the sponsor's
+  review and merge of #9 to #18 in stack order. Earlier milestone CLI review
+  rounds retain their original candidate scope in `Decision log`.
+- Delivery follow-up (2026-10-14): assessment confirmation completed for
+  `804a38f`. Its subsequent formal review exposed the source-path and coverage
+  gaps now repaired in `0656e00`, with all seven local gates and five mutation
+  controls passing. The fresh local CLI inspection completed across 93 paths;
+  this documentation follow-up addresses both minor findings. Affected hosted
+  assessment, formal finding/row reconciliation, and sponsor merges remain
+  delivery work; no historical assessment is relabelled for the new candidate.
 
 ## Context and orientation
 
@@ -645,14 +969,14 @@ Companion artefacts: `docs/testable-bets.md` (generated from `spec/bets.json`),
 example, `spec/kernel-contract.schema.json` (native kernel declarations), and
 `spec/cost-cases.json`.
 
-The checker is `tools/check_docs.py`. It runs the checks in
-`tools/docs_validation/` and requires `docs/validation-results.json` to equal
+The checker is `scripts/check_docs.py`. It runs the checks in
+`scripts/docs_validation/` and requires `docs/validation-results.json` to equal
 the freshly computed report; after a deliberate change, run
 `check_docs.py --write` and commit the report. `make design-check` runs the
-checker and `python3 -m unittest discover -s tools/tests`;
+checker and `python3 -m unittest discover -s scripts/tests`;
 `.github/workflows/design.yml` runs it on every pull request. Markdown checks
 cover the files listed in `DESIGN_DOCUMENTS` in
-`tools/docs_validation/context.py`.
+`scripts/docs_validation/context.py`.
 
 ADR format (after `EP-M1a`): `docs/adrs/adr-nnnn-title-slug.md`, title
 `# Architectural decision record (ADR) nnnn: <title>`, sections `Status`,
@@ -680,16 +1004,16 @@ ADR format (after `EP-M1a`): `docs/adrs/adr-nnnn-title-slug.md`, title
 Trace chains:
 
 ```plaintext
-ToR Q1, Q8 -> TD GAP5, GAP9 -> D01, D02, D13 -> EP-M2 -> ADR-0002 -> tools/tests/test_decision_register.py
+ToR Q1, Q8 -> TD GAP5, GAP9 -> D01, D02, D13 -> EP-M2 -> ADR-0002 -> scripts/tests/test_decision_register.py
 ToR Q4 -> TD §2 scope classes -> D03 -> EP-M2 -> ADR-0003 -> register anchors in five documents
-ToR Q7 -> TD GAP5 -> D04, D05 -> EP-M2 -> ADR-0004 -> tools/tests/test_package_policy.py
+ToR Q7 -> TD GAP5 -> D04, D05 -> EP-M2 -> ADR-0004 -> scripts/tests/test_package_policy.py
 ToR C5 -> TD §15 row 10, §17.8 -> D06 -> EP-M2 -> ADR-0005
 TD §15 candidate ADRs -> D07 -> EP-M1a, EP-M2 -> docs/decision-register.md disposition table; docs/adrs/
-TD §§4-7, §17.3, §17.5 -> R2 -> D08-D10, D14 -> SC-* -> EP-M3 -> ADR-0006, ADR-0007 -> tools/tests/test_semantic_contracts.py
-ToR Q2, S7 -> TD §12, §14 V13, §17.8, §18.5 -> D11, D12 -> AC-* -> EP-M4 -> ADR-0008 -> tools/tests/test_preregistration.py
-TD §17.1-17.2, V14, V20 -> R8 -> PF14.structural@1.1.4 -> EP-M5 -> ADR-0009 -> tools/tests/test_evidence_gate.py
+TD §§4-7, §17.3, §17.5 -> R2 -> D08-D10, D14 -> SC-* -> EP-M3 -> ADR-0006, ADR-0007 -> scripts/tests/test_semantic_contracts.py
+ToR Q2, S7 -> TD §12, §14 V13, §17.8, §18.5 -> D11, D12 -> AC-* -> EP-M4 -> ADR-0008 -> scripts/tests/test_preregistration.py
+TD §17.1-17.2, V14, V20 -> R8 -> PF14.structural@1.1.4 -> EP-M5 -> ADR-0009 -> scripts/tests/test_evidence_gate.py
 D15 -> EP-M0 -> docs/roadmap.md canonical -> scripts/tests/test_export_roadmap.py
-Roadmap 1.1.1-1.1.4 -> EP-M6 -> ticked in docs/roadmap.md -> tools/tests/test_roadmap_status.py
+Roadmap 1.1.1-1.1.4 -> EP-M6 -> ticked in docs/roadmap.md -> scripts/tests/test_roadmap_status.py
 ```
 
 Gaps addressed: GAP2 (thresholds recorded, not met), GAP5 (scope, licence,
@@ -889,7 +1213,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   test-only renderer (the former generator's layout) and exports them back;
   parameterized malformed-input cases; command-line exit codes. Artefacts:
   `scripts/tests/test_export_roadmap.py` (pytest) and
-  `tools/tests/test_roadmap_export_gate.py` (the checker rejects a stale
+  `scripts/tests/test_roadmap_export_gate.py` (the checker rejects a stale
   export). Non-vacuity: a changed task title, a changed `Requires` reference,
   and a changed checkbox in an in-memory roadmap each make the drift check fail
   and name the item; a heading at the wrong level is rejected rather than
@@ -898,10 +1222,10 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
 - VO-1 (admission correctness, MS-0 to MS-2, P1 to P4). Method: exhaustive
   enumeration of all 345,600 abstract states against an independent interpreter
   of the ADR-0009 rule table in
-  `tools/tests/fixtures/evidence_gate_rules.json`; P1 to P4 over the full
+  `scripts/tests/fixtures/evidence_gate_rules.json`; P1 to P4 over the full
   enumeration against both; the scenario corpus against both. Artefacts:
-  `tools/tests/test_evidence_gate.py`,
-  `tools/docs_validation/evidence_gate.py`. Evidence: red is
+  `scripts/tests/test_evidence_gate.py`,
+  `scripts/docs_validation/evidence_gate.py`. Evidence: red is
   `ModuleNotFoundError`; green is full agreement. Non-vacuity: every level and
   reason occurs, each reason as the sole reason for some state; the valid-state
   count is asserted. Seeded mutations that must fail: `resource-exhausted`
@@ -911,7 +1235,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   valid abstract state a generated concrete record must be schema-valid and
   abstract back to that state; for each invalid state the record must be
   schema-invalid; a Hypothesis property checks that abstraction depends only on
-  documented fields. Artefact: `tools/tests/test_evidence_records.py`.
+  documented fields. Artefact: `scripts/tests/test_evidence_records.py`.
   Non-vacuity: fails if any kind or outcome class is never generated; a seeded
   mapping fault must fail.
 - VO-3 (exception register validity, P5). Method: boundary tests on the
@@ -919,12 +1243,12 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   before `invalid_from`: active; `invalid_from`: expired); malformed cases
   (lifetime beyond D02's maximum, approver other than `leynos`, missing
   narrowed claim, missing owner); a Hypothesis property that `as_of` changes
-  only the exception state. Artefact: `tools/tests/test_exceptions.py`.
+  only the exception state. Artefact: `scripts/tests/test_exceptions.py`.
   Non-vacuity: each malformed variant has its own reason; a complete active
   exception yields `restricted`.
 - VO-4 (components and closure, MS-3, MS-4, P6). Method: parameterized tests
   over synthetic roadmaps (a chain and a diamond) and the real roadmap.
-  Artefact: `tools/tests/test_roadmap_status.py`. Non-vacuity: a tick with an
+  Artefact: `scripts/tests/test_roadmap_status.py`. Non-vacuity: a tick with an
   open prerequisite fails; a tick citing a proposed or superseded decision
   fails; a tick with an unsatisfied component or unresolvable completion
   artefact fails; a counterexample at the current revision reopens a component;
@@ -938,18 +1262,19 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   carry no approval fields; two-way, acyclic supersession links; each cited ADR
   exists under `docs/adrs/` with an agreeing `Status` line; dates validated
   with the `jsonschema` format checker. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity: one in-memory negative
-  control per invariant, each with a distinct message; the real register passes.
+  `scripts/tests/test_decision_register.py`. Non-vacuity: one in-memory
+  negative control per invariant, each with a distinct message; the real
+  register passes.
 - VO-6 (five-document consistency). Invariants: each governing document links
   `decision-register.md`; each accepted question's ToR §9 row links its
   register anchor; after whitespace and inline-Markdown normalization, no
   `retired_statements` text of an accepted decision appears; no governing
   document matches `(pending|open|unresolved|remains? proposed)` within 60
   characters of an accepted question's identifier. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity: after D03's acceptance,
-  reinserting "The classes remain proposed pending ToR Q4." (also rewrapped
-  across two lines), writing "Q4 remains open", or deleting the ToR §9 anchor
-  each fails.
+  `scripts/tests/test_decision_register.py`. Non-vacuity: after D03's
+  acceptance, reinserting "The classes remain proposed pending ToR Q4." (also
+  rewrapped across two lines), writing "Q4 remains open", or deleting the ToR
+  §9 anchor each fails.
 - VO-7 (base-revision freeze). Invariant: compared with `--base-rev`, the
   check rejects a frozen-field change to a registered control without a new
   amendment whose `replaces` equals the previous digest; an edited or removed
@@ -957,7 +1282,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   an accepted exception altered rather than replaced. Method: in-memory base
   and head documents, plus one integration test against a temporary Git
   repository in the test's temporary directory. Artefact:
-  `tools/tests/test_freeze.py`. Non-vacuity: changing a threshold and its
+  `scripts/tests/test_freeze.py`. Non-vacuity: changing a threshold and its
   digest together is rejected; a correct amendment passes.
 - VO-8 (semantic contract coherence and examples). Invariants: every contract
   record names existing catalogue identifiers; has preconditions, success
@@ -979,7 +1304,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `sum([-0.0])` negative zero; `skip_nulls` then empty; `Batch<DVec3>` of shape
   `[2,3]` with cardinality 6 rejecting `.axis(2)`; an injected failure leaving
   the destination unchanged. Artefact:
-  `tools/tests/test_semantic_contracts.py`. Non-vacuity: each seeded mutation
+  `scripts/tests/test_semantic_contracts.py`. Non-vacuity: each seeded mutation
   must change at least one outcome (left association for `reduce`; floor
   division for `idiv`; error instead of identity for empty `sum`; identity as a
   seed; implicit promotion in `add`; NaN-ignoring `min`; two-valued null logic;
@@ -993,8 +1318,8 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   accepted and outside rejected; `rows(&centre)` as host construction; `as`,
   `..`, `=`, `+=` rejected; token-level entries tagged `phase2-only`. Method: a
   precedence-climbing recognizer under 200 lines in
-  `tools/docs_validation/grammar.py`. Artefact:
-  `tools/tests/test_macro_grammar.py`. Non-vacuity: swapping `*` and `+`,
+  `scripts/docs_validation/grammar.py`. Artefact:
+  `scripts/tests/test_macro_grammar.py`. Non-vacuity: swapping `*` and `+`,
   right-associative `|>`, accepting `&&`, or allowing comparison mixing each
   fail an entry; a mechanical check requires an entry per precedence level and
   rejection rule. Residual gap: the recognizer models the corpus, not the
@@ -1003,7 +1328,7 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
 - VO-10 (no superseded-name shims). Invariant: no name in the
   `excluded_names` register (`a!`, `cells`, `cells2`, `id` aliasing `identity`,
   `.pipe` accepting descriptors, array `&&` and `||`) appears as a catalogue
-  name or alias. Artefact: `tools/tests/test_semantic_contracts.py`.
+  name or alias. Artefact: `scripts/tests/test_semantic_contracts.py`.
   Non-vacuity: adding `cells` in memory fails.
 - VO-11 (pre-registration completeness and amendment chain). Invariants: a
   registered control has every frozen field listed in `EP-M4`, including its
@@ -1012,33 +1337,34 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   current digest equals the last `new_digest`); a measurement record cites a
   current or historical digest. Method: a Hypothesis property mutating each
   frozen field in turn; parameterized completeness controls. Artefact:
-  `tools/tests/test_preregistration.py`. Non-vacuity: fails unless every frozen
-  field was exercised; a correct amendment passes.
+  `scripts/tests/test_preregistration.py`. Non-vacuity: fails unless every
+  frozen field was exercised; a correct amendment passes.
 - VO-12 (measurement outcomes cannot be relabelled). Invariant:
   `resource-exhausted`, `budget-exceeded`, `inconclusive`, and a missing record
   from a killed job map to fail or inconclusive, never pass; retries are all
   recorded and all count; calibration records can never satisfy an acceptance
   control. Method: exhaustive enumeration of the outcome mapping. Artefact:
-  `tools/tests/test_preregistration.py`. Non-vacuity: a seeded mapping treating
-  `resource-exhausted` as pass, or admitting a calibration record, must fail.
+  `scripts/tests/test_preregistration.py`. Non-vacuity: a seeded mapping
+  treating `resource-exhausted` as pass, or admitting a calibration record,
+  must fail.
 - VO-13 (package policy). Invariant: `Cargo.toml` `license` is `ISC` and
   `publish` is `false`, per accepted D04 and D05. Artefact:
-  `tools/tests/test_package_policy.py`. Non-vacuity: an in-memory manifest
+  `scripts/tests/test_package_policy.py`. Non-vacuity: an in-memory manifest
   without `publish = false` fails.
 - VO-14 (drift and idempotence for every generator and export). Invariant:
   every generator and the roadmap exporter are covered by the checker; rerun on
   a clean tree, they yield no diff. Artefact:
-  `tools/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity: a
-  hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails.
+  `scripts/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity:
+  a hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails.
 - VO-15 (bet and task links are two-way). Artefact:
-  `tools/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
+  `scripts/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
   memory fails.
 - VO-16 (no host identity leaks). Invariant: committed calibration and
   measurement records contain no hostname, username, or absolute home path.
   Method: a check over `docs/acceptance-calibration.md` and measurement records
   using the hardware-class schema (no free-form host fields) plus a pattern
   scan for `/home/`, `/Users/`, and the local hostname supplied at test time
-  only. Artefact: `tools/tests/test_preregistration.py`. Non-vacuity: an
+  only. Artefact: `scripts/tests/test_preregistration.py`. Non-vacuity: an
   in-memory record containing a home path fails.
 
 ### Axioms
@@ -1075,7 +1401,7 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
 - Add `wenmode==0.15.2`, `cyclopts==5.2.0`, and `pytest==9.1.1` to
-  `tools/requirements.txt`, and run `pytest -q scripts/tests` from
+  `scripts/requirements.txt`, and run `pytest -q scripts/tests` from
   `make design-check`.
 - Add `scripts/export_roadmap.py` (a `uv` script with a PEP 723 block and a
   Cyclopts command line) whose parser parses the region between
@@ -1091,9 +1417,9 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
   (or `INPUT_CHECK=true`) exits 1 and prints a unified diff when the committed
   export has drifted. The checker loads it by path through
   `ValidationContext.load_script`.
-- In `tools/docs_validation/ledger.py`, replace the JSON-to-Markdown drift
+- In `scripts/docs_validation/ledger.py`, replace the JSON-to-Markdown drift
   comparison for the roadmap with the export drift comparison. Remove
-  `tools/generate_roadmap.py`. Move its rendering layout into
+  `scripts/generate_roadmap.py`. Move its rendering layout into
   `scripts/tests/roadmap_render.py` as the independent test-only renderer used
   by VO-0. The checker's Python-source check also parses `scripts/`.
 - Update `docs/validation.md` (reproduction steps),
@@ -1123,7 +1449,7 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
   between `<!-- decisions:start -->` and `<!-- decisions:end -->` with one
   anchored heading per decision.
 - Turn the generator list in `ledger.check_generated_documents` into a table
-  including the decisions generator. Add `tools/docs_validation/decisions.py`
+  including the decisions generator. Add `scripts/docs_validation/decisions.py`
   (VO-5, VO-6) and register it. Add the register and all ADRs to
   `DESIGN_DOCUMENTS`.
 - Link the register from the five governing documents and `docs/contents.md`.
@@ -1133,17 +1459,17 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
 ### EP-M1b. Roadmap status, obligation components, and freeze check
 
 - Add `spec/task-completion.json` (task identifier to completion artefact
-  references) and `tools/docs_validation/roadmap_status.py` as the single owner
-  of MS-3 and MS-4, reading tick state from the roadmap export. Replace the
-  blanket ban in `ledger.py` with a call to it. Compute the export's `status`
-  string and the checker's roadmap detail from tick state.
+  references) and `scripts/docs_validation/roadmap_status.py` as the single
+  owner of MS-3 and MS-4, reading tick state from the roadmap export. Replace
+  the blanket ban in `ledger.py` with a call to it. Compute the export's
+  `status` string and the checker's roadmap detail from tick state.
 - In `spec/proof-obligations.json`, add `components` to every obligation (for
   PF14, `PF14.structural@1.1.4` accepts `tested`, evidence source
   `checker:evidence-gate`). Relax `check_obligations` so components may cite
   evidence while obligation-level status stays `planned-not-run` until every
   component is satisfied. Until `EP-M5`, a task with a component cannot be
   ticked.
-- Add `tools/docs_validation/freeze.py` (VO-7) and `--base-rev` to
+- Add `scripts/docs_validation/freeze.py` (VO-7) and `--base-rev` to
   `check_docs.py`. In the `Makefile`, add
   `AS_OF ?= $(shell git log -1 --format=%cs)` and an optional `BASE_REV` to
   `design-check`. In `.github/workflows/design.yml`, set `fetch-depth: 0`, pass
@@ -1166,7 +1492,7 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
   `docs/language-reference.md` prose outside the generated region is updated.
   Record each replaced sentence in `retired_statements`.
 - Add `publish = false` to `Cargo.toml`; add
-  `tools/docs_validation/package_policy.py` (VO-13). Add a "Licence and
+  `scripts/docs_validation/package_policy.py` (VO-13). Add a "Licence and
   publication" section to `docs/developers-guide.md` stating plainly that the
   crate is ISC-licensed, that `publish = false` blocks crates.io publication
   until the Core acceptance dossier (task 4.3.3) passes and `leynos` approves
@@ -1201,8 +1527,8 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
 - Make affected `spec/vocabulary.json` contracts cite their identifiers;
   regenerate the reference; add the `excluded_names` register.
 - Add tagged-scalar examples to `spec/examples.json`; extend the
-  documentation model in a new `tools/docs_validation/contract_examples.py`. Add
-  `spec/macro-grammar.json` and `tools/docs_validation/grammar.py`.
+  documentation model in a new `scripts/docs_validation/contract_examples.py`.
+  Add `spec/macro-grammar.json` and `scripts/docs_validation/grammar.py`.
 - Tests: VO-8, VO-9, VO-10. Update technical design §§6-7 and §17.3 to cite
   the ADRs and record the proof-influenced choices; reconcile accepted rows of
   `docs/context.md` §6. Tick task 1.1.2.
@@ -1218,7 +1544,7 @@ the report diff, and have `scrutineer` run the full gates (Stage D).
 - Add `spec/acceptance-controls.schema.json`, `spec/acceptance-controls.json`,
   `spec/measurement-record.schema.json` (binding `control_id` and
   `control_digest`; a `purpose` of `calibration` or `acceptance`), and
-  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
+  `scripts/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
   `spec/acceptance-controls.json` in `freeze.FROZEN_DOCUMENTS` with its
   amendment-chain rule, so VO-7 covers controls from the commit that creates
   them.
@@ -1309,7 +1635,7 @@ and the bet register's measurement sentences.
   per technical design §17.8 and D06; the `check_evidence.py` exit codes). It
   is drafted under the accepted D02 and D06 policies and reviewed by the
   sponsor in the milestone pull request before merge.
-- Red: write `tools/tests/fixtures/evidence_gate_rules.json`, the scenario
+- Red: write `scripts/tests/fixtures/evidence_gate_rules.json`, the scenario
   corpus, and the tests first.
 - Revise `spec/proof-evidence.schema.json` to `schema_version` 2: `id` and
   `component`; `evidence_kind` and `outcome` with `outcome_detail`; structured
@@ -1327,7 +1653,7 @@ and the bet register's measurement sentences.
   `spec/evidence-reason-codes.json`, in one change. Register
   `spec/exceptions.json` in `freeze.FROZEN_DOCUMENTS` (an accepted exception is
   replaced, never altered).
-- Implement the pure `tools/docs_validation/evidence_gate.py`
+- Implement the pure `scripts/docs_validation/evidence_gate.py`
   (`abstract_record`, `admit`), have `roadmap_status.py` consume it, and add
   `scripts/check_evidence.py`. Tests: VO-1 to VO-4.
 - Add `docs/evidence-and-decision-records.md` (the component document for
@@ -1344,7 +1670,7 @@ and the bet register's measurement sentences.
   `docs/roadmap.md` and re-export. Reconcile bet task lists and add the two-way
   check (VO-15).
 - Update `docs/validation.md`, `docs/repository-layout.md` (new `spec/` and
-  `tools/` files, `docs/adrs/`, `docs/execplans/`, the calibration probe),
+  `scripts/` files, `docs/adrs/`, `docs/execplans/`, the calibration probe),
   `docs/contents.md`, `docs/developers-guide.md` (per-module owners, the
   exception renewal runbook, the pre-registration amendment procedure, the
   report conflict rule), and `docs/revision-0.2.md` if affected.
@@ -1396,14 +1722,14 @@ and the bet register's measurement sentences.
 Run all commands from the repository root.
 
 ```bash
-export PY="uv run --python 3.14 --with-requirements tools/requirements.txt python3"
+export PY="uv run --python 3.14 --with-requirements scripts/requirements.txt python3"
 make design-check PYTHON="$PY" 2>&1 | tee /tmp/design-check-combobulate-1-1-resolve-acceptance-control-decisions.out
 ```
 
 Red step, for example in `EP-M5`:
 
 ```bash
-$PY -m unittest discover -s tools/tests -p 'test_evidence_gate.py' 2>&1 | tail -n 3
+$PY -m unittest discover -s scripts/tests -p 'test_evidence_gate.py' 2>&1 | tail -n 3
 ```
 
 ```plaintext
@@ -1414,13 +1740,13 @@ FAILED (errors=1)
 Green and refactor, then regenerate and check idempotence:
 
 ```bash
-$PY -m unittest discover -s tools/tests
+$PY -m unittest discover -s scripts/tests
 $PY scripts/export_roadmap.py
-for g in reference bets; do $PY tools/generate_$g.py; done
+for g in reference bets; do $PY scripts/generate_$g.py; done
 $PY scripts/generate_decisions.py
-$PY tools/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
+$PY scripts/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
 $PY scripts/export_roadmap.py --check
-for g in reference bets; do $PY tools/generate_$g.py; done
+for g in reference bets; do $PY scripts/generate_$g.py; done
 $PY scripts/generate_decisions.py
 git diff --exit-code -- docs/ spec/ && echo idempotent
 ```
@@ -1433,7 +1759,7 @@ make fmt
 make check-fmt
 make lint
 make test
-make design-check PYTHON="$PY" BASE_REV=origin/main
+make design-check PYTHON="$PY" BASE_REV=b4e2c14146c8acee147ef8561a19695d849e26f9
 make markdownlint
 make nixie
 ```
@@ -1452,7 +1778,7 @@ exit=1
 ## Validation and acceptance
 
 Quality criteria: `make test` passes unchanged;
-`$PY -m unittest discover -s tools/tests` passes, including every new module,
+`$PY -m unittest discover -s scripts/tests` passes, including every new module,
 each observed failing for the expected reason first; VO-0 to VO-16 discharged
 with non-vacuity checks passing; `make check-fmt`, `make lint`,
 `make markdownlint` (with spelling), and `make nixie` pass; `make design-check`
@@ -1471,7 +1797,9 @@ Behavioural acceptance:
    `docs/technical-design.md`, or writing "Q4 remains open", makes
    `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
-   `make design-check BASE_REV=origin/main` fail and name AC-03.
+   `make design-check BASE_REV=b4e2c14146c8acee147ef8561a19695d849e26f9` fail
+   and name AC-03. This #17 base already contains the frozen control register;
+   a base predating AC-03 cannot establish its freeze.
 5. `check_evidence.py` rejects a `resource-exhausted` fixture, reports a
    partial-bounds Kani fixture at `bounded`, never `proof`, and rejects a
    self-reported Verus record with `verdict-self-reported`.
@@ -1514,15 +1842,15 @@ New specification files: `spec/decision-register.schema.json`,
 
 New tooling: helper scripts `scripts/export_roadmap.py`,
 `scripts/generate_decisions.py`, and `scripts/check_evidence.py`; the probe
-`tools/calibration/cardinality-probe/`; and `tools/docs_validation/` modules
+`tools/calibration/cardinality-probe/`; and `scripts/docs_validation/` modules
 `decisions.py`, `roadmap_status.py`, `freeze.py`, `package_policy.py`,
 `contract_examples.py`, `grammar.py`, `preregistration.py`, `evidence_gate.py`.
-Removed: `tools/generate_roadmap.py`.
+Removed: `scripts/generate_roadmap.py`.
 
 New pytest suites in `scripts/tests/`: `test_export_roadmap.py` (with
 `conftest.py` and the test-only `roadmap_render.py`),
 `test_generate_decisions.py`, and `test_check_evidence.py`. New `unittest`
-modules in `tools/tests/`: `test_roadmap_export_gate.py`,
+modules in `scripts/tests/`: `test_roadmap_export_gate.py`,
 `test_decision_register.py`, `test_roadmap_status.py`, `test_freeze.py`,
 `test_package_policy.py`, `test_semantic_contracts.py`, `test_macro_grammar.py`,
 `test_preregistration.py`, `test_exceptions.py`, `test_evidence_gate.py`,
@@ -1535,7 +1863,7 @@ New dependency: `wenmode==0.15.2` (sponsor-directed). Otherwise the standard
 library (`tomllib`, `hashlib`, `subprocess` only in `freeze.py` for `git show`)
 plus the pinned `jsonschema`, `hypothesis`, `markdown-it-py`, and `PyYAML`.
 
-In `tools/docs_validation/evidence_gate.py`:
+In `scripts/docs_validation/evidence_gate.py`:
 
 ```python
 class Level(enum.Enum):
@@ -1602,6 +1930,54 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
 
+- 2026-10-14, recorded passed helper documentation checks and three failed
+  CLI starts. Set review delivery to BLOCKED, preserved the actual code-review
+  and gate scopes, and retained independent publication/hosted work without
+  claiming the unavailable reassessment completed.
+
+- 2026-10-14, recorded seven passed property-follow-up gates and the complete
+  93-path CLI inspection of `3ed0593`. Clarified two helper docstrings and
+  verified AST equivalence; example validation and affected delivery remain
+  pending.
+
+- 2026-10-14, recorded current-head hosted success and resolved source/testing
+  findings. Added two generated invariant properties after verifying the new
+  Property/Proof warning; both properties and five isolated mutation controls
+  pass. Full gates, publication, and affected hosted confirmation are pending.
+
+- 2026-10-14, recorded the completed formal-repair gates and fresh committed
+  CLI inspection at `0656e00`. Corrected the document-pack check date and
+  distinguished the confirmed `804a38f` assessment from pending affected hosted
+  assessment and formal reconciliation. Preserved historical delivery receipts.
+
+- 2026-10-14, reopened implementation for verified formal-review findings.
+  Added a failing in-root parent-component regression before the source guard,
+  lifecycle/report cases, and a symlink-escape control. Recorded ADR history,
+  source-path guidance, and the independent docstring inventory. Focused green
+  and five mutation controls passed; remaining full gates and affected hosted
+  review are pending.
+
+- 2026-10-14, corrected both hosted assessment findings: the stacked gate
+  example and AC-03 acceptance recipe now name the exact #17 base that contains
+  the control register. Refreshed delivery receipts with published `5bf739a`
+  and its two passing workflow URLs, preserving prior candidate-bound results
+  and keeping assessment confirmation, formal review, and sponsor merges
+  separate.
+
+- 2026-10-14, completed the preflight repair after the two regression cases
+  failed before the fix and all 12 preflight tests passed afterwards. All seven
+  code gates passed for `2bf668f`; fresh CodeRabbit CLI review reported zero
+  findings across 92 paths. Restored implementation-complete status; the final
+  documentation receipt is validated separately, and hosted CI, assessments,
+  formal review, and sponsor-owned stack merges remain delivery work.
+
+- 2026-10-14, published `1f48268` and observed hosted CI run 38486818299 fail
+  its coverage-backend preflight assertion; Design contracts run 38486818460
+  passed. Reopened implementation status for the in-scope pipeline repair. Both
+  long-list regression cases failed before repair (Make exit 2, Nextest exit
+  100), with no compilation error. Focused green validation and all code gates
+  remain pending; the earlier gates retain their original candidate scope.
+
 - 2026-10-10, initial draft.
 - 2026-10-10, revised after the community-of-experts review (verdict
   "revise"): per-component evidence, `evidence_kind` split from `outcome`, new
@@ -1622,4 +1998,28 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   `scripts/export_roadmap.py` under the scripting standards (Cyclopts, PEP 723,
   pytest suites in `scripts/tests/`), and the planned decision generator and
   evidence checker follow the same rule. Checker modules stay in
-  `tools/docs_validation/`. Remaining work is unchanged.
+  `scripts/docs_validation/`. Remaining work is unchanged.
+- 2026-10-12, all remaining Python scripts, the documentation-validation
+  package, tests, fixtures, and requirements relocated from `tools/` to
+  `scripts/`. Make targets, CI workflows, and documentation use the new paths;
+  existing `unittest`, Hypothesis, and pytest suites retain their test styles.
+- 2026-10-12, AC-07 amended under the sponsor's relocation instruction to
+  bind the CI workflow with the new probe path. Its original registration,
+  thresholds, and measurement protocol are preserved.
+- 2026-10-13, corrected the stale completed-task-ban observation and added
+  confirmatory export and full-checker tests. All three source mutations were
+  killed; the unmutated three-test baseline passed.
+- 2026-10-13, resumed the approved implementation workflow, mapped all six
+  acceptance criteria, collected current consistency and publication-policy
+  evidence, and recorded the local review's valid and invalid findings.
+  Remaining work is repair validation, publication, hosted assessment, formal
+  review, and sponsor-owned stack merging.
+- 2026-10-13, completed the source-path repair: all seven local gates passed
+  and CodeRabbit reassessment reported zero findings for `b079f72`. Updated the
+  implementation status and acceptance record without treating local review as
+  hosted assessment, readiness, or a merged stack.
+- 2026-10-14, resumed delivery after the sponsor reported that memory
+  pressure had been alleviated. The validated code candidate remains `b079f72`,
+  with comparison base `b4e2c14`. Refreshed PR #18 metadata confirms the
+  existing draft and stack base. Final documentation checks, publication,
+  hosted assessment, and formal review remain pending.

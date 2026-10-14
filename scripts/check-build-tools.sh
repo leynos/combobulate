@@ -53,7 +53,8 @@ check_toolchain() {
     # rustup accepts the manifest's preview names but lists these installed
     # components without the suffix (llvm-tools and rustc-codegen-cranelift).
     installed_name=${component%-preview}
-    if ! printf '%s\n' "$installed_components" | grep -Fxq "$installed_name-$host"; then
+    # Consume the listing: quiet grep can break printf's pipe under pipefail.
+    if ! printf '%s\n' "$installed_components" | grep -Fx "$installed_name-$host" >/dev/null; then
       note "missing $component for $toolchain; run make install-build-tools"
       status=1
     fi

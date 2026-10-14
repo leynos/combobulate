@@ -47,7 +47,8 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R8, R10. Tasks: 1.1.4, 1.2.4, 1.2.5, 4.3.3.
+Requirements: R8, R10. Tasks: 1.1.1, 1.1.2, 1.1.3, 1.1.4, 1.2.1, 1.2.2, 1.2.3,
+1.2.4, 1.2.5, 2.1.1, 4.3.3.
 
 Status: planned-not-run.
 
@@ -76,8 +77,10 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R3, R9. Tasks: 1.2.5, 2.1.4, 2.3.5, 3.2.4, 3.4.1, 5.1.4, 5.3.4,
-6.1.3.
+Requirements: R3, R9. Tasks: 1.1.2, 1.1.4, 1.2.2, 1.2.5, 2.1.2, 2.1.4, 2.2.1,
+2.2.2, 2.2.4, 2.2.5, 2.3.1, 2.3.2, 2.3.3, 2.3.4, 2.3.5, 3.1.1, 3.1.2, 3.2.1,
+3.2.2, 3.2.4, 3.3.1, 3.4.1, 4.3.2, 5.1.1, 5.1.2, 5.1.3, 5.1.4, 5.2.1, 5.3.1,
+5.3.4, 6.1.3.
 
 Status: planned-not-run.
 
@@ -106,7 +109,8 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R4, R10. Tasks: 2.4.1, 2.4.2, 2.4.3.
+Requirements: R4, R10. Tasks: 1.1.3, 1.2.4, 2.1.1, 2.1.3, 2.2.3, 2.3.1, 2.4.1,
+2.4.2, 2.4.3, 3.2.3.
 
 Status: planned-not-run.
 
@@ -137,7 +141,8 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R4, R8, R10. Tasks: 2.4.2, 3.3.3, 4.2.5, 4.3.1.
+Requirements: R4, R8, R10. Tasks: 2.1.3, 2.4.2, 2.4.3, 3.2.3, 3.3.2, 3.3.3,
+4.2.3, 4.2.5, 4.3.1, 5.3.3.
 
 Status: planned-not-run.
 
@@ -165,7 +170,8 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R5, R11. Tasks: 1.2.6, 4.1.3, 4.2.5, 4.3.2.
+Requirements: R5, R11. Tasks: 1.2.1, 1.2.6, 4.1.1, 4.1.2, 4.1.3, 4.2.1, 4.2.2,
+4.2.5, 4.3.1, 4.3.2.
 
 Status: planned-not-run.
 
@@ -194,7 +200,7 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R5, R11. Tasks: 1.2.6, 4.2.4, 4.3.3.
+Requirements: R5, R11. Tasks: 1.2.6, 4.2.1, 4.2.3, 4.2.4, 4.3.3.
 
 Status: planned-not-run.
 
@@ -225,7 +231,9 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R6, R9. Tasks: 5.1.4, 5.3.4, 6.1.3, 6.2.4, 6.3.4.
+Requirements: R6, R9. Tasks: 2.2.5, 2.3.5, 5.1.2, 5.1.4, 5.2.1, 5.2.2, 5.3.1,
+5.3.2, 5.3.3, 5.3.4, 6.1.1, 6.1.2, 6.1.3, 6.2.1, 6.2.2, 6.2.3, 6.2.4, 6.3.1,
+6.3.2, 6.3.3, 6.3.4.
 
 Status: planned-not-run.
 
@@ -258,7 +266,8 @@ target/features, assumptions, and cost against the pre-registered acceptance
 controls (spec/acceptance-controls.json). Correctness gates are categorical;
 empirical thresholds are the registered controls.
 
-Requirements: R7, R8, R9, R11. Tasks: 1.1.4, 3.4.1, 4.3.3, 6.2.4.
+Requirements: R7, R8, R9, R11. Tasks: 1.1.4, 3.4.1, 4.3.2, 4.3.3, 6.2.3, 6.2.4,
+6.3.4, 7.1.1, 7.2.1, 7.3.1.
 
 Status: planned-not-run.
 

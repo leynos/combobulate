@@ -101,7 +101,7 @@ fn record_capability(
         return Ok(());
     }
     let command = concat!(
-        "uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py ",
+        "uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py ",
         "--workflow .github/workflows/ci.yml"
     );
     if step.get("run").and_then(Value::as_str) != Some(command)
@@ -314,7 +314,7 @@ fn weakened_capability_verification_is_rejected() {
             "--workflow .github/workflows/ci.yml",
             "--workflow fixture.yml",
         ),
-        ("tools/whitaker_probe.py", "tools/unrelated.py"),
+        ("scripts/whitaker_probe.py", "scripts/unrelated.py"),
     ] {
         assert!(
             CI.contains(before),

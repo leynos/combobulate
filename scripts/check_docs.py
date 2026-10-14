@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate the explicit documentation pack and its committed evidence report.
 
-Run ``python tools/check_docs.py`` using tools/requirements.txt. Default checks
+Run ``python scripts/check_docs.py`` using scripts/requirements.txt. Default checks
 are read-only; ``--write`` explicitly regenerates docs/validation-results.json
 only after every source check passes. No network access occurs. Repository
 Markdown and Rust gates remain authoritative for their independent inputs.
@@ -49,7 +49,7 @@ NOT_RUN = [
 
 def check_tool_sources(context: ValidationContext) -> None:
     """Parse delivered Python tooling and helper scripts; e.g. a syntax error in either fails."""
-    paths = sorted((context.root / 'tools').rglob('*.py')) + sorted((context.root / 'scripts').rglob('*.py'))
+    paths = sorted((context.root / 'scripts').rglob('*.py'))
     for path in paths:
         ast.parse(path.read_text(), filename=str(path))
     context.record('python-tools', 'All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.', len(paths))
@@ -83,7 +83,7 @@ def verify_report(context: ValidationContext, expected: dict) -> None:
     """Require the committed report to match execution; stale or fabricated evidence fails."""
     actual = context.load('docs/validation-results.json')
     require(same_typed_value(actual, expected),
-            'Validation report drift: run python tools/check_docs.py --write and review the changes')
+            'Validation report drift: run python scripts/check_docs.py --write and review the changes')
 
 
 def main(argv: list[str] | None = None) -> int:

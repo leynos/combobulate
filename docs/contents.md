@@ -32,11 +32,19 @@ implemented API or completed verification.
   acceptance, their authority, options, approval references, and ADRs.
 - [ADR-0001: repository bootstrap](adrs/adr-0001-repository-bootstrap.md):
   scaffold provenance, repository integration, and complexity repair boundaries.
+- [ADR-0002: governance authority and exceptions](adrs/adr-0002-governance-authority.md).
+- [ADR-0003: initial release scope](adrs/adr-0003-initial-release-scope.md).
+- [ADR-0004: licence and publication](adrs/adr-0004-licence-and-publication.md).
+- [ADR-0005: pre-1.0 API and proof-interface policy](adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md).
+- [ADR-0006: numeric, validity, and reduction contracts](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
+- [ADR-0007: `comb!` macro grammar and staging](adrs/adr-0007-comb-macro-grammar-and-staging.md).
+- [ADR-0008: acceptance-control pre-registration](adrs/adr-0008-acceptance-control-pre-registration.md).
+- [ADR-0009: proof-first policy and evidence gate](adrs/adr-0009-proof-first-policy-and-evidence-gate.md).
 
 ## Execution plans
 
 - [Roadmap 1.1: resolve the decisions that control acceptance](execplans/1-1-resolve-acceptance-control-decisions.md):
-  draft ExecPlan awaiting sponsor approval.
+  ExecPlan for roadmap step 1.1, implemented in stacked pull requests.
 
 ## Project guides
 
