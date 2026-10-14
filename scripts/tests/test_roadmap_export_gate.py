@@ -32,6 +32,7 @@ class RoadmapExportGate(unittest.TestCase):
                 check_roadmap_export(context)
 
     def test_export_preserves_completed_and_open_task_statuses(self):
+        """Keep completed and open status when exporting the canonical roadmap."""
         roadmap = parse_roadmap((ROOT / 'docs/roadmap.md').read_text(encoding='utf-8'))
         tasks = {task['id']: task for phase in roadmap['phases']
                  for step in phase['steps'] for task in step['tasks']}

@@ -11,6 +11,9 @@ interface policy (D06) recorded in the
 [decision register](../decision-register.md), and the public proof
 compatibility subject assigned here by D07.
 
+Amended by ADR-0009 (2026-10-14): clerical fixture relocation, recorded in
+[Amendments](#amendments).
+
 ## Date
 
 2026-10-10.
@@ -85,8 +88,8 @@ _Table 1: Admission rules, applied in order._
 The base level is `proof` for deductive evidence and for bounded evidence with
 type-complete bounds. It is `bounded` for bounded evidence with partial bounds,
 `tested` for tests, and `restricted` for trust declarations.
-`scripts/tests/fixtures/evidence_gate_rules.json` states the same table as
-data; reason codes are single-sourced in `spec/evidence-reason-codes.json`.
+`tools/tests/fixtures/evidence_gate_rules.json` states the same table as data;
+reason codes are single-sourced in `spec/evidence-reason-codes.json`.
 
 ## Components and closure
 
@@ -164,3 +167,13 @@ schema-invalid record or a usage error.
   component. This is deliberate.
 - Rust tooling replays the rule table in task 1.2.4. The Python gate remains
   the documentation-model reference until then.
+
+## Amendments
+
+### 2026-10-14: Fixture relocation
+
+The Python tooling relocation on 2026-10-12 moved the evidence-gate fixture from
+`tools/tests/fixtures/evidence_gate_rules.json` to
+`scripts/tests/fixtures/evidence_gate_rules.json`. Use the latter path in the
+current repository. The accepted rule table and policy are unchanged; the
+original path above remains part of the accepted record's history.

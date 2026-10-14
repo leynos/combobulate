@@ -2229,6 +2229,13 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   existing draft and stack base. Final documentation checks, publication,
   hosted assessment, and formal review remain pending.
 - 2026-10-14, published `1f48268` and observed hosted CI run 38486818299 fail
+- 2026-10-14, reopened implementation for verified formal-review findings.
+  Added an in-root parent-component regression before the source guard,
+  lifecycle/report cases, and a symlink-escape control. Recorded ADR history,
+  source-path guidance, and the independent docstring inventory. Focused green
+  and five mutation controls passed; remaining full gates and affected hosted
+  review are pending.
+
 - 2026-10-14, corrected both hosted assessment findings: the stacked gate
   example and AC-03 acceptance recipe now name the exact #17 base that contains
   the control register. Refreshed delivery receipts with published `5bf739a`

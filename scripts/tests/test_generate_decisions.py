@@ -85,6 +85,7 @@ def test_accepted_decision_renders_its_approval():
 
 
 def test_multi_paragraph_answer_keeps_its_paragraph_break():
+    """Keep separate sponsor-answer paragraphs in the rendered block quote."""
     text = render(REGISTER)
     section = text[text.index('### D07\n'):text.index('### D08\n')]
     assert 'Answer, quoted verbatim:' in section, 'the session answer is quoted'
@@ -92,6 +93,7 @@ def test_multi_paragraph_answer_keeps_its_paragraph_break():
 
 
 def test_answer_soft_line_break_keeps_words_in_one_paragraph():
+    """Preserve all answer words while reflowing a soft line break."""
     register = accepted(REGISTER, 'D03')
     record = next(entry for entry in register['decisions'] if entry['id'] == 'D03')
     record['approval_reference']['answer'] = 'First line.\nSecond line.'
@@ -131,6 +133,7 @@ def test_check_rejects_a_heading_absorbed_into_paragraph_text(workspace):
 
 
 def test_check_reports_a_hand_edit(workspace, capsys):
+    """Fail check-only generation when the committed register has been edited."""
     register, document = workspace
     text = document.read_text(encoding='utf-8')
     edited = text.replace('Subject: ', 'Subject: Hand-edited ', 1)
