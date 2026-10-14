@@ -97,6 +97,25 @@ class ValidationContext:
         The module is registered under a checker-private name during execution,
         because decorators such as `dataclass` resolve the defining module
         through that table. Any prior registry entry is restored afterwards.
+
+        Parameters
+        ----------
+        path
+            Filesystem path to the Python source file to import.
+
+        Returns
+        -------
+        ModuleType
+            The imported module.
+
+        Examples
+        --------
+        Load the roadmap exporter without invoking its command-line entry point:
+
+        >>> module = ValidationContext.load_module(
+        ...     Path('scripts/export_roadmap.py'))
+        >>> module.__name__
+        '_design_pack_scripts_export_roadmap'
         """
         name = f'_design_pack_{path.parent.name}_{path.stem}'
         spec = importlib.util.spec_from_file_location(name, path)

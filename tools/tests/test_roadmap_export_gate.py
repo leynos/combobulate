@@ -53,7 +53,7 @@ class RoadmapExportGate(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError, 'Roadmap export drift'):
                         check_roadmap_export(ValidationContext(root))
 
-    def test_loading_exporter_removes_temporary_module_registration(self):
+    def test_loading_exporter_removes_temporary_module_registration(self) -> None:
         """Keep a successful path-based import from leaving checker state in sys.modules."""
         module_name = '_design_pack_scripts_export_roadmap'
         previous = sys.modules.pop(module_name, None)
@@ -67,7 +67,7 @@ class RoadmapExportGate(unittest.TestCase):
             else:
                 sys.modules[module_name] = previous
 
-    def test_loading_exporter_restores_previous_module_registration(self):
+    def test_loading_exporter_restores_previous_module_registration(self) -> None:
         """Preserve another module occupying the checker's private import name."""
         module_name = '_design_pack_scripts_export_roadmap'
         previous = sys.modules.get(module_name)
@@ -83,7 +83,7 @@ class RoadmapExportGate(unittest.TestCase):
             else:
                 sys.modules[module_name] = previous
 
-    def test_failed_module_execution_cleans_up_temporary_registration(self):
+    def test_failed_module_execution_cleans_up_temporary_registration(self) -> None:
         """Restore global module state when a path-loaded script raises during execution."""
         module_name = '_design_pack_scripts_broken'
         previous = sys.modules.pop(module_name, None)
