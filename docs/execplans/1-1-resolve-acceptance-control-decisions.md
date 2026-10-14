@@ -5,12 +5,11 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (hosted CI preflight repair). Implementation of `EP-M0` to
-`EP-M6` and the 2026-10-13 review repair passed all seven local gates;
-CodeRabbit reassessment of `b4e2c14..b079f72` completed with zero findings.
-Published head `1f48268` exposed a build-tools pipeline failure in hosted CI.
-The repair requires fresh validation before publication, hosted assessments and
-formal review, then sponsor-owned stack merges.
+Status: COMPLETE (implementation of `EP-M0` to `EP-M6` and CI/review repairs).
+The preflight repair `2bf668f` passed all seven local gates; CodeRabbit
+reassessment of `b4e2c14..2bf668f` completed with zero findings across 92
+paths. Delivery remains pending: publish the repair, verify hosted CI, obtain
+hosted assessments and formal review, then sponsor-owned stack merges.
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
 recorded per decision identifier (see `Sponsor decisions`).
@@ -358,11 +357,18 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   preflight tests, including both new long-list cases and genuine
   missing-component checks; the doctest passed. Make and tee exited 0. Evidence:
   `/tmp/test-green-combobulate-1-1-reconciliation-preflight.out`.
-- [ ] (2026-10-14) Run all code gates and fresh local review, then publish
-  the CI repair.
-- [ ] (2026-10-13) Publish PR #18's validated candidate, obtain its hosted
-  completeness/correctness assessment, and reconcile formal review. Sponsor
-  review and merge of the preserved stack remain delivery work.
+- [x] (2026-10-14) All seven code gates passed for repair `2bf668f`:
+  formatting, documentation/Clippy/Whitaker lint, typecheck, full tests,
+  design-check against the #17 freeze base, Markdown lint/spelling, and Mermaid
+  validation. Rust: 331 passed, 1 skipped; doctest: 1 passed. Python: 266
+  unittest tests, 310 pytest tests, and 573 subtests passed. Logs:
+  `/tmp/{action}-combobulate-1-1-reconciliation-preflight-repair.out`.
+- [x] (2026-10-14) Fresh CodeRabbit CLI review of `b4e2c14..2bf668f`
+  completed with zero findings across 92 committed paths. Evidence:
+  `/tmp/coderabbit-combobulate-1-1-reconciliation-preflight-repair.out`.
+- [ ] (2026-10-14) Publish PR #18's validated repair, verify hosted CI,
+  obtain its hosted completeness/correctness assessment, and reconcile formal
+  review. Sponsor review and merge of the preserved stack remain delivery work.
 
 ## Surprises & discoveries
 
@@ -1758,6 +1764,13 @@ and `pr-creation`. Agents: `scrutineer` runs every gate; `scribe` makes
 mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
+
+- 2026-10-14, completed the preflight repair after the two regression cases
+  failed before the fix and all 12 preflight tests passed afterwards. All seven
+  code gates passed for `2bf668f`; fresh CodeRabbit CLI review reported zero
+  findings across 92 paths. Restored implementation-complete status; the final
+  documentation receipt is validated separately, and hosted CI, assessments,
+  formal review, and sponsor-owned stack merges remain delivery work.
 
 - 2026-10-14, published `1f48268` and observed hosted CI run 38486818299 fail
   its coverage-backend preflight assertion; Design contracts run 38486818460
