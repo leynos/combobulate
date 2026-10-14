@@ -5,17 +5,16 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: COMPLETE (implementation and formal-review repairs after `EP-M0` to
-`EP-M6`). Repair `0656e00` passed all seven applicable local gates. A fresh
-CodeRabbit CLI review of `b4e2c14..0656e00` completed across 93 paths with two
-minor documentation findings; this follow-up corrects the validation date and
-clarifies delivery status. The hosted assessment confirmed the prior
-corrections on `804a38f` in
-[reply](https://github.com/leynos/combobulate/pull/18#issuecomment-6158621418).
-Affected hosted assessment and formal-review confirmation for the repaired
-candidate remain pending, as do sponsor-owned stack merges. Historical receipts
-below retain their original candidate scope. Current delivery state is recorded
-on [PR #18](https://github.com/leynos/combobulate/pull/18).
+Status: IN PROGRESS (property-coverage follow-up after `EP-M0` to `EP-M6`).
+Published `a7d6a43` passed both hosted workflows and its affected ExecPlan
+assessment. The source-path thread, both testing rows, and developer
+documentation were confirmed resolved. A configured pre-merge-check run then
+reported 13 passes and two warnings: missing generated invariant coverage and
+an inconclusive docstring aggregate. Two new Hypothesis properties pass and
+kill five deliberate source mutants; full local gates and affected hosted
+confirmation remain pending for this follow-up. Historical receipts below
+retain their original candidate scope. Current delivery state is recorded on
+[PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
 recorded per decision identifier (see `Sponsor decisions`).
@@ -417,11 +416,38 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   date and distinguished confirmed historical assessment from pending affected
   assessment. Review log:
   `/tmp/coderabbit-combobulate-1-1-reconciliation-formal-repair.out`.
-- [ ] (2026-10-14) Validate and publish the documentation follow-up, then
-  reconcile every formal finding and pre-merge row on the published candidate.
-  Sponsor review and merge of the preserved stack remain delivery work.
+- [x] (2026-10-14) Validated and published the documentation follow-up as
+  `a7d6a43`. The source thread and three substantive rows are confirmed below;
+  current property coverage and docstring-report reconciliation remain separate
+  delivery work. Sponsor-owned stack merges remain pending.
+
+- [x] (2026-10-14) Published `a7d6a43`; CI 38500252800 and Design contracts
+  38500252779 passed. Affected assessment 6159481081 found no remaining
+  implementation defect. Inline response 4266123896 resolved the source-path
+  thread; response 6159504364 resolved both testing rows and developer
+  documentation. Its separate rename-aware inventories found all 27
+  changed-line and all 28 new/AST-changed Python functions documented.
+- [x] (2026-10-14) The supported configured-check command produced 13 passes
+  and two warnings. Added two Hypothesis properties for generated quote words,
+  paragraph boundaries, long tokens, source components, parent placements,
+  absolute forms, and internal/external symlink targets. The dependency was
+  already pinned; production code is unchanged. Focused tests and the isolated
+  two-test baseline passed; all five mutants failed at their intended
+  assertions (word loss, collapsed paragraphs, and removal of each absolute,
+  parent, or containment guard). Logs:
+  `/tmp/pytest-combobulate-1-1-reconciliation-properties.out` and
+  `/tmp/mutation-combobulate-1-1-reconciliation-properties.out`.
+- [ ] (2026-10-14) Validate, review, and publish the property follow-up. Obtain
+  affected hosted confirmation and current pre-merge evidence; retain the old
+  docstring aggregate as inconclusive until its checker provenance is known.
 
 ## Surprises & discoveries
+
+- Observation: configured pre-merge checks can run independently of a full PR
+  review. The supported command refreshed the testing and developer rows but
+  retained the old docstring percentage and introduced a valid generated-test
+  gap. Impact: verify each new warning against source, preserve independent
+  inventory counts, and do not infer a current checker pass from chat analysis.
 
 - Observation: a successful CodeRabbit status can accompany a
   `CHANGES_REQUESTED` review and failed pre-merge rows. Evidence: formal review
@@ -547,6 +573,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `README.md` through ADR 001; D04 ratifies it.
 
 ## Decision log
+
+- Decision: add generated invariant tests using the existing pinned Hypothesis
+  dependency and default settings. Construct word/paragraph inputs and normal
+  path components directly, preserve fixed regressions, and isolate each
+  filesystem example. Vary two symlink topologies rather than inventing an
+  arbitrary graph. The finite package-policy matrix remains exhaustive and
+  needs no additional property framework.
 
 - Decision: reject literal `..` source-path components before resolution,
   retaining absolute-path, containment, file, and digest checks. Add the
@@ -1848,6 +1881,11 @@ and `pr-creation`. Agents: `scrutineer` runs every gate; `scribe` makes
 mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
+
+- 2026-10-14, recorded current-head hosted success and resolved source/testing
+  findings. Added two generated invariant properties after verifying the new
+  Property/Proof warning; both properties and five isolated mutation controls
+  pass. Full gates, publication, and affected hosted confirmation are pending.
 
 - 2026-10-14, recorded the completed formal-repair gates and fresh committed
   CLI inspection at `0656e00`. Corrected the document-pack check date and

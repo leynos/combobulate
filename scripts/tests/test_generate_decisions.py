@@ -6,8 +6,9 @@ import json
 from pathlib import Path
 
 import pytest
+from hypothesis import example, given, strategies as st
 
-from generate_decisions import END, START, MarkerError, app, render, splice
+from generate_decisions import END, START, MarkerError, app, quoted_answer, render, splice
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTER_PATH = ROOT / 'spec/decisions.json'
@@ -98,6 +99,30 @@ def test_answer_soft_line_break_keeps_words_in_one_paragraph():
     section = text[text.index('### D03\n'):text.index('### D04\n')]
     assert '> First line. Second line.\n' in section, 'a soft break may reflow without changing the quoted words'
     assert record['approval_reference']['answer'] == 'First line.\nSecond line.', 'the approval answer stays intact'
+
+
+@example(paragraphs=[['single']], separator=' ')
+@example(paragraphs=[['x' * 140], [], ['éЖ字']], separator='\n')
+@given(
+    paragraphs=st.lists(st.lists(st.text(alphabet='abcXYZ09-_/.,!?éЖ字', min_size=1, max_size=140),
+                                 max_size=5), min_size=2, max_size=5),
+    separator=st.sampled_from((' ', '\n', '  \n ')),
+)
+def test_quoted_answer_preserves_generated_words_and_paragraphs(paragraphs, separator):
+    """Preserve generated words, empty paragraphs, and long tokens through quote reflow."""
+    answer = '\n\n'.join(separator.join(words) for words in paragraphs)
+    record = {'approval_reference': {'answer': answer}}
+    rendered = quoted_answer(record)
+    heading, ending = 'Answer, quoted verbatim:\n\n', '\n\n'
+    assert rendered.startswith(heading) and rendered.endswith(ending), 'the quote must retain its framing'
+    quoted = rendered[len(heading):-len(ending)]
+    restored = []
+    for paragraph in quoted.split('\n>\n'):
+        lines = paragraph.splitlines()
+        assert all(line.startswith('> ') for line in lines), 'every content line must remain in the quote'
+        restored.append(' '.join(line[2:] for line in lines).split())
+    assert restored == paragraphs, 'reflow must preserve every word and each paragraph, including empty ones'
+    assert record['approval_reference']['answer'] == answer, 'rendering must preserve the original answer'
 
 
 def test_splice_rejects_missing_or_repeated_markers():
