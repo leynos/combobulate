@@ -223,16 +223,17 @@ def parse_task(item: Node, source: Source) -> dict:
 
 def parse_phase_header(heading: Node, paragraphs: list[Node], source: Source) -> dict:
     """Build a phase from its heading and its idea, goals, context, and gate paragraphs."""
-    if len(paragraphs) != 4:
-        raise source.fail(heading, 'a phase needs Idea, Goals, context, and Gate paragraphs')
+    if len(paragraphs) != 4 or any(node.type != 'paragraph' for node in paragraphs):
+        invalid = next((node for node in paragraphs if node.type != 'paragraph'), heading)
+        raise source.fail(invalid, 'a phase needs Idea, Goals, context, and Gate paragraphs')
     idea, goals, context, gate = (inline_text(node, source) for node in paragraphs)
     number, title = numbered(inline_text(heading, source), r'\d+', heading, source)
     goal_text = labelled(goals, 'Goals: ', paragraphs[1], source)
-    goal_list, marker, _ = goal_text.partition(' in `terms-of-reference.md`')
-    if not marker:
-        raise source.fail(paragraphs[1], 'goals must cite `terms-of-reference.md`')
+    goal_match = re.fullmatch(r'(.+) in `terms-of-reference\.md` §6\.', goal_text)
+    if goal_match is None:
+        raise source.fail(paragraphs[1], 'goals must end with `terms-of-reference.md` §6.')
     return {'number': int(number), 'title': title, 'idea': labelled(idea, 'Idea: ', paragraphs[0], source),
-            'goals': id_list(goal_list), 'gate': labelled(gate, 'Gate: ', paragraphs[3], source),
+            'goals': id_list(goal_match.group(1)), 'gate': labelled(gate, 'Gate: ', paragraphs[3], source),
             'context': context, 'steps': []}
 
 

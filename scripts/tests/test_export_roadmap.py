@@ -77,6 +77,16 @@ def test_open_checkboxes_export_as_open_status():
     assert statuses == {'open'}, 'every task is open before roadmap step 1.1 completes'
 
 
+@pytest.mark.parametrize(('text', 'expected'), [
+    pytest.param(ROADMAP, 'proposed-all-tasks-open', id='all-open'),
+    pytest.param(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record'),
+                 'tasks-in-progress', id='mixed'),
+    pytest.param(ROADMAP.replace('- [ ]', '- [x]'), 'all-tasks-done', id='all-done'),
+])
+def test_overall_status_matches_independent_expectations(text: str, expected: str):
+    assert parse_roadmap(text)['status'] == expected, f'roadmap status must be {expected}'
+
+
 def test_changed_title_changes_export():
     edited = replace_once(ROADMAP, '1.1.1. Record the scope', '1.1.1. Record only the scope')
     assert first_task(parse_roadmap(edited))['title'] != first_task(committed_export())['title'], (
@@ -149,6 +159,38 @@ def test_malformed_structure_names_its_line(text: str, line: int):
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(text)
     assert raised.value.line == line, f'error must name line {line}: {raised.value}'
+
+
+@pytest.mark.parametrize(('replacement', 'source_node'), [
+    pytest.param('```text\nnot a paragraph\n```', '```text', id='code-block'),
+    pytest.param('---', '---', id='thematic-break'),
+])
+def test_phase_rejects_nonparagraph_body_with_line_and_cli_exit_two(
+        replacement: str, source_node: str, workspace, capsys):
+    context = ('This phase permits foundational work, but its output must include a runnable\n'
+               'public path. Document preparation alone does not complete a task.')
+    edited = replace_once(ROADMAP, context, replacement)
+    expected_line = line_of(edited, source_node)
+    with pytest.raises(RoadmapStructureError) as raised:
+        parse_roadmap(edited)
+    assert raised.value.line == expected_line, f'non-paragraph phase node must name line {expected_line}'
+
+    roadmap, export = workspace
+    roadmap.write_text(edited, encoding='utf-8')
+    assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 2, (
+        'non-paragraph phase nodes must exit as malformed input')
+    assert f':{expected_line}:' in capsys.readouterr().err, 'CLI error must include the malformed node line'
+
+
+def test_goals_reference_rejects_unrecognized_trailing_text():
+    edited = replace_once(ROADMAP,
+                          'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` §6.',
+                          'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` §6. Additional acceptance rule.')
+    expected_line = line_of(edited, 'Goals: G1, G2, G6, G7, G8')
+    with pytest.raises(RoadmapStructureError) as raised:
+        parse_roadmap(edited)
+    assert raised.value.line == expected_line, f'unknown goal suffix must name line {expected_line}'
+    assert 'must end with' in str(raised.value), 'error must identify the incomplete Goals grammar'
 
 
 @pytest.fixture

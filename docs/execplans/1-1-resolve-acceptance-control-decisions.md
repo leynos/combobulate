@@ -234,30 +234,21 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - [x] (2026-10-15) R2 clarified checker-backed component satisfaction in MS-3
   and VO-4; implementation alignment remains pending in PRs #17 and #18.
 - [x] (2026-10-11) `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode
-  exporter and drift validator (separate stacked pull request,
-  sponsor-directed). Evidence: the fresh export equals the previous
-  `spec/roadmap.json` exactly apart from the new per-task `status` field. On
-  2026-10-11 the exporter moved to `scripts/export_roadmap.py` (Cyclopts, PEP
-  723) per the sponsor. 18 pytest cases in
-       `scripts/tests/test_export_roadmap.py`
-  pass, including the command line, `INPUT_CHECK`, and a 60-example
-  derandomized round-trip property that observed every required structural
-  class; 2 checker-gate cases pass in
-  `tools/tests/test_roadmap_export_gate.py`; seeded faults (dropped details,
-  ignored ticks) each fail the suite; the script runs through its own `uv`
-  shebang; `make design-check` passes.
   exporter and drift validator (sponsor-directed, delivered in PR #11). The
   export matches the previous `spec/roadmap.json` apart from the intended
-  per-task `status` field. The exporter moved to `scripts/export_roadmap.py`
-  (Cyclopts, PEP 723) per the sponsor. Review repair rejects missing or
-  repeated task fields and empty roadmaps or phases. Its 24 pytest cases cover
-  the command line, `INPUT_CHECK`, malformed-input line reporting, and a
-  60-example derandomized round-trip property that observes every structural
-  class; 2 checker-gate cases pass in `tools/tests/test_roadmap_export_gate.py`.
-  Seeded faults (dropped details, ignored ticks) fail the suite, the script
-  runs through its `uv` shebang, and `make design-check` passes with the
-  documented `uv` requirements environment. Validation evidence is recorded in
-  PR #11.
+  per-task `status` field. On 2026-10-11 the exporter moved to
+  `scripts/export_roadmap.py` (Cyclopts, PEP 723) per the sponsor. Review
+  repairs reject missing or repeated task fields and empty roadmaps or phases,
+  validate Goals references and phase body node types, check overall status,
+  and cover code blocks and thematic breaks in CLI tests. All 30 focused
+  exporter cases pass, including `INPUT_CHECK`, malformed-input line reporting,
+  and a 60-example derandomized round-trip property that observes every
+  structural class; 2 checker-gate cases pass in
+  `tools/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
+  ignored ticks) fail the suite. The script runs through its `uv` shebang, and
+  `make design-check` passes with the documented `uv` requirements environment.
+  Full candidate gates were pending at this point; final validation evidence is
+  recorded in PR #11.
 - [ ] Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
@@ -422,9 +413,17 @@ here; implementation alignment remains pending in PRs #17 and #18.
 
 ## Outcomes & retrospective
 
-Not started. Complete at each milestone boundary and at completion, comparing
-the result with `Purpose / big picture` and reconciling every discovery with
-the artefacts in `Conformance basis` before setting the status to `COMPLETE`.
+EP-M0 makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
+drift-checked export. The retired generator is removed; the Wenmode exporter,
+checker integration, workflow documentation, and independent round-trip tests
+are in place. Review found that suffix text after the Terms of Reference
+reference could be discarded and that non-paragraph phase nodes could escape
+the structured malformed-input error. The review repair now validates the
+complete Goals reference and rejects non-paragraph phase nodes at their source
+line. It also adds independent all-open, mixed, and all-done status checks. The
+focused exporter suite passes 30 cases; full verification of the candidate is
+pending. The later milestones remain approval-gated, and the exporter is
+expected to retire when mapsplice#144 adds native JSON export and validation.
 
 ## Context and orientation
 
