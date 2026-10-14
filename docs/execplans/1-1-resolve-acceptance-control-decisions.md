@@ -5,14 +5,11 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT (sponsor decisions D01 to D15 received on 2026-10-10 and folded
-in; `EP-M0` is sponsor-directed and proceeds now; the remaining milestones
-await explicit approval of this revision)
+Status: APPROVED (the sponsor approved this plan for implementation on
+2026-10-11)
 
-Implementation of `EP-M1a` onward must not begin until the sponsor explicitly
-approves this revision. Approval of the plan is distinct from acceptance of a
-decision; acceptances are recorded per decision identifier (see
-`Sponsor decisions`).
+Plan approval is distinct from acceptance of an individual decision;
+acceptances are recorded per decision identifier (see `Sponsor decisions`).
 
 ## Purpose / big picture
 
@@ -37,11 +34,12 @@ before:
    Each record states preconditions, postconditions, empty and failure rules, a
    proof sketch for the later Verus or Kani work, and executable examples; the
    documentation model rejects deliberately wrong semantics.
-3. Read pre-registered resource, performance, build, and proof controls whose
-   thresholds are calibrated from recorded measurements and extrapolated to the
-   pinned GitHub runner class. A pull request that changes a registered
-   threshold without an authorized amendment fails the `Design contracts`
-   workflow, even if it also recomputes the stored digest.
+3. Read pre-registered resource, performance, build, and proof controls.
+   Thresholds are calibrated from recorded measurements where the workload can
+   run and extrapolated to the pinned GitHub runner class; AC-05 remains
+   explicitly uncalibrated until an executor exists. A pull request that
+   changes a registered threshold without an authorized amendment fails the
+   `Design contracts` workflow, even if it also recomputes the stored digest.
 4. Run `python3 tools/check_evidence.py` on a proof-evidence record and see a
    timeout, skipped harness, unsatisfied `cover`, negative control that failed
    for the wrong reason, unaudited or uncovered trusted assumption, stale
@@ -121,10 +119,11 @@ Term definitions used throughout:
 - C-EP-11. Gates run sequentially through the `scrutineer` agent, with
   output captured under `/tmp`. `make fmt` (which writes files) runs before,
   never inside, a scrutineer gate run.
-- C-EP-12. No hostnames, usernames, or absolute home paths in repository
-  documents or records (D11). Measurement records describe hardware by class
-  only: CPU model, core and thread counts, memory, operating-system family, and
-  kernel major version.
+- C-EP-12. No hostnames, host-local usernames, or absolute home paths in
+  repository documents or records (D11). Public approval logins required by
+  C-EP-1, such as the GitHub login `leynos`, are permitted. Measurement records
+  describe hardware by class only: CPU model, core and thread counts, memory,
+  operating-system family, and kernel major version.
 - C-EP-13. No `.github/CODEOWNERS` (D13). Governance relies on the
   base-revision freeze check and the sponsor's pull request review and merge.
 
@@ -223,9 +222,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   and folded into this revision.
 - [x] (2026-10-10) Upstream request leynos/mapsplice#144 filed for a JSON
   export and export validator.
+- [x] (2026-10-11) Sponsor approved this plan for implementation. This approves
+  the plan; individual decisions still require acceptance by identifier.
+- [x] (2026-10-15) Corrected the six CodeRabbit documentation findings on
+  approval, calibration, host identity, and evidence-state expectations.
 - [ ] `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode exporter and
   drift validator (separate stacked pull request, sponsor-directed).
-- [ ] Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
@@ -302,9 +304,10 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   same commit. Date/Author: 2026-10-10, sponsor.
 - Decision: the sponsor delegated threshold selection (D12) to the agent, on
   condition that thresholds rest on recorded local measurements extrapolated to
-  the pinned runner class. The calibration method, transcripts, and
-  extrapolation factors are recorded in `docs/acceptance-calibration.md`; the
-  registered values cite them. Date/Author: 2026-10-10, sponsor.
+  the pinned runner class. AC-05 remains uncalibrated until an executor exists.
+  The calibration method, transcripts, and extrapolation factors are recorded in
+  `docs/acceptance-calibration.md`; the registered values cite them.
+  Date/Author: 2026-10-10, sponsor.
 - Decision: implement validators and the evidence gate in Python inside
   `tools/docs_validation/`. Rationale: the design-contract checker, its JSON
   Schema validation, its Hypothesis tests, and its CI workflow live there. Rust
@@ -557,18 +560,19 @@ An abstract record is a tuple of ten fields:
 - `verdict_source` in {log-parser, self-reported}.
 
 The product domain has 345,600 states. A validity predicate `Valid` excludes
-contradictory combinations: `kind = none` exactly when `outcome = not-run`;
-`trust-declaration` requires `outcome = not-run`; `bounds = not-applicable`
-exactly when `kind` is not bounded. The JSON Schema enforces the same
-predicate, and VO-2 checks that the two agree.
+contradictory combinations: `outcome = not-run` iff `kind` is one of
+`trust-declaration` or `none`; `bounds = not-applicable` exactly when `kind` is
+not bounded. The JSON Schema enforces the same predicate, and VO-2 checks that
+the two agree.
 
 Admission (recorded in ADR-0009 as a compact, ordered rule table and
 implemented exactly):
 
 - MS-0. If `Valid` fails, the level is `rejected` with `schema-invalid`.
 - MS-1 (blocking reasons). Each failed condition contributes one reason code:
-  `outcome != verified` gives `outcome-<value>` (except for trust-declarations);
-  `witness != all-satisfied` gives `witness-<value>`;
+  `outcome != verified` gives `outcome-<value>` except for `none` and
+  `trust-declaration`; this generic rule therefore never emits
+  `outcome-not-run`; `witness != all-satisfied` gives `witness-<value>`;
   `controls != all-required-rejected-as-intended` gives `control-<value>`; for
   deductive and bounded kinds, `trust = unaudited` gives `trust-unaudited` and
   `audited-uncovered` gives `trust-uncovered`; `binding != current` gives
@@ -576,7 +580,8 @@ implemented exactly):
   not-yet-valid, or malformed exception gives `exception-<value>`; for
   deductive and bounded kinds, `verdict_source = self-reported` gives
   `verdict-self-reported`; `kind = none` gives `not-run`; a trust-declaration
-  without an active exception gives `trust-without-exception`.
+  without an active exception gives `trust-without-exception`. The reachable
+  reason catalogue excludes `outcome-not-run`.
 - MS-2 (level). With no blocking reason, the base level is `proof` for
   deductive, or bounded with `type-complete` bounds; `bounded` for bounded with
   `partial` bounds; `tested` for test; `restricted` for a trust-declaration. If
@@ -601,8 +606,9 @@ implementation:
 - P1 (degradation monotonicity): replacing any field value with a worse one
   never raises the level (proof > bounded > tested > restricted > rejected).
 - P2 (diagnostic soundness and completeness): a level is `rejected` exactly
-  when a blocking reason exists, and moving any single contributing field to
-  its best value removes exactly that reason.
+  when a blocking reason exists. A schema-valid repair removes exactly the
+  blocking reasons whose failed conditions it satisfies and retains diagnostics
+  for other conditions that remain unchanged.
 - P3 (exceptions never substitute): no state with `exception != none`
   satisfies any component.
 - P4 (bounded honesty): no state with `bounds = partial` reaches `proof`.
@@ -649,17 +655,35 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `tools/tests/test_evidence_gate.py`,
   `tools/docs_validation/evidence_gate.py`. Evidence: red is
   `ModuleNotFoundError`; green is full agreement. Non-vacuity: every level and
-  reason occurs, each reason as the sole reason for some state; the valid-state
-  count is asserted. Seeded mutations that must fail: `resource-exhausted`
+  reason occurs; the valid-state count is asserted. The reachable reason
+  catalogue excludes `outcome-not-run`, and each reachable reason occurs as the
+  sole reason for some state. A valid state with `kind = trust-declaration`,
+  `outcome = not-run`, `bounds = not-applicable`, `witness = all-satisfied`,
+  `controls = all-required-rejected-as-intended`, `trust = audited-none`,
+  `exception = active`, `binding = current`, `run_mode = full-profile`, and
+  `verdict_source = self-reported` must yield exactly
+  `restricted [exception-active]`; MS-3 must report no component satisfaction
+  for it. The same concrete state must round-trip through the schema in VO-2. A
+  paired state with the same fields except `exception = none` must be
+  schema-valid and yield exactly `rejected [trust-without-exception]`. A second
+  valid state with `kind = none`, `outcome = not-run`,
+  `bounds = not-applicable`, `witness = all-satisfied`,
+  `controls = all-required-rejected-as-intended`, `trust = audited-none`,
+  `exception = none`, `binding = current`, `run_mode = full-profile`, and
+  `verdict_source = self-reported` must yield exactly `rejected [not-run]`; all
+  other blocker conditions are satisfied. This establishes `not-run` as a
+  reachable sole reason. Seeded mutations that must fail: `resource-exhausted`
   treated as verified; `trust` ignored; `active` keeping the base level;
   `partial` mapped to `proof`; `some-rejected-otherwise` accepted.
 - VO-2 (concrete-to-abstract mapping and schema agreement). Method: for each
   valid abstract state a generated concrete record must be schema-valid and
   abstract back to that state; for each invalid state the record must be
   schema-invalid; a Hypothesis property checks that abstraction depends only on
-  documented fields. Artefact: `tools/tests/test_evidence_records.py`.
-  Non-vacuity: fails if any kind or outcome class is never generated; a seeded
-  mapping fault must fail.
+  documented fields. Include the fully specified valid trust-declaration state
+  from VO-1 and require a concrete record to round-trip to that exact abstract
+  state. Artefact: `tools/tests/test_evidence_records.py`. Non-vacuity: fails
+  if any kind or outcome class is never generated; a seeded mapping fault must
+  fail.
 - VO-3 (exception register validity, P5). Method: boundary tests on the
   injected date (day before approval: not-yet-valid; approval day: active; day
   before `invalid_from`: active; `invalid_from`: expired); malformed cases
@@ -780,12 +804,13 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `tools/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
   memory fails.
 - VO-16 (no host identity leaks). Invariant: committed calibration and
-  measurement records contain no hostname, username, or absolute home path.
-  Method: a check over `docs/acceptance-calibration.md` and measurement records
-  using the hardware-class schema (no free-form host fields) plus a pattern
-  scan for `/home/`, `/Users/`, and the local hostname supplied at test time
-  only. Artefact: `tools/tests/test_preregistration.py`. Non-vacuity: an
-  in-memory record containing a home path fails.
+  measurement records contain no hostname, host-local username, or absolute
+  home path. Public approval logins required by C-EP-1 are permitted. Method: a
+  check over `docs/acceptance-calibration.md` and measurement records using the
+  hardware-class schema (no free-form host fields) plus a pattern scan for
+  `/home/`, `/Users/`, and the local hostname supplied at test time only.
+  Artefact: `tools/tests/test_preregistration.py`. Non-vacuity: an in-memory
+  record containing a home path fails.
 
 ### Axioms
 
@@ -810,13 +835,14 @@ Trusted, not verified here:
 
 ## Plan of work
 
-Milestones run in order on stacked branches. `EP-M0` is sponsor-directed and
-proceeds now. `EP-M1a` onward awaits approval of this revision; all decisions
-they need have been answered. Each milestone follows Red, Green, Refactor:
-draft as `proposed` (Stage A); add rule tables, fixtures, and tests and observe
-the expected failure (Stage B); implement until the focused tests pass (Stage
-C); tidy, run the generators and exporter and `check_docs.py --write`, review
-the report diff, and have `scrutineer` run the full gates (Stage D).
+Milestones run in order on stacked branches. The sponsor approved this plan on
+2026-10-11; `EP-M0` is sponsor-directed, and later milestones follow the
+approved plan. All decisions they need have been answered. Each milestone
+follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables,
+fixtures, and tests and observe the expected failure (Stage B); implement until
+the focused tests pass (Stage C); tidy, run the generators and exporter and
+`check_docs.py --write`, review the report diff, and have `scrutineer` run the
+full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
@@ -1120,11 +1146,12 @@ and the bet register's measurement sentences.
   amendments only. Compatibility: none.
 - `EP-M5`. Outcome: ADR-0009; schema version 2; exception register; pure gate
   with exhaustive tests; task 1.1.4 ticked via `PF14.structural@1.1.4`.
-  Evidence: VO-1 to VO-4; `check_evidence.py` rejects the planned example with
-  `not-run` (exit 1), admits the complete test fixture at `tested` (exit 0),
-  and reports its partial-bounds variant at `bounded`. Conformance: the 1.1.4
-  success text is satisfied; no version-1 consumer remains. Compatibility: none
-  (no deployed consumer).
+  Evidence: VO-1 to VO-4; the transcript's `kind = none`, `outcome = not-run`
+  witness has every other blocker condition satisfied and yields exactly
+  `rejected [not-run]` (exit 1); the complete test fixture is admitted at
+  `tested` (exit 0), and reports its partial-bounds variant at `bounded`.
+  Conformance: the 1.1.4 success text is satisfied; no version-1 consumer
+  remains. Compatibility: none (no deployed consumer).
 - `EP-M6`. Outcome: all four 1.1 tasks ticked; documents reconciled; plan
   `COMPLETE`. Evidence: full gates and the idempotence step pass.
 
@@ -1174,6 +1201,9 @@ make nixie
 ```
 
 Evidence gate demonstration (after `EP-M5`):
+
+The planned example uses VO-1's `none/not-run` witness, with every other
+blocking condition satisfied.
 
 ```bash
 $PY tools/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json; echo "exit=$?"
@@ -1349,3 +1379,9 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   documented in the developers' guide (D05); approval references admit session
   answers. Remaining work: deliver `EP-M0` now, then obtain approval of this
   revision before `EP-M1a`.
+- 2026-10-15, current review correction: the sponsor approved this plan on
+  2026-10-11; the 2026-10-10 entry above preserves the state of that revision
+  note. Plan approval remains distinct from acceptance of each decision. This
+  review updates the approval status and clarifies the evidence-gate validity,
+  reachable reason catalogue, and calibration exception. It does not mark any
+  implementation milestone complete in this plan-only pull request.
