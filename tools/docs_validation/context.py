@@ -94,14 +94,21 @@ class ValidationContext:
     def load_module(path: Path) -> ModuleType:
         """Import a Python file by path without running its command-line entry point.
 
-        The module is registered in `sys.modules` under a checker-private name
-        before execution, because decorators such as `dataclass` resolve the
-        defining module through that table.
+        The module is registered under a checker-private name during execution,
+        because decorators such as `dataclass` resolve the defining module
+        through that table. Any prior registry entry is restored afterwards.
         """
         name = f'_design_pack_{path.parent.name}_{path.stem}'
         spec = importlib.util.spec_from_file_location(name, path)
         require(spec is not None and spec.loader is not None, str(path))
         module = importlib.util.module_from_spec(spec)
+        previous_module = sys.modules.get(name)
         sys.modules[name] = module
-        spec.loader.exec_module(module)
+        try:
+            spec.loader.exec_module(module)
+        finally:
+            if previous_module is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous_module
         return module

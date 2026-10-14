@@ -56,22 +56,26 @@ def line_of(text: str, needle: str) -> int:
 
 
 def test_export_matches_committed_json_view():
+    """Keep every canonical Markdown field represented in the committed JSON view."""
     assert parse_roadmap(ROADMAP) == committed_export(), 'docs/roadmap.md must export exactly to spec/roadmap.json'
 
 
 def test_serialized_export_is_byte_identical_and_deterministic():
+    """Treat serialization details as part of the generated file contract."""
     committed = EXPORT_PATH.read_text(encoding='utf-8')
     assert export_text(ROADMAP) == committed, 'serialization must match the committed file'
     assert export_text(ROADMAP) == export_text(ROADMAP), 'export must be deterministic'
 
 
 def test_export_is_independent_of_paragraph_wrapping():
+    """Keep Markdown presentation changes from changing the parsed roadmap meaning."""
     rewrapped = replace_once(ROADMAP, 'Record the scope, decision authority, licence, and pre-1.0 API\n  policy.',
                              'Record the scope, decision authority, licence, and\n  pre-1.0 API policy.')
     assert parse_roadmap(rewrapped) == parse_roadmap(ROADMAP), 'wrapping must not change the export'
 
 
 def test_open_checkboxes_export_as_open_status():
+    """Preserve the unfinished state of tasks whose roadmap checkboxes are empty."""
     statuses = {task['status'] for phase in parse_roadmap(ROADMAP)['phases']
                 for step in phase['steps'] for task in step['tasks']}
     assert statuses == {'open'}, 'every task is open before roadmap step 1.1 completes'
@@ -84,38 +88,45 @@ def test_open_checkboxes_export_as_open_status():
     pytest.param(ROADMAP.replace('- [ ]', '- [x]'), 'all-tasks-done', id='all-done'),
 ])
 def test_overall_status_matches_independent_expectations(text: str, expected: str):
+    """Derive the aggregate status correctly for open, mixed, and completed task sets."""
     assert parse_roadmap(text)['status'] == expected, f'roadmap status must be {expected}'
 
 
 def test_changed_title_changes_export():
+    """Ensure a task title edit is visible in the derived JSON rather than ignored."""
     edited = replace_once(ROADMAP, '1.1.1. Record the scope', '1.1.1. Record only the scope')
     assert first_task(parse_roadmap(edited))['title'] != first_task(committed_export())['title'], (
         'a retitled task must drift from the committed export')
 
 
 def test_changed_dependency_changes_export():
+    """Keep dependency edits in canonical Markdown reflected by the JSON view."""
     edited = replace_once(ROADMAP, 'Requires 1.1.1, 1.1.2, 1.1.3.', 'Requires 1.1.1, 1.1.3.')
     task = parse_roadmap(edited)['phases'][0]['steps'][0]['tasks'][3]
     assert task['requires'] == ['1.1.1', '1.1.3'], 'the edited Requires line must be exported'
 
 
 def test_ticked_checkbox_changes_status():
+    """Make checkbox completion affect task status and aggregate roadmap status."""
     edited = replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record')
     assert first_task(parse_roadmap(edited))['status'] == 'done', 'a tick must export as done'
 
 
 def test_missing_markers_are_rejected():
+    """Reject a document that no longer identifies the canonical roadmap region."""
     with pytest.raises(RoadmapStructureError, match='exactly one'):
         parse_roadmap('# Roadmap\n')
 
 
 def test_empty_marked_region_is_rejected():
+    """Require at least one phase inside the marked canonical region."""
     text = f'Revision 0.2, 6 October 2026.\n\n{START}\n\n{END}\n'
     with pytest.raises(RoadmapStructureError, match='at least one phase'):
         parse_roadmap(text)
 
 
 def test_phase_without_steps_is_rejected_at_its_heading():
+    """Point to the phase heading when its body contains no numbered step."""
     text = (f'Revision 0.2, 6 October 2026.\n\n{START}\n\n'
             '## 1. Empty phase\n\nIdea: A phase without steps.\n\n'
             'Goals: G1 in `terms-of-reference.md` §6.\n\nContext.\n\nGate: Not ready.\n\n'
@@ -131,6 +142,7 @@ def test_phase_without_steps_is_rejected_at_its_heading():
     ('Success:', 'success'),
 ])
 def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
+    """Reject incomplete task contracts and name the absent required field."""
     edited = remove_first_task_bullet(ROADMAP, label)
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
@@ -139,6 +151,7 @@ def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
 
 
 def test_duplicate_task_success_bullet_is_rejected():
+    """Reject repeated success criteria instead of silently choosing one value."""
     edited = replace_once(ROADMAP, '- [ ] 1.1.2.', '  - Success: duplicate.\n- [ ] 1.1.2.')
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
@@ -156,6 +169,7 @@ def test_duplicate_task_success_bullet_is_rejected():
                  line_of(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.'), id='ticked-detail'),
 ])
 def test_malformed_structure_names_its_line(text: str, line: int):
+    """Keep each unsupported structure error attached to its source line."""
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(text)
     assert raised.value.line == line, f'error must name line {line}: {raised.value}'
@@ -167,6 +181,7 @@ def test_malformed_structure_names_its_line(text: str, line: int):
 ])
 def test_phase_rejects_nonparagraph_body_with_line_and_cli_exit_two(
         replacement: str, source_node: str, workspace, capsys):
+    """Reject unsupported phase-body nodes consistently in the parser and command line."""
     context = ('This phase permits foundational work, but its output must include a runnable\n'
                'public path. Document preparation alone does not complete a task.')
     edited = replace_once(ROADMAP, context, replacement)
@@ -183,6 +198,7 @@ def test_phase_rejects_nonparagraph_body_with_line_and_cli_exit_two(
 
 
 def test_goals_reference_rejects_unrecognized_trailing_text():
+    """Prevent trailing Goals text from disappearing during structural export."""
     edited = replace_once(ROADMAP,
                           'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` §6.',
                           'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` §6. Additional acceptance rule.')
@@ -210,12 +226,14 @@ def run_cli(*args: str) -> int:
 
 
 def test_cli_check_passes_on_matching_export(workspace, capsys):
+    """Let check mode succeed when the committed export matches its canonical source."""
     roadmap, export = workspace
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 0, 'matching export passes'
     assert 'matches' in capsys.readouterr().out
 
 
 def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
+    """Show actionable serialized differences and exit one when check mode detects drift."""
     roadmap, export = workspace
     roadmap.write_text(replace_once(ROADMAP, '1.1.1. Record the scope', '1.1.1. Record only the scope'),
                        encoding='utf-8')
@@ -226,6 +244,7 @@ def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
 
 
 def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
+    """Reserve exit two for malformed input and include its source line in diagnostics."""
     roadmap, export = workspace
     roadmap.write_text(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'), encoding='utf-8')
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 2, 'malformed input exits 2'
@@ -233,6 +252,7 @@ def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
 
 
 def test_cli_reads_check_flag_from_environment(workspace, monkeypatch):
+    """Honor INPUT_CHECK when the command line does not explicitly select check mode."""
     roadmap, export = workspace
     export.write_text('{}\n', encoding='utf-8')
     monkeypatch.setenv('INPUT_CHECK', 'true')
@@ -240,6 +260,7 @@ def test_cli_reads_check_flag_from_environment(workspace, monkeypatch):
 
 
 def test_write_mode_refreshes_the_export(workspace):
+    """Rewrite the derived file from canonical Markdown when write mode is selected."""
     roadmap, export = workspace
     export.write_text('{}\n', encoding='utf-8')
     assert main(roadmap=roadmap, export=export) == 0, 'writing succeeds'
@@ -305,11 +326,13 @@ def structural_classes(structure: dict) -> set[str]:
 
 
 def test_render_then_export_round_trips():
+    """Preserve generated roadmap structure through an independent render and parse path."""
     seen: set[str] = set()
 
     @settings(derandomize=True, max_examples=60, deadline=None)
     @given(roadmaps())
     def round_trip(structure: dict) -> None:
+        """Check one generated structure and record the structural classes exercised."""
         classes = structural_classes(structure)
         for name in classes:
             event(name)
