@@ -44,7 +44,41 @@ def check_bets_and_tasks(bets: list[dict], tasks: dict, requirement_ids: set[str
 
 
 def check_bet_links(bets: list[dict], tasks: dict) -> None:
-    """Require bet and task links to agree both ways; e.g. B08 listing 1.1.4 needs 1.1.4 to cite B08."""
+    """Require bet and task links to agree in both directions.
+
+    Parameters
+    ----------
+    bets : list[dict]
+        Bet records with an 'id' and a list of task identifiers in 'tasks'.
+    tasks : dict
+        Records indexed by task identifier, each with an 'id' and 'bets' list.
+        Referenced identifiers and required fields must already exist.
+
+    Returns
+    -------
+    None
+        Both directions agree; neither input is modified.
+
+    Raises
+    ------
+    AssertionError
+        A bet lists a task that does not cite it, or the reverse link is absent.
+
+    Examples
+    --------
+    Matching references pass without a result:
+
+    >>> check_bet_links([{'id': 'B08', 'tasks': ['1.1.4']}],
+    ...                 {'1.1.4': {'id': '1.1.4', 'bets': ['B08']}})
+
+    A missing reverse reference fails:
+
+    >>> check_bet_links([{'id': 'B08', 'tasks': ['1.1.4']}],
+    ...                 {'1.1.4': {'id': '1.1.4', 'bets': []}})
+    Traceback (most recent call last):
+        ...
+    AssertionError: Bet B08 lists task 1.1.4, which does not cite it
+    """
     for bet in bets:
         for task_id in bet['tasks']:
             require(bet['id'] in tasks[task_id]['bets'], f"Bet {bet['id']} lists task {task_id}, which does not cite it")

@@ -5,15 +5,14 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (property-coverage follow-up after `EP-M0` to `EP-M6`).
-Published `a7d6a43` passed both hosted workflows and its affected ExecPlan
-assessment. The source-path thread, both testing rows, and developer
-documentation were confirmed resolved. A configured pre-merge-check run then
-reported 13 passes and two warnings: missing generated invariant coverage and
-an inconclusive docstring aggregate. Two new Hypothesis properties pass and
-kill five deliberate source mutants; full local gates and affected hosted
-confirmation remain pending for this follow-up. Historical receipts below
-retain their original candidate scope. Current delivery state is recorded on
+Status: IN PROGRESS (final helper documentation after property coverage).
+Property follow-up `3ed0593` passed all seven local gates. Fresh CodeRabbit CLI
+inspection completed all 93 paths and identified documentation gaps in two
+helpers. Their input, return, failure, and executable example documentation is
+now clarified; the function ASTs are unchanged after removing docstrings.
+Documentation validation, publication, and affected hosted confirmation remain
+pending. Published `a7d6a43` retains its earlier green CI and clear assessment
+at their original scope. Current delivery state is recorded on
 [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
@@ -441,6 +440,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   affected hosted confirmation and current pre-merge evidence; retain the old
   docstring aggregate as inconclusive until its checker provenance is known.
 
+- [x] (2026-10-14) Committed property coverage as `3ed0593` after all seven
+  gates passed: 331 Rust tests, one skipped, one doctest, 270 unittest tests,
+  315 pytest tests, and 589 subtests. Fresh committed CLI review inspected all
+  93 paths and found only two helper documentation gaps. Added structured
+  input/return descriptions and executable success/failure examples for
+  `check_bet_links` and `quoted_answer`; AST equivalence confirms no executable
+  changes after removing function docstrings.
+- [ ] (2026-10-14) Validate and reassess the helper documentation, then publish
+  the property and documentation follow-ups and obtain affected hosted
+  assessment and pre-merge confirmation.
+
 ## Surprises & discoveries
 
 - Observation: configured pre-merge checks can run independently of a full PR
@@ -573,6 +583,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `README.md` through ADR 001; D04 ratifies it.
 
 ## Decision log
+
+- Decision: clarify only the two helper docstrings identified by CLI review.
+  The repository requires usage/outcome examples, but the review's claimed
+  repository-wide NumPy-style mandate is not present in tracked instructions.
+  Structured descriptions make these two interfaces clearer without adding a
+  global style rule or changing runtime behaviour. Verify examples as doctests
+  and preserve the earlier full code gates at their actual source scope.
 
 - Decision: add generated invariant tests using the existing pinned Hypothesis
   dependency and default settings. Construct word/paragraph inputs and normal
@@ -1881,6 +1898,11 @@ and `pr-creation`. Agents: `scrutineer` runs every gate; `scribe` makes
 mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
+
+- 2026-10-14, recorded seven passed property-follow-up gates and the complete
+  93-path CLI inspection of `3ed0593`. Clarified two helper docstrings and
+  verified AST equivalence; example validation and affected delivery remain
+  pending.
 
 - 2026-10-14, recorded current-head hosted success and resolved source/testing
   findings. Added two generated invariant properties after verifying the new

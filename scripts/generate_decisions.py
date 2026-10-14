@@ -72,7 +72,29 @@ def outcome(record: dict) -> str:
 
 
 def quoted_answer(record: dict) -> str:
-    """Quote unchanged answer words and paragraph breaks, rewrapping Markdown soft breaks."""
+    """Quote answer words and paragraph breaks, rewrapping Markdown soft breaks.
+
+    Parameters
+    ----------
+    record : dict
+        A decision with an 'approval_reference' entry. That entry may be
+        None or a mapping whose optional 'answer' is the original string.
+
+    Returns
+    -------
+    str
+        An empty string when no answer is recorded; otherwise a labelled
+        Markdown block quote with a trailing blank line. Words and paragraph
+        boundaries are preserved, soft line breaks may reflow, and the input
+        record stays unchanged.
+
+    Examples
+    --------
+    >>> quoted_answer({'approval_reference': None})
+    ''
+    >>> quoted_answer({'approval_reference': {'answer': 'First line.\\nSecond line.'}})
+    'Answer, quoted verbatim:\\n\\n> First line. Second line.\\n\\n'
+    """
     reference = record['approval_reference']
     if reference is None or 'answer' not in reference:
         return ''
