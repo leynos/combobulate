@@ -8,8 +8,13 @@ be kept up to date as work proceeds.
 Status: COMPLETE (implementation of `EP-M0` to `EP-M6` and CI/review repairs).
 The preflight repair `2bf668f` passed all seven local gates; CodeRabbit
 reassessment of `b4e2c14..2bf668f` completed with zero findings across 92
-paths. Delivery remains pending: publish the repair, verify hosted CI, obtain
-hosted assessments and formal review, then sponsor-owned stack merges.
+paths. Delivery receipt (2026-10-14): published `5bf739a` passed
+[CI](https://github.com/leynos/combobulate/actions/runs/38492308721) and
+[Design contracts](https://github.com/leynos/combobulate/actions/runs/38492308682).
+The hosted assessment found no blocking code defect and requested two
+documentation corrections, recorded below. Assessment confirmation, formal
+review, and sponsor-owned stack merges remain pending. Current delivery state
+is recorded on [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -513,9 +518,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - [x] (2026-10-14) Fresh CodeRabbit CLI review of `b4e2c14..2bf668f`
   completed with zero findings across 92 committed paths. Evidence:
   `/tmp/coderabbit-combobulate-1-1-reconciliation-preflight-repair.out`.
-- [ ] (2026-10-14) Publish PR #18's validated repair, verify hosted CI,
-  obtain its hosted completeness/correctness assessment, and reconcile formal
-  review. Sponsor review and merge of the preserved stack remain delivery work.
+- [x] (2026-10-14) Published `5bf739a`; CI run 38492308721 and Design
+  contracts run 38492308682 both passed on attempt 1. The CI run supersedes the
+  earlier preflight failure; its optional Act step was skipped. The hosted
+  assessment confirmed implementation completeness, with two documentation
+  corrections: use the #17 control-containing freeze base and refresh delivery
+  receipts. See
+  [the assessment](https://github.com/leynos/combobulate/pull/18#issuecomment-6158476454).
+- [ ] (2026-10-14) Obtain confirmation of the documentation corrections and
+  reconcile formal review. Sponsor review and merge of the preserved stack
+  remain delivery work.
 
 ## Surprises & discoveries
 
@@ -1102,10 +1114,12 @@ Deviations and lessons:
   mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
   `runner`. A stacked synchronize run also reported `main` as its base branch,
   which led to choosing the freeze base by commit.
-- Remaining: publish the validated reconciliation candidate, obtain hosted
-  assessments and formal reviews, and leave the sponsor's review and merge of
-  #9 to #18 in stack order. The two earlier milestone CLI review rounds are
-  recorded in `Decision log`.
+- Delivery evidence: reconciliation candidate `5bf739a` is published, with
+  successful hosted CI and Design contracts runs recorded above. The hosted
+  assessment found no blocking code defect; its documentation corrections
+  require confirmation. Formal review remains pending. Leave the sponsor's
+  review and merge of #9 to #18 in stack order. Earlier milestone CLI review
+  rounds retain their original candidate scope in `Decision log`.
 
 
 ## Context and orientation
@@ -1972,7 +1986,7 @@ make fmt
 make check-fmt
 make lint
 make test
-make design-check PYTHON="$PY" BASE_REV=origin/main
+make design-check PYTHON="$PY" BASE_REV=a246aac8abf252bd7ad3cf2d1c16e06ebd5fb10c
 make markdownlint
 make nixie
 ```
@@ -2015,7 +2029,9 @@ Behavioural acceptance:
    in the roadmap preamble while task 1.1.1 remains checked, or writing "Q4
    remains open", makes `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
-   `make design-check BASE_REV=origin/main` fail and name AC-03.
+   `make design-check BASE_REV=a246aac8abf252bd7ad3cf2d1c16e06ebd5fb10c` fail and name AC-03. This base
+   contains the frozen control register; a base predating AC-03 cannot establish
+   its freeze.
 5. `check_evidence.py` rejects a `resource-exhausted` fixture and a
    self-reported Verus record with `verdict-self-reported`. The abstract gate
    reports a partial-bounds Kani state at `bounded`, never `proof`, only when a
@@ -2213,6 +2229,12 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   existing draft and stack base. Final documentation checks, publication,
   hosted assessment, and formal review remain pending.
 - 2026-10-14, published `1f48268` and observed hosted CI run 38486818299 fail
+- 2026-10-14, corrected both hosted assessment findings: the stacked gate
+  example and AC-03 acceptance recipe now name the exact #17 base that contains
+  the control register. Refreshed delivery receipts with published `5bf739a`
+  and its two passing workflow URLs, preserving prior candidate-bound results
+  and keeping assessment confirmation, formal review, and sponsor merges
+  separate.
 - 2026-10-14, completed the preflight repair after the two regression cases
   failed before the fix and all 12 preflight tests passed afterwards. All seven
   code gates passed for `2bf668f`; fresh CodeRabbit CLI review reported zero
