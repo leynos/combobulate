@@ -69,6 +69,8 @@ class Source:
 
 def inline_text(node: Node, source: Source) -> str:
     """Flatten inline content to single-spaced text; inline code keeps its backticks."""
+    if node.type not in {'paragraph', 'heading'}:
+        raise source.fail(node, f'unsupported block {node.type}')
     parts: list[str] = []
     for child in node.children:
         if child.type == 'text':
@@ -223,9 +225,8 @@ def parse_task(item: Node, source: Source) -> dict:
 
 def parse_phase_header(heading: Node, paragraphs: list[Node], source: Source) -> dict:
     """Build a phase from its heading and its idea, goals, context, and gate paragraphs."""
-    if len(paragraphs) != 4 or any(node.type != 'paragraph' for node in paragraphs):
-        invalid = next((node for node in paragraphs if node.type != 'paragraph'), heading)
-        raise source.fail(invalid, 'a phase needs Idea, Goals, context, and Gate paragraphs')
+    if len(paragraphs) != 4:
+        raise source.fail(heading, 'a phase needs Idea, Goals, context, and Gate paragraphs')
     idea, goals, context, gate = (inline_text(node, source) for node in paragraphs)
     number, title = numbered(inline_text(heading, source), r'\d+', heading, source)
     goal_text = labelled(goals, 'Goals: ', paragraphs[1], source)

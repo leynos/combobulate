@@ -247,8 +247,9 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `tools/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
   ignored ticks) fail the suite. The script runs through its `uv` shebang, and
   `make design-check` passes with the documented `uv` requirements environment.
-  Full candidate gates were pending at this point; final validation evidence is
-  recorded in PR #11.
+  The full local gates pass after moving block-node validation to the
+  inline-text boundary, and CodeScene reports no issues; final validation
+  evidence is recorded in PR #11.
 - [ ] Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
