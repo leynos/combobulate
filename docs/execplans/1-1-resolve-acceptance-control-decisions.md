@@ -580,10 +580,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   docstrings and this plan. Both executable doctests passed; formatting,
   exact-base design checks (270/315/589), Markdown/spelling, and diagram checks
   passed. The old aggregate docstring percentage remains inconclusive.
+- [x] (2026-10-14) Read-only CLI diagnostics reported signed-in
+  authentication, repository readiness, reachable backend/WebSocket, and
+  available review capacity. Two focused and one actual-base reassessment
+  attempt failed before inspection; each reported a non-recoverable startup
+  failure without findings or a stated cause. No credentials, accounts,
+  configuration, services, or billing settings changed.
 - [ ] (2026-10-20) Revalidate the property and helper-documentation follow-ups
   against merged base `a246aac`, then publish and reconcile current hosted CI,
-  assessment, formal review, and pre-merge evidence. Sponsor review and merge
-  remain delivery work.
+  assessment, formal review, and pre-merge evidence. Reassess the prior missing
+  CLI result against the published candidate. Sponsor review and merge remain
+  delivery work.
 
 ## Surprises & discoveries
 
@@ -613,6 +620,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   inventory with 15 missing test docstrings; its 23 unsupported skips are not
   missing documentation. Impact: document verified changed functions and do
   not invent the original denominator.
+- Observation: CLI review startup failed despite passing readiness and usage
+  diagnostics. The helper-doc, helper-doc-retry, and helper-doc-full logs report
+  a non-recoverable start error without findings or completion. Impact: preserve
+  the missing review, avoid unsupported retries, and continue independent
+  publication and hosted evidence without substituting them for reassessment.
 
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
@@ -732,6 +744,18 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   keeps task 1.1.1 checked.
 
 ## Decision log
+
+- Decision: preserve the earlier CLI startup failure as missing review evidence
+  after two focused attempts, healthy read-only diagnostics, and one actual-base
+  attempt. Do not rotate credentials, alter service configuration, infer a
+  cooldown, or claim a clean reassessment. Reassess the published replayed
+  candidate before treating the review gate as satisfied.
+
+- Decision: clarify only the two helper docstrings identified by CLI review.
+  Repository instructions require usage and outcome examples, but the review's
+  claimed repository-wide NumPy-style mandate is not tracked. Structured
+  descriptions clarify these interfaces without adding a global rule or
+  changing runtime behaviour. Validate examples as doctests.
 
 - Decision: add generated invariant tests using the existing pinned Hypothesis
   dependency and default settings. Construct word/paragraph inputs and normal
@@ -2265,6 +2289,10 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   decision-register regressions while adapting generated path checks to the
   source-loading boundary. Current-candidate validation and delivery remain
   pending.
+- 2026-10-14, recorded the missing CLI reassessment after three non-recoverable
+  startup failures with readiness diagnostics passing. Preserved the old
+  property and helper-documentation receipts at their original scope; the
+  published replay still requires current-candidate gates and review evidence.
 - 2026-10-10, initial draft.
 - 2026-10-10, revised after the community-of-experts review (verdict
   "revise"): per-component evidence, `evidence_kind` split from `outcome`, new
