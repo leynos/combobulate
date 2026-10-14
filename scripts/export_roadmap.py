@@ -25,8 +25,8 @@ import difflib
 import json
 import re
 import sys
-from collections.abc import Iterator
-from dataclasses import dataclass
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cyclopts
@@ -116,34 +116,94 @@ def item_paragraph(item: Node, source: Source) -> tuple[str, list[Node]]:
     return inline_text(lead, source), rest
 
 
+def is_detail_bullet(task: dict, item: Node, text: str, source: Source) -> bool:
+    """Append an unchecked detail; e.g. `- [ ] Context.` adds a detail string."""
+    if item.checked is None:
+        return False
+    if item.checked:
+        raise source.fail(item, 'detail checkboxes are not tracked; tick the task instead')
+    task['details'].append(text)
+    return True
+
+
+TaskField = tuple[str, object, list[str] | None]
+
+
+def parse_requires_field(text: str) -> TaskField:
+    """Parse a task dependency field; e.g. `Requires T1.` becomes `['T1']`."""
+    return 'requires', id_list(text.removeprefix('Requires ')), None
+
+
+def parse_sections_field(text: str) -> TaskField:
+    """Parse a task design reference; e.g. `See ... §§1.` becomes `sections='§§1'`."""
+    sections = text.removeprefix('See `technical-design.md` ').removesuffix('.')
+    return 'sections', sections, None
+
+
+def parse_proof_field(text: str, item: Node, source: Source) -> TaskField:
+    """Parse proof and bets together; e.g. `Proof first: x Bets: B01` yields both fields."""
+    proof, marker, bets = text.removeprefix('Proof first: ').rpartition(' Bets: ')
+    if not marker:
+        raise source.fail(item, 'proof-first bullet must end with its bets')
+    if not proof:
+        raise source.fail(item, 'proof-first bullet must include its proof')
+    bet_ids = id_list(bets)
+    if not bet_ids:
+        raise source.fail(item, 'proof-first bullet must include at least one bet')
+    return 'proof_first', proof, bet_ids
+
+
+def parse_success_field(text: str) -> TaskField:
+    """Parse a task success field; e.g. `Success: x` yields `('success', 'x', None)`."""
+    return 'success', text.removeprefix('Success: '), None
+
+
+def parse_task_field(text: str, item: Node, source: Source) -> TaskField:
+    """Parse one task field; e.g. `Success: x` yields `('success', 'x', None)`."""
+    parsers: tuple[tuple[str, Callable[[str], TaskField]], ...] = (
+        ('Requires ', parse_requires_field),
+        ('See `technical-design.md` ', parse_sections_field),
+        ('Proof first: ', lambda value: parse_proof_field(value, item, source)),
+        ('Success: ', parse_success_field),
+    )
+    for prefix, parser in parsers:
+        if text.startswith(prefix):
+            return parser(text)
+    raise source.fail(item, f'unrecognized task bullet {text[:40]!r}')
+
+
 def apply_bullet(task: dict, item: Node, source: Source, seen_fields: set[str]) -> None:
     """Fold one labelled task sub-bullet into the task record."""
     text, nested = item_paragraph(item, source)
     if nested:
         raise source.fail(item, 'task sub-bullets must not nest further')
-    if item.checked is not None:
-        if item.checked:
-            raise source.fail(item, 'detail checkboxes are not tracked; tick the task instead')
-        task['details'].append(text)
+    if is_detail_bullet(task, item, text, source):
         return
-    if text.startswith('Requires '):
-        field, value = 'requires', id_list(text.removeprefix('Requires '))
-    elif text.startswith('See `technical-design.md` '):
-        field, value = 'sections', text.removeprefix('See `technical-design.md` ').removesuffix('.')
-    elif text.startswith('Proof first: '):
-        proof, marker, bets = text.removeprefix('Proof first: ').rpartition(' Bets: ')
-        if not marker or not proof or not id_list(bets):
-            raise source.fail(item, 'proof-first bullet must include its proof and at least one bet')
-        field, value = 'proof_first', proof
-        task['bets'] = id_list(bets)
-    elif text.startswith('Success: '):
-        field, value = 'success', text.removeprefix('Success: ')
-    else:
-        raise source.fail(item, f'unrecognized task bullet {text[:40]!r}')
+    field, value, bets = parse_task_field(text, item, source)
     if field in seen_fields:
         raise source.fail(item, f'duplicate task {field} bullet')
     seen_fields.add(field)
     task[field] = value
+    if bets is not None:
+        task['bets'] = bets
+
+
+def task_sub_items(nested: list[Node]) -> Iterator[Node]:
+    """Yield task sub-bullets; e.g. flatten each nested list into one sequence."""
+    for sub_list in nested:
+        yield from sub_list.children
+
+
+def require_task_fields(item: Node, seen_fields: set[str], source: Source) -> None:
+    """Require each contract field; e.g. a task without `Success:` fails at its line."""
+    required_fields = (
+        ('sections', 'technical-design reference'),
+        ('proof_first', 'proof-first'),
+        ('success', 'success'),
+    )
+    for field, label in required_fields:
+        if field not in seen_fields:
+            raise source.fail(item, f'task is missing its {label} bullet')
 
 
 def parse_task(item: Node, source: Source) -> dict:
@@ -155,17 +215,9 @@ def parse_task(item: Node, source: Source) -> dict:
     task = {'id': task_id, 'title': title, 'requires': [], 'sections': '', 'success': '', 'details': [],
             'proof_first': '', 'bets': [], 'status': TASK_STATUS[item.checked]}
     seen_fields: set[str] = set()
-    for sub_list in nested:
-        for sub_item in sub_list.children:
-            apply_bullet(task, sub_item, source, seen_fields)
-    required_fields = (
-        ('sections', 'technical-design reference'),
-        ('proof_first', 'proof-first'),
-        ('success', 'success'),
-    )
-    for field, label in required_fields:
-        if field not in seen_fields:
-            raise source.fail(item, f'task is missing its {label} bullet')
+    for sub_item in task_sub_items(nested):
+        apply_bullet(task, sub_item, source, seen_fields)
+    require_task_fields(item, seen_fields, source)
     return task
 
 
@@ -184,35 +236,59 @@ def parse_phase_header(heading: Node, paragraphs: list[Node], source: Source) ->
             'context': context, 'steps': []}
 
 
+def collect_block_node(node: Node, heading: Node | None, body: list[Node],
+                       source: Source) -> tuple[tuple[Node, list[Node]] | None, Node | None, list[Node]]:
+    """Add a node to its section; e.g. a heading closes the previous section."""
+    if node.type != 'heading':
+        if heading is None:
+            raise source.fail(node, 'content before the first phase heading')
+        body.append(node)
+        return None, heading, body
+    if node.depth not in (2, 3):
+        raise source.fail(node, f'unexpected level-{node.depth} heading')
+    completed = (heading, body) if heading is not None else None
+    return completed, node, []
+
+
 def blocks(root: Node, source: Source) -> Iterator[tuple[Node, list[Node]]]:
     """Group top-level nodes into (heading, following nodes) sections."""
     heading: Node | None = None
     body: list[Node] = []
     for node in root.children:
-        if node.type == 'heading':
-            if heading is not None:
-                yield heading, body
-            if node.depth not in (2, 3):
-                raise source.fail(node, f'unexpected level-{node.depth} heading')
-            heading, body = node, []
-        elif heading is None:
-            raise source.fail(node, 'content before the first phase heading')
-        else:
-            body.append(node)
+        completed, heading, body = collect_block_node(node, heading, body, source)
+        if completed is not None:
+            yield completed
     if heading is not None:
         yield heading, body
 
 
-def parse_step(heading: Node, body: list[Node], phase: dict, source: Source) -> dict:
-    """Build a step from its heading, question paragraph, and task list."""
-    if len(body) != 2 or body[0].type != 'paragraph' or body[1].type != 'list':
+def step_body(heading: Node, body: list[Node], source: Source) -> tuple[Node, Node]:
+    """Validate and split step content; e.g. return its question and task list."""
+    if len(body) != 2:
         raise source.fail(heading, 'a step needs one question paragraph and one task list')
+    question, tasks = body
+    if question.type != 'paragraph':
+        raise source.fail(heading, 'a step needs one question paragraph before its task list')
+    if tasks.type != 'list':
+        raise source.fail(heading, 'a step needs one task list after its question paragraph')
+    return question, tasks
+
+
+def step_number(heading: Node, phase: dict, source: Source) -> tuple[str, str]:
+    """Validate a step's phase prefix; e.g. phase 1 accepts `1.2. Step`."""
     number, title = numbered(inline_text(heading, source), r'\d+\.\d+', heading, source)
-    question, sections = split_design_ref(inline_text(body[0], source), body[0], source)
     if not number.startswith(f"{phase['number']}."):
         raise source.fail(heading, f'step {number} is outside phase {phase["number"]}')
+    return number, title
+
+
+def parse_step(heading: Node, body: list[Node], phase: dict, source: Source) -> dict:
+    """Build a step from its heading, question paragraph, and task list."""
+    question_node, task_list = step_body(heading, body, source)
+    number, title = step_number(heading, phase, source)
+    question, sections = split_design_ref(inline_text(question_node, source), question_node, source)
     return {'number': number, 'title': title, 'question': question, 'sections': sections,
-            'tasks': [parse_task(item, source) for item in body[1].children]}
+            'tasks': [parse_task(item, source) for item in task_list.children]}
 
 
 def roadmap_region(text: str) -> tuple[str, int]:
@@ -231,6 +307,34 @@ def overall_status(phases: list[dict]) -> str:
     return 'all-tasks-done' if statuses == {'done'} else 'tasks-in-progress'
 
 
+@dataclass
+class RoadmapBuilder:
+    """Accumulate parsed phases; e.g. add blocks before validating empty phases."""
+
+    source: Source
+    phases: list[dict] = field(default_factory=list)
+    phase_headings: list[Node] = field(default_factory=list)
+
+    def add_block(self, heading: Node, body: list[Node]) -> None:
+        """Add one phase or step; e.g. a level-three heading appends a phase step."""
+        if heading.depth == 2:
+            self.phases.append(parse_phase_header(heading, body, self.source))
+            self.phase_headings.append(heading)
+        elif not self.phases:
+            raise self.source.fail(heading, 'step heading before any phase heading')
+        else:
+            phase = self.phases[-1]
+            phase['steps'].append(parse_step(heading, body, phase, self.source))
+
+    def require_nonempty_phases(self) -> None:
+        """Require a populated roadmap; e.g. an empty phase fails at its heading."""
+        if not self.phases:
+            raise RoadmapStructureError('docs/roadmap.md needs at least one phase')
+        for phase, heading in zip(self.phases, self.phase_headings, strict=True):
+            if not phase['steps']:
+                raise self.source.fail(heading, f'phase {phase["number"]} needs at least one step')
+
+
 def parse_roadmap(text: str) -> dict:
     """Export the canonical roadmap; e.g. parse_roadmap(path.read_text())['phases'][0]['number'] == 1."""
     region, offset = roadmap_region(text)
@@ -238,23 +342,11 @@ def parse_roadmap(text: str) -> dict:
     revision = re.search(r'^Revision (\d+\.\d+),', text, re.M)
     if revision is None:
         raise RoadmapStructureError('docs/roadmap.md needs a "Revision N.N," preamble line')
-    phases: list[dict] = []
-    phase_headings: list[Node] = []
+    roadmap = RoadmapBuilder(source)
     for heading, body in blocks(PARSER.parse(region), source):
-        if heading.depth == 2:
-            if phases and not phases[-1]['steps']:
-                raise source.fail(phase_headings[-1], f'phase {phases[-1]["number"]} needs at least one step')
-            phases.append(parse_phase_header(heading, body, source))
-            phase_headings.append(heading)
-        elif not phases:
-            raise source.fail(heading, 'step heading before any phase heading')
-        else:
-            phases[-1]['steps'].append(parse_step(heading, body, phases[-1], source))
-    if not phases:
-        raise RoadmapStructureError('docs/roadmap.md needs at least one phase')
-    if not phases[-1]['steps']:
-        raise source.fail(phase_headings[-1], f'phase {phases[-1]["number"]} needs at least one step')
-    return {'revision': revision.group(1), 'status': overall_status(phases), 'phases': phases}
+        roadmap.add_block(heading, body)
+    roadmap.require_nonempty_phases()
+    return {'revision': revision.group(1), 'status': overall_status(roadmap.phases), 'phases': roadmap.phases}
 
 
 def export_text(text: str) -> str:

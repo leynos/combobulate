@@ -31,7 +31,7 @@ def replace_once(text: str, old: str, new: str) -> str:
 
 
 def remove_first_task_bullet(text: str, label: str) -> str:
-    """Remove one first-task bullet and its wrapped lines for malformed-input tests."""
+    """Remove a first-task bullet; e.g. omit `Success:` for malformed-input tests."""
     start = text.index('- [ ] 1.1.1.')
     end = text.index('- [ ] 1.1.2.')
     task_lines = text[start:end].splitlines(keepends=True)
@@ -210,29 +210,44 @@ BETS = st.lists(st.sampled_from(['B01', 'B02', 'B03']), min_size=1, max_size=3, 
 GOALS = st.lists(st.sampled_from(['G1', 'G2', 'G3']), min_size=1, max_size=3, unique=True)
 
 
+def drawn_tasks(draw, phase_number: int, step_index: int, task_ids: list[str]) -> list[dict]:
+    """Draw one step's tasks; e.g. its first task has no earlier dependency."""
+    tasks = []
+    task_count = draw(st.integers(1, 3))
+    for task_index in range(1, task_count + 1):
+        task_id = f'{phase_number}.{step_index}.{task_index}'
+        requires = draw(st.lists(st.sampled_from(task_ids), max_size=2, unique=True)) if task_ids else []
+        tasks.append({
+            'id': task_id, 'title': draw(SENTENCE), 'requires': requires,
+            'sections': f'§§{draw(st.integers(1, 19))}', 'success': draw(SENTENCE),
+            'details': draw(st.lists(SENTENCE, max_size=2)), 'proof_first': draw(SENTENCE),
+            'bets': draw(BETS), 'status': draw(st.sampled_from(['open', 'done'])),
+        })
+        task_ids.append(task_id)
+    return tasks
+
+
+def drawn_steps(draw, phase_number: int, task_ids: list[str]) -> list[dict]:
+    """Draw one phase's steps; e.g. each task id uses the phase number."""
+    steps = []
+    step_count = draw(st.integers(1, 2))
+    for step_index in range(1, step_count + 1):
+        tasks = drawn_tasks(draw, phase_number, step_index, task_ids)
+        steps.append({'number': f'{phase_number}.{step_index}', 'title': draw(SENTENCE).rstrip('.'),
+                      'question': draw(SENTENCE), 'sections': f'§§{draw(st.integers(1, 19))}', 'tasks': tasks})
+    return steps
+
+
 @st.composite
 def roadmaps(draw) -> dict:
-    """Draw small, well-formed roadmap structures in canonical numbering."""
+    """Draw small, well-formed roadmaps; e.g. each phase has numbered steps."""
     phases: list[dict] = []
     task_ids: list[str] = []
-    for phase_number in range(1, draw(st.integers(1, 3)) + 1):
-        steps = []
-        for step_index in range(1, draw(st.integers(1, 2)) + 1):
-            tasks = []
-            for task_index in range(1, draw(st.integers(1, 3)) + 1):
-                task_id = f'{phase_number}.{step_index}.{task_index}'
-                requires = draw(st.lists(st.sampled_from(task_ids), max_size=2, unique=True)) if task_ids else []
-                tasks.append({
-                    'id': task_id, 'title': draw(SENTENCE), 'requires': requires,
-                    'sections': f'§§{draw(st.integers(1, 19))}', 'success': draw(SENTENCE),
-                    'details': draw(st.lists(SENTENCE, max_size=2)), 'proof_first': draw(SENTENCE),
-                    'bets': draw(BETS), 'status': draw(st.sampled_from(['open', 'done'])),
-                })
-                task_ids.append(task_id)
-            steps.append({'number': f'{phase_number}.{step_index}', 'title': draw(SENTENCE).rstrip('.'),
-                          'question': draw(SENTENCE), 'sections': f'§§{draw(st.integers(1, 19))}', 'tasks': tasks})
+    phase_count = draw(st.integers(1, 3))
+    for phase_number in range(1, phase_count + 1):
         phases.append({'number': phase_number, 'title': draw(SENTENCE).rstrip('.'), 'idea': draw(SENTENCE),
-                       'goals': draw(GOALS), 'gate': draw(SENTENCE), 'context': draw(SENTENCE), 'steps': steps})
+                       'goals': draw(GOALS), 'gate': draw(SENTENCE), 'context': draw(SENTENCE),
+                       'steps': drawn_steps(draw, phase_number, task_ids)})
     return {'revision': '0.2', 'phases': phases}
 
 

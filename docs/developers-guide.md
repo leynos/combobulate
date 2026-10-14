@@ -433,6 +433,10 @@ bullet without a bet. Required task fields are its design reference,
 proof-first obligation, and success criterion.
 `scripts/export_roadmap.py --check` exits 1 and prints a diff when the
 committed export is stale, and the design checks reject the same drift.
+`parse_roadmap` is the checker's parser interface; keep field, task, and phase
+helpers, along with its `RoadmapBuilder` accumulator, as composition details of
+this exporter instead of importing them from other tools. Create one builder per
+`parse_roadmap` call; it owns only that call's phases and source locations.
 Upstream request leynos/mapsplice#144 tracks a native export that will replace
 this exporter.
 
@@ -444,7 +448,8 @@ script, such as `scripts/tests/test_export_roadmap.py`. `make design-check`
 runs those suites. When the design checker needs a helper's logic, it loads the
 script by path with `ValidationContext.load_script` rather than keeping a
 second copy, so the script's dependencies are also pinned in
-`tools/requirements.txt`.
+`tools/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
+test fixtures and must not become a production parsing or rendering path.
 
 The `tools/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
