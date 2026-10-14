@@ -5,14 +5,17 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (final helper documentation after property coverage).
-Property follow-up `3ed0593` passed all seven local gates. Fresh CodeRabbit CLI
-inspection completed all 93 paths and identified documentation gaps in two
-helpers. Their input, return, failure, and executable example documentation is
-now clarified; the function ASTs are unchanged after removing docstrings.
-Documentation validation, publication, and affected hosted confirmation remain
-pending. Published `a7d6a43` retains its earlier green CI and clear assessment
-at their original scope. Current delivery state is recorded on
+Status: BLOCKED (CodeRabbit CLI reassessment cannot start). Implementation and
+generated invariant coverage are validated: `3ed0593` passed all seven local
+gates. Its full 93-path CLI inspection found two helper documentation gaps,
+corrected in `d0460a8` without executable AST changes. Both doctests and all
+documentation/design gates pass. Two focused reassessment attempts and one
+full-base attempt failed before inspection with "Failed to start review. Please
+try again." Authentication, repository readiness, backend/WebSocket
+connectivity, and review allowance diagnostics pass; the startup failure's
+cause is unknown. No completed reassessment or approval is claimed. Publication
+and hosted confirmation continue independently; current delivery state and the
+remaining CLI blocker are recorded on
 [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
@@ -451,7 +454,29 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   the property and documentation follow-ups and obtain affected hosted
   assessment and pre-merge confirmation.
 
+- [x] (2026-10-14) Validated and committed helper documentation as `d0460a8`.
+  Both executable doctests, formatting, design/freeze checks, 270 unittest
+  tests, 315 pytest tests with 589 subtests, Markdown/spelling, and diagram
+  checks passed. Two focused CLI attempts and one actual-base attempt each
+  failed before inspection; original logs are preserved separately.
+- [x] (2026-10-14) Read-only CLI diagnostics found signed-in authentication,
+  repository readiness, reachable backend/WebSocket, and available included
+  reviews. No rate-limit or cooldown advice was given. The comparison-specific
+  startup hypothesis was falsified by the full-base failure. No credentials,
+  accounts, configuration, services, or billing settings were changed.
+- [ ] (2026-10-14) Publish the validated follow-up and establish its hosted
+  evidence. Resume the missing CLI reassessment only after service recovery;
+  keep this blocker and stale docstring-report provenance explicit. Sponsor
+  review and stack merges remain separate delivery work.
+
 ## Surprises & discoveries
+
+- Observation: CLI review startup failed despite passing readiness and usage
+  diagnostics. Evidence: the helper-docs, helper-docs-retry, and
+  helper-docs-full CLI logs all report a non-recoverable start error without
+  findings or completion. Impact: stop retries, preserve the missing review,
+  and continue independent publication/hosted evidence without substituting it
+  for the required CLI result.
 
 - Observation: configured pre-merge checks can run independently of a full PR
   review. The supported command refreshed the testing and developer rows but
@@ -583,6 +608,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `README.md` through ADR 001; D04 ratifies it.
 
 ## Decision log
+
+- Decision: preserve the CLI startup failure as a delivery blocker after two
+  focused attempts, healthy read-only diagnostics, and one full-base diagnostic
+  attempt. Do not rotate credentials, alter service configuration, infer a
+  cooldown, or claim a clean reassessment. Publish only the already gated
+  source/documentation and distinguish hosted assessment from local review.
 
 - Decision: clarify only the two helper docstrings identified by CLI review.
   The repository requires usage/outcome examples, but the review's claimed
@@ -1898,6 +1929,11 @@ and `pr-creation`. Agents: `scrutineer` runs every gate; `scribe` makes
 mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
+
+- 2026-10-14, recorded passed helper documentation checks and three failed
+  CLI starts. Set review delivery to BLOCKED, preserved the actual code-review
+  and gate scopes, and retained independent publication/hosted work without
+  claiming the unavailable reassessment completed.
 
 - 2026-10-14, recorded seven passed property-follow-up gates and the complete
   93-path CLI inspection of `3ed0593`. Clarified two helper docstrings and
