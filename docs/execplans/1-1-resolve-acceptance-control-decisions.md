@@ -116,7 +116,8 @@ Term definitions used throughout:
 - C-EP-9. Checks are deterministic for a given commit. The evidence gate
   never reads the wall clock; `make design-check` injects the HEAD commit date
   as `--as-of`, and the base revision for freeze checks as `--base-rev`. No
-  check reads environment variables.
+  evidence-gate or design-check path reads environment variables. The exporter's
+  `INPUT_*` CLI support remains as specified in C-EP-7.
 - C-EP-10. Fail closed. Until a log parser registered for a verifier
   re-derives a record's verdict from a committed raw log (task 1.2.4 onward),
   no record from that verifier can be admitted at `proof` or `bounded`. Until

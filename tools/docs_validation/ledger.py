@@ -7,6 +7,13 @@ from .context import ValidationContext, require, same_typed_value
 from .markdown import generated_matches
 
 
+class MalformedCanonicalRoadmapError(AssertionError):
+    """Expose parser diagnostics through the design-check failure surface."""
+
+    def __init__(self, parser_error: Exception) -> None:
+        super().__init__(f'Malformed canonical roadmap: {parser_error}')
+
+
 def numbered_identity(value: object, name: str, components: int) -> tuple[int, ...]:
     """Parse a canonical positive numbered identity; '1.2' is a step, while '1.02' fails."""
     parts = value.split('.') if isinstance(value, str) else []
@@ -95,12 +102,17 @@ def check_catalogue(catalogue: list[dict], tasks: dict[str, dict]) -> None:
 def check_roadmap_export(context: ValidationContext) -> None:
     """Require the committed JSON view to equal a fresh export of the canonical roadmap."""
     exporter = context.load_script('export_roadmap.py')
+    roadmap_text = (context.root / 'docs/roadmap.md').read_text(encoding='utf-8')
+    committed_path = context.root / 'spec/roadmap.json'
     try:
-        fresh = exporter.parse_roadmap((context.root / 'docs/roadmap.md').read_text(encoding='utf-8'))
+        fresh = exporter.parse_roadmap(roadmap_text)
     except exporter.RoadmapStructureError as error:
-        raise AssertionError(f'Malformed canonical roadmap: {error}') from error
-    require(same_typed_value(context.load('spec/roadmap.json'), fresh),
-            'Roadmap export drift: run scripts/export_roadmap.py')
+        raise MalformedCanonicalRoadmapError(error) from error
+    require(
+        same_typed_value(context.load('spec/roadmap.json'), fresh)
+        and committed_path.read_text(encoding='utf-8') == exporter.export_text(roadmap_text),
+        'Roadmap export drift: run scripts/export_roadmap.py',
+    )
 
 
 def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
