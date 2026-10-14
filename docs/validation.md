@@ -1,6 +1,6 @@
 # Combobulate document-pack validation
 
-Revision 0.2. Checked: 11 October 2026. Scope: the Markdown, JSON declarations
+Revision 0.2. Checked: 14 October 2026. Scope: the Markdown, JSON declarations
 and Python documentation models in this pack, not a Combobulate implementation.
 [Machine-readable results](validation-results.json)
 record the executed checks.

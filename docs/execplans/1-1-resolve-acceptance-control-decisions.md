@@ -5,16 +5,17 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (formal-review repair after `EP-M0` to `EP-M6`). The
-preflight repair `2bf668f` passed all seven local gates; CodeRabbit
-reassessment of `b4e2c14..2bf668f` completed with zero findings across 92
-paths. Delivery receipt (2026-10-14): published `5bf739a` passed
-[CI](https://github.com/leynos/combobulate/actions/runs/38492308721) and
-[Design contracts](https://github.com/leynos/combobulate/actions/runs/38492308682).
-The hosted assessment found no blocking code defect and requested two
-documentation corrections, recorded below. Assessment confirmation, formal
-review, and sponsor-owned stack merges remain pending. Current delivery state
-is recorded on [PR #18](https://github.com/leynos/combobulate/pull/18).
+Status: COMPLETE (implementation and formal-review repairs after `EP-M0` to
+`EP-M6`). Repair `0656e00` passed all seven applicable local gates. A fresh
+CodeRabbit CLI review of `b4e2c14..0656e00` completed across 93 paths with two
+minor documentation findings; this follow-up corrects the validation date and
+clarifies delivery status. The hosted assessment confirmed the prior
+corrections on `804a38f` in
+[its reply](https://github.com/leynos/combobulate/pull/18#issuecomment-6158621418).
+Affected hosted assessment and formal-review confirmation for the repaired
+candidate remain pending, as do sponsor-owned stack merges. Historical receipts
+below retain their original candidate scope. Current delivery state is recorded
+on [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
 recorded per decision identifier (see `Sponsor decisions`).
@@ -406,11 +407,19 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   331 Rust tests (one skipped), and one doctest. The design check then detected
   report drift: the ADR amendment adds one local link, raising the generated
   count from 105 to 106. Regenerated and reviewed that single-field change;
-  remaining design, Markdown, and diagram validation is pending.
-- [ ] (2026-10-14) Complete and validate the source-path, coverage, and
-  documentation repairs; publish and reconcile every formal finding and
-  pre-merge row. Sponsor review and merge of the preserved stack remain
-  delivery work.
+  subsequent formatting, design, Markdown/spelling, and diagram checks passed.
+  Python validation passed 269 unittest tests, 313 pytest tests, and 589
+  subtests against the exact frozen #17 base. The initial failure and rerun
+  remain separate evidence; code gates retain their unchanged source scope.
+- [x] (2026-10-14) Committed source-path, coverage, documentation, and report
+  repairs as `0656e00`. Fresh CodeRabbit CLI review completed 93 paths with two
+  minor documentation findings and no source findings; corrected the checked
+  date and distinguished confirmed historical assessment from pending affected
+  assessment. Review log:
+  `/tmp/coderabbit-combobulate-1-1-reconciliation-formal-repair.out`.
+- [ ] (2026-10-14) Validate and publish the documentation follow-up, then
+  reconcile every formal finding and pre-merge row on the published candidate.
+  Sponsor review and merge of the preserved stack remain delivery work.
 
 ## Surprises & discoveries
 
@@ -842,12 +851,19 @@ Deviations and lessons:
   mdtablefix 0.6.0's renumbering of a wrapped "2026." line, and the CI user name
   `runner`. A stacked synchronize run also reported `main` as its base branch,
   which led to choosing the freeze base by commit.
-- Delivery evidence: reconciliation candidate `5bf739a` is published, with
+- Historical delivery evidence at `5bf739a`: that candidate was published, with
   successful hosted CI and Design contracts runs recorded above. The hosted
   assessment found no blocking code defect; its documentation corrections
   require confirmation. Formal review remains pending. Leave the sponsor's
   review and merge of #9 to #18 in stack order. Earlier milestone CLI review
   rounds retain their original candidate scope in `Decision log`.
+- Delivery follow-up (2026-10-14): assessment confirmation completed for
+  `804a38f`. Its subsequent formal review exposed the source-path and coverage
+  gaps now repaired in `0656e00`, with all seven local gates and five mutation
+  controls passing. The fresh local CLI inspection completed across 93 paths;
+  this documentation follow-up addresses both minor findings. Affected hosted
+  assessment, formal finding/row reconciliation, and sponsor merges remain
+  delivery work; no historical assessment is relabelled for the new candidate.
 
 ## Context and orientation
 
@@ -1832,6 +1848,11 @@ and `pr-creation`. Agents: `scrutineer` runs every gate; `scribe` makes
 mechanical documentation edits; `wyvern` does read-only reconnaissance.
 
 ## Revision note
+
+- 2026-10-14, recorded the completed formal-repair gates and fresh committed
+  CLI inspection at `0656e00`. Corrected the document-pack check date and
+  distinguished the confirmed `804a38f` assessment from pending affected hosted
+  assessment and formal reconciliation. Preserved historical delivery receipts.
 
 - 2026-10-14, reopened implementation for verified formal-review findings.
   Added a failing in-root parent-component regression before the source guard,
