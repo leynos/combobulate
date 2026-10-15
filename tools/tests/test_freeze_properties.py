@@ -28,7 +28,7 @@ MUTABLE_FIELDS = ('id', 'subject', 'lifecycle', 'decided_option', 'supersedes', 
 
 
 @st.composite
-def forbidden_mutations(draw: DrawFn) -> st.SearchStrategy[Mutation]:
+def forbidden_mutations(draw: DrawFn) -> Mutation:
     """Generate a changed value for each frozen decision field, including its identity."""
     field = draw(st.sampled_from(MUTABLE_FIELDS))
     replacements = {
