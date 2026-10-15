@@ -16,6 +16,7 @@ from docs_validation.decisions import (
     GOVERNING_DOCUMENTS, check_adr_files, check_adr_links, check_decision_register,
     check_governing_documents, check_register_records, normalize, validate_register,
 )
+from check_docs import LEDGER_DEPENDENCIES
 from docs_validation.ledger import check_generated_documents
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -307,7 +308,9 @@ class RealRegister(unittest.TestCase):
 
         with patch.object(Path, 'read_text', read_text):
             with self.assertRaisesRegex(AssertionError, 'Generated content drift: docs/decision-register.md'):
-                check_generated_documents(context, context.load('spec/vocabulary.json')['entries'])
+                check_generated_documents(
+                    context, context.load('spec/vocabulary.json')['entries'], LEDGER_DEPENDENCIES
+                )
 
 
 if __name__ == '__main__':

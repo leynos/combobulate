@@ -129,7 +129,7 @@
           "sources": [
             {
               "path": "tools/calibration/cardinality-probe/src/lib.rs",
-              "sha256": "72573fc2da4b2ca029805e22ab2332e543cf778b685cad8468f4c5e2abd6328e"
+              "sha256": "a024d84c6297bc008c42fe6c5585fa18d7c1b6d7a1c5205b3cdaa055bc0c219d"
             }
           ]
         },
@@ -179,8 +179,17 @@
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
       "registered_digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
-      "digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
-      "amendments": []
+      "digest": "ae8e70fd653f1dc7bf2162750ab8517cb1841a7ad2514f0085b07f6eb28f1ddb",
+      "amendments": [
+        {
+          "date": "2026-10-15",
+          "approved_by": "leynos",
+          "approval_reference": "https://lody.ai/leynos/sessions/8fb76d43-45b2-4220-b158-195708155f07",
+          "replaces": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
+          "new_digest": "ae8e70fd653f1dc7bf2162750ab8517cb1841a7ad2514f0085b07f6eb28f1ddb",
+          "reason": "Sponsor-requested module documentation for the AC-02 calibration probe; retain the workload, thresholds, and measurement protocol."
+        }
+      ]
     },
     {
       "id": "AC-03",

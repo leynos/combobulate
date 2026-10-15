@@ -1,17 +1,16 @@
-"""Own explicit design-pack inputs and validation reporting.
+"""Own filesystem inputs and validation reporting for the design pack.
 
-Feature checks accept one context, so tests can supply an isolated repository
-without changing process globals. Only the checker composition root writes reports.
+Feature checks use a context for repository data and receive ledger script
+collaborators separately. This lets tests supply isolated repository roots
+without dynamically importing modules or changing process globals. Only the
+checker composition root writes reports.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from types import ModuleType
 
 DESIGN_DOCUMENTS = (
     'acceptance-calibration.md', 'context.md', 'decision-register.md', 'evidence-and-decision-records.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
@@ -87,27 +86,3 @@ class ValidationContext:
         return sorted((self.root / 'spec').glob('*.json')) + [
             self.root / 'docs' / name for name in DOCUMENT_REPORTS
         ]
-
-    def load_generator(self, name: str) -> ModuleType:
-        """Load a local generator; e.g. context.load_generator('generate_bets.py')."""
-        return self.load_module(self.root / 'scripts' / name)
-
-    def load_script(self, name: str) -> ModuleType:
-        """Load a helper script's functions; e.g. context.load_script('export_roadmap.py')."""
-        return self.load_module(self.root / 'scripts' / name)
-
-    @staticmethod
-    def load_module(path: Path) -> ModuleType:
-        """Import a Python file by path without running its command-line entry point.
-
-        The module is registered in `sys.modules` under a checker-private name
-        before execution, because decorators such as `dataclass` resolve the
-        defining module through that table.
-        """
-        name = f'_design_pack_{path.parent.name}_{path.stem}'
-        spec = importlib.util.spec_from_file_location(name, path)
-        require(spec is not None and spec.loader is not None, str(path))
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-        spec.loader.exec_module(module)
-        return module

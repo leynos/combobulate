@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from hypothesis import given, settings, strategies as st
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
@@ -16,6 +18,33 @@ from docs_validation.contracts import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@st.composite
+def bipartite_link_graphs(draw):
+    """Generate a small graph with at least one present and one absent link."""
+    bet_count = draw(st.integers(min_value=2, max_value=5))
+    task_count = draw(st.integers(min_value=2, max_value=5))
+    bet_ids = [f'B{index}' for index in range(bet_count)]
+    task_ids = [f'T{index}' for index in range(task_count)]
+    all_edges = [(bet_id, task_id) for bet_id in bet_ids for task_id in task_ids]
+    edges = draw(st.sets(st.sampled_from(all_edges), min_size=1, max_size=len(all_edges) - 1))
+    present = draw(st.sampled_from(sorted(edges)))
+    absent = draw(st.sampled_from(sorted(set(all_edges) - edges)))
+    return bet_ids, task_ids, edges, present, absent
+
+
+def link_records(bet_ids, task_ids, edges):
+    """Build both sides of a generated task/bet link graph."""
+    bets = [
+        {'id': bet_id, 'tasks': [task_id for task_id in task_ids if (bet_id, task_id) in edges]}
+        for bet_id in bet_ids
+    ]
+    tasks = {
+        task_id: {'id': task_id, 'bets': [bet_id for bet_id in bet_ids if (bet_id, task_id) in edges]}
+        for task_id in task_ids
+    }
+    return bets, tasks
 
 
 class BetLinks(unittest.TestCase):
@@ -45,6 +74,36 @@ class BetLinks(unittest.TestCase):
         self.tasks['1.1.4']['bets'].remove('B08')
         with self.assertRaisesRegex(AssertionError, 'Bet B08 lists task 1.1.4, which does not cite it'):
             check_bet_links(self.bets, self.tasks)
+
+    @settings(max_examples=100, deadline=None)
+    @given(graph=bipartite_link_graphs())
+    def test_generated_links_reject_one_sided_edge_changes(self, graph):
+        """Accept matching graphs and reject a missing or extra one-sided edge."""
+        bet_ids, task_ids, edges, present, absent = graph
+        bets, tasks = link_records(bet_ids, task_ids, edges)
+        check_bet_links(bets, tasks)
+
+        bet_id, task_id = present
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        next(bet for bet in mutated_bets if bet['id'] == bet_id)['tasks'].remove(task_id)
+        with self.assertRaisesRegex(AssertionError, 'does not list it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        mutated_tasks[task_id]['bets'].remove(bet_id)
+        with self.assertRaisesRegex(AssertionError, 'does not cite it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+        bet_id, task_id = absent
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        next(bet for bet in mutated_bets if bet['id'] == bet_id)['tasks'].append(task_id)
+        with self.assertRaisesRegex(AssertionError, 'does not cite it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        mutated_tasks[task_id]['bets'].append(bet_id)
+        with self.assertRaisesRegex(AssertionError, 'does not list it'):
+            check_bet_links(mutated_bets, mutated_tasks)
 
 
 class MetadataIds(unittest.TestCase):

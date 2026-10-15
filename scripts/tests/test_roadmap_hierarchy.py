@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from check_docs import LEDGER_DEPENDENCIES
 from docs_validation.context import ValidationContext
 from docs_validation.ledger import (
     check_catalogue_and_roadmap, check_dependencies, collect_tasks,
@@ -103,10 +104,14 @@ class RoadmapHierarchy(unittest.TestCase):
         with patch.object(context, 'load', side_effect=lambda name:
                           mutated if name == 'spec/roadmap.json' else original_load(name)):
             with self.assertRaisesRegex(AssertionError, 'Phase numbers must be unique and ascending'):
-                check_catalogue_and_roadmap(context)
+                check_catalogue_and_roadmap(context, LEDGER_DEPENDENCIES)
         context = ValidationContext(ROOT)
-        check_catalogue_and_roadmap(context)
+        before = sys.modules.copy()
+        check_catalogue_and_roadmap(context, LEDGER_DEPENDENCIES)
         self.assertTrue(all(row['status'] == 'pass' for row in context.results))
+        self.assertEqual(set(sys.modules), set(before), 'the ledger check must not add process-global modules')
+        self.assertTrue(all(sys.modules[name] is module for name, module in before.items()),
+                        'the ledger check must not replace process-global modules')
 
 
 if __name__ == '__main__':

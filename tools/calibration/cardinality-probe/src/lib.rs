@@ -27,6 +27,13 @@ pub fn checked_cardinality(extents: &[usize]) -> Option<usize> {
 
 #[cfg(kani)]
 mod verification {
+    //! Bounded Kani harnesses for the cardinality probe.
+    //!
+    //! These harnesses check the scalar case and zero-extent short-circuit,
+    //! including a late zero beside a maximum extent. They provide structural
+    //! calibration evidence; unbounded arithmetic is covered separately by
+    //! the Verus probe in `verus/cardinality.rs`.
+
     use super::checked_cardinality;
 
     /// Any zero extent gives zero without multiplying, whatever the other extents are.
