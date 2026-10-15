@@ -314,8 +314,9 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   invalidate its mutation.
 - [x] (2026-10-15) Reconciled the formal review findings: group ADRs by coherent
   subject with a recorded rationale; use a typed Cargo manifest projection and
-  NumPy-style examples; and keep publication disabled until an accepted D05
-  supersession and validated task 4.3.3 closure are both present.
+  complete NumPy-style interface documentation; and keep publication disabled
+  until an accepted D05 supersession and validated task 4.3.3 closure are both
+  present.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.

@@ -121,6 +121,12 @@ def check_package_policy(context: ValidationContext) -> None:
         and a completed task 4.3.3 record are required before an accepted D05
         supersession can lift the publication guard.
 
+    Raises
+    ------
+    AssertionError
+        If the package licence or publication setting violates the policy
+        enforced by the accepted decision records.
+
     Examples
     --------
     From the repository root, the checker records the package-policy result::
