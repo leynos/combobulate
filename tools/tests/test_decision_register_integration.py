@@ -52,7 +52,8 @@ class RealRegister(unittest.TestCase):
         """Reject a hand edit that changes generated register wording."""
         context = ValidationContext(ROOT)
         text = (ROOT / 'docs/decision-register.md').read_text(encoding='utf-8')
-        edited = text.replace('Decision: pending.', 'Decision: option A.', 1)
+        edited = text.replace('### D01\n', '### D99\n', 1)
+        self.assertNotEqual(edited, text, 'the generated decision heading must be present for mutation')
         original = Path.read_text
 
         def read_text(path: Path, *args: Any, **kwargs: Any) -> str:
