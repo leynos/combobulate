@@ -909,10 +909,11 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   two-way, acyclic links between accepted or superseded records with valid
   D01-authorized acceptance, and terminate at an accepted replacement; each
   cited ADR exists under `docs/adrs/` with an agreeing `Status` line; dates are
-  validated with the `jsonschema` format checker. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity includes coordinated
-  authority-map and approval changes, a non-D01 source, proposed and withdrawn
-  replacements; each negative control has its own message.
+  validated with the `jsonschema` format checker. Artefacts:
+  `tools/tests/test_decision_register.py` and
+  `tools/tests/test_supersession_lifecycle.py`. Non-vacuity includes
+  coordinated authority-map and approval changes, a non-D01 source, proposed
+  and withdrawn replacements; each negative control has its own message.
 - VO-6 (five-document consistency). Invariants: each governing document links
   `decision-register.md`; each accepted question's ToR §9 row links its
   register anchor; after whitespace and inline-Markdown normalization, no
