@@ -232,6 +232,34 @@ class DesignWorkflowContract(unittest.TestCase):
                         f'{event} must select the expected base and evaluation date',
                     )
 
+    def test_pull_request_fails_when_merge_base_is_missing(self) -> None:
+        """Fail before writing an empty freeze base when the base ref is absent."""
+        with tempfile.TemporaryDirectory(prefix='design-check-missing-base-') as directory_name:
+            directory = Path(directory_name)
+            repository = directory / 'repository'
+            self._make_git_fixture(repository)
+            self._run_git(repository, 'update-ref', '-d', 'refs/remotes/origin/main')
+            date_command = directory / 'date'
+            date_command.write_text(f'#!{sys.executable}\nprint("2031-02-03")\n', encoding='utf-8')
+            date_command.chmod(
+                date_command.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+            )
+            output = directory / 'github-output'
+
+            with self.assertRaises(
+                subprocess.CalledProcessError,
+                msg='the pull-request selector must fail when Git cannot find a merge base',
+            ):
+                self._run_workflow_base_step(
+                    self._workflow_base_step(), repository, output,
+                    date_command, 'pull_request', '',
+                )
+
+            self.assertFalse(
+                output.exists(),
+                'the failed merge-base lookup must not write an empty freeze revision',
+            )
+
 
 if __name__ == '__main__':
     unittest.main()

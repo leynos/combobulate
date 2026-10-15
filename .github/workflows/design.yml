@@ -38,7 +38,8 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$EVENT" = pull_request ]; then
-            echo "rev=$(git merge-base "origin/$BASE_REF" HEAD)" >> "$GITHUB_OUTPUT"
+            rev="$(git merge-base "origin/$BASE_REF" HEAD)"
+            echo "rev=$rev" >> "$GITHUB_OUTPUT"
           elif [ "$EVENT" = push ] && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             echo "rev=$BEFORE" >> "$GITHUB_OUTPUT"
           else
