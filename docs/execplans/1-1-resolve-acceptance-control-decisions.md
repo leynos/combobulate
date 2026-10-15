@@ -226,6 +226,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   the plan; individual decisions still require acceptance by identifier.
 - [x] (2026-10-15) Corrected the six CodeRabbit documentation findings on
   approval, calibration, host identity, and evidence-state expectations.
+- [x] (2026-10-15) R2 clarified checker-backed component satisfaction in MS-3
+  and VO-4; implementation alignment remains pending in PRs #17 and #18.
 - [ ] `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode exporter and
   drift validator (separate stacked pull request, sponsor-directed).
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
@@ -325,6 +327,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Decision: evidence is tracked per obligation component; closure checks the
   latest record per component and binding; a counterexample at the current
   source revision always blocks. Date/Author: 2026-10-10.
+- Decision: checker-backed components are satisfied only when the latest result
+  for the named check passes in the same validation run at the current binding,
+  the component accepts `tested`, and no evidence record for that component
+  reports a current-source-revision counterexample. The checker result is
+  `tested` evidence only; it requires no separate verifier record and cannot
+  justify promotion to `proof` or `bounded`. A counterexample veto applies at
+  every admission level and is not cancelled by a later passing checker result.
+  Date/Author: 2026-10-15, planning agent following confirmed CodeRabbit R2.
+  Implementation alignment remains pending in PRs #17 and #18.
 - Decision: admission levels are `proof`, `bounded`, `tested`, `restricted`,
   and `rejected`; `restricted` never satisfies a component. Date/Author:
   2026-10-10.
@@ -366,6 +377,12 @@ admission properties and an upstream scenario corpus; a `syn`-aware grammar
 corpus; two-way bet-to-task links; a separate `package_policy.py`; a component
 document; per-module owners. Not adopted: a full Rust gate now; deferring all
 executable grammar checks to phase 2.
+
+R2 review resolution (2026-10-15): clarified that checker-backed components
+receive only `tested` evidence under the current-run, current-binding rule in
+MS-3, with the universal counterexample veto retained. VO-4 now requires
+independent negative and positive cases. The design correction is recorded
+here; implementation alignment remains pending in PRs #17 and #18.
 
 ## Outcomes & retrospective
 
@@ -588,11 +605,18 @@ implemented exactly):
   `exception = active`, the level becomes `restricted` with the informational
   reason `exception-active`. Any blocking reason makes the level `rejected`.
 - MS-3 (component satisfaction). A component lists the levels it accepts (a
-  subset of {proof, bounded, tested}; never `restricted`). It is satisfied when
-  the latest record for it at the current binding is admitted at an accepted
-  level and no record at the same source revision reports
-  `outcome = counterexample`. A component whose `evidence_source` is
-  `checker:<check-id>` is satisfied when that check passes in the same run.
+  subset of {proof, bounded, tested}; never `restricted`). For a record-sourced
+  component, the latest record for it at the current binding must be admitted
+  at an accepted level, and no record at the same source revision may report
+  `outcome = counterexample`. For a component whose `evidence_source` is
+  `checker:<check-id>`, the latest result for that named check must pass in the
+  same validation run at the current binding, the component must accept
+  `tested`, and no evidence record for that component may report
+  `outcome = counterexample` at the current source revision. This checker
+  result is `tested` evidence only: it needs no separate verifier record and
+  cannot be promoted to `proof` or `bounded`. A current-source-revision
+  counterexample vetoes satisfaction regardless of its admission level and
+  regardless of any later passing checker result.
 - MS-4 (task closure). A task may be ticked in `docs/roadmap.md` only when
   every prerequisite task is ticked, every decision it cites is accepted and
   not superseded, every completion artefact it lists (in
@@ -698,7 +722,12 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   open prerequisite fails; a tick citing a proposed or superseded decision
   fails; a tick with an unsatisfied component or unresolvable completion
   artefact fails; a counterexample at the current revision reopens a component;
-  a fully satisfied task passes. Before `EP-M5`, a task with a linked component
+  a fully satisfied task passes. Checker components independently reject a
+  stale check result, a passing check when `tested` is not accepted, and a
+  current-source-revision counterexample despite a passing check. A
+  current-run, current-binding passing check satisfies a component that accepts
+  `tested` and has no current-source-revision counterexample, without a
+  separate verifier record. Before `EP-M5`, a task with a linked component
   cannot be ticked.
 - VO-5 (decision register integrity). Invariants: unique identifiers; unique
   subjects among accepted, non-superseded records; every in-scope ToR question
@@ -1098,8 +1127,8 @@ and the bet register's measurement sentences.
   obligations, kernel-contract status mapping). Update technical design §17.1
   and §17.2, ToR Q8, GAP9, the B08 entry, and `docs/users-guide.md` (public
   proof contract summary).
-- `PF14.structural@1.1.4` is satisfied by the passing `evidence-gate` check;
-  tick task 1.1.4.
+- Tick task 1.1.4 only when `PF14.structural@1.1.4` satisfies MS-3 under the
+  checker-source rule above and every MS-4 task-closure condition passes.
 
 ### EP-M6. Reconciliation, roadmap closure, and final gates
 
@@ -1385,3 +1414,8 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   review updates the approval status and clarifies the evidence-gate validity,
   reachable reason catalogue, and calibration exception. It does not mark any
   implementation milestone complete in this plan-only pull request.
+- 2026-10-15, R2 correction: checker-backed components require a current-run,
+  current-binding passing result, acceptance of `tested`, and no current-source
+  counterexample; the result cannot be promoted or replace verifier evidence.
+  MS-3 and VO-4 now state this contract, and EP-M5 requires MS-3 plus all MS-4
+  closure conditions for the tick. Alignment in PRs #17 and #18 remains pending.
