@@ -129,8 +129,9 @@ Term definitions used throughout:
   settings before running fake build tools, and the alias check includes child
   diagnostics on failure. The task owner's instruction to repair gate failures
   authorizes these test-only changes; they do not alter library behaviour or
-  the public API. Calibration probes live outside the repository's Cargo
-  package (see `EP-M4`).
+  the public API. The AC-01 probe's module documentation is already present in
+  the merged parent and covered by its later approved amendment chain;
+  calibration probes live outside the repository's Cargo package (see `EP-M4`).
 - C-EP-9. Checks are deterministic for a given commit. The evidence gate
   never reads the wall clock; `make design-check` injects the HEAD commit date
   as `--as-of`, and the base revision for freeze checks as `--base-rev`. No
@@ -586,6 +587,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   attempt failed before inspection; each reported a non-recoverable startup
   failure without findings or a stated cause. No credentials, accounts,
   configuration, services, or billing settings changed.
+- [x] (2026-10-15) The pre-commit candidate atop `9ccf1c4` added the sponsor-
+  requested AC-01 module comment; all seven gates passed. On replay, the merged
+  parent already contained a later version of the probe and its current
+  sponsor-approved AC-01 amendment chain. The older source/control amendment is
+  therefore superseded; retain the parent source and register without changing
+  the workload, thresholds, or measurement protocol.
 - [ ] (2026-10-20) Revalidate the property and helper-documentation follow-ups
   against merged base `a246aac`, then publish and reconcile current hosted CI,
   assessment, formal review, and pre-merge evidence. Reassess the prior missing
@@ -625,6 +632,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   a non-recoverable start error without findings or completion. Impact: preserve
   the missing review, avoid unsupported retries, and continue independent
   publication and hosted evidence without substituting them for reassessment.
+- Observation: the earlier AC-01 module-comment change targeted a registered
+  calibration source. The merged parent now contains a later version of that
+  source and an approved amendment chain binding its current digest. Impact:
+  retain the parent source and control history; do not replay an obsolete
+  digest or alter the workload, thresholds, or measurement protocol.
 
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
@@ -744,6 +756,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   keeps task 1.1.1 checked.
 
 ## Decision log
+
+- Decision: preserve the merged parent's current AC-01 source and approved
+  amendment chain. The old branch's module-comment amendment points to an
+  earlier source and digest and is superseded by the parent's later approved
+  changes. Record the disposition here rather than creating a parallel or
+  invalid amendment chain.
 
 - Decision: preserve the earlier CLI startup failure as missing review evidence
   after two focused attempts, healthy read-only diagnostics, and one actual-base
@@ -2287,8 +2305,9 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
 - 2026-10-20, replayed the property and helper-documentation follow-ups onto
   merged `EP-M5` (`a246aac`). Preserved the parent-side parser-admission and
   decision-register regressions while adapting generated path checks to the
-  source-loading boundary. Current-candidate validation and delivery remain
-  pending.
+  source-loading boundary. Retained the merged parent's later AC-01 amendment
+  chain in place of the superseded branch amendment. Current-candidate
+  validation and delivery remain pending.
 - 2026-10-14, recorded the missing CLI reassessment after three non-recoverable
   startup failures with readiness diagnostics passing. Preserved the old
   property and helper-documentation receipts at their original scope; the
