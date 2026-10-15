@@ -15,8 +15,12 @@ ROOT = Path(__file__).resolve().parents[2]
 ROADMAP_PATH = ROOT / 'docs/roadmap.md'
 EXPORT_PATH = ROOT / 'spec/roadmap.json'
 ROADMAP = ROADMAP_PATH.read_text(encoding='utf-8')
-REQUIRED_CLASSES = {'multi-phase', 'single-phase', 'has-details', 'no-details', 'has-requires', 'no-requires',
-                    'has-done', 'all-open'}
+REQUIRED_CLASSES = {
+    'multi-phase', 'single-phase', 'multi-step', 'single-step',
+    'multi-task', 'single-task', 'no-details', 'has-details',
+    'task-detail-count=0', 'task-detail-count=1', 'task-detail-count=2',
+    'has-requires', 'no-requires', 'has-done', 'all-open',
+}
 
 
 def committed_export() -> dict:
@@ -315,14 +319,29 @@ def roadmaps(draw) -> dict:
 
 
 def structural_classes(structure: dict) -> set[str]:
-    """Classify a drawn roadmap so the property can prove its generator's reach."""
-    tasks = [task for phase in structure['phases'] for step in phase['steps'] for task in step['tasks']]
-    return {
-        'multi-phase' if len(structure['phases']) > 1 else 'single-phase',
-        'has-details' if any(task['details'] for task in tasks) else 'no-details',
+    """Describe generated counts and classes for the property coverage gate."""
+    phases = structure['phases']
+    steps = [step for phase in phases for step in phase['steps']]
+    tasks = [task for step in steps for task in step['tasks']]
+    task_detail_counts = [len(task['details']) for task in tasks]
+    phase_count = len(phases)
+    step_count = len(steps)
+    task_count = len(tasks)
+    detail_count = sum(task_detail_counts)
+    classes = {
+        f'phase-count={phase_count}',
+        f'step-count={step_count}',
+        f'task-count={task_count}',
+        f'detail-count={detail_count}',
+        'multi-phase' if phase_count > 1 else 'single-phase',
+        'multi-step' if step_count > 1 else 'single-step',
+        'multi-task' if task_count > 1 else 'single-task',
+        'has-details' if detail_count > 0 else 'no-details',
         'has-requires' if any(task['requires'] for task in tasks) else 'no-requires',
         'has-done' if any(task['status'] == 'done' for task in tasks) else 'all-open',
     }
+    classes.update(f'task-detail-count={count}' for count in set(task_detail_counts))
+    return classes
 
 
 def test_render_then_export_round_trips():

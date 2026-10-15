@@ -251,7 +251,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   The full local gates pass after moving block-node validation to the
   inline-text boundary, and CodeScene reports no issues; final validation
   evidence is recorded in PR #11.
-- [ ] Sponsor approval of this revision.
+- [x] (2026-10-11) Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
@@ -427,9 +427,10 @@ focused exporter suite passes 30 cases. All seven local gates pass on
 `722d140a9fd170233d020b1f761d437dd7180d1d`: 329 tests (one skipped) and one
 doctest, 115 design-check unit cases, 30 pytest cases, and a clean CodeScene
 delta. Hosted `build-test` and `design-check` pass at that head; the optional
-`Test under Act` step is skipped. The later milestones remain approval-gated,
-and the exporter is expected to retire when mapsplice#144 adds native JSON
-export and validation.
+`Test under Act` step is skipped. The plan was approved for implementation on
+2026-10-11; individual decisions remain accepted by identifier, and later
+milestones follow the approved plan's declared gates. The exporter is expected
+to retire when mapsplice#144 adds native JSON export and validation.
 
 ## Context and orientation
 
