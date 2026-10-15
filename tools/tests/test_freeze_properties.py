@@ -7,13 +7,16 @@ import unittest
 from pathlib import Path
 
 from hypothesis import given, settings, strategies as st
+from hypothesis.strategies import DrawFn
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.freeze import check_decisions_frozen
 
 GENERATED = settings(max_examples=80, derandomize=True, deadline=None)
-ACCEPTED = {
+DecisionRecord = dict[str, object]
+Mutation = tuple[str, DecisionRecord]
+ACCEPTED: DecisionRecord = {
     'id': 'D04', 'subject': 'Package licence', 'lifecycle': 'accepted', 'decided_option': 'A',
     'supersedes': [], 'superseded_by': None, 'accepted_by': 'leynos', 'accepted_on': '2026-10-10',
     'approval_reference': {'kind': 'session', 'url': 'https://example.org/session',
@@ -25,7 +28,7 @@ MUTABLE_FIELDS = ('id', 'subject', 'lifecycle', 'decided_option', 'supersedes', 
 
 
 @st.composite
-def forbidden_mutations(draw):
+def forbidden_mutations(draw: DrawFn) -> st.SearchStrategy[Mutation]:
     """Generate a changed value for each frozen decision field, including its identity."""
     field = draw(st.sampled_from(MUTABLE_FIELDS))
     replacements = {
@@ -53,7 +56,7 @@ class DecisionFreezeProperties(unittest.TestCase):
 
     @GENERATED
     @given(mutation=forbidden_mutations())
-    def test_every_generated_accepted_field_mutation_fails(self, mutation):
+    def test_every_generated_accepted_field_mutation_fails(self, mutation: Mutation) -> None:
         """Reject edits to identity and every mutable field of an accepted decision."""
         field, changed = mutation
         with self.assertRaisesRegex(
@@ -67,14 +70,14 @@ class DecisionFreezeProperties(unittest.TestCase):
 
     @GENERATED
     @given(replacement=st.integers(min_value=1, max_value=99))
-    def test_only_a_linked_supersession_transition_may_change_acceptance(self, replacement):
+    def test_only_a_linked_supersession_transition_may_change_acceptance(self, replacement: int) -> None:
         """Allow the explicit accepted-to-superseded transition while retaining its new link."""
         changed = ACCEPTED | {'lifecycle': 'superseded', 'superseded_by': f'D{replacement:02}'}
         check_decisions_frozen({'decisions': [ACCEPTED]}, {'decisions': [changed]})
 
     @GENERATED
     @given(mutation=forbidden_mutations())
-    def test_generated_mutations_of_superseded_records_always_fail(self, mutation):
+    def test_generated_mutations_of_superseded_records_always_fail(self, mutation: Mutation) -> None:
         """Keep superseded records fully frozen even when a mutation resembles supersession."""
         _field, changed = mutation
         superseded = ACCEPTED | {'lifecycle': 'superseded', 'superseded_by': 'D16'}

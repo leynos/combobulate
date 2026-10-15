@@ -202,6 +202,17 @@ class RealRoadmap(unittest.TestCase):
             self.assertFalse(exists(str(outside)), 'an absolute path outside the root never resolves')
             self.assertFalse(exists('docs/guide.md#no-such-heading'), 'a missing anchor does not resolve')
 
+    def test_anchored_non_utf8_artefact_does_not_resolve(self) -> None:
+        """Report undecodable anchored artefacts as unresolved without rejecting their path."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repository'
+            (root / 'docs').mkdir(parents=True)
+            (root / 'docs/binary.dat').write_bytes(b'\xff')
+            exists = artefact_resolver(ValidationContext(root))
+            self.assertTrue(exists('docs/binary.dat'), 'an unanchored in-root file resolves')
+            self.assertFalse(exists('docs/binary.dat#heading'),
+                             'an undecodable file cannot satisfy an anchor')
+
     def test_pf14_structural_component_targets_task_114(self):
         """Bind PF14's structural component to task 1.1.4 and the evidence-gate check."""
         obligations = ValidationContext(ROOT).load('spec/proof-obligations.json')['obligations']

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class DesignWorkflowContract(unittest.TestCase):
     """Check that workflow-selected inputs reach the reproducible design check."""
 
-    def test_workflow_passes_base_and_scheduled_date_to_make(self):
+    def test_workflow_passes_base_and_scheduled_date_to_make(self) -> None:
         """Preserve full history and connect selected workflow outputs to Make."""
         workflow = yaml.load(
             (ROOT / '.github/workflows/design.yml').read_text(encoding='utf-8'),
@@ -40,7 +40,7 @@ class DesignWorkflowContract(unittest.TestCase):
         self.assertIn('AS_OF="$RUN_DATE"', check_step['run'],
                       'the workflow must pass a scheduled evaluation date')
 
-    def test_make_forwards_as_of_and_base_revision_to_checker(self):
+    def test_make_forwards_as_of_and_base_revision_to_checker(self) -> None:
         """Keep Make's design-check arguments aligned with its workflow inputs."""
         result = subprocess.run(
             ['make', '--no-print-directory', '--dry-run', 'design-check',

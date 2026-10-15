@@ -148,7 +148,12 @@ def artefact_resolver(context: ValidationContext) -> Callable[[str], bool]:
         target = (root / path).resolve()
         if not target.is_relative_to(root) or not target.is_file():
             return False
-        return not anchor or anchor in headings(target.read_text(encoding='utf-8'))
+        if not anchor:
+            return True
+        try:
+            return anchor in headings(target.read_text(encoding='utf-8'))
+        except UnicodeDecodeError:
+            return False
     return exists
 
 

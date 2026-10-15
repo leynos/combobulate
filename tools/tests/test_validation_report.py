@@ -15,6 +15,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from docs_validation.context import ValidationContext
+
 import check_docs
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class ValidationReport(unittest.TestCase):
     """Run the complete checker on copied source inputs and inspect persistent side effects."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Run report checks against disposable source copies, away from repository files."""
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -48,13 +50,13 @@ class ValidationReport(unittest.TestCase):
                 for path in self.root.rglob('*')
                 if path.is_file() and '__pycache__' not in path.parts}
 
-    def test_successful_default_check_does_not_mutate_inputs_or_report(self):
+    def test_successful_default_check_does_not_mutate_inputs_or_report(self) -> None:
         """Keep the default validation path read-only after confirming a valid report."""
         before = self.source_bytes()
         self.assertEqual(self.run_main([]), 0)
         self.assertEqual(self.source_bytes(), before)
 
-    def test_invalid_json_report_is_rejected_without_replacement(self):
+    def test_invalid_json_report_is_rejected_without_replacement(self) -> None:
         """Reject malformed prior evidence without silently replacing the report."""
         self.report.write_text('{')
         before = self.source_bytes()
@@ -62,7 +64,7 @@ class ValidationReport(unittest.TestCase):
             self.run_main([])
         self.assertEqual(self.source_bytes(), before)
 
-    def test_stale_and_falsified_reports_fail_without_mutation(self):
+    def test_stale_and_falsified_reports_fail_without_mutation(self) -> None:
         """Reject altered counts, status, or omitted checks without changing that evidence."""
         original = json.loads(self.report.read_text())
         mutations = ('count', 'status', 'not_run')
@@ -80,7 +82,7 @@ class ValidationReport(unittest.TestCase):
                 self.run_main([])
             self.assertEqual(self.source_bytes(), before)
 
-    def test_source_failure_leaves_report_untouched_even_with_write_requested(self):
+    def test_source_failure_leaves_report_untouched_even_with_write_requested(self) -> None:
         """Validate every source before allowing explicit report regeneration."""
         (self.root / 'spec/cost-cases.json').write_text('{')
         for arguments in ([], ['--write']):
@@ -89,7 +91,7 @@ class ValidationReport(unittest.TestCase):
                 self.run_main(arguments)
             self.assertEqual(self.source_bytes(), before)
 
-    def test_explicit_write_repairs_report_after_source_validation(self):
+    def test_explicit_write_repairs_report_after_source_validation(self) -> None:
         """Limit a successful write request to the generated validation report."""
         self.report.write_text('{')
         before = self.source_bytes()
@@ -100,11 +102,11 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(json.loads(self.report.read_text())['status'], 'pass')
         self.assertEqual(self.run_main([]), 0)
 
-    def test_cli_injects_evaluation_date_and_base_revision(self):
+    def test_cli_injects_evaluation_date_and_base_revision(self) -> None:
         """Pass CLI values into validation context and print the freeze summary."""
         observed = {}
 
-        def freeze(context, base_revision):
+        def freeze(context: ValidationContext, base_revision: str | None) -> str:
             """Capture the injected command-line values and return a visible summary."""
             observed['as_of'] = context.as_of
             observed['base_revision'] = base_revision
@@ -123,7 +125,7 @@ class ValidationReport(unittest.TestCase):
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')
 
-    def test_cli_rejects_an_accepted_decision_edit_against_git_base(self):
+    def test_cli_rejects_an_accepted_decision_edit_against_git_base(self) -> None:
         """Surface a real base-revision freeze failure through the command-line entrypoint."""
         accepted = {
             'id': 'D04', 'subject': 'Package licence', 'lifecycle': 'accepted',
