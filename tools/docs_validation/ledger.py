@@ -117,7 +117,17 @@ def check_roadmap_export(context: ValidationContext) -> None:
 
 
 def generated_documents(context: ValidationContext, catalogue: list[dict]) -> list[tuple[ModuleType, object, str]]:
-    """List each generator module with its master data and generated document."""
+    """List each generator module with its master data and generated document.
+
+    For example, the decision generator owns the rendered register document::
+
+        >>> from pathlib import Path
+        >>> context = ValidationContext(Path.cwd())
+        >>> catalogue = context.load('spec/vocabulary.json')['entries']
+        >>> any(path == 'docs/decision-register.md'
+        ...     for _, _, path in generated_documents(context, catalogue))
+        True
+    """
     return [
         (context.load_generator('generate_reference.py'), catalogue, 'docs/language-reference.md'),
         (context.load_generator('generate_bets.py'), context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),

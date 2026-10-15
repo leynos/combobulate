@@ -55,7 +55,15 @@ def report_data(context: ValidationContext, status: str) -> dict:
 
 
 def collect_checks(context: ValidationContext) -> None:
-    """Run source-only checks; the existing evidence report cannot affect their results."""
+    """Run source-only checks; the evidence report cannot affect their results.
+
+    For example, collecting checks records the decision-register result::
+
+        >>> context = ValidationContext(ROOT)
+        >>> collect_checks(context)
+        >>> any(row['check'] == 'decision-register' for row in context.results)
+        True
+    """
     for path in context.json_paths():
         json.loads(path.read_text(encoding='utf-8'))
     for check in (

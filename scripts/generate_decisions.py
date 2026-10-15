@@ -55,14 +55,26 @@ def bullet(text: str) -> str:
 
 
 def adr_link(path: str) -> str:
-    """Link an ADR path from `docs/`; e.g. 'docs/adrs/adr-0002-x.md' becomes '[ADR-0002](adrs/...)'."""
+    """Link an ADR path from `docs/`; e.g. an ADR-0002 path becomes its relative link.
+
+    The result keeps the four-digit identifier and drops the `docs/` prefix::
+
+        >>> adr_link('docs/adrs/adr-0002-release.md')
+        '[ADR-0002](adrs/adr-0002-release.md)'
+    """
     relative = path.removeprefix('docs/')
     number = relative.removeprefix('adrs/adr-')[:4]
     return f'[ADR-{number}]({relative})'
 
 
 def outcome(record: dict) -> str:
-    """Describe a record's decision; a proposed record is pending, an accepted one names its approval."""
+    """Describe a record's decision; accepted records name their approval.
+
+    For example, a proposed record has no approval yet::
+
+        >>> outcome({'lifecycle': 'proposed'})
+        'Decision: pending.'
+    """
     if record['lifecycle'] in {'proposed', 'withdrawn'}:
         return 'Decision: pending.' if record['lifecycle'] == 'proposed' else 'Decision: withdrawn.'
     reference = record['approval_reference']
@@ -75,7 +87,13 @@ def outcome(record: dict) -> str:
 
 
 def lineage(record: dict) -> str:
-    """Describe supersession links; an unlinked record renders nothing."""
+    """Describe supersession links; an unlinked record renders nothing.
+
+    For example, a record without supersession links returns an empty string::
+
+        >>> lineage({'supersedes': [], 'superseded_by': None})
+        ''
+    """
     parts = []
     if record['supersedes']:
         parts.append('Supersedes: ' + ', '.join(f'[{other}](#{other.lower()})' for other in record['supersedes']) + '.')
@@ -86,7 +104,19 @@ def lineage(record: dict) -> str:
 
 
 def render_decision(record: dict) -> str:
-    """Render one decision with its own `### Dnn` heading, so its anchor is `#dnn`."""
+    """Render one decision with its own heading and register anchor.
+
+    For example, a proposed D01 renders a section beginning with its heading::
+
+        >>> record = {'id': 'D01', 'subject': 'Example', 'questions': [],
+        ...           'authority_roles': ['sponsor'], 'options': [{'id': 'A', 'summary': 'Keep'}],
+        ...           'recommendation': 'A', 'rationale': 'Small scope', 'lifecycle': 'proposed',
+        ...           'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+        ...           'approval_reference': None, 'adr': None, 'supersedes': [],
+        ...           'superseded_by': None, 'retired_statements': []}
+        >>> render_decision(record).startswith('### D01\\n\\n')
+        True
+    """
     questions = ', '.join(record['questions']) or 'none'
     roles = ', '.join(ROLE_NAMES[role] for role in record['authority_roles'])
     options = ''.join(
@@ -109,12 +139,28 @@ def render_decision(record: dict) -> str:
 
 
 def roadmap_item(identifier: str) -> str:
-    """Name a roadmap item by its depth; e.g. '2.4' is a step and '1.2.1' is a task."""
+    """Name a roadmap item by its depth; e.g. '2.4' is a step and '1.2.1' is a task.
+
+    A two-level identifier is rendered as a step::
+
+        >>> roadmap_item('2.4')
+        'step 2.4'
+    """
     return f"{'task' if identifier.count('.') == 2 else 'step'} {identifier}"
 
 
 def render_candidate(candidate: dict) -> str:
-    """Render one candidate ADR subject with its disposition."""
+    """Render one candidate ADR subject with its disposition.
+
+    For example, a schema-shaped ADR disposition renders its ADR and decision link::
+
+        >>> candidate = {'id': 'CA1', 'subject': 'Archive format', 'source': 'design §15',
+        ...              'disposition': {'kind': 'adr', 'adrs': ['ADR-0001']},
+        ...              'decision': 'D03'}
+        >>> rendered = render_candidate(candidate)
+        >>> 'recorded in ADR-0001' in rendered and '[D03](#d03)' in rendered
+        True
+    """
     disposition = candidate['disposition']
     if disposition['kind'] == 'adr':
         target = 'recorded in ' + ' and '.join(disposition['adrs'])
@@ -127,7 +173,14 @@ def render_candidate(candidate: dict) -> str:
 
 
 def render(register: dict) -> str:
-    """Render the generated region body from the register master."""
+    """Render the generated region body from the register master.
+
+    The committed register renders its decisions section from the repository root::
+
+        >>> register = json.loads((ROOT / 'spec/decisions.json').read_text())
+        >>> render(register).startswith('## Decisions\\n\\n')
+        True
+    """
     output = ['## Decisions\n\n']
     output.extend(render_decision(record) for record in register['decisions'])
     output.append('## Candidate ADR subjects\n\n')
@@ -136,7 +189,13 @@ def render(register: dict) -> str:
 
 
 def splice(text: str, body: str) -> str:
-    """Replace the generated region; e.g. splice(document, render(register))."""
+    """Replace the generated region between its markers.
+
+    For example, the body is placed between the marker pair with blank lines::
+
+        >>> splice(START + END, '## Decisions').startswith(START + '\\n\\n## Decisions')
+        True
+    """
     if text.count(START) != 1 or text.count(END) != 1 or text.index(START) > text.index(END):
         raise MarkerError(f'The document must contain exactly one {START} ... {END} pair.')
     before, rest = text.split(START)
@@ -145,12 +204,24 @@ def splice(text: str, body: str) -> str:
 
 
 def region_words(text: str) -> list[str]:
-    """Return the generated region's words, so formatter rewrapping cannot cause drift."""
+    """Return generated-region words so formatter rewrapping cannot cause drift.
+
+    For example, words outside the markers are ignored::
+
+        >>> region_words('outside ' + START + 'one two' + END + ' outside')
+        ['one', 'two']
+    """
     return text.split(START)[1].split(END)[0].split()
 
 
 def region_headings(text: str) -> list[str]:
-    """Return generated ATX headings; e.g. a paragraph cannot replace ``### D03``."""
+    """Return generated ATX headings so generated anchors remain stable.
+
+    For example, D01 is returned as a heading anchor candidate::
+
+        >>> region_headings(START + '\\n### D01\\n' + END)
+        ['### D01']
+    """
     region = text.split(START)[1].split(END)[0]
     return [line.strip() for line in region.splitlines()
             if re.match(r' {0,3}#{1,6}(?:[ \t]+|$)', line)]

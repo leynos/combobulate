@@ -71,7 +71,14 @@ class ValidationContext:
         self.results.append(row)
 
     def markdown_paths(self) -> list[Path]:
-        """Enumerate design files, ADRs, and README, without traversing build outputs."""
+        """Enumerate design files, ADRs, and README without traversing build outputs.
+
+        From the repository root, ADR files under `docs/adrs/` are included::
+
+            >>> context = ValidationContext(Path.cwd())
+            >>> any(path.parent.name == 'adrs' for path in context.markdown_paths())
+            True
+        """
         return [self.root / 'README.md'] + [
             self.root / 'docs' / name for name in DESIGN_DOCUMENTS
         ] + sorted((self.root / 'docs' / 'adrs').glob('adr-*.md'))
