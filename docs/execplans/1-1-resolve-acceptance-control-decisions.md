@@ -312,6 +312,10 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   package policy; and document the touched test helpers and cases. The
   corrected regression uses Markdown normalization so formatter wrapping cannot
   invalidate its mutation.
+- [x] (2026-10-15) Reconciled the formal review findings: group ADRs by coherent
+  subject with a recorded rationale; use a typed Cargo manifest projection and
+  NumPy-style examples; and keep publication disabled until an accepted D05
+  supersession and validated task 4.3.3 closure are both present.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
@@ -540,8 +544,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Decision: admission levels are `proof`, `bounded`, `tested`, `restricted`,
   and `rejected`; `restricted` never satisfies a component. Date/Author:
   2026-10-10.
-- Decision: one decision per ADR, ADR-0002 to ADR-0009. Date/Author:
-  2026-10-10.
+- Decision (revised 2026-10-15): ADRs group decisions by coherent subject;
+  distinct decisions keep separate identifiers, and an ADR may record related
+  outcomes with shared rationale and consequences. ADR-0002 groups governance
+  authority, exception policy, and the absence of CODEOWNERS (D01, D02, D13);
+  ADR-0004 groups licence and publication (D04, D05), which answer ToR Q7.
+  Splitting these records would duplicate their shared context without making
+  the authority or outcome boundaries clearer. Date/Author: 2026-10-15.
 - Decision: the proof-evidence schema gains `schema_version` (value 2) rather
   than changing the pack-wide `revision` (`0.2`). Date/Author: 2026-10-10.
 - Decision: exceptions live in `spec/exceptions.json`, referenced by

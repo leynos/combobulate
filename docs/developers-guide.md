@@ -526,10 +526,12 @@ formatting can preserve the contract without creating false generator drift.
 
 `check_manifest` in `tools/docs_validation/package_policy.py` is an internal
 package-policy helper. `check_package_policy` is its only production caller and
-supplies the D04/D05 lifecycle decisions; unit tests may call the helper
-directly to isolate those rules. Do not use it as a general Cargo manifest API
-or from another checker composition; repository validation goes through
-`collect_checks`.
+supplies the D04/D05 decision state. The checker runs after roadmap closure:
+publication remains disabled until an accepted D05 supersession and a
+successful task 4.3.3 closure result are both present. Unit tests may call the
+helpers directly to isolate those rules. Do not use them as general Cargo
+manifest APIs or from another checker composition; repository validation goes
+through `collect_checks`.
 
 Roadmap closure and frozen-register comparison keep repository access behind
 small reader callbacks. `ClosureInputs` receives an artefact resolver that

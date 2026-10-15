@@ -93,15 +93,15 @@
       "count": 49
     },
     {
-      "check": "package-policy",
-      "status": "pass",
-      "detail": "Cargo.toml declares the ISC licence (D04) and publish = false (D05) while those decisions stand accepted.",
-      "count": 1
-    },
-    {
       "check": "roadmap-status",
       "status": "pass",
       "detail": "1 of 72 tasks ticked (1.1.1); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 1
+    },
+    {
+      "check": "package-policy",
+      "status": "pass",
+      "detail": "Cargo.toml meets the D04 licence policy and keeps publication disabled until an accepted D05 supersession and validated task 4.3.3 closure.",
       "count": 1
     }
   ],

@@ -77,7 +77,7 @@ def collect_checks(context: ValidationContext) -> None:
         check_markdown, check_catalogue_and_roadmap, check_decision_register, check_kernel_envelope,
         check_examples, check_revision_contracts,
         check_proof_evidence_envelope, check_cost_examples, check_tool_sources,
-        check_package_policy, check_roadmap_status,
+        check_roadmap_status, check_package_policy,
     ):
         check(context)
 
