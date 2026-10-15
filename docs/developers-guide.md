@@ -645,9 +645,13 @@ Python helper scripts live in `scripts/` and follow
 723 dependency block, Cyclopts for the command line (so `INPUT_*` environment
 variables work in CI), and pytest suites in `scripts/tests/` named after the
 script, such as `scripts/tests/test_export_roadmap.py`. `make design-check`
-runs those suites. When the design checker needs a helper's logic, it loads the
-script by path with `ValidationContext.load_script` rather than keeping a
-second copy, so the script's dependencies are also pinned in
+runs those suites. The checker composition root imports the roadmap exporter
+and document generators, wraps their renderers and markers in
+`DocumentRenderer`, and passes them through `LedgerDependencies`. The ledger
+checker receives these collaborators directly; it does not load scripts or
+create a general plugin interface. Focused tests pass the same collaborators
+explicitly, so they can exercise isolated repository roots without mutating
+process-wide module state. Script dependencies remain pinned in
 `scripts/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
 

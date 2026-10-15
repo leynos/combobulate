@@ -9,7 +9,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from check_docs import collect_checks
+import generate_decisions
+
+from check_docs import LEDGER_DEPENDENCIES, collect_checks
 from docs_validation.context import ValidationContext
 from docs_validation.decisions import (
     GOVERNING_DOCUMENTS, check_decision_register, check_governing_documents, check_register_records,
@@ -43,12 +45,12 @@ class RealRegister(unittest.TestCase):
         catalogue = context.load('spec/vocabulary.json')['entries']
         register_entries = [
             (Path(generator.__file__).resolve(), source, path)
-            for generator, source, path in generated_documents(context, catalogue)
+            for generator, source, path in generated_documents(context, catalogue, LEDGER_DEPENDENCIES)
             if path == 'docs/decision-register.md'
         ]
         self.assertEqual(
             register_entries,
-            [(ROOT / 'scripts/generate_decisions.py', REGISTER, 'docs/decision-register.md')],
+            [(generate_decisions.render, REGISTER, 'docs/decision-register.md')],
             'the generated-document check must pair the register with its master and renderer',
         )
 
@@ -66,7 +68,9 @@ class RealRegister(unittest.TestCase):
 
         with patch.object(Path, 'read_text', read_text):
             with self.assertRaisesRegex(AssertionError, 'Generated content drift: docs/decision-register.md'):
-                check_generated_documents(context, context.load('spec/vocabulary.json')['entries'])
+                check_generated_documents(
+                    context, context.load('spec/vocabulary.json')['entries'], LEDGER_DEPENDENCIES
+                )
 
 
 class RealGoverningDocuments(unittest.TestCase):

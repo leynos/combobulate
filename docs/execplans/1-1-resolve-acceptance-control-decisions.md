@@ -5,13 +5,14 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (property and helper-documentation follow-ups replayed onto
-merged `EP-M5`). Prior receipts record both generated properties, five isolated
-mutants, and the helper documentation correction passing against the former
-base `b4e2c14`; they do not cover this replay. The merged `EP-M5` base is
-`a246aac`; current-candidate gates, hosted checks, review, and merge remain
-pending. Historical receipts below retain their original candidate scope.
-Current delivery state is recorded on
+Status: IN PROGRESS (review follow-ups replayed onto merged `EP-M5`). Prior
+receipts record the generated properties and helper documentation passing
+against former base `b4e2c14`; they do not cover this replay. The replay also
+adds AC-02 module documentation with a sponsor-approved digest amendment; the
+older AC-01 source amendment was superseded by the merged parent's later chain.
+The merged base is `a246aac`; current-candidate gates, hosted checks, review,
+and merge remain pending. Historical receipts below retain their original
+candidate scope. Current delivery state is recorded on
 [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Plan approval is distinct from acceptance of an individual decision;
@@ -129,9 +130,10 @@ Term definitions used throughout:
   settings before running fake build tools, and the alias check includes child
   diagnostics on failure. The task owner's instruction to repair gate failures
   authorizes these test-only changes; they do not alter library behaviour or
-  the public API. The AC-01 probe's module documentation is already present in
-  the merged parent and covered by its later approved amendment chain;
-  calibration probes live outside the repository's Cargo package (see `EP-M4`).
+  the public API. Calibration-probe module documentation is outside the
+  repository's Cargo package; the current AC-01 source is covered by the
+  parent's later approved chain, and the AC-02 source change is covered by a
+  new approved digest amendment (see `EP-M4`).
 - C-EP-9. Checks are deterministic for a given commit. The evidence gate
   never reads the wall clock; `make design-check` injects the HEAD commit date
   as `--as-of`, and the base revision for freeze checks as `--base-rev`. No
@@ -593,6 +595,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   sponsor-approved AC-01 amendment chain. The older source/control amendment is
   therefore superseded; retain the parent source and register without changing
   the workload, thresholds, or measurement protocol.
+- [x] (2026-10-20) Expanded the AC-02 Kani module comment to describe its
+  scalar and zero-extent structural harnesses and the separate Verus proof.
+  Appended the sponsor-approved amendment after the merged parent's existing
+  chain; the registered digest and accepted workload, thresholds, and
+  measurement protocol remain unchanged. No acceptance measurement exists.
 - [ ] (2026-10-20) Revalidate the property and helper-documentation follow-ups
   against merged base `a246aac`, then publish and reconcile current hosted CI,
   assessment, formal review, and pre-merge evidence. Reassess the prior missing
@@ -637,6 +644,10 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   source and an approved amendment chain binding its current digest. Impact:
   retain the parent source and control history; do not replay an obsolete
   digest or alter the workload, thresholds, or measurement protocol.
+- Observation: the merged parent's AC-02 amendment chain postdates the original
+  branch base. The follow-up's expanded Kani module comment changes the current
+  source hash; its new amendment follows the parent's latest digest and leaves
+  calibration and measurement fields unchanged.
 
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
@@ -762,6 +773,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   earlier source and digest and is superseded by the parent's later approved
   changes. Record the disposition here rather than creating a parallel or
   invalid amendment chain.
+
+- Decision: retain the expanded AC-02 Kani module comment and append its
+  sponsor-approved source-digest amendment after the parent's existing chain.
+  Preserve the registered digest, workload, thresholds, measurement protocol,
+  and historical calibration details.
+
+- Decision: keep the roadmap/export ledger pure by injecting its narrow
+  renderer, parser, serializer, and error collaborators from the checker
+  composition root. Tests use the same collaborators with isolated roots; no
+  dynamic module loader or general plugin registry is needed. Keep both typed
+  semantic equality and exact serialized-export comparison.
 
 - Decision: preserve the earlier CLI startup failure as missing review evidence
   after two focused attempts, healthy read-only diagnostics, and one actual-base
@@ -1764,8 +1786,8 @@ full gates (Stage D).
   naming the source line.
 - The script writes `spec/roadmap.json` from the Markdown, or with `--check`
   (or `INPUT_CHECK=true`) exits 1 and prints a unified diff when the committed
-  export has drifted. The checker loads it by path through
-  `ValidationContext.load_script`.
+  export has drifted. The checker composition root supplies its parser and
+  renderer to the ledger through `LedgerDependencies`.
 - In `scripts/docs_validation/ledger.py`, replace the JSON-to-Markdown drift
   comparison for the roadmap with the export drift comparison. Remove
   `tools/generate_roadmap.py`. Move its rendering layout into
@@ -2306,8 +2328,11 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   merged `EP-M5` (`a246aac`). Preserved the parent-side parser-admission and
   decision-register regressions while adapting generated path checks to the
   source-loading boundary. Retained the merged parent's later AC-01 amendment
-  chain in place of the superseded branch amendment. Current-candidate
-  validation and delivery remain pending.
+  chain in place of the superseded branch amendment, and appended the approved
+  AC-02 documentation amendment after the current chain. Injected ledger
+  collaborators from the composition root while retaining exact export
+  serialization checks. Current-candidate validation and delivery remain
+  pending.
 - 2026-10-14, recorded the missing CLI reassessment after three non-recoverable
   startup failures with readiness diagnostics passing. Preserved the old
   property and helper-documentation receipts at their original scope; the

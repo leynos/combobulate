@@ -137,7 +137,7 @@
           "sources": [
             {
               "path": "tools/calibration/cardinality-probe/src/lib.rs",
-              "sha256": "1f831495b8de00a127ccb307c8aed805addab9d347ae557a1681186f19417fd5"
+              "sha256": "e402b2318c5008f38be1e6edc2d72da278eb327bec14a01dfc51015c12147977"
             }
           ]
         },
@@ -187,7 +187,7 @@
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
       "registered_digest": "22b26e508049ce2ca51da79f9acd11bcb32ef12d46e1cadd57966a0f30a744a2",
-      "digest": "26c62a284fef425fd5b7a8d0d31c5d6e700cab781e7b0e7e5df2163c46de7753",
+      "digest": "5af63ccd61b0a1ae661b2f503688e65ca2926c0918cabcad95aebc634af05f95",
       "amendments": [
         {
           "date": "2026-10-19",
@@ -204,6 +204,14 @@
           "replaces": "bddb65b3101bde682e2df7dba56ba3afd522a75266367bfde58b2385c9ed3a0c",
           "new_digest": "26c62a284fef425fd5b7a8d0d31c5d6e700cab781e7b0e7e5df2163c46de7753",
           "reason": "Corrected the recorded full-width and bounded Kani timeout outcomes and refreshed the AC-02 source hash."
+        },
+        {
+          "date": "2026-10-20",
+          "approved_by": "leynos",
+          "approval_reference": "https://lody.ai/leynos/sessions/8fb76d43-45b2-4220-b158-195708155f07",
+          "replaces": "26c62a284fef425fd5b7a8d0d31c5d6e700cab781e7b0e7e5df2163c46de7753",
+          "new_digest": "5af63ccd61b0a1ae661b2f503688e65ca2926c0918cabcad95aebc634af05f95",
+          "reason": "Expanded the AC-02 module documentation to describe its bounded structural harnesses and the separate Verus proof; the workload, thresholds, and measurement protocol are unchanged."
         }
       ]
     },

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import re
-from types import ModuleType
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from .context import ValidationContext, require, same_typed_value
 from .markdown import generated_matches
@@ -13,6 +14,31 @@ class MalformedCanonicalRoadmapError(AssertionError):
 
     def __init__(self, parser_error: Exception) -> None:
         super().__init__(f'Malformed canonical roadmap: {parser_error}')
+
+
+@dataclass(frozen=True)
+class DocumentRenderer:
+    """Expose the renderer and markers needed to check one generated document."""
+
+    render: Callable[..., str]
+    start: str
+    end: str
+
+
+@dataclass(frozen=True)
+class LedgerDependencies:
+    """Hold narrow collaborators supplied by the checker composition root.
+
+    For example, wrap a generator as ``DocumentRenderer(module.render,
+    module.START, module.END)``; the ledger never imports or loads that module.
+    """
+
+    reference_generator: DocumentRenderer
+    bet_generator: DocumentRenderer
+    decision_generator: DocumentRenderer
+    parse_roadmap: Callable[[str], dict]
+    export_roadmap: Callable[[str], str]
+    roadmap_structure_error: type[ValueError]
 
 
 def numbered_identity(value: object, name: str, components: int) -> tuple[int, ...]:
@@ -100,55 +126,62 @@ def check_catalogue(catalogue: list[dict], tasks: dict[str, dict]) -> None:
                     f'Core row has no Core implementation task: {row["id"]}')
 
 
-def check_roadmap_export(context: ValidationContext) -> None:
+def check_roadmap_export(context: ValidationContext, dependencies: LedgerDependencies) -> None:
     """Require the committed JSON view to equal a fresh export of the canonical roadmap."""
-    exporter = context.load_script('export_roadmap.py')
     roadmap_text = (context.root / 'docs/roadmap.md').read_text(encoding='utf-8')
     committed_path = context.root / 'spec/roadmap.json'
     try:
-        fresh = exporter.parse_roadmap(roadmap_text)
-    except exporter.RoadmapStructureError as error:
+        fresh = dependencies.parse_roadmap(roadmap_text)
+    except dependencies.roadmap_structure_error as error:
         raise MalformedCanonicalRoadmapError(error) from error
     require(
         same_typed_value(context.load('spec/roadmap.json'), fresh)
-        and committed_path.read_text(encoding='utf-8') == exporter.export_text(roadmap_text),
+        and committed_path.read_text(encoding='utf-8') == dependencies.export_roadmap(roadmap_text),
         'Roadmap export drift: run scripts/export_roadmap.py',
     )
 
 
-def generated_documents(context: ValidationContext, catalogue: list[dict]) -> list[tuple[ModuleType, object, str]]:
-    """List each generator module with its master data and generated document.
+def generated_documents(
+    context: ValidationContext, catalogue: list[dict], dependencies: LedgerDependencies
+) -> list[tuple[DocumentRenderer, object, str]]:
+    """List each renderer with its master data and generated document.
 
     For example, the decision generator owns the rendered register document::
 
         >>> from pathlib import Path
+        >>> from check_docs import LEDGER_DEPENDENCIES
         >>> context = ValidationContext(Path.cwd())
         >>> catalogue = context.load('spec/vocabulary.json')['entries']
         >>> any(path == 'docs/decision-register.md'
-        ...     for _, _, path in generated_documents(context, catalogue))
+        ...     for _, _, path in generated_documents(
+        ...         context, catalogue, LEDGER_DEPENDENCIES))
         True
     """
     return [
-        (context.load_generator('generate_reference.py'), catalogue, 'docs/language-reference.md'),
-        (context.load_generator('generate_bets.py'), context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
-        (context.load_script('generate_decisions.py'), context.load('spec/decisions.json'), 'docs/decision-register.md'),
+        (dependencies.reference_generator, catalogue, 'docs/language-reference.md'),
+        (dependencies.bet_generator, context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
+        (dependencies.decision_generator, context.load('spec/decisions.json'), 'docs/decision-register.md'),
     ]
 
 
-def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
+def check_generated_documents(
+    context: ValidationContext, catalogue: list[dict], dependencies: LedgerDependencies
+) -> None:
     """Check generated contents against masters, allowing only Markdown formatting.
 
     From the repository root, every generated document matches its master::
 
         >>> from pathlib import Path
+        >>> from check_docs import LEDGER_DEPENDENCIES
         >>> context = ValidationContext(Path.cwd())
         >>> catalogue = context.load('spec/vocabulary.json')['entries']
-        >>> check_generated_documents(context, catalogue) is None
+        >>> check_generated_documents(
+        ...     context, catalogue, LEDGER_DEPENDENCIES) is None
         True
     """
-    for generator, source, path in generated_documents(context, catalogue):
+    for generator, source, path in generated_documents(context, catalogue, dependencies):
         text = (context.root / path).read_text(encoding='utf-8')
-        require(generated_matches(text, generator.render(source), generator.START, generator.END),
+        require(generated_matches(text, generator.render(source), generator.start, generator.end),
                 f'Generated content drift: {path}')
 
 
@@ -165,7 +198,7 @@ def check_task_links(context: ValidationContext, tasks: dict[str, dict]) -> None
                 require(task_id in tasks, f'Invalid trace task {task_id}')
 
 
-def check_catalogue_and_roadmap(context: ValidationContext) -> None:
+def check_catalogue_and_roadmap(context: ValidationContext, dependencies: LedgerDependencies) -> None:
     """Run ledger checks; all 19 design sections must appear in task references."""
     catalogue = context.load('spec/vocabulary.json')['entries']
     phases = context.load('spec/roadmap.json')['phases']
@@ -173,8 +206,8 @@ def check_catalogue_and_roadmap(context: ValidationContext) -> None:
     check_dependencies(tasks)
     require(sections == set(range(1, 20)), f'Design coverage mismatch: {sections}')
     check_catalogue(catalogue, tasks)
-    check_generated_documents(context, catalogue)
-    check_roadmap_export(context)
+    check_generated_documents(context, catalogue, dependencies)
+    check_roadmap_export(context, dependencies)
     check_task_links(context, tasks)
     context.record('catalogue', 'Unique IDs, scope labels, semantic table regeneration, and task mappings pass.', len(catalogue))
     ticked = sum(task['status'] == 'done' for task in tasks.values())

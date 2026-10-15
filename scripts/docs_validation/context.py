@@ -1,17 +1,14 @@
 """Own explicit design-pack inputs and validation reporting.
 
-Feature checks accept one context, so tests can supply an isolated repository
-without changing process globals. Only the checker composition root writes reports.
+Checks read through an isolated context, while ledger helpers receive their
+renderers from the composition root. Only that root writes reports.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
-import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from types import ModuleType
 
 import yaml
 
@@ -110,65 +107,3 @@ class ValidationContext:
         return sorted((self.root / 'spec').glob('*.json')) + [
             self.root / 'docs' / name for name in DOCUMENT_REPORTS
         ]
-
-    def load_generator(self, name: str) -> ModuleType:
-        """Load a local generator; e.g. context.load_generator('generate_bets.py')."""
-        return self.load_module(self.root / 'scripts' / name)
-
-    def load_script(self, name: str) -> ModuleType:
-        """Load a helper script's functions; e.g. context.load_script('export_roadmap.py').
-
-        Parameters
-        ----------
-        name
-            Filename of the helper script beneath the repository's
-            `scripts/` directory.
-
-        Returns
-        -------
-        ModuleType
-            Imported module containing the helper script's functions.
-        """
-        return self.load_module(self.root / 'scripts' / name)
-
-    @staticmethod
-    def load_module(path: Path) -> ModuleType:
-        """Import a Python file by path without running its command-line entry point.
-
-        The module is registered under a checker-private name during execution,
-        because decorators such as `dataclass` resolve the defining module
-        through that table. Any prior registry entry is restored afterwards.
-
-        Parameters
-        ----------
-        path
-            Filesystem path to the Python source file to import.
-
-        Returns
-        -------
-        ModuleType
-            The imported module.
-
-        Examples
-        --------
-        Load the roadmap exporter without invoking its command-line entry point:
-
-        >>> module = ValidationContext.load_module(
-        ...     Path('scripts/export_roadmap.py'))
-        >>> module.__name__
-        '_design_pack_scripts_export_roadmap'
-        """
-        name = f'_design_pack_{path.parent.name}_{path.stem}'
-        spec = importlib.util.spec_from_file_location(name, path)
-        require(spec is not None and spec.loader is not None, str(path))
-        module = importlib.util.module_from_spec(spec)
-        previous_module = sys.modules.get(name)
-        sys.modules[name] = module
-        try:
-            spec.loader.exec_module(module)
-        finally:
-            if previous_module is None:
-                sys.modules.pop(name, None)
-            else:
-                sys.modules[name] = previous_module
-        return module
