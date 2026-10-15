@@ -7,7 +7,7 @@ be kept up to date as work proceeds.
 
 Status: IN PROGRESS (the sponsor approved this revision for implementation on
 2026-10-11 by invoking the implementation workflow; `EP-M0` and `EP-M1a` are
-complete, and `EP-M1b` is pending)
+complete, and `EP-M1b` is complete; `EP-M2` through `EP-M6` remain pending)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -388,6 +388,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   while ungoverned tasks have none to cite. The composed test records that
   valid case and still rejects missing completion evidence and citations to
   unaccepted decisions. Date/Author: 2026-10-15, implementing agent.
+- EP-M1b scope escalation: the current-head completeness assessment found
+  1,757 net added lines across 25 changed files, excluding
+  `docs/validation-results.json`. The file count is within tolerance; the net
+  line count exceeds the 1,500-line trigger in `Tolerances`. The per-task
+  obligation components and regression suites provide the requested closure,
+  freeze, and workflow evidence; removing those tests to meet the line limit
+  would weaken acceptance coverage. No regression coverage was removed. The
+  overrun is disclosed to the sponsor in PR #13 for review. Evidence:
+  [current-head assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6183978863).
+  Date/Author: 2026-10-15, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
