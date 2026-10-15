@@ -31,7 +31,7 @@ implemented API or completed verification.
 ## Execution plans
 
 - [Roadmap 1.1: resolve the decisions that control acceptance][roadmap-1-1]:
-  approved ExecPlan for step 1.1.
+  approved ExecPlan; `EP-M0` and `EP-M1a` complete, with `EP-M1b` pending.
 
 [roadmap-1-1]: execplans/1-1-resolve-acceptance-control-decisions.md
 
