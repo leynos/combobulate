@@ -6,8 +6,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 be kept up to date as work proceeds.
 
 Status: IN PROGRESS (the sponsor approved this revision for implementation on
-2026-10-11 by invoking the implementation workflow; `EP-M0` and `EP-M1a` are
-complete, and `EP-M1b` is complete; `EP-M2` through `EP-M6` remain pending)
+2026-10-11 by invoking the implementation workflow; `EP-M0`, `EP-M1a`,
+`EP-M1b`, and `EP-M2` are complete; `EP-M3` is next)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -552,7 +552,7 @@ here; implementation alignment remains pending in PRs #17 and #18.
 
 ## Outcomes & retrospective
 
-EP-M0 makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
+`EP-M0` makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
 drift-checked export. The retired generator is removed; the Wenmode exporter,
 checker integration, workflow documentation, and independent round-trip tests
 are in place. Review found that suffix text after the Terms of Reference
@@ -569,12 +569,35 @@ delta. Hosted `build-test` and `design-check` pass at that head; the optional
 milestones follow the approved plan's declared gates. The exporter is expected
 to retire when mapsplice#144 adds native JSON export and validation.
 
+`EP-M1a` added the decision register, ADR naming convention, generated
+register, and governing-document anchors. The register kept decisions proposed,
+leaving acceptance to later work; this preserves the distinction between
+recording a candidate and accepting it.
+
+`EP-M1b` added evidence-gated roadmap completion, obligation components, and
+the base-revision freeze check. A completed task now requires linked evidence,
+and frozen acceptance controls cannot be edited without an approved change.
+
 Pre-merge assessment on 2026-10-15 found gaps in the EP-M1a authority,
 supersession, and generator CLI checks. The repairs bind authority to accepted
 D01 and C-EP-1's `leynos` login, require an accepted replacement before
 supersession, and preserve generated headings while allowing paragraph
 rewrapping. VO-5 and VO-14 now name these invariants and their negative
 controls.
+
+`EP-M2` accepted D01 to D07 and D13, recorded the rationale in ADR-0002 to
+ADR-0005, reconciled the five governing documents, and backed roadmap task
+1.1.1 with its completion artefacts. The package check enforces the accepted
+licence and publication policy. These results meet the governance and
+release-policy outcomes in `Purpose / big picture`; contract records,
+calibrated controls, proof evidence, and final reconciliation remain for
+`EP-M3` to `EP-M6`.
+
+The staged register and evidence checks keep acceptance separate from
+implementation progress: milestone completion alone does not accept a decision
+or satisfy a roadmap obligation. Continue recording evidence at each milestone
+boundary, then reconcile the remaining outcomes before setting the status to
+`COMPLETE`.
 
 ## Context and orientation
 
@@ -1059,13 +1082,14 @@ Trusted, not verified here:
 
 ## Plan of work
 
-Milestones run in order on stacked branches. The sponsor approved this plan on
-2026-10-11. `EP-M0`, `EP-M1a`, and `EP-M1b` are complete; `EP-M2` through
-`EP-M6` remain pending. All decisions they need have been answered. Each
-milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule
-tables, fixtures, and tests and observe the expected failure (Stage B);
-implement until the focused tests pass (Stage C); tidy, run the generators and
-exporter and `check_docs.py --write`, review the report diff, and have
+Milestones run in order on stacked branches. `EP-M0` was sponsor-directed
+and is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`,
+`EP-M1b`, and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through
+`EP-M6` outstanding. All decisions they need have been answered. Each
+milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add
+rule tables, fixtures, and tests and observe the expected failure (Stage B);
+implement until the focused tests pass (Stage C); tidy, run the generators
+and exporter and `check_docs.py --write`, review the report diff, and have
 `scrutineer` run the full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
