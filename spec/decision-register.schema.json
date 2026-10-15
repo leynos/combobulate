@@ -17,7 +17,7 @@
       "additionalProperties": false,
       "required": ["decision", "roles"],
       "properties": {
-        "decision": {"$ref": "#/$defs/decision_id"},
+        "decision": {"const": "D01"},
         "roles": {
           "type": "object",
           "additionalProperties": false,
@@ -56,7 +56,7 @@
       "properties": {
         "kind": {"enum": ["session", "pr-review", "pr-comment", "commit"]},
         "url": {"type": "string", "format": "uri", "pattern": "^https://"},
-        "author_login": {"$ref": "#/$defs/login"},
+        "author_login": {"const": "leynos"},
         "names_decisions": {
           "type": "array",
           "minItems": 1,
@@ -134,7 +134,7 @@
           "then": {
             "properties": {
               "decided_option": {"type": "string"},
-              "accepted_by": {"$ref": "#/$defs/login"},
+              "accepted_by": {"const": "leynos"},
               "accepted_on": {"type": "string"},
               "approval_reference": {"$ref": "#/$defs/approval_reference"}
             }

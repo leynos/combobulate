@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from generate_decisions import END, START, MarkerError, app, render, splice
+from generate_decisions import (
+    END, START, MarkerError, app, region_headings, region_words, render, splice,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTER_PATH = ROOT / 'spec/decisions.json'
@@ -94,6 +96,16 @@ def test_check_tolerates_rewrapping(workspace):
     text = document.read_text(encoding='utf-8')
     document.write_text(text.replace('Lifecycle: proposed.', 'Lifecycle:\nproposed.', 1), encoding='utf-8')
     assert run_cli('--check', '--register', str(register), '--document', str(document)) == 0, 'wrapping is free'
+
+
+def test_check_rejects_a_heading_absorbed_into_paragraph_text(workspace):
+    register, document = workspace
+    original = document.read_text(encoding='utf-8')
+    edited = original.replace('\n\n### D03\n\n', ' ### D03\n\n', 1)
+    assert region_words(edited) == region_words(original), 'the mutation must preserve the word sequence'
+    assert region_headings(edited) != region_headings(original), 'the mutation must remove a heading anchor'
+    document.write_text(edited, encoding='utf-8')
+    assert run_cli('--check', '--register', str(register), '--document', str(document)) == 1, 'heading drift fails'
 
 
 def test_check_reports_a_hand_edit(workspace, capsys):

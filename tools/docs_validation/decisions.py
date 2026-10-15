@@ -28,6 +28,8 @@ ADR_NAME = re.compile(r'^docs/adrs/adr-(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 ADR_STATUS = {'proposed': 'Proposed', 'accepted': 'Accepted', 'superseded': 'Superseded'}
 KNOWN_ADR_STATUSES = frozenset(ADR_STATUS.values()) | {'Deprecated'}
 LIVE = {'proposed', 'accepted'}
+AUTHORITY_DECISION = 'D01'
+APPROVAL_LOGIN = 'leynos'
 
 
 def validate_register(register: dict, schema: dict) -> None:
@@ -70,13 +72,17 @@ def check_approval(record: dict, authorities: dict | None) -> None:
     require(authorities is not None, f"{record['id']} is accepted but the register names no authorities")
     allowed = {authorities['roles'][role] for role in record['authority_roles']}
     require(record['accepted_by'] in allowed, f"{record['id']} accepted by a login outside its authority")
+    require(record['accepted_by'] == APPROVAL_LOGIN,
+            f"{record['id']} must be accepted by {APPROVAL_LOGIN}")
 
 
 def check_authorities(register: dict, records: dict[str, dict]) -> None:
-    """Require the authority map to come from an accepted decision once anything is accepted."""
+    """Require the authority map to cite accepted D01, the source of approval authority."""
     authorities = register.get('authorities')
     if authorities is None:
         return
+    require(authorities['decision'] == AUTHORITY_DECISION,
+            f"Authorities must cite {AUTHORITY_DECISION}, not {authorities['decision']}")
     source = records.get(authorities['decision'])
     require(source is not None and is_accepted(source),
             f"Authorities cite {authorities['decision']}, which is not an accepted decision")
@@ -111,6 +117,8 @@ def check_supersession(records: dict[str, dict]) -> None:
         if newer is not None:
             require(newer in records, f"{record['id']} superseded by unknown {newer}")
             require(record['id'] in records[newer]['supersedes'], f"One-way supersession {newer} -> {record['id']}")
+            require(records[newer]['lifecycle'] in {'accepted', 'superseded'},
+                    f"{newer} must be accepted before superseding {record['id']}")
     for record in records.values():
         seen = {record['id']}
         current = record

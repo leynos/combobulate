@@ -112,6 +112,15 @@ class RegisterInvariants(unittest.TestCase):
         record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
         self.assert_rejected(register, 'D03 accepted by a login outside its authority')
 
+    def test_authority_and_approvals_cannot_be_changed_together(self):
+        register = accepted_register()
+        register['authorities']['roles'] = {'sponsor': 'someone-else', 'technical-owner': 'someone-else'}
+        for decision_id in ('D01', 'D03'):
+            accepted = record(register, decision_id)
+            accepted['accepted_by'] = 'someone-else'
+            accepted['approval_reference']['author_login'] = 'someone-else'
+        self.assert_rejected(register, 'D01 must be accepted by leynos')
+
     def test_acceptance_without_authorities_fails(self):
         register = accepted_register()
         del register['authorities']
@@ -121,6 +130,11 @@ class RegisterInvariants(unittest.TestCase):
         register = copy.deepcopy(REGISTER)
         register['authorities'] = {'decision': 'D01', 'roles': {'sponsor': 'leynos', 'technical-owner': 'leynos'}}
         self.assert_rejected(register, 'Authorities cite D01, which is not an accepted decision')
+
+    def test_authorities_must_cite_d01_not_another_accepted_decision(self):
+        register = accepted_register()
+        register['authorities']['decision'] = 'D03'
+        self.assert_rejected(register, 'Authorities must cite D01, not D03')
 
     def test_two_accepted_records_cannot_share_a_subject(self):
         register = accepted_register()
@@ -139,11 +153,26 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'One-way supersession D04 -> D03')
 
     def test_supersession_cycle_fails(self):
-        register = copy.deepcopy(REGISTER)
+        register = accepted_register()
+        accept(register, 'D04')
         for older, newer in (('D03', 'D04'), ('D04', 'D03')):
             record(register, older)['superseded_by'] = newer
             record(register, newer)['supersedes'] = [older]
         self.assert_rejected(register, 'Supersession cycle through D03')
+
+    def test_proposed_replacement_cannot_supersede_an_accepted_record(self):
+        register = accepted_register()
+        older = record(register, 'D03')
+        older.update(lifecycle='superseded', superseded_by='D16')
+        replacement = copy.deepcopy(older)
+        replacement.update({
+            'id': 'D16', 'subject': 'Revised initial release scope',
+            'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None,
+            'accepted_on': None, 'approval_reference': None, 'adr': None,
+            'supersedes': ['D03'], 'superseded_by': None,
+        })
+        register['decisions'].append(replacement)
+        self.assert_rejected(register, 'D16 must be accepted before superseding D03')
 
     def test_candidate_must_cite_a_known_decision(self):
         register = copy.deepcopy(REGISTER)
@@ -169,6 +198,19 @@ class RegisterSchema(unittest.TestCase):
     def test_session_approval_needs_the_verbatim_answer(self):
         register = accepted_register()
         del record(register, 'D03')['approval_reference']['answer']
+        with self.assertRaises(ValidationError):
+            validate_register(register, SCHEMA)
+
+    def test_accepted_record_identity_must_be_the_plan_sponsor(self):
+        register = accepted_register()
+        record(register, 'D03')['accepted_by'] = 'someone-else'
+        record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
+        with self.assertRaises(ValidationError):
+            validate_register(register, SCHEMA)
+
+    def test_authority_source_must_be_d01(self):
+        register = accepted_register()
+        register['authorities']['decision'] = 'D03'
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
 

@@ -476,6 +476,13 @@ delta. Hosted `build-test` and `design-check` pass at that head; the optional
 milestones follow the approved plan's declared gates. The exporter is expected
 to retire when mapsplice#144 adds native JSON export and validation.
 
+Pre-merge assessment on 2026-10-15 found gaps in the EP-M1a authority,
+supersession, and generator CLI checks. The repairs bind authority to accepted
+D01 and C-EP-1's `leynos` login, require an accepted replacement before
+supersession, and preserve generated headings while allowing paragraph
+rewrapping. VO-5 and VO-14 now name these invariants and their negative
+controls.
+
 ## Context and orientation
 
 Combobulate is a proposed Rust array-programming library. The repository holds
@@ -819,14 +826,16 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   cannot be ticked.
 - VO-5 (decision register integrity). Invariants: unique identifiers; unique
   subjects among accepted, non-superseded records; every in-scope ToR question
-  covered by an accepted record; accepted records carry `decided_option`,
+  covered by a live record; accepted records carry `decided_option`,
   `accepted_on`, and a structured approval reference whose `author_login` is
-  `leynos` and whose `names_decisions` includes the record; proposed records
-  carry no approval fields; two-way, acyclic supersession links; each cited ADR
-  exists under `docs/adrs/` with an agreeing `Status` line; dates validated
-  with the `jsonschema` format checker. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity: one in-memory negative
-  control per invariant, each with a distinct message; the real register passes.
+  `leynos` and whose `names_decisions` includes the record; the authority map
+  cites accepted D01; proposed records carry no approval fields; a replacement
+  is accepted before it supersedes an accepted record; supersession links are
+  two-way and acyclic; each cited ADR exists under `docs/adrs/` with an agreeing
+  `Status` line; dates are validated with the `jsonschema` format checker.
+  Artefact: `tools/tests/test_decision_register.py`. Non-vacuity includes
+  coordinated authority-map and approval changes, a non-D01 source, and a
+  proposed replacement; each negative control has its own message.
 - VO-6 (five-document consistency). Invariants: each governing document links
   `decision-register.md`; each accepted question's ToR §9 row links its
   register anchor; after whitespace and inline-Markdown normalization, no
@@ -916,7 +925,9 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   every generator and the roadmap exporter are covered by the checker; rerun on
   a clean tree, they yield no diff. Artefact:
   `tools/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity: a
-  hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails.
+  hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails. The
+  generator CLI rejects a word-preserving loss of a decision heading while
+  permitting ordinary paragraph rewrapping.
 - VO-15 (bet and task links are two-way). Artefact:
   `tools/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
   memory fails.

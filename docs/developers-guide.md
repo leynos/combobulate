@@ -445,19 +445,22 @@ Decisions that control acceptance live in `spec/decisions.json`, validated by
 [decision register](decision-register.md) by `scripts/generate_decisions.py`.
 To propose a decision, add a `proposed` record with its options, a
 recommendation, and a rationale, then run the generator. Only the D01 authority
-accepts a decision. Record an acceptance by setting `lifecycle` to `accepted`
-with `decided_option`, `accepted_by`, `accepted_on`, and an
-`approval_reference` whose `author_login` is the accepting login and whose
-`names_decisions` lists the record; a session answer is quoted verbatim in
-`answer`. Accepting a decision is the moment to reconcile the governing
-documents: list each replaced sentence in `retired_statements`, and link the
-ToR §9 row of every answered question to the record's anchor (for example
-`decision-register.md#d03`). The design checks reject an accepted decision
-whose approval is malformed, whose ADR disagrees on status, whose retired text
-reappears, or whose question is still described as open or pending within 60
-characters of its identifier. Never edit an accepted record in place: add a
-superseding record and link both directions with `supersedes` and
-`superseded_by`. ADRs live in `docs/adrs/` as `adr-nnnn-title-slug.md`, per the
+accepts a decision. The authority map must cite accepted D01, and C-EP-1 fixes
+the accepting login to `leynos`; changing the map cannot appoint another
+approver. Record an acceptance by setting `lifecycle` to `accepted` with
+`decided_option`, `accepted_by`, `accepted_on`, and an `approval_reference`
+whose `author_login` is `leynos` and whose `names_decisions` lists the record;
+a session answer is quoted verbatim in `answer`. Accepting a decision is the
+moment to reconcile the governing documents: list each replaced sentence in
+`retired_statements`, and link the ToR §9 row of every answered question to the
+record's anchor (for example `decision-register.md#d03`). The design checks
+reject an accepted decision whose approval is malformed, whose ADR disagrees on
+status, whose retired text reappears, or whose question is still described as
+open or pending within 60 characters of its identifier. Never edit an accepted
+record in place. A proposed replacement cannot retire it: record the
+replacement's acceptance first, then mark the older record `superseded` and add
+both `supersedes` and `superseded_by` links together. ADRs live in `docs/adrs/`
+as `adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
 
 Python helper scripts live in `scripts/` and follow

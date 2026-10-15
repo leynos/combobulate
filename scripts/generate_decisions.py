@@ -13,15 +13,16 @@ prose outside the markers is maintained by hand.
 
 Run ``scripts/generate_decisions.py`` after editing the register to rewrite
 the region, or ``scripts/generate_decisions.py --check`` (``INPUT_CHECK=true``
-in CI) to fail when the document has drifted. The check ignores line wrapping,
-because the Markdown formatter rewraps generated paragraphs. Exit codes: 0 when
-the region is written or matches, 1 on drift, and 2 when the document lacks
-exactly one marker pair. The design checker imports `render`, `START`, and
-`END` from this file for its own semantic drift check.
+in CI) to fail when the document has drifted. The check ignores paragraph
+rewrapping but preserves generated Markdown headings as anchors. Exit codes: 0
+when the region is written or matches, 1 on drift, and 2 when the document
+lacks exactly one marker pair. The design checker imports `render`, `START`,
+and `END` from this file for its own semantic drift check.
 """
 from __future__ import annotations
 
 import json
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -148,6 +149,13 @@ def region_words(text: str) -> list[str]:
     return text.split(START)[1].split(END)[0].split()
 
 
+def region_headings(text: str) -> list[str]:
+    """Return generated ATX headings; e.g. a paragraph cannot replace ``### D03``."""
+    region = text.split(START)[1].split(END)[0]
+    return [line.strip() for line in region.splitlines()
+            if re.match(r' {0,3}#{1,6}(?:[ \t]+|$)', line)]
+
+
 app = App(help=__doc__.splitlines()[0], config=cyclopts.config.Env('INPUT_', command=False))
 
 
@@ -174,7 +182,7 @@ def main(*, check: bool = False, register: Path = ROOT / 'spec/decisions.json',
     if not check:
         document.write_text(expected, encoding='utf-8')
         return 0
-    if region_words(text) == region_words(expected):
+    if region_words(text) == region_words(expected) and region_headings(text) == region_headings(expected):
         print(f'{document.name} matches {register.name}.')
         return 0
     print(f'{document.name} has drifted from {register.name}: run scripts/generate_decisions.py', file=sys.stderr)
