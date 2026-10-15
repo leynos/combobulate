@@ -14,24 +14,13 @@ controls (with their amendment chain) and exceptions when they are added.
 """
 from __future__ import annotations
 
-import json
-import subprocess
 from collections.abc import Callable, Mapping
+from typing import TypeAlias
 
 from .context import ValidationContext, require
 
 SUPERSESSION_FIELDS = frozenset({'lifecycle', 'superseded_by'})
-
-
-def committed_json(context: ValidationContext, revision: str, path: str) -> dict | None:
-    """Read JSON from a revision; a path absent at that revision returns None."""
-    result = subprocess.run(['git', 'show', f'{revision}:{path}'], cwd=context.root, capture_output=True,
-                            text=True, check=False)
-    if result.returncode != 0:
-        require('does not exist' in result.stderr or 'exists on disk, but not in' in result.stderr,
-                f'Cannot read {path} at base revision {revision}: {result.stderr.strip()}')
-        return None
-    return json.loads(result.stdout)
+RevisionJsonReader: TypeAlias = Callable[[str, str], dict | None]
 
 
 def check_decisions_frozen(base: dict, head: dict) -> None:
@@ -54,15 +43,24 @@ FROZEN_DOCUMENTS: Mapping[str, Callable[[dict, dict], None]] = {
 }
 
 
-def check_frozen(context: ValidationContext, base_rev: str | None) -> str:
+def check_frozen(context: ValidationContext, base_rev: str | None,
+                 read_json_at_revision: RevisionJsonReader) -> str:
     """Compare each frozen register with the base revision; return a summary for the caller to print.
+
+    For example, a test can supply a fixed base register without invoking Git::
+
+        check_frozen(context, 'base', lambda revision, path: base_register)
 
     Parameters
     ----------
     context
-        The validation context whose root is a Git work tree.
+        The validation context containing the current register files.
     base_rev
         The revision to compare with, or None to skip the check.
+    read_json_at_revision
+        A repository reader that returns the committed JSON value, or None
+        only when the register did not exist at that revision. The CLI supplies
+        the Git adapter; unit tests can supply a deterministic reader.
 
     Returns
     -------
@@ -78,7 +76,7 @@ def check_frozen(context: ValidationContext, base_rev: str | None) -> str:
         return 'Freeze check not run: no --base-rev supplied.'
     compared = []
     for path, check in FROZEN_DOCUMENTS.items():
-        base = committed_json(context, base_rev, path)
+        base = read_json_at_revision(base_rev, path)
         if base is None:
             continue
         check(base, context.load(path))

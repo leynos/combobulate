@@ -24,15 +24,22 @@ RECORD_SOURCE = 'record'
 
 
 @dataclass(frozen=True)
+class ArtefactProblem:
+    """Name why one declared completion artefact cannot support a tick."""
+
+    detail: str
+
+
+@dataclass(frozen=True)
 class ClosureInputs:
-    """Bundle what closure reads; e.g. ClosureInputs(tasks, completions, decisions, components, passed, exists)."""
+    """Bundle closure inputs; e.g. ClosureInputs(tasks, completions, decisions, components, passed, problem)."""
 
     tasks: Mapping[str, dict]
     completions: Mapping[str, dict]
     decisions: Mapping[str, dict]
     components: Mapping[str, list[dict]]
     passed_checks: frozenset[str]
-    artefact_exists: Callable[[str], bool]
+    artefact_problem: Callable[[str], ArtefactProblem | None]
 
 
 def roadmap_tasks(roadmap: dict) -> dict[str, dict]:
@@ -117,8 +124,11 @@ def closure_failures(task_id: str, inputs: ClosureInputs) -> list[str]:
     else:
         failures.extend(f'decision {decision} is {inputs.decisions[decision]["lifecycle"]}, not accepted'
                         for decision in record['decisions'] if inputs.decisions[decision]['lifecycle'] != 'accepted')
-        failures.extend(f'artefact {artefact} does not resolve' for artefact in record['artefacts']
-                        if not inputs.artefact_exists(artefact))
+        failures.extend(
+            f'artefact {artefact} {problem.detail}'
+            for artefact in record['artefacts']
+            if (problem := inputs.artefact_problem(artefact)) is not None
+        )
     failures.extend(failure for component in inputs.components.get(task_id, [])
                     if (failure := component_failure(component, inputs.passed_checks)) is not None)
     return failures
@@ -138,23 +148,45 @@ def task_closure(inputs: ClosureInputs) -> tuple[list[str], list[str]]:
     return ticked, eligible
 
 
-def artefact_resolver(context: ValidationContext) -> Callable[[str], bool]:
-    """Resolve 'path' or 'path#anchor' beneath the root; '../x' or a missing heading anchor does not resolve."""
+def artefact_resolver(context: ValidationContext) -> Callable[[str], ArtefactProblem | None]:
+    """Resolve a repository artefact, returning a named problem when it cannot support a tick.
+
+    A path may include a Markdown heading anchor, such as ``docs/guide.md#setup``.
+    The callback returns ``None`` for a resolved artefact and ``ArtefactProblem``
+    for paths outside the repository, missing files or anchors, and read or
+    parse failures. This keeps filesystem errors outside the closure rules.
+
+    For example, a file with a ``Setup`` heading resolves through
+    ``artefact_resolver(context)('docs/guide.md#setup')`` with a ``None`` result.
+    """
     root = context.root.resolve()
 
-    def exists(artefact: str) -> bool:
-        """Resolve a path only when it stays in-root and its optional anchor exists."""
+    def resolve(artefact: str) -> ArtefactProblem | None:
+        """Resolve one path and translate expected filesystem failures to a problem."""
         path, _, anchor = artefact.partition('#')
-        target = (root / path).resolve()
-        if not target.is_relative_to(root) or not target.is_file():
-            return False
-        if not anchor:
-            return True
         try:
-            return anchor in headings(target.read_text(encoding='utf-8'))
+            target = (root / path).resolve()
+        except (OSError, RuntimeError) as error:
+            return ArtefactProblem(f'cannot resolve path ({error})')
+        if not target.is_relative_to(root):
+            return ArtefactProblem('resolves outside the repository')
+        if not target.is_file():
+            return ArtefactProblem('does not resolve to a file')
+        if not anchor:
+            return None
+        try:
+            text = target.read_text(encoding='utf-8')
         except UnicodeDecodeError:
-            return False
-    return exists
+            return ArtefactProblem('is not valid UTF-8 text')
+        except OSError as error:
+            return ArtefactProblem(f'cannot be read ({error})')
+        try:
+            has_anchor = anchor in headings(text)
+        except ValueError as error:
+            return ArtefactProblem(f'cannot be parsed ({error})')
+        return None if has_anchor else ArtefactProblem(f'has no heading anchor {anchor!r}')
+
+    return resolve
 
 
 def check_task_status(context: ValidationContext, roadmap: dict, decisions: Mapping[str, dict],
@@ -183,7 +215,7 @@ def check_task_status(context: ValidationContext, roadmap: dict, decisions: Mapp
         completions=index_completions(context.load('spec/task-completion.json'), tasks, decisions),
         decisions=decisions, components=components,
         passed_checks=frozenset(row['check'] for row in context.results if row['status'] == 'pass'),
-        artefact_exists=artefact_resolver(context),
+        artefact_problem=artefact_resolver(context),
     )
     ticked, eligible = task_closure(inputs)
     context.record('roadmap-status',

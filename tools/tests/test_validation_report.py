@@ -16,6 +16,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
+from docs_validation.freeze import RevisionJsonReader
 
 import check_docs
 
@@ -104,12 +105,14 @@ class ValidationReport(unittest.TestCase):
 
     def test_cli_injects_evaluation_date_and_base_revision(self) -> None:
         """Pass CLI values into validation context and print the freeze summary."""
-        observed = {}
+        observed: dict[str, object] = {}
 
-        def freeze(context: ValidationContext, base_revision: str | None) -> str:
-            """Capture the injected command-line values and return a visible summary."""
+        def freeze(context: ValidationContext, base_revision: str | None,
+                   read_json_at_revision: RevisionJsonReader) -> str:
+            """Capture command-line values and the composition-root reader."""
             observed['as_of'] = context.as_of
             observed['base_revision'] = base_revision
+            observed['reader_is_callable'] = callable(read_json_at_revision)
             return 'Freeze check fixture passed.'
 
         stderr = io.StringIO()
@@ -121,6 +124,7 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(result, 0, 'the checker should accept an explicit evaluation date and base revision')
         self.assertEqual(observed, {
             'as_of': date(2026, 10, 15), 'base_revision': 'fixture-base',
+            'reader_is_callable': True,
         }, 'the parsed CLI values must reach the context and freeze check')
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')

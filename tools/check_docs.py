@@ -13,6 +13,7 @@ import ast
 import json
 import sys
 from datetime import date
+from functools import partial
 from pathlib import Path
 
 from jsonschema import ValidationError
@@ -26,6 +27,7 @@ from docs_validation.decisions import check_decision_register
 from docs_validation.freeze import check_frozen
 from docs_validation.ledger import check_catalogue_and_roadmap
 from docs_validation.markdown import check_markdown
+from docs_validation.revision_reader import git_json_at_revision
 from docs_validation.roadmap_status import check_roadmap_status
 from docs_validation.semantics import check_examples
 
@@ -96,7 +98,9 @@ def main(argv: list[str] | None = None) -> int:
     context = ValidationContext(ROOT, as_of=args.as_of)
     try:
         collect_checks(context)
-        freeze_summary = check_frozen(context, args.base_rev)
+        freeze_summary = check_frozen(
+            context, args.base_rev, partial(git_json_at_revision, context.root)
+        )
         report = report_data(context, 'pass')
         if args.write:
             (context.root / 'docs/validation-results.json').write_text(

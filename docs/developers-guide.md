@@ -509,6 +509,16 @@ validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout
 formatting can preserve the contract without creating false generator drift.
 
+Roadmap closure and frozen-register comparison keep repository access behind
+small reader callbacks. `ClosureInputs` receives an artefact resolver that
+returns `ArtefactProblem` for path, read, or anchor failures; `check_frozen`
+receives a `RevisionJsonReader`. The roadmap check composes its filesystem
+adapter from the validation context; the command-line composition root supplies
+the Git adapter. These ports belong only to `tools/docs_validation/`: keep
+their domain rules independent of I/O, and do not reuse them as general
+repository file or Git APIs. Unit tests inject deterministic readers, while a
+temporary Git integration test covers actual revision reads.
+
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their
 independent oracle uses Python's unbounded integers and checks the I64 range

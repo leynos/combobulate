@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from docs_validation.roadmap_status import (
-    ClosureInputs, artefact_resolver, component_failure, index_completions, task_closure,
+    ArtefactProblem, ClosureInputs, artefact_resolver, component_failure, index_completions, task_closure,
 )
 
 GENERATED = settings(max_examples=60, derandomize=True, deadline=None)
@@ -47,7 +47,7 @@ def closure_states(draw):
         decisions={},
         components={},
         passed_checks=frozenset(),
-        artefact_exists=lambda artefact: artefact == 'docs/evidence.md',
+        artefact_problem=lambda artefact: None if artefact == 'docs/evidence.md' else ArtefactProblem('is missing'),
     )
 
 
@@ -125,8 +125,8 @@ class RoadmapClosureProperties(unittest.TestCase):
             target = root / relative
             target.parent.mkdir(parents=True)
             target.write_text('# Evidence\n', encoding='utf-8')
-            exists = artefact_resolver(ValidationContext(root))
-            self.assertTrue(exists(relative.as_posix()), 'an existing descendant file must resolve')
+            resolve = artefact_resolver(ValidationContext(root))
+            self.assertIsNone(resolve(relative.as_posix()), 'an existing descendant file must resolve')
 
     @GENERATED
     @given(depth=st.integers(min_value=1, max_value=4))
@@ -138,8 +138,11 @@ class RoadmapClosureProperties(unittest.TestCase):
             root.mkdir(parents=True)
             (base / 'outside.md').write_text('# Outside\n', encoding='utf-8')
             escaped = '/'.join(['..'] * depth + ['outside.md'])
-            exists = artefact_resolver(ValidationContext(root))
-            self.assertFalse(exists(escaped), 'an existing file outside the root must not resolve')
+            resolve = artefact_resolver(ValidationContext(root))
+            problem = resolve(escaped)
+            assert problem is not None, 'an escaped artefact must return a named problem'
+            self.assertIn('outside the repository', problem.detail,
+                          'an existing file outside the root must not resolve')
 
 
 if __name__ == '__main__':

@@ -6,13 +6,15 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from check_docs import collect_checks
 from docs_validation.roadmap_status import (
-    ClosureInputs, artefact_resolver, closure_failures, index_completions, index_components, task_closure,
+    ArtefactProblem, ClosureInputs, artefact_resolver, closure_failures, index_completions,
+    index_components, task_closure,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +54,7 @@ def inputs(tasks: dict[str, dict], **overrides: object) -> ClosureInputs:
     """Build closure inputs in which every condition holds unless overridden."""
     values = {'tasks': tasks, 'completions': completions(tasks), 'decisions': {'D01': ACCEPTED},
               'components': {}, 'passed_checks': frozenset({'evidence-gate'}),
-              'artefact_exists': lambda artefact: artefact == ARTEFACT}
+              'artefact_problem': lambda artefact: None if artefact == ARTEFACT else ArtefactProblem('is missing')}
     values.update(overrides)
     return ClosureInputs(**values)
 
@@ -102,7 +104,8 @@ class TaskClosure(unittest.TestCase):
 
     def test_tick_with_unresolvable_artefact_fails(self):
         """Reject a tick when its completion artefact cannot be resolved."""
-        closure = inputs(ticked(chain(), '1.1.1'), artefact_exists=lambda artefact: False)
+        closure = inputs(ticked(chain(), '1.1.1'),
+                         artefact_problem=lambda artefact: ArtefactProblem('does not resolve'))
         self.assert_rejected(closure, f'artefact {ARTEFACT} does not resolve')
 
     def test_record_sourced_component_fails_closed(self):
@@ -196,11 +199,20 @@ class RealRoadmap(unittest.TestCase):
             (root / 'docs/guide.md').write_text('# Guide\n', encoding='utf-8')
             outside = Path(directory) / 'outside.md'
             outside.write_text('# Outside\n', encoding='utf-8')
-            exists = artefact_resolver(ValidationContext(root))
-            self.assertTrue(exists('docs/guide.md#guide'), 'an in-repository heading resolves')
-            self.assertFalse(exists('../outside.md'), 'a relative path escaping the root never resolves')
-            self.assertFalse(exists(str(outside)), 'an absolute path outside the root never resolves')
-            self.assertFalse(exists('docs/guide.md#no-such-heading'), 'a missing anchor does not resolve')
+            resolve = artefact_resolver(ValidationContext(root))
+            self.assertIsNone(resolve('docs/guide.md#guide'), 'an in-repository heading resolves')
+            relative_problem = resolve('../outside.md')
+            assert relative_problem is not None, 'an escaped relative artefact returns a problem'
+            self.assertIn('outside the repository', relative_problem.detail,
+                          'a relative path escaping the root is rejected')
+            absolute_problem = resolve(str(outside))
+            assert absolute_problem is not None, 'an escaped absolute artefact returns a problem'
+            self.assertIn('outside the repository', absolute_problem.detail,
+                          'an absolute path outside the root is rejected')
+            anchor_problem = resolve('docs/guide.md#no-such-heading')
+            assert anchor_problem is not None, 'a missing heading anchor returns a problem'
+            self.assertIn('no heading anchor', anchor_problem.detail,
+                          'a missing anchor is reported')
 
     def test_anchored_non_utf8_artefact_does_not_resolve(self) -> None:
         """Report undecodable anchored artefacts as unresolved without rejecting their path."""
@@ -208,10 +220,35 @@ class RealRoadmap(unittest.TestCase):
             root = Path(directory) / 'repository'
             (root / 'docs').mkdir(parents=True)
             (root / 'docs/binary.dat').write_bytes(b'\xff')
-            exists = artefact_resolver(ValidationContext(root))
-            self.assertTrue(exists('docs/binary.dat'), 'an unanchored in-root file resolves')
-            self.assertFalse(exists('docs/binary.dat#heading'),
+            resolve = artefact_resolver(ValidationContext(root))
+            self.assertIsNone(resolve('docs/binary.dat'), 'an unanchored in-root file resolves')
+            self.assertEqual(resolve('docs/binary.dat#heading'),
+                             ArtefactProblem('is not valid UTF-8 text'),
                              'an undecodable file cannot satisfy an anchor')
+
+    def test_artefact_read_failure_returns_a_named_problem(self) -> None:
+        """Translate an expected file read failure into the resolver contract."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repository'
+            (root / 'docs').mkdir(parents=True)
+            (root / 'docs/guide.md').write_text('# Guide\n', encoding='utf-8')
+            resolve = artefact_resolver(ValidationContext(root))
+            with patch.object(Path, 'read_text', side_effect=OSError('read blocked')):
+                problem = resolve('docs/guide.md#guide')
+            self.assertEqual(problem, ArtefactProblem('cannot be read (read blocked)'),
+                             'read failures cross the resolver boundary as a named problem')
+
+    def test_heading_parser_failure_returns_a_named_problem(self) -> None:
+        """Translate a heading parser failure before it reaches closure rules."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'repository'
+            (root / 'docs').mkdir(parents=True)
+            (root / 'docs/guide.md').write_text('# Guide\n', encoding='utf-8')
+            resolve = artefact_resolver(ValidationContext(root))
+            with patch('docs_validation.roadmap_status.headings', side_effect=ValueError('bad Markdown')):
+                problem = resolve('docs/guide.md#guide')
+            self.assertEqual(problem, ArtefactProblem('cannot be parsed (bad Markdown)'),
+                             'parser failures cross the resolver boundary as a named problem')
 
     def test_pf14_structural_component_targets_task_114(self):
         """Bind PF14's structural component to task 1.1.4 and the evidence-gate check."""
