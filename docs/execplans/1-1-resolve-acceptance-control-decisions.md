@@ -297,6 +297,9 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   remains open", or deleting the Q4 anchor each fails naming D03); task 1.1.1
   ticked with its completion record, and the checker reports it backed.
 - [x] (2026-10-15) Rebased `EP-M2` onto roadmap-closure head `2df245d`.
+- [x] (2026-10-15) Rebased `EP-M2` onto updated roadmap-closure head
+  `62768a8`, retaining its fail-closed PR merge-base assignment and
+  missing-base workflow regression.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
@@ -420,6 +423,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `tools/tests/test_supersession_properties.py`. This retains the parent
   branch's parser and freeze improvements, keeps the governance check narrow,
   and preserves all cases within the per-file line limit. Date/Author:
+  2026-10-15, implementing agent.
+- EP-M2 follow-up rebase integration: retain roadmap-closure's standalone
+  `git merge-base` assignment and executable missing-base workflow regression.
+  The governance branch changes neither file; keeping both preserves the
+  design-check workflow's fail-closed PR freeze-base selection. Date/Author:
   2026-10-15, implementing agent.
 - EP-M1b scope escalation: the current-head completeness assessment found
   1,757 net added lines across 25 changed files, excluding
