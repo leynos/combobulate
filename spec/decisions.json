@@ -158,6 +158,10 @@
         {
           "document": "docs/context.md",
           "text": "Unresolved choices include a dependency/toolchain baseline, quantitative performance and compile-cost gates, the accepted core release boundary, and actual trasic adoption access."
+        },
+        {
+          "document": "docs/roadmap.md",
+          "text": "All work remains proposed and open."
         }
       ]
     },

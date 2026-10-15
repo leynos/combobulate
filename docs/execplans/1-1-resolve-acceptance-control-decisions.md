@@ -292,14 +292,19 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   with 12 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
   Q4, Q7, and Q8 link their register anchors; `Cargo.toml` sets
   `publish = false` and `cargo publish --dry-run` refuses; 4 cases in
-  `tools/tests/test_package_policy.py` (red first) and 5 real-document VO-6
-  controls pass (reinserting the Q4 sentence, rewrapped or not, writing "Q4
-  remains open", or deleting the Q4 anchor each fails naming D03); task 1.1.1
+  `tools/tests/test_package_policy.py` (red first) and 6 real-document VO-6
+  controls pass for the retired Q4 sentence (including a wrapped form), the
+  restored roadmap preamble while task 1.1.1 remains checked, "Q4 remains
+  open", and removal of the Q4 anchor; each failure names D03. Task 1.1.1 is
   ticked with its completion record, and the checker reports it backed.
 - [x] (2026-10-15) Rebased `EP-M2` onto roadmap-closure head `2df245d`.
 - [x] (2026-10-15) Rebased `EP-M2` onto updated roadmap-closure head
   `62768a8`, retaining its fail-closed PR merge-base assignment and
   missing-base workflow regression.
+- [x] (2026-10-15) Resolved the current-head CodeRabbit assessment finding:
+  registered the superseded roadmap preamble under D03 and added a
+  real-document negative control that restores it while task 1.1.1 remains
+  checked.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
@@ -372,6 +377,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `ValidationContext.root`, and keep real-document governance controls and
   generated supersession properties in separate test modules so the invariant
   module stays within the 400-line limit.
+- Observation: the CodeRabbit completeness assessment found that the
+  superseded roadmap preamble, "All work remains proposed and open.", was not
+  in D03's `retired_statements`, and that restoring it beside the completed
+  task checkbox passed the consistency check
+  ([assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6194483690)).
+  Impact: add the sentence to D03 and a real-document negative control that
+  keeps task 1.1.1 checked.
 
 ## Decision log
 
@@ -984,10 +996,12 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `retired_statements` text of an accepted decision appears; no governing
   document matches `(pending|open|unresolved|remains? proposed)` within 60
   characters of an accepted question's identifier. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity: after D03's acceptance,
-  reinserting "The classes remain proposed pending ToR Q4." (also rewrapped
-  across two lines), writing "Q4 remains open", or deleting the ToR §9 anchor
-  each fails.
+  `tools/tests/test_decision_register.py` and
+  `tools/tests/test_decision_register_integration.py`. Non-vacuity: after D03's
+  acceptance, reinserting "The classes remain proposed pending ToR Q4." (also
+  rewrapped across two lines), restoring "All work remains proposed and open."
+  while task 1.1.1 stays checked, writing "Q4 remains open", or deleting the
+  ToR §9 anchor each fails.
 - VO-7 (base-revision freeze). Invariant: compared with `--base-rev`, the
   check rejects a frozen-field change to a registered control without a new
   amendment whose `replaces` equals the previous digest; an edited or removed
@@ -1522,8 +1536,9 @@ Behavioural acceptance:
 2. `docs/roadmap.md` shows 1.1.1 to 1.1.4 ticked and no other ticked task;
    `scripts/export_roadmap.py --check` passes.
 3. Reinserting "The classes remain proposed pending ToR Q4." into
-   `docs/technical-design.md`, or writing "Q4 remains open", makes
-   `make design-check` fail and name D03.
+   `docs/technical-design.md`, restoring "All work remains proposed and open."
+   in the roadmap preamble while task 1.1.1 remains checked, or writing "Q4
+   remains open", makes `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
    `make design-check BASE_REV=origin/main` fail and name AC-03.
 5. `check_evidence.py` rejects a `resource-exhausted` fixture, reports a

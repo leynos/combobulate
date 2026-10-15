@@ -92,6 +92,23 @@ class RealGoverningDocuments(unittest.TestCase):
         self.documents['docs/technical-design.md'] += '\nThe classes remain proposed\npending ToR Q4.\n'
         self.assert_rejected('still states text retired by D03')
 
+    def test_restored_roadmap_preamble_names_d03_and_keeps_task_ticked(self) -> None:
+        """Reject the old roadmap preamble while task 1.1.1 remains complete."""
+        name = 'docs/roadmap.md'
+        roadmap = self.documents[name]
+        completed_task = '- [x] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API'
+        current_preamble = 'Task 1.1.1 is complete; all other work remains\nproposed and open.'
+        old_preamble = 'All work remains proposed and open.'
+        self.assertIn(completed_task, roadmap,
+                      'the real roadmap must show task 1.1.1 complete before mutation')
+        restored = roadmap.replace(current_preamble, old_preamble, 1)
+        self.assertNotEqual(restored, roadmap,
+                            'the current roadmap preamble must be present for mutation')
+        self.assertIn(completed_task, restored,
+                      'restoring the preamble must leave task 1.1.1 checked')
+        self.documents[name] = restored
+        self.assert_rejected('still states text retired by D03')
+
     def test_q4_described_as_open_names_d03(self) -> None:
         """Reject a live document that describes the accepted Q4 scope as open."""
         self.documents['docs/roadmap.md'] += '\nQ4 remains open.\n'
