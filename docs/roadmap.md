@@ -31,11 +31,15 @@ public API stabilizes. Optional Polars hooks may be declined; that does not
 waive the first-class backend contract or required semantic proofs.
 
 The foundational phase resolves candidate ADRs identified in
-`technical-design.md` §15; no accepted ADR or ExecPlan exists in this evidence
-set. Core scope ends at 4.3.3, including public consumer and staged-cost gates.
-Integration scope has a separate gate at 6.3.4; its real-client experiments
-require source access, while synthetic extensions do not. The final phase
-contains bounded evaluations, not promised features.
+`technical-design.md` §15. Decisions D01–D15 that control acceptance are
+accepted and recorded in the [decision register](decision-register.md), which
+links their applicable ADRs. Roadmap step 1.1 has a dedicated
+[EP-M6 ExecPlan](execplans/1-1-resolve-acceptance-control-decisions.md). Later
+design and delivery work remains proposed. Core scope ends at 4.3.3, including
+public consumer and staged-cost gates. Integration scope has a separate gate at
+6.3.4; its real-client experiments require source access, while synthetic
+extensions do not. The final phase contains bounded evaluations, not promised
+features.
 
 <!-- roadmap:start -->
 

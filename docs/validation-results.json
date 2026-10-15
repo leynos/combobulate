@@ -12,7 +12,7 @@
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 106
+      "count": 108
     },
     {
       "check": "catalogue",
