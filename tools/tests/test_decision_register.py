@@ -10,7 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from jsonschema import ValidationError
-from hypothesis import given, settings, strategies as st
+from hypothesis import assume, given, settings, strategies as st
 
 from docs_validation.context import ValidationContext
 from docs_validation.decisions import (
@@ -398,6 +398,33 @@ class SupersessionProperties(unittest.TestCase):
     @given(records=supersession_cycles())
     def test_reciprocal_cycles_fail_regardless_of_record_order(self, records):
         with self.assertRaisesRegex(AssertionError, 'Supersession cycle'):
+            check_supersession(records)
+
+    @settings(max_examples=100, derandomize=True, deadline=None)
+    @given(records=acyclic_supersession_graphs())
+    def test_one_way_links_fail_for_generated_acyclic_graphs(self, records):
+        edges = [(record['id'], older) for record in records.values() for older in record['supersedes']]
+        assume(bool(edges))
+        newer, older = edges[0]
+        records[newer]['supersedes'].remove(older)
+        with self.assertRaisesRegex(AssertionError, 'One-way supersession'):
+            check_supersession(records)
+
+    @settings(max_examples=100, derandomize=True, deadline=None)
+    @given(records=acyclic_supersession_graphs())
+    def test_unknown_links_fail_for_generated_acyclic_graphs(self, records):
+        next(iter(records.values()))['supersedes'].append('D99')
+        with self.assertRaisesRegex(AssertionError, 'supersedes unknown D99'):
+            check_supersession(records)
+
+    @settings(max_examples=100, derandomize=True, deadline=None)
+    @given(records=acyclic_supersession_graphs())
+    def test_proposed_replacements_fail_for_generated_acyclic_graphs(self, records):
+        edges = [(record['id'], older) for record in records.values() for older in record['supersedes']]
+        assume(bool(edges))
+        replacement, _older = edges[0]
+        records[replacement]['lifecycle'] = 'proposed'
+        with self.assertRaisesRegex(AssertionError, 'must be accepted before superseding'):
             check_supersession(records)
 
 
