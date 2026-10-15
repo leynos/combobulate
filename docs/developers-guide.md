@@ -458,8 +458,8 @@ reject an accepted decision whose approval is malformed, whose ADR disagrees on
 status, whose retired text reappears, or whose question is still described as
 open or pending within 60 characters of its identifier. Never edit an accepted
 record in place. A replacement must have its own valid D01-authorized
-acceptance before it can retire the accepted decision. Link both directions
-with `supersedes` and `superseded_by`; supersession chains must be acyclic and
+acceptance before it can retire the accepted decision. Link both directions with
+`supersedes` and `superseded_by`; supersession chains must be acyclic and
 terminate at an accepted replacement. ADRs live in `docs/adrs/` as
 `adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
