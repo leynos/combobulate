@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 12
+      "count": 16
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 40
+      "count": 67
     },
     {
       "check": "catalogue",
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 48
+      "count": 49
     },
     {
       "check": "package-policy",

@@ -296,6 +296,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   controls pass (reinserting the Q4 sentence, rewrapped or not, writing "Q4
   remains open", or deleting the Q4 anchor each fails naming D03); task 1.1.1
   ticked with its completion record, and the checker reports it backed.
+- [x] (2026-10-15) Rebased `EP-M2` onto roadmap-closure head `2df245d`.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
@@ -361,6 +362,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   documentation, 2026-10-10). Impact: calibration extrapolates to that class.
 - Observation: ISC already appears in `Cargo.toml`, `LICENSE`, and
   `README.md` through ADR 001; D04 ratifies it.
+- Observation: rebasing `EP-M2` onto the updated roadmap-closure branch brought
+  in a `RoadmapBuilder`, explicit parser-node checks, and a typed
+  `RevisionJsonReader` for historical freeze comparisons. Impact: retain those
+  boundaries and their tests; keep package policy scoped to
+  `ValidationContext.root`, and keep real-document governance controls and
+  generated supersession properties in separate test modules so the invariant
+  module stays within the 400-line limit.
 
 ## Decision log
 
@@ -406,6 +414,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   while ungoverned tasks have none to cite. The composed test records that
   valid case and still rejects missing completion evidence and citations to
   unaccepted decisions. Date/Author: 2026-10-15, implementing agent.
+- EP-M2 rebase integration: keep the roadmap-closure parser and revision-reader
+  seams, preserve the governance package-policy check at the repository-root
+  boundary, and move generated supersession cases into
+  `tools/tests/test_supersession_properties.py`. This retains the parent
+  branch's parser and freeze improvements, keeps the governance check narrow,
+  and preserves all cases within the per-file line limit. Date/Author:
+  2026-10-15, implementing agent.
 - EP-M1b scope escalation: the current-head completeness assessment found
   1,757 net added lines across 25 changed files, excluding
   `docs/validation-results.json`. The file count is within tolerance; the net
@@ -1082,8 +1097,15 @@ Trusted, not verified here:
 
 ## Plan of work
 
-Milestones run in order on stacked branches. `EP-M0` was sponsor-directed
-and is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`,
+Milestones run in order on stacked branches. `EP-M0` was sponsor-directed and
+is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`,
+`EP-M1b`, and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through
+`EP-M6` outstanding. All decisions they need have been answered. Each
+milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add
+rule tables, fixtures, and tests and observe the expected failure (Stage B);
+implement until the focused tests pass (Stage C); tidy, run the generators
+and exporter and `check_docs.py --write`, review the report diff, and have
+`scrutineer` run the full gates (Stage D).
 `EP-M1b`, and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through
 `EP-M6` outstanding. All decisions they need have been answered. Each
 milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add
