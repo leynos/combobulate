@@ -13,6 +13,7 @@ from check_docs import collect_checks
 from docs_validation.context import ValidationContext
 from docs_validation.decisions import (
     GOVERNING_DOCUMENTS, check_decision_register, check_governing_documents, check_register_records,
+    normalize,
 )
 from docs_validation.ledger import check_generated_documents, generated_documents
 from test_decision_register import REGISTER, RETIRED
@@ -71,10 +72,12 @@ class RealGoverningDocuments(unittest.TestCase):
     """Keep accepted decisions reconciled with the committed governing documents."""
 
     def setUp(self) -> None:
+        """Load fresh register records and governing-document copies per mutation."""
         self.records = check_register_records(REGISTER)
         self.documents = {name: (ROOT / name).read_text(encoding='utf-8') for name in GOVERNING_DOCUMENTS}
 
     def assert_rejected(self, message: str) -> None:
+        """Require a mutated document set to fail with its decision-specific reason."""
         with self.assertRaisesRegex(AssertionError, message):
             check_governing_documents(self.records, self.documents)
 
@@ -106,6 +109,25 @@ class RealGoverningDocuments(unittest.TestCase):
                             'the current roadmap preamble must be present for mutation')
         self.assertIn(completed_task, restored,
                       'restoring the preamble must leave task 1.1.1 checked')
+        self.documents[name] = restored
+        self.assert_rejected('still states text retired by D03')
+
+    def test_stale_roadmap_adr_claim_names_d03_and_keeps_task_ticked(self) -> None:
+        """Reject stale claims that no ADR has been accepted after task 1.1.1."""
+        name = 'docs/roadmap.md'
+        roadmap = self.documents[name]
+        completed_task = '- [x] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API'
+        retired_claim = ('The foundational phase resolves candidate ADRs identified in '
+                         '`technical-design.md` §15; no accepted ADR or ExecPlan exists in this evidence set.')
+        self.assertIn(completed_task, roadmap,
+                      'the real roadmap must show task 1.1.1 complete before mutation')
+        self.assertNotIn(normalize(retired_claim), normalize(roadmap),
+                         'the current roadmap must not contain the retired ADR claim')
+        restored = f'{roadmap.rstrip()}\n\n{retired_claim}\n'
+        self.assertNotEqual(restored, roadmap,
+                            'the retired ADR claim must change the roadmap for mutation')
+        self.assertIn(completed_task, restored,
+                      'restoring the stale claim must leave task 1.1.1 checked')
         self.documents[name] = restored
         self.assert_rejected('still states text retired by D03')
 

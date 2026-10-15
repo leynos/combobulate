@@ -90,11 +90,13 @@ class RegisterInvariants(unittest.TestCase):
         check_register_records(register)
 
     def test_duplicate_identifier_fails(self):
+        """Reject records whose repeated identifier makes decision lookup ambiguous."""
         register = proposed_register()
         register['decisions'].append(copy.deepcopy(record(register, 'D03')))
         self.assert_rejected(register, 'Duplicate decision D03')
 
     def test_unknown_recommendation_fails(self):
+        """Reject a recommendation that does not name a declared option."""
         register = proposed_register()
         record(register, 'D03')['recommendation'] = 'Z'
         self.assert_rejected(register, 'Unknown recommended option in D03')
@@ -135,6 +137,7 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D01 is accepted but the register names no authorities')
 
     def test_authorities_must_cite_an_accepted_decision(self):
+        """Require the authority map to be grounded in an accepted D01 record."""
         register = proposed_register()
         register['authorities'] = {'decision': 'D01', 'roles': {'sponsor': 'leynos', 'technical-owner': 'leynos'}}
         self.assert_rejected(register, 'Authorities cite D01, which is not an accepted decision')
@@ -151,16 +154,19 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'Accepted decisions D03 and D04 share a subject')
 
     def test_every_in_scope_question_needs_a_live_record(self):
+        """Keep every in-scope question linked to a proposed or accepted decision."""
         register = proposed_register()
         record(register, 'D03')['lifecycle'] = 'withdrawn'
         self.assert_rejected(register, 'In-scope questions without a live decision: Q4')
 
     def test_one_way_supersession_fails(self):
+        """Reject supersession when only the replacement side records the link."""
         register = proposed_register()
         record(register, 'D04')['supersedes'] = ['D03']
         self.assert_rejected(register, 'One-way supersession D04 -> D03')
 
     def test_supersession_cycle_fails(self):
+        """Reject a pair of accepted decisions that supersede each other."""
         register = accepted_register()
         accept(register, 'D04')
         live_proposal = copy.deepcopy(record(register, 'D03'))
@@ -191,6 +197,7 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D16 must be accepted before superseding D03')
 
     def test_candidate_must_cite_a_known_decision(self):
+        """Reject candidate ADR metadata that points to an absent decision."""
         register = proposed_register()
         register['candidate_adrs'][0]['decision'] = 'D99'
         self.assert_rejected(register, 'CA1 cites unknown D99')
@@ -218,12 +225,14 @@ class RegisterSchema(unittest.TestCase):
             validate_register(register, SCHEMA)
 
     def test_accepted_record_identity_must_be_the_plan_sponsor(self):
+        """Require accepted records to retain the sponsor's recorded identity."""
         register = accepted_register()
         record(register, 'D03')['accepted_by'] = 'someone-else'
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
 
     def test_approval_author_is_fixed_to_the_sponsor(self):
+        """Prevent accepted-record metadata from substituting another approval author."""
         register = accepted_register()
         record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
         with self.assertRaises(ValidationError):

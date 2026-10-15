@@ -30,12 +30,13 @@ phase. A supported profile requires actual downstream proof fixtures before its
 public API stabilizes. Optional Polars hooks may be declined; that does not
 waive the first-class backend contract or required semantic proofs.
 
-The foundational phase resolves candidate ADRs identified in
-`technical-design.md` §15; no accepted ADR or ExecPlan exists in this evidence
-set. Core scope ends at 4.3.3, including public consumer and staged-cost gates.
-Integration scope has a separate gate at 6.3.4; its real-client experiments
-require source access, while synthetic extensions do not. The final phase
-contains bounded evaluations, not promised features.
+Task 1.1.1 has accepted the decision authority, initial release scope,
+licence/publication policy, and pre-1.0 API policy; the decision register and
+ADRs record those answers. Remaining foundational decisions and experiments
+stay proposed. Core scope ends at 4.3.3, including public consumer and
+staged-cost gates. Integration scope has a separate gate at 6.3.4; its
+real-client experiments require source access, while synthetic extensions do
+not. The final phase contains bounded evaluations, not promised features.
 
 <!-- roadmap:start -->
 

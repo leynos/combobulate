@@ -305,6 +305,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   registered the superseded roadmap preamble under D03 and added a
   real-document negative control that restores it while task 1.1.1 remains
   checked.
+- [x] (2026-10-15) Reconciled current-head review findings: retired the stale
+  roadmap claim under D03 with a wrapped-text regression; require D01 release
+  approval alongside task 4.3.3 in the scope documents; document
+  `check_manifest`'s call boundary; test composed and lifecycle-controlled
+  package policy; and document the touched test helpers and cases. The
+  corrected regression uses Markdown normalization so formatter wrapping cannot
+  invalidate its mutation.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.

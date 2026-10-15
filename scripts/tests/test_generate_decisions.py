@@ -65,6 +65,7 @@ def test_rendering_is_deterministic():
 
 
 def test_proposed_decision_renders_as_pending_with_its_recommendation():
+    """Keep recommendations visible without presenting proposals as accepted."""
     register = copy.deepcopy(REGISTER)
     record = next(entry for entry in register['decisions'] if entry['id'] == 'D03')
     record.update({'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None, 'accepted_on': None,

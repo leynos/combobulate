@@ -162,6 +162,10 @@
         {
           "document": "docs/roadmap.md",
           "text": "All work remains proposed and open."
+        },
+        {
+          "document": "docs/roadmap.md",
+          "text": "The foundational phase resolves candidate ADRs identified in `technical-design.md` §15; no accepted ADR or ExecPlan exists in this evidence set."
         }
       ]
     },
