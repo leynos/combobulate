@@ -31,6 +31,7 @@ class SupersessionLifecycle(unittest.TestCase):
     """Every supersession chain preserves an accepted terminal decision."""
 
     def test_withdrawn_replacement_cannot_retire_an_accepted_decision(self):
+        """Reject a withdrawn record as the replacement for an accepted decision."""
         register = accepted_register()
         replacement = supersede_decision(register, 'D16', 'withdrawn')
         live_proposal = copy.deepcopy(replacement)
@@ -44,6 +45,7 @@ class SupersessionLifecycle(unittest.TestCase):
             check_register_records(register)
 
     def test_accepted_replacement_can_supersede_an_accepted_decision(self):
+        """Accept a valid D01-authorized replacement of an accepted decision."""
         register = accepted_register()
         supersede_decision(register, 'D16', 'proposed')
         accept(register, 'D16')
@@ -51,6 +53,7 @@ class SupersessionLifecycle(unittest.TestCase):
         check_register_records(register)
 
     def test_supersession_chain_may_end_at_accepted_replacement(self):
+        """Accept an acyclic supersession chain whose newest record is accepted."""
         register = accepted_register()
         intermediate = supersede_decision(register, 'D16', 'proposed')
         accept(register, 'D16')

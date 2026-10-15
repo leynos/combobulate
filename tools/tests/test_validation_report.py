@@ -8,6 +8,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -96,6 +97,29 @@ class ValidationReport(unittest.TestCase):
                          {'docs/validation-results.json'})
         self.assertEqual(json.loads(self.report.read_text())['status'], 'pass')
         self.assertEqual(self.run_main([]), 0)
+
+    def test_cli_injects_evaluation_date_and_base_revision(self):
+        """Pass CLI values into validation context and print the freeze summary."""
+        observed = {}
+
+        def freeze(context, base_revision):
+            """Capture the injected command-line values and return a visible summary."""
+            observed['as_of'] = context.as_of
+            observed['base_revision'] = base_revision
+            return 'Freeze check fixture passed.'
+
+        stderr = io.StringIO()
+        with patch.object(check_docs, 'check_frozen', side_effect=freeze), contextlib.redirect_stderr(stderr):
+            result = self.run_main([
+                '--write', '--as-of', '2026-10-15', '--base-rev', 'fixture-base',
+            ])
+
+        self.assertEqual(result, 0, 'the checker should accept an explicit evaluation date and base revision')
+        self.assertEqual(observed, {
+            'as_of': date(2026, 10, 15), 'base_revision': 'fixture-base',
+        }, 'the parsed CLI values must reach the context and freeze check')
+        self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
+                      'the caller must see the summary returned by the freeze check')
 
 
 if __name__ == '__main__':

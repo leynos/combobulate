@@ -69,16 +69,19 @@ class TaskClosure(unittest.TestCase):
     """MS-4: a tick needs ticked prerequisites, accepted decisions, artefacts, and satisfied components."""
 
     def assert_rejected(self, closure: ClosureInputs, message: str) -> None:
+        """Assert that closure fails with the requested diagnostic."""
         with self.assertRaisesRegex(AssertionError, message):
             task_closure(closure)
 
     def test_fully_supported_ticks_pass_on_chain_and_diamond(self):
+        """Accept every tick when both generated roadmap shapes have complete evidence."""
         for name, shape in (('chain', chain()), ('diamond', diamond())):
             with self.subTest(shape=name):
                 done = ticked(shape, *shape)
                 self.assertEqual(task_closure(inputs(done))[0], list(shape), 'every supported tick is accepted')
 
     def test_tick_with_open_prerequisite_fails(self):
+        """Reject a tick when a chain or diamond prerequisite remains open."""
         for name, shape, target, missing in (('chain', chain(), '1.1.3', '1.1.2'),
                                              ('diamond', diamond(), '1.1.4', '1.1.3')):
             with self.subTest(shape=name):
@@ -86,25 +89,30 @@ class TaskClosure(unittest.TestCase):
                 self.assert_rejected(inputs(done), f'Task {target} is ticked but prerequisite {missing} is not ticked')
 
     def test_tick_citing_proposed_or_superseded_decision_fails(self):
+        """Reject completion evidence that cites a decision which no longer binds."""
         for lifecycle in ('proposed', 'superseded', 'withdrawn'):
             with self.subTest(lifecycle=lifecycle):
                 closure = inputs(ticked(chain(), '1.1.1'), decisions={'D01': {'id': 'D01', 'lifecycle': lifecycle}})
                 self.assert_rejected(closure, f'decision D01 is {lifecycle}, not accepted')
 
     def test_tick_without_completion_record_fails(self):
+        """Reject a tick with no entry in the completion register."""
         closure = inputs(ticked(chain(), '1.1.1'), completions={})
         self.assert_rejected(closure, 'Task 1.1.1 is ticked but no completion record')
 
     def test_tick_with_unresolvable_artefact_fails(self):
+        """Reject a tick when its completion artefact cannot be resolved."""
         closure = inputs(ticked(chain(), '1.1.1'), artefact_exists=lambda artefact: False)
         self.assert_rejected(closure, f'artefact {ARTEFACT} does not resolve')
 
     def test_record_sourced_component_fails_closed(self):
+        """Keep record-sourced components unsatisfied until evidence admission exists."""
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components)
         self.assert_rejected(closure, 'component PF14.proof@1.1.1 has no admitted evidence record')
 
     def test_checker_component_needs_its_check_to_pass_in_this_run(self):
+        """Use this run's check result to satisfy a checker-sourced component."""
         components = {'1.1.1': [component('PF14.structural@1.1.1', 'checker:evidence-gate')]}
         self.assertEqual(task_closure(inputs(ticked(chain(), '1.1.1'), components=components))[0], ['1.1.1'],
                          'a passing evidence-gate check satisfies the structural component')
@@ -112,10 +120,12 @@ class TaskClosure(unittest.TestCase):
         self.assert_rejected(closure, 'component PF14.structural@1.1.1 needs check evidence-gate to pass')
 
     def test_supported_but_unticked_task_is_reported_not_failed(self):
+        """Report supported open work as eligible while keeping it unticked."""
         ticks, eligible = task_closure(inputs(ticked(chain(), '1.1.1')))
         self.assertEqual((ticks, eligible), (['1.1.1'], ['1.1.2']), 'only the next task becomes eligible')
 
     def test_closure_names_each_open_prerequisite(self):
+        """Name the prerequisite that prevents an otherwise supported task from closing."""
         failures = closure_failures('1.1.2', inputs(ticked(chain(), '1.1.2')))
         self.assertIn('prerequisite 1.1.1 is not ticked', failures, 'closure soundness names the open prerequisite')
 
@@ -124,46 +134,62 @@ class ComponentsAndCompletions(unittest.TestCase):
     """MS-3 inputs are validated before closure reads them."""
 
     def obligation(self, *components: dict) -> dict:
+        """Build a PF14 contract requiring components for both linked tasks."""
         return {'id': 'PF14', 'tasks': ['1.1.4', '3.4.1'], 'components': list(components)}
 
     def test_every_obligation_task_needs_a_component(self):
+        """Require every linked task to have a component in the obligation."""
         with self.assertRaisesRegex(AssertionError, 'PF14 has no component for tasks 3.4.1'):
             index_components([self.obligation(component('PF14.structural@1.1.4', 'checker:evidence-gate'))])
 
     def test_component_must_belong_to_its_obligation(self):
+        """Reject a component whose owner differs from the enclosing obligation."""
         with self.assertRaisesRegex(AssertionError, 'does not belong to PF14'):
             index_components([self.obligation(component('PF13.structural@1.1.4', 'checker:evidence-gate'))])
 
     def test_component_fields_must_agree_with_identity(self):
+        """Reject component metadata that disagrees with its encoded identity."""
         broken = component('PF14.structural@1.1.4', 'checker:evidence-gate') | {'method': 'proof'}
         with self.assertRaisesRegex(AssertionError, 'disagrees with its method or task fields'):
             index_components([self.obligation(broken)])
 
     def test_component_cannot_accept_restricted(self):
+        """Reject restricted as a component admission level."""
         broken = component('PF14.structural@1.1.4', 'record', ['restricted'])
         with self.assertRaisesRegex(AssertionError, 'must accept a non-empty subset'):
             index_components([self.obligation(broken)])
 
     def test_checker_component_must_accept_tested(self):
+        """Require checker-sourced components to admit tested evidence."""
         broken = component('PF14.structural@1.1.4', 'checker:evidence-gate', ['proof'])
         with self.assertRaisesRegex(AssertionError, 'must accept the tested level'):
             index_components([self.obligation(broken)])
 
     def test_completion_record_must_cite_known_decisions(self):
+        """Reject a completion record that names a decision absent from the register."""
         with self.assertRaisesRegex(AssertionError, 'cites unknown decisions D99'):
             index_completions({'tasks': [{'task': '1.1.1', 'decisions': ['D99'], 'artefacts': [ARTEFACT]}]},
                               chain(), {'D01': ACCEPTED})
+
+    def test_completion_record_may_cite_no_decisions(self):
+        """Allow an empty citation list when no register decision governs the task."""
+        record = {'task': '1.1.1', 'decisions': [], 'artefacts': [ARTEFACT]}
+        indexed = index_completions({'tasks': [record]}, chain(), {})
+        self.assertEqual(indexed, {'1.1.1': record},
+                         'an ungoverned task must not need an invented decision citation')
 
 
 class RealRoadmap(unittest.TestCase):
     """The committed roadmap passes closure, and PF14.structural@1.1.4 is wired to the evidence gate."""
 
     def test_committed_roadmap_passes_after_the_checks_it_depends_on(self):
+        """Run the committed roadmap after checks that checker-sourced components consume."""
         context = ValidationContext(ROOT)
         collect_checks(context)
         self.assertEqual(context.results[-1]['check'], 'roadmap-status', 'closure runs after every other check')
 
     def test_artefact_outside_the_repository_does_not_resolve(self):
+        """Keep artefact resolution within the repository and require any anchor to exist."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'repository'
             (root / 'docs').mkdir(parents=True)
@@ -177,6 +203,7 @@ class RealRoadmap(unittest.TestCase):
             self.assertFalse(exists('docs/guide.md#no-such-heading'), 'a missing anchor does not resolve')
 
     def test_pf14_structural_component_targets_task_114(self):
+        """Bind PF14's structural component to task 1.1.4 and the evidence-gate check."""
         obligations = ValidationContext(ROOT).load('spec/proof-obligations.json')['obligations']
         components = index_components(obligations)
         structural = [entry for entry in components['1.1.4'] if entry['id'] == 'PF14.structural@1.1.4']

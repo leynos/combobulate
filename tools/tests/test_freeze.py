@@ -29,26 +29,32 @@ class DecisionFreeze(unittest.TestCase):
     """Accepted decisions are append-only; proposed ones may still change."""
 
     def test_unchanged_register_passes(self):
+        """Accept a head register that preserves every frozen decision field."""
         check_decisions_frozen(register(ACCEPTED, PROPOSED), register(ACCEPTED, PROPOSED))
 
     def test_proposed_record_may_change(self):
+        """Leave proposed decisions editable until they are accepted."""
         check_decisions_frozen(register(PROPOSED), register(PROPOSED | {'subject': 'Publication policy'}))
 
     def test_editing_an_accepted_record_fails(self):
+        """Reject an in-place edit to an accepted decision's selected option."""
         with self.assertRaisesRegex(AssertionError, r'Accepted decision D04 was edited \(decided_option\)'):
             check_decisions_frozen(register(ACCEPTED), register(ACCEPTED | {'decided_option': 'B'}))
 
     def test_deleting_an_accepted_record_fails(self):
+        """Reject deleting an accepted record instead of superseding it."""
         with self.assertRaisesRegex(AssertionError, 'Accepted decision D04 was deleted'):
             check_decisions_frozen(register(ACCEPTED), register())
 
     def test_supersession_may_change_only_lifecycle_and_link(self):
+        """Permit the supersession fields while keeping all other accepted fields frozen."""
         superseded = ACCEPTED | {'lifecycle': 'superseded', 'superseded_by': 'D16'}
         check_decisions_frozen(register(ACCEPTED), register(superseded))
         with self.assertRaisesRegex(AssertionError, r'was edited \(subject\)'):
             check_decisions_frozen(register(ACCEPTED), register(superseded | {'subject': 'Licence'}))
 
     def test_superseded_record_is_fully_frozen(self):
+        """Reject edits to a record after its accepted decision has been superseded."""
         superseded = ACCEPTED | {'lifecycle': 'superseded', 'superseded_by': 'D16'}
         with self.assertRaisesRegex(AssertionError, r'was edited \(superseded_by\)'):
             check_decisions_frozen(register(superseded), register(superseded | {'superseded_by': 'D17'}))
@@ -58,6 +64,7 @@ class BaseRevisionIntegration(unittest.TestCase):
     """The checker reads the base revision from Git rather than trusting the head."""
 
     def setUp(self):
+        """Create a temporary Git work tree for base-revision integration cases."""
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
@@ -68,21 +75,26 @@ class BaseRevisionIntegration(unittest.TestCase):
         self.git('commit', '-q', '-m', 'Start')
 
     def git(self, *args: str) -> None:
+        """Run a fixture Git command with local identity and signing disabled."""
         subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
                         '-c', 'commit.gpgsign=false', *args], cwd=self.root, check=True, capture_output=True)
 
     def write(self, value: dict) -> None:
+        """Write a decision register into the temporary work tree."""
         (self.root / 'spec/decisions.json').write_text(json.dumps(value), encoding='utf-8')
 
     def test_no_base_revision_reports_that_the_check_did_not_run(self):
+        """Report an explicit skip when the caller provides no base revision."""
         self.assertIn('not run', check_frozen(ValidationContext(self.root), None), 'a skipped check says so')
 
     def test_register_absent_at_base_has_nothing_frozen(self):
+        """Allow a register introduced after the base because it has no frozen history."""
         self.write(register(ACCEPTED))
         summary = check_frozen(ValidationContext(self.root), 'HEAD')
         self.assertIn('no frozen registers', summary, 'a new register freezes nothing yet')
 
     def test_head_edit_of_committed_acceptance_fails(self):
+        """Compare committed base content with the work tree and reject an accepted edit."""
         self.write(register(ACCEPTED))
         self.git('add', 'spec/decisions.json')
         self.git('commit', '-q', '-m', 'Accept D04')
@@ -91,6 +103,7 @@ class BaseRevisionIntegration(unittest.TestCase):
             check_frozen(ValidationContext(self.root), 'HEAD')
 
     def test_unknown_base_revision_fails(self):
+        """Reject a base revision that Git cannot resolve to the frozen register."""
         with self.assertRaisesRegex(AssertionError, 'Cannot read spec/decisions.json at base revision'):
             check_frozen(ValidationContext(self.root), 'no-such-revision')
 

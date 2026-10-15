@@ -77,7 +77,15 @@ def index_components(obligations: list[dict]) -> dict[str, list[dict]]:
 
 
 def index_completions(completion: dict, tasks: Mapping[str, dict], decisions: Mapping[str, dict]) -> dict[str, dict]:
-    """Validate completion records; each names a known task, known decisions, and at least one artefact."""
+    """Validate completion records; an ungoverned task may cite no decisions.
+
+    For example, a known task with an artefact but no governing decision is
+    still a valid completion record::
+
+        >>> record = {'task': '1.1.1', 'decisions': [], 'artefacts': ['docs/guide.md']}
+        >>> index_completions({'tasks': [record]}, {'1.1.1': {}}, {})
+        {'1.1.1': {'task': '1.1.1', 'decisions': [], 'artefacts': ['docs/guide.md']}}
+    """
     records: dict[str, dict] = {}
     for record in completion['tasks']:
         task_id = record['task']
@@ -135,6 +143,7 @@ def artefact_resolver(context: ValidationContext) -> Callable[[str], bool]:
     root = context.root.resolve()
 
     def exists(artefact: str) -> bool:
+        """Resolve a path only when it stays in-root and its optional anchor exists."""
         path, _, anchor = artefact.partition('#')
         target = (root / path).resolve()
         if not target.is_relative_to(root) or not target.is_file():
