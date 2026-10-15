@@ -513,8 +513,11 @@ This repository deliberately diverges from the shared df12 documentation style
 guide, which places ADRs directly under `docs/` with a three-digit index and
 names RFCs without a prefix. The sponsor directed the `docs/adrs/` and
 `docs/rfcs/` layout on 2026-10-10, as recorded in the
-[roadmap 1.1 execution plan's decision log](execplans/1-1-resolve-acceptance-control-decisions.md#decision-log);
-if it works well, the shared guide will be updated to match.
+[decision log][roadmap-1-1-decision-log]; if it works well, the shared guide
+will be updated to match.
+
+[roadmap-1-1-decision-log]:
+  execplans/1-1-resolve-acceptance-control-decisions.md#decision-log
 
 ### Required sections
 

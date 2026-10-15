@@ -10,13 +10,16 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from jsonschema import ValidationError
+from hypothesis import given, settings, strategies as st
 
 from docs_validation.context import ValidationContext
 from docs_validation.decisions import (
     GOVERNING_DOCUMENTS, check_adr_files, check_adr_links, check_decision_register,
-    check_governing_documents, check_register_records, normalize, validate_register,
+    check_governing_documents, check_register_records, check_supersession, normalize,
+    validate_register,
 )
 from docs_validation.ledger import check_generated_documents
+from check_docs import collect_checks
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTEXT = ValidationContext(ROOT)
@@ -294,6 +297,13 @@ class RealRegister(unittest.TestCase):
     def test_committed_register_passes_the_checker(self):
         check_decision_register(ValidationContext(ROOT))
 
+    def test_composed_checker_records_the_decision_register(self):
+        context = ValidationContext(ROOT)
+        collect_checks(context)
+        result = next(row for row in context.results if row['check'] == 'decision-register')
+        self.assertEqual(result['count'], 15,
+                         'the composed documentation checker validates all 15 decisions')
+
     def test_hand_edited_register_document_fails_the_drift_check(self):
         context = ValidationContext(ROOT)
         text = (ROOT / 'docs/decision-register.md').read_text(encoding='utf-8')
@@ -306,6 +316,75 @@ class RealRegister(unittest.TestCase):
         with patch.object(Path, 'read_text', read_text):
             with self.assertRaisesRegex(AssertionError, 'Generated content drift: docs/decision-register.md'):
                 check_generated_documents(context, context.load('spec/vocabulary.json')['entries'])
+
+
+def acyclic_supersession_graphs():
+    """Generate ordered forests of valid supersession links for property checks."""
+    @st.composite
+    def graphs(draw):
+        size = draw(st.integers(min_value=1, max_value=10))
+        topology = draw(st.sampled_from(('chain', 'merge', 'forest')))
+        if topology == 'chain':
+            newer_for = [index + 1 if index + 1 < size else None for index in range(size)]
+        elif topology == 'merge':
+            newer_for = [size - 1 if index + 1 < size else None for index in range(size)]
+        else:
+            newer_for = [
+                draw(st.one_of(st.none(), st.integers(min_value=index + 1, max_value=size - 1)))
+                if index < size - 1 else None
+                for index in range(size)
+            ]
+        supersedes = {index: [] for index in range(size)}
+        for older, newer in enumerate(newer_for):
+            if newer is not None:
+                supersedes[newer].append(older)
+        order = draw(st.permutations(tuple(range(size))))
+        return {
+            f'D{index:02}': {
+                'id': f'D{index:02}',
+                'supersedes': [f'D{older:02}' for older in supersedes[index]],
+                'superseded_by': None if newer_for[index] is None else f'D{newer_for[index]:02}',
+                'lifecycle': ('superseded' if newer_for[index] is not None else
+                              'accepted' if supersedes[index] else 'proposed'),
+            }
+            for index in order
+        }
+
+    return graphs()
+
+
+def supersession_cycles():
+    """Generate reciprocal cycles of three or more decisions in varied record order."""
+    @st.composite
+    def cycles(draw):
+        size = draw(st.integers(min_value=3, max_value=8))
+        order = draw(st.permutations(tuple(range(size))))
+        return {
+            f'D{index:02}': {
+                'id': f'D{index:02}',
+                'supersedes': [f'D{(index - 1) % size:02}'],
+                'superseded_by': f'D{(index + 1) % size:02}',
+                'lifecycle': 'superseded',
+            }
+            for index in order
+        }
+
+    return cycles()
+
+
+class SupersessionProperties(unittest.TestCase):
+    """Exercise acyclic graphs, cycles, and record ordering over generated cases."""
+
+    @settings(max_examples=100, derandomize=True, deadline=None)
+    @given(records=acyclic_supersession_graphs())
+    def test_acyclic_chains_and_merges_pass_in_any_record_order(self, records):
+        check_supersession(records)
+
+    @settings(max_examples=50, derandomize=True, deadline=None)
+    @given(records=supersession_cycles())
+    def test_reciprocal_cycles_fail_regardless_of_record_order(self, records):
+        with self.assertRaisesRegex(AssertionError, 'Supersession cycle'):
+            check_supersession(records)
 
 
 if __name__ == '__main__':

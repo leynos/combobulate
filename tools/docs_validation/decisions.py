@@ -62,7 +62,16 @@ def check_options(record: dict) -> None:
 
 
 def check_approval(record: dict, authorities: dict | None) -> None:
-    """Require an accepted record's approval to come from its authority and to name it."""
+    """Require approval to name the decision and come from an authorised login.
+
+    For example, a D03 approval by the sponsor passes when D01 assigns that
+    role to the accepting login::
+
+        >>> record = {'id': 'D03', 'approval_reference': {
+        ...     'names_decisions': ['D03'], 'author_login': 'leynos'},
+        ...     'accepted_by': 'leynos', 'authority_roles': ['sponsor']}
+        >>> check_approval(record, {'roles': {'sponsor': 'leynos'}})
+    """
     reference = record['approval_reference']
     if reference is None:
         return
@@ -108,7 +117,17 @@ def check_questions(register: dict, records: dict[str, dict]) -> None:
 
 
 def check_supersession(records: dict[str, dict]) -> None:
-    """Require two-way, acyclic supersession links; a one-way or circular link fails."""
+    """Require two-way, acyclic supersession links; a one-way or circular link fails.
+
+    For example, D02 may supersede D01 when both records name the relationship::
+
+        >>> records = {
+        ...     'D01': {'id': 'D01', 'supersedes': [], 'superseded_by': 'D02',
+        ...             'lifecycle': 'superseded'},
+        ...     'D02': {'id': 'D02', 'supersedes': ['D01'], 'superseded_by': None,
+        ...             'lifecycle': 'accepted'}}
+        >>> check_supersession(records)
+    """
     for record in records.values():
         for older in record['supersedes']:
             require(older in records, f"{record['id']} supersedes unknown {older}")
@@ -231,7 +250,16 @@ def check_governing_documents(records: dict[str, dict], documents: Mapping[str, 
 
 
 def check_decision_register(context: ValidationContext) -> None:
-    """Validate the register master, its ADRs, and the governing documents against each other."""
+    """Validate the register master, ADRs, and governing documents together.
+
+    A passing run records the number of decisions checked::
+
+        >>> from pathlib import Path
+        >>> context = ValidationContext(Path('/repo'))
+        >>> check_decision_register(context)
+        >>> context.results[0]['check']
+        'decision-register'
+    """
     register = context.load('spec/decisions.json')
     validate_register(register, context.load('spec/decision-register.schema.json'))
     records = check_register_records(register)

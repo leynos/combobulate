@@ -44,6 +44,13 @@ class MarkdownBoundaries(unittest.TestCase):
         self.assertEqual(self.context.results[0]['count'], 1 + len(DESIGN_DOCUMENTS),
                          'only README and the listed design documents are checked')
 
+    def test_discovers_relocated_adrs(self):
+        adr = self.root / 'docs/adrs/adr-0001-repository-bootstrap.md'
+        adr.parent.mkdir(parents=True)
+        adr.write_text('# Architectural decision record\n', encoding='utf-8')
+        self.assertIn(adr, self.context.markdown_paths(),
+                      'Markdown validation includes ADRs in their relocated directory')
+
     def test_json_inputs_exclude_repository_and_build_metadata(self):
         (self.root / 'spec').mkdir()
         (self.root / 'spec/cases.json').write_text('{}')

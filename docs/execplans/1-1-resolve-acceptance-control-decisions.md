@@ -5,8 +5,9 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: APPROVED (the sponsor approved this plan for implementation on
-2026-10-11)
+Status: IN PROGRESS (the sponsor approved this revision for implementation on
+2026-10-11 by invoking the implementation workflow; `EP-M0` and `EP-M1a` are
+complete, and `EP-M1b` is pending)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
