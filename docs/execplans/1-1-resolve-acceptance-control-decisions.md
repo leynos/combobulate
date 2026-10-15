@@ -8,14 +8,18 @@ be kept up to date as work proceeds.
 Status: BLOCKED (CodeRabbit CLI reassessment cannot start). Implementation and
 generated invariant coverage are validated: `3ed0593` passed all seven local
 gates. Its full 93-path CLI inspection found two helper documentation gaps,
-corrected in `d0460a8` without executable AST changes. Both doctests and all
-documentation/design gates pass. Two focused reassessment attempts and one
-full-base attempt failed before inspection with "Failed to start review. Please
-try again." Authentication, repository readiness, backend/WebSocket
-connectivity, and review allowance diagnostics pass; the startup failure's
-cause is unknown. No completed reassessment or approval is claimed. Publication
-and hosted confirmation continue independently; current delivery state and the
-remaining CLI blocker are recorded on
+corrected in `d0460a8` without executable AST changes. A later pre-merge check
+identified a missing module comment in the AC-01 calibration probe. The
+sponsor-approved documentation amendment preserves the registered workload,
+thresholds, and measurement protocol; all seven gates passed on the resulting
+working-tree candidate atop `9ccf1c4`. The amendment is not yet committed or
+published. Two focused reassessment attempts and one full-base attempt failed
+before inspection with "Failed to start review. Please try again."
+Authentication, repository readiness, backend/WebSocket connectivity, and
+review allowance diagnostics pass; the startup failure's cause is unknown. No
+completed reassessment or approval is claimed. Publication and hosted
+confirmation continue independently; current delivery state and the remaining
+CLI blocker are recorded on
 [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Approval of the plan is distinct from acceptance of a decision; acceptances are
@@ -120,8 +124,11 @@ Term definitions used throughout:
   logic it loads the script by path rather than duplicating it. No Python file
   exceeds 400 lines. Checks perform no network access.
 - C-EP-8. No Rust library behaviour, public API, or Rust dependency changes.
-  The only Rust-adjacent edit is `publish = false` in `Cargo.toml` (D05).
-  Calibration probes live outside the repository's Cargo package (see `EP-M4`).
+  Rust-adjacent edits are limited to `publish = false` in `Cargo.toml` (D05)
+  and sponsor-approved module documentation for the existing AC-01 calibration
+  probe, recorded by an authorized control amendment. The probe remains outside
+  the repository's Cargo package (see `EP-M4`); the amendment preserves its
+  workload, thresholds, and measurement protocol.
 - C-EP-9. Checks are deterministic for a given commit. The evidence gate
   never reads the wall clock; `make design-check` injects the HEAD commit date
   as `--as-of`, and the base revision for freeze checks as `--base-rev`. No
@@ -468,8 +475,24 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   evidence. Resume the missing CLI reassessment only after service recovery;
   keep this blocker and stale docstring-report provenance explicit. Sponsor
   review and stack merges remain separate delivery work.
+- [x] (2026-10-15) Added the required module-level documentation to the AC-01
+  calibration probe after current pre-merge checks reported its missing `//!`
+  header. The sponsor-approved amendment preserves AC-01's original registered
+  digest and updates only its current source/control digests; no acceptance
+  measurement exists for this control. All seven candidate gates passed on
+  `9ccf1c4` (331 Rust tests, one skipped, one doctest, 270 unittest cases, 315
+  pytest cases, and 589 subtests). Commit, publication, hosted confirmation,
+  and fresh review-row reconciliation remain pending.
 
 ## Surprises & discoveries
+
+- Observation: the current module-documentation finding named the registered
+  AC-01 Verus probe, whose source digest is frozen. The project-wide Rust rule
+  requires `//!` module documentation, while C-EP-8 originally excluded this
+  source. The sponsor authorized a documentation-only amendment through the
+  current Lody session; no acceptance measurement exists, and the workload,
+  thresholds, and protocol remain unchanged. The freeze check passed after the
+  control digest was amended.
 
 - Observation: CLI review startup failed despite passing readiness and usage
   diagnostics. Evidence: the helper-docs, helper-docs-retry, and
@@ -608,6 +631,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `README.md` through ADR 001; D04 ratifies it.
 
 ## Decision log
+
+- Decision: satisfy the current module-level documentation finding in the
+  registered AC-01 calibration probe. The sponsor authorized this narrow
+  source-comment change through the Lody session linked by the amendment in
+  `spec/acceptance-controls.json`. Preserve the original registered digest and
+  update the current source/control digests; retain the workload, thresholds,
+  and measurement protocol. No acceptance measurement exists for AC-01, so a
+  new control ID is not required. Date/Author: 2026-10-15, sponsor decision
+  recorded by the implementing agent.
 
 - Decision: preserve the CLI startup failure as a delivery blocker after two
   focused attempts, healthy read-only diagnostics, and one full-base diagnostic
