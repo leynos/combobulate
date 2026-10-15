@@ -413,6 +413,7 @@ column says when each is meant to shrink or go.
 | `scripts/export_roadmap.py`                    | Canonical roadmap to JSON export and drift check | Replaced when leynos/mapsplice#144 ships a native export |
 | `scripts/generate_decisions.py`                | Decision register rendering                      | Stays                                                    |
 | `scripts/check_evidence.py`                    | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
+| `scripts/docs_validation/contracts.py`         | Semantic contract and bet/task validation        | Stays                                                    |
 | `scripts/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
 | `scripts/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
 | `scripts/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
@@ -422,6 +423,11 @@ column says when each is meant to shrink or go.
 | `scripts/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
 
 *Table 1: Governance modules, ownership, and retirement.*
+
+`check_bet_links(bets, tasks)` in `scripts/docs_validation/contracts.py`
+requires every task listed by a bet to cite that bet, and every bet cited by a
+task to list that task. This check validates traceability only; it does not
+mark experiments as run or provide evidence.
 
 To renew an exception before it expires, add a new exception with a new
 identifier, a fresh `approved_on`, an `invalid_from` at most 90 days later, and
