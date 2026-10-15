@@ -368,6 +368,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   terminate at an accepted replacement. Links remain two-way and acyclic. This
   prevents an unapproved record from retiring an accepted decision.
   Date/Author: 2026-10-15, implementing agent.
+- EP-M1b review conformance repair: the [CodeRabbit completeness
+  assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6182674988)
+  found `tools/tests/test_decision_register.py` over the 400-line limit. Move
+  supersession lifecycle cases to `tools/tests/test_supersession_lifecycle.py`.
+  Rebasing onto the updated parent added generator-catalogue coverage and
+  raised the invariant module above the limit again, so move composed-checker
+  and generated-document tests to
+  `tools/tests/test_decision_register_integration.py`. Preserve all regression
+  cases and update the generated Python-source count. Date/Author: 2026-10-15,
+  implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
