@@ -363,6 +363,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   and `EP-M5` now state that each register joins `freeze.FROZEN_DOCUMENTS` in
   the commit that creates it, and the module docstring says so. Date/Author:
   2026-10-11, implementing agent.
+- EP-M1b review repair: supersession must lead through records with valid
+  D01-authorized acceptance and `accepted` or `superseded` lifecycle, then
+  terminate at an accepted replacement. Links remain two-way and acyclic. This
+  prevents an unapproved record from retiring an accepted decision.
+  Date/Author: 2026-10-15, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
@@ -870,12 +875,14 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `accepted_on`, and a structured approval reference whose `author_login` is
   `leynos` and whose `names_decisions` includes the record; the authority map
   cites accepted D01; proposed records carry no approval fields; a replacement
-  is accepted before it supersedes an accepted record; supersession links are
-  two-way and acyclic; each cited ADR exists under `docs/adrs/` with an agreeing
-  `Status` line; dates are validated with the `jsonschema` format checker.
-  Artefact: `tools/tests/test_decision_register.py`. Non-vacuity includes
-  coordinated authority-map and approval changes, a non-D01 source, and a
-  proposed replacement; each negative control has its own message.
+  is accepted before it supersedes an accepted record; supersession chains use
+  two-way, acyclic links between accepted or superseded records with valid
+  D01-authorized acceptance, and terminate at an accepted replacement; each
+  cited ADR exists under `docs/adrs/` with an agreeing `Status` line; dates are
+  validated with the `jsonschema` format checker. Artefact:
+  `tools/tests/test_decision_register.py`. Non-vacuity includes coordinated
+  authority-map and approval changes, a non-D01 source, proposed and withdrawn
+  replacements; each negative control has its own message.
 - VO-6 (five-document consistency). Invariants: each governing document links
   `decision-register.md`; each accepted question's ToR §9 row links its
   register anchor; after whitespace and inline-Markdown normalization, no

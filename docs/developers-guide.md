@@ -457,10 +457,11 @@ record's anchor (for example `decision-register.md#d03`). The design checks
 reject an accepted decision whose approval is malformed, whose ADR disagrees on
 status, whose retired text reappears, or whose question is still described as
 open or pending within 60 characters of its identifier. Never edit an accepted
-record in place. A proposed replacement cannot retire it: record the
-replacement's acceptance first, then mark the older record `superseded` and add
-both `supersedes` and `superseded_by` links together. ADRs live in `docs/adrs/`
-as `adr-nnnn-title-slug.md`, per the
+record in place. A replacement must have its own valid D01-authorized
+acceptance before it can retire the accepted decision. Link both directions
+with `supersedes` and `superseded_by`; supersession chains must be acyclic and
+terminate at an accepted replacement. ADRs live in `docs/adrs/` as
+`adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
 
 A ticked roadmap checkbox is a claim, and

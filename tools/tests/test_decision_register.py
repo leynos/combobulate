@@ -56,6 +56,21 @@ def accepted_register() -> dict:
     return register
 
 
+def supersede_decision(register: dict, replacement_id: str, lifecycle: str) -> dict:
+    """Replace accepted D03 with a new record in the requested lifecycle."""
+    older = record(register, 'D03')
+    replacement = copy.deepcopy(older)
+    replacement.update({
+        'id': replacement_id, 'subject': f'Replacement for {older["subject"]}',
+        'lifecycle': lifecycle, 'decided_option': None, 'accepted_by': None,
+        'accepted_on': None, 'approval_reference': None, 'adr': None,
+        'supersedes': ['D03'], 'superseded_by': None, 'retired_statements': [],
+    })
+    older.update({'lifecycle': 'superseded', 'superseded_by': replacement_id})
+    register['decisions'].append(replacement)
+    return replacement
+
+
 def governing_documents() -> dict[str, str]:
     """Return minimal governing documents consistent with an accepted D03."""
     documents = {name: f'# {name}\n\n{REGISTER_LINK}' for name in GOVERNING_DOCUMENTS}
@@ -175,6 +190,41 @@ class RegisterInvariants(unittest.TestCase):
         })
         register['decisions'].append(replacement)
         self.assert_rejected(register, 'D16 must be accepted before superseding D03')
+
+    def test_withdrawn_replacement_cannot_retire_an_accepted_decision(self):
+        register = accepted_register()
+        replacement = supersede_decision(register, 'D16', 'withdrawn')
+        live_proposal = copy.deepcopy(replacement)
+        live_proposal.update({
+            'id': 'D17', 'subject': 'Open alternative for Q4', 'lifecycle': 'proposed',
+            'supersedes': [], 'superseded_by': None,
+        })
+        register['decisions'].append(live_proposal)
+        validate_register(register, SCHEMA)
+        self.assert_rejected(register, 'D16 must be accepted before superseding D03')
+
+    def test_accepted_replacement_can_supersede_an_accepted_decision(self):
+        register = accepted_register()
+        supersede_decision(register, 'D16', 'proposed')
+        accept(register, 'D16')
+        validate_register(register, SCHEMA)
+        check_register_records(register)
+
+    def test_supersession_chain_may_end_at_accepted_replacement(self):
+        register = accepted_register()
+        intermediate = supersede_decision(register, 'D16', 'proposed')
+        accept(register, 'D16')
+        final = copy.deepcopy(intermediate)
+        final.update({
+            'id': 'D17', 'subject': 'Final replacement for Q4', 'lifecycle': 'proposed',
+            'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+            'approval_reference': None, 'supersedes': ['D16'], 'superseded_by': None,
+        })
+        intermediate.update({'lifecycle': 'superseded', 'superseded_by': 'D17'})
+        register['decisions'].append(final)
+        accept(register, 'D17')
+        validate_register(register, SCHEMA)
+        check_register_records(register)
 
     def test_candidate_must_cite_a_known_decision(self):
         register = copy.deepcopy(REGISTER)
