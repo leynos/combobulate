@@ -1041,13 +1041,13 @@ Trusted, not verified here:
 ## Plan of work
 
 Milestones run in order on stacked branches. The sponsor approved this plan on
-2026-10-11. `EP-M0` and `EP-M1a` are complete, and `EP-M1b` is pending; all
-decisions they need have been answered. Each milestone follows Red, Green,
-Refactor: draft as `proposed` (Stage A); add rule tables, fixtures, and tests
-and observe the expected failure (Stage B); implement until the focused tests
-pass (Stage C); tidy, run the generators and exporter and
-`check_docs.py --write`, review the report diff, and have `scrutineer` run the
-full gates (Stage D).
+2026-10-11. `EP-M0`, `EP-M1a`, and `EP-M1b` are complete; `EP-M2` through
+`EP-M6` remain pending. All decisions they need have been answered. Each
+milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule
+tables, fixtures, and tests and observe the expected failure (Stage B);
+implement until the focused tests pass (Stage C); tidy, run the generators and
+exporter and `check_docs.py --write`, review the report diff, and have
+`scrutineer` run the full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
