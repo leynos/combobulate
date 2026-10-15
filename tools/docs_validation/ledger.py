@@ -136,7 +136,16 @@ def generated_documents(context: ValidationContext, catalogue: list[dict]) -> li
 
 
 def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
-    """Check generated contents against masters, allowing only Markdown formatting."""
+    """Check generated contents against masters, allowing only Markdown formatting.
+
+    From the repository root, every generated document matches its master::
+
+        >>> from pathlib import Path
+        >>> context = ValidationContext(Path.cwd())
+        >>> catalogue = context.load('spec/vocabulary.json')['entries']
+        >>> check_generated_documents(context, catalogue) is None
+        True
+    """
     for generator, source, path in generated_documents(context, catalogue):
         text = (context.root / path).read_text(encoding='utf-8')
         require(generated_matches(text, generator.render(source), generator.START, generator.END),
