@@ -12,9 +12,8 @@ from jsonschema import ValidationError
 
 from docs_validation.context import ValidationContext
 from docs_validation.decisions import (
-    GOVERNING_DOCUMENTS, check_adr_files, check_adr_links,
-    check_governing_documents, check_register_records, check_supersession, normalize,
-    validate_register,
+    GOVERNING_DOCUMENTS, check_adr_files, check_adr_links, check_governing_documents,
+    check_register_records, normalize, validate_register,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -164,8 +163,16 @@ class RegisterInvariants(unittest.TestCase):
     def test_supersession_cycle_fails(self):
         register = accepted_register()
         accept(register, 'D04')
+        live_proposal = copy.deepcopy(record(register, 'D03'))
+        live_proposal.update({
+            'id': 'D17', 'subject': 'Open alternative for Q4', 'lifecycle': 'proposed',
+            'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+            'approval_reference': None, 'adr': None, 'supersedes': [], 'superseded_by': None,
+            'retired_statements': [],
+        })
+        register['decisions'].append(live_proposal)
         for older, newer in (('D03', 'D04'), ('D04', 'D03')):
-            record(register, older)['superseded_by'] = newer
+            record(register, older).update(lifecycle='superseded', superseded_by=newer)
             record(register, newer)['supersedes'] = [older]
         self.assert_rejected(register, 'Supersession cycle through D03')
 
@@ -213,6 +220,11 @@ class RegisterSchema(unittest.TestCase):
     def test_accepted_record_identity_must_be_the_plan_sponsor(self):
         register = accepted_register()
         record(register, 'D03')['accepted_by'] = 'someone-else'
+        with self.assertRaises(ValidationError):
+            validate_register(register, SCHEMA)
+
+    def test_approval_author_is_fixed_to_the_sponsor(self):
+        register = accepted_register()
         record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
@@ -295,3 +307,8 @@ class GoverningDocuments(unittest.TestCase):
     def test_normalization_strips_inline_markdown(self):
         self.assertEqual(normalize('*Q4* `remains`\n [open](x.md)'), 'Q4 remains open',
                          'normalization must strip emphasis, code, links, and wrapping')
+
+
+
+if __name__ == '__main__':
+    unittest.main()

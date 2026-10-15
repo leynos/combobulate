@@ -72,3 +72,7 @@ class SupersessionLifecycle(unittest.TestCase):
         accept(register, 'D17')
         validate_register(register, SCHEMA)
         check_register_records(register)
+
+
+if __name__ == '__main__':
+    unittest.main()
