@@ -18,7 +18,7 @@ from docs_validation.decisions import (
     check_governing_documents, check_register_records, check_supersession, normalize,
     validate_register,
 )
-from docs_validation.ledger import check_generated_documents
+from docs_validation.ledger import check_generated_documents, generated_documents
 from check_docs import collect_checks
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -303,6 +303,20 @@ class RealRegister(unittest.TestCase):
         result = next(row for row in context.results if row['check'] == 'decision-register')
         self.assertEqual(result['count'], 15,
                          'the composed documentation checker validates all 15 decisions')
+
+    def test_decision_register_generator_is_in_the_generated_document_catalogue(self):
+        context = ValidationContext(ROOT)
+        catalogue = context.load('spec/vocabulary.json')['entries']
+        register_entries = [
+            (Path(generator.__file__).resolve(), source, path)
+            for generator, source, path in generated_documents(context, catalogue)
+            if path == 'docs/decision-register.md'
+        ]
+        self.assertEqual(
+            register_entries,
+            [(ROOT / 'scripts/generate_decisions.py', REGISTER, 'docs/decision-register.md')],
+            'the generated-document check must pair the register with its master and renderer',
+        )
 
     def test_hand_edited_register_document_fails_the_drift_check(self):
         context = ValidationContext(ROOT)
