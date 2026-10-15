@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -30,7 +31,8 @@ class ValidationReport(unittest.TestCase):
         for folder in ('docs', 'scripts', 'spec', 'tools'):
             shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__'))
         for path in ROOT.iterdir():
-            if path.is_file():
+            # Linked worktrees store a .git pointer file that is invalid in this fixture.
+            if path.is_file() and path.name != '.git':
                 shutil.copy2(path, self.root / path.name)
         self.report = self.root / 'docs/validation-results.json'
         self.assertEqual(self.run_main(['--write']), 0)
@@ -120,6 +122,28 @@ class ValidationReport(unittest.TestCase):
         }, 'the parsed CLI values must reach the context and freeze check')
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')
+
+    def test_cli_rejects_an_accepted_decision_edit_against_git_base(self):
+        """Surface a real base-revision freeze failure through the command-line entrypoint."""
+        accepted = {
+            'id': 'D04', 'subject': 'Package licence', 'lifecycle': 'accepted',
+            'decided_option': 'A', 'supersedes': [], 'superseded_by': None,
+        }
+        decisions = self.root / 'spec/decisions.json'
+        decisions.write_text(json.dumps({'decisions': [accepted]}), encoding='utf-8')
+        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(['git', 'add', 'spec/decisions.json'], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(
+            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
+             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Accept D04'],
+            cwd=self.root, check=True, capture_output=True,
+        )
+        decisions.write_text(json.dumps({'decisions': [accepted | {'subject': 'Different licence'}]}),
+                             encoding='utf-8')
+
+        with patch.object(check_docs, 'collect_checks'), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(SystemExit, 'Accepted decision D04 was edited'):
+                self.run_main(['--base-rev', 'HEAD'])
 
 
 if __name__ == '__main__':

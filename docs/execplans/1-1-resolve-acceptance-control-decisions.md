@@ -379,14 +379,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   cases and update the generated Python-source count. Date/Author: 2026-10-15,
   implementing agent.
 - EP-M1b follow-up review: add a composed test for a ticked roadmap with valid
-  and invalid evidence, CLI coverage for `--as-of` and `--base-rev`, and
-  generated properties for dependency states, citations, component evidence,
-  artefact containment, and frozen decision mutations. Add the missing test
-  descriptions reported by CodeRabbit's docstring check. The repeated request
-  to reject an empty decision list remains declined: MS-4 constrains each cited
-  decision, while ungoverned tasks have none to cite. The composed test records
-  that valid case and still rejects missing completion evidence and citations
-  to unaccepted decisions. Date/Author: 2026-10-15, implementing agent.
+  and invalid evidence, CLI success and failure coverage for `--as-of` and
+  `--base-rev`, workflow and Make argument-propagation checks, and generated
+  properties for dependency states, citations, component evidence, artefact
+  containment, and frozen decision mutations. Add the missing test descriptions
+  reported by CodeRabbit's docstring check. The repeated request to reject an
+  empty decision list remains declined: MS-4 constrains each cited decision,
+  while ungoverned tasks have none to cite. The composed test records that
+  valid case and still rejects missing completion evidence and citations to
+  unaccepted decisions. Date/Author: 2026-10-15, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
