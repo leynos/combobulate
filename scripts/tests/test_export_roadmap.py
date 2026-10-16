@@ -318,28 +318,35 @@ def roadmaps(draw) -> dict:
     return {'revision': '0.2', 'phases': phases}
 
 
+def count_classes(name: str, count: int) -> set[str]:
+    """Label an observed count; e.g. one phase yields ``single-phase``."""
+    cardinality = f'single-{name}' if count == 1 else f'multi-{name}'
+    return {f'{name}-count={count}', cardinality}
+
+
+def presence_class(condition: bool, present: str, absent: str) -> str:
+    """Choose a feature label; e.g. true selects ``has-details``."""
+    return present if condition else absent
+
+
 def structural_classes(structure: dict) -> set[str]:
     """Describe generated counts and classes for the property coverage gate."""
     phases = structure['phases']
     steps = [step for phase in phases for step in phase['steps']]
     tasks = [task for step in steps for task in step['tasks']]
     task_detail_counts = [len(task['details']) for task in tasks]
-    phase_count = len(phases)
-    step_count = len(steps)
-    task_count = len(tasks)
     detail_count = sum(task_detail_counts)
-    classes = {
-        f'phase-count={phase_count}',
-        f'step-count={step_count}',
-        f'task-count={task_count}',
-        f'detail-count={detail_count}',
-        'multi-phase' if phase_count > 1 else 'single-phase',
-        'multi-step' if step_count > 1 else 'single-step',
-        'multi-task' if task_count > 1 else 'single-task',
-        'has-details' if detail_count > 0 else 'no-details',
-        'has-requires' if any(task['requires'] for task in tasks) else 'no-requires',
-        'has-done' if any(task['status'] == 'done' for task in tasks) else 'all-open',
-    }
+    classes = (
+        count_classes('phase', len(phases))
+        | count_classes('step', len(steps))
+        | count_classes('task', len(tasks))
+        | count_classes('detail', detail_count)
+        | {
+            presence_class(detail_count > 0, 'has-details', 'no-details'),
+            presence_class(any(task['requires'] for task in tasks), 'has-requires', 'no-requires'),
+            presence_class(any(task['status'] == 'done' for task in tasks), 'has-done', 'all-open'),
+        }
+    )
     classes.update(f'task-detail-count={count}' for count in set(task_detail_counts))
     return classes
 
