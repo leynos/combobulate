@@ -1,0 +1,28 @@
+Revision 0.2, 6 October 2026.
+
+<!-- roadmap:start -->
+
+## 1. Status-test phase
+
+Idea: Keep status tests independent of the live roadmap.
+
+Goals: G1 in `terms-of-reference.md` §6.
+
+Status-test context.
+
+Gate: Ready.
+
+### 1.1. Status-test step
+
+Are empty checkboxes exported as open? See `technical-design.md` §1.
+
+- [ ] 1.1.1. Record the first status test
+  - See `technical-design.md` §1.
+  - Proof first: The parser records checkbox state. Bets: B01.
+  - Success: Task status is open.
+- [ ] 1.1.2. Record the second status test
+  - See `technical-design.md` §1.
+  - Proof first: The parser records checkbox state. Bets: B01.
+  - Success: Task status is open.
+
+<!-- roadmap:end -->

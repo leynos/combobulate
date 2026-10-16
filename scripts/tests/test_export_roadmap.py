@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 ROADMAP_PATH = ROOT / 'docs/roadmap.md'
 EXPORT_PATH = ROOT / 'spec/roadmap.json'
 ROADMAP = ROADMAP_PATH.read_text(encoding='utf-8')
+ALL_OPEN_ROADMAP = (
+    Path(__file__).parent / 'fixtures' / 'all_open_roadmap.txt'
+).read_text(encoding='utf-8')
 REQUIRED_CLASSES = {
     'multi-phase', 'single-phase', 'multi-step', 'single-step',
     'multi-task', 'single-task', 'no-details', 'has-details',
@@ -79,17 +82,17 @@ def test_export_is_independent_of_paragraph_wrapping():
 
 
 def test_open_checkboxes_export_as_open_status():
-    """Preserve the unfinished state of tasks whose roadmap checkboxes are empty."""
-    statuses = {task['status'] for phase in parse_roadmap(ROADMAP)['phases']
+    """Keep open-checkbox assertions independent of the live roadmap state."""
+    statuses = {task['status'] for phase in parse_roadmap(ALL_OPEN_ROADMAP)['phases']
                 for step in phase['steps'] for task in step['tasks']}
-    assert statuses == {'open'}, 'every task is open before roadmap step 1.1 completes'
+    assert statuses == {'open'}, 'every task in the fixed fixture must export as open'
 
 
 @pytest.mark.parametrize(('text', 'expected'), [
-    pytest.param(ROADMAP, 'proposed-all-tasks-open', id='all-open'),
-    pytest.param(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record'),
+    pytest.param(ALL_OPEN_ROADMAP, 'proposed-all-tasks-open', id='all-open'),
+    pytest.param(replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record'),
                  'tasks-in-progress', id='mixed'),
-    pytest.param(ROADMAP.replace('- [ ]', '- [x]'), 'all-tasks-done', id='all-done'),
+    pytest.param(ALL_OPEN_ROADMAP.replace('- [ ]', '- [x]'), 'all-tasks-done', id='all-done'),
 ])
 def test_overall_status_matches_independent_expectations(text: str, expected: str):
     """Derive the aggregate status correctly for open, mixed, and completed task sets."""
@@ -112,7 +115,7 @@ def test_changed_dependency_changes_export():
 
 def test_ticked_checkbox_changes_status():
     """Make checkbox completion affect task status and aggregate roadmap status."""
-    edited = replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record')
+    edited = replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record', '- [x] 1.1.1. Record')
     assert first_task(parse_roadmap(edited))['status'] == 'done', 'a tick must export as done'
 
 

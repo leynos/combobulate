@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class RoadmapExportGate(unittest.TestCase):
     """The checker loads the exporter from scripts/ and compares its output."""
 
-    def test_stale_committed_export_fails_the_checker(self):
+    def test_stale_committed_export_fails_the_checker(self) -> None:
         """Reject semantically stale JSON even when the Markdown source is unchanged."""
         context = ValidationContext(ROOT)
         stale = context.load('spec/roadmap.json')
@@ -30,11 +30,11 @@ class RoadmapExportGate(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'Roadmap export drift'):
                 check_roadmap_export(context)
 
-    def test_current_committed_export_passes_the_checker(self):
+    def test_current_committed_export_passes_the_checker(self) -> None:
         """Accept the checked-in export when it matches a fresh canonical-roadmap export."""
         check_roadmap_export(ValidationContext(ROOT))
 
-    def test_whitespace_only_export_drift_fails_the_checker(self):
+    def test_whitespace_only_export_drift_fails_the_checker(self) -> None:
         """Treat trailing whitespace and a missing final newline as serialized-file drift."""
         export_path = ROOT / 'spec/roadmap.json'
         committed = export_path.read_text(encoding='utf-8')

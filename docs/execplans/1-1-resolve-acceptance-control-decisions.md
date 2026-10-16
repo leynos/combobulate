@@ -40,12 +40,11 @@ before:
    explicitly uncalibrated until an executor exists. A pull request that
    changes a registered threshold without an authorized amendment fails the
    `Design contracts` workflow, even if it also recomputes the stored digest.
-4. Run `python3 scripts/check_evidence.py` on a proof-evidence record and see a
-   timeout, skipped harness, unsatisfied `cover`, negative control that failed
-   for the wrong reason, unaudited or uncovered trusted assumption, stale
-   binding, focused run, self-reported verdict, or expired exception rejected
-   with a specific reason code, while a complete record is admitted at the
-   level it has earned (`proof`, `bounded`, or `tested`).
+4. Run
+   `$PY scripts/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json`
+   and see a not-run proof-evidence record rejected with a specific reason
+   code, while a complete record is admitted at the level it has earned
+   (`proof`, `bounded`, or `tested`).
 5. See roadmap tasks 1.1.1 to 1.1.4 ticked in the canonical `docs/roadmap.md`,
    with the checker confirming that each tick is backed by evidence.
 
@@ -426,11 +425,11 @@ EP-M0 makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
 drift-checked export. The retired generator is removed; the Wenmode exporter,
 checker integration, workflow documentation, and independent round-trip tests
 are in place. Review found that suffix text after the Terms of Reference
-reference could be discarded and that non-paragraph phase nodes could escape
-the structured malformed-input error. The review repair now validates the
-complete Goals reference and rejects non-paragraph phase nodes at their source
-line. It also adds independent all-open, mixed, and all-done status checks. The
-focused exporter suite passes 30 cases. All seven local gates pass on
+citation could be discarded and that non-paragraph phase nodes could escape the
+structured malformed-input error. The review repair now validates the complete
+Goals reference and rejects non-paragraph phase nodes at their source line. It
+also adds independent all-open, mixed, and all-done status checks. The focused
+exporter suite passes 30 cases. All seven local gates pass on
 `722d140a9fd170233d020b1f761d437dd7180d1d`: 329 tests (one skipped) and one
 doctest, 115 design-check unit cases, 30 pytest cases, and a clean CodeScene
 delta. Hosted `build-test` and `design-check` pass at that head; the optional
