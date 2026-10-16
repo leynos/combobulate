@@ -111,8 +111,15 @@ Term definitions used throughout:
   logic it loads the script by path rather than duplicating it. No Python file
   exceeds 400 lines. Checks perform no network access.
 - C-EP-8. No Rust library behaviour, public API, or Rust dependency changes.
-  The only Rust-adjacent edit is `publish = false` in `Cargo.toml` (D05).
-  Calibration probes live outside the repository's Cargo package (see `EP-M4`).
+  Rust-adjacent edits are `publish = false` in `Cargo.toml` (D05) and the
+  narrowly scoped test-harness exception in
+  `tests/support/build_tools_preflight.rs` and
+  `tests/build_tools_preflight.rs`. The fixture clears inherited environment
+  settings before running fake build tools, and the alias check includes child
+  diagnostics on failure. The task owner's instruction to repair gate failures
+  authorizes these test-only changes; they do not alter library behaviour or
+  the public API. Calibration probes live outside the repository's Cargo
+  package (see `EP-M4`).
 - C-EP-9. Checks are deterministic for a given commit. The evidence gate
   never reads the wall clock; `make design-check` injects the HEAD commit date
   as `--as-of`, and the base revision for freeze checks as `--base-rev`. No
