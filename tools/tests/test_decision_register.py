@@ -323,7 +323,7 @@ class RealRegister(unittest.TestCase):
         edited = text.replace('Decision: pending.', 'Decision: option A.', 1)
         original = Path.read_text
 
-        def read_text(path: Path, *args, **kwargs) -> str:
+        def read_text(path: Path, *args: str | None, **kwargs: str | None) -> str:
             return edited if path == ROOT / 'docs/decision-register.md' else original(path, *args, **kwargs)
 
         with patch.object(Path, 'read_text', read_text):
