@@ -40,11 +40,17 @@ before:
    explicitly uncalibrated until an executor exists. A pull request that
    changes a registered threshold without an authorized amendment fails the
    `Design contracts` workflow, even if it also recomputes the stored digest.
-4. Run
-   `$PY scripts/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json`
-   and see a not-run proof-evidence record rejected with a specific reason
-   code, while a complete record is admitted at the level it has earned
-   (`proof`, `bounded`, or `tested`).
+4. Run the following command and see a not-run proof-evidence record rejected
+   with a specific reason code, while a complete record is admitted at the
+   level it has earned (`proof`, `bounded`, or `tested`):
+
+   ```sh
+   $PY scripts/check_evidence.py \
+     --as-of 2026-10-10 \
+     --require proof \
+     spec/proof-evidence.example.json
+   ```
+
 5. See roadmap tasks 1.1.1 to 1.1.4 ticked in the canonical `docs/roadmap.md`,
    with the checker confirming that each tick is backed by evidence.
 
@@ -250,7 +256,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   and cover code blocks and thematic breaks in CLI tests. All 30 focused
   exporter cases pass, including `INPUT_CHECK`, malformed-input line reporting,
   and a 60-example derandomized round-trip property that observes every
-  structural class; 2 checker-gate cases pass in
+  structural class; 3 checker-gate cases pass in
   `tools/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
   ignored ticks) fail the suite. The script runs through its `uv` shebang, and
   `make design-check` passes with the documented `uv` requirements environment.
