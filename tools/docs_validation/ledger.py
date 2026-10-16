@@ -3,8 +3,15 @@ from __future__ import annotations
 
 import re
 
-from .context import ValidationContext, require
+from .context import ValidationContext, require, same_typed_value
 from .markdown import generated_matches
+
+
+class MalformedCanonicalRoadmapError(AssertionError):
+    """Expose parser diagnostics through the design-check failure surface."""
+
+    def __init__(self, parser_error: Exception) -> None:
+        super().__init__(f'Malformed canonical roadmap: {parser_error}')
 
 
 def numbered_identity(value: object, name: str, components: int) -> tuple[int, ...]:
@@ -92,11 +99,26 @@ def check_catalogue(catalogue: list[dict], tasks: dict[str, dict]) -> None:
                     f'Core row has no Core implementation task: {row["id"]}')
 
 
-def check_generated_documents(context: ValidationContext, catalogue: list[dict], phases: list[dict]) -> None:
+def check_roadmap_export(context: ValidationContext) -> None:
+    """Require the committed JSON view to equal a fresh export of the canonical roadmap."""
+    exporter = context.load_script('export_roadmap.py')
+    roadmap_text = (context.root / 'docs/roadmap.md').read_text(encoding='utf-8')
+    committed_path = context.root / 'spec/roadmap.json'
+    try:
+        fresh = exporter.parse_roadmap(roadmap_text)
+    except exporter.RoadmapStructureError as error:
+        raise MalformedCanonicalRoadmapError(error) from error
+    require(
+        same_typed_value(context.load('spec/roadmap.json'), fresh)
+        and committed_path.read_text(encoding='utf-8') == exporter.export_text(roadmap_text),
+        'Roadmap export drift: run scripts/export_roadmap.py',
+    )
+
+
+def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
     """Check generated contents against masters, allowing only Markdown formatting."""
     inputs = [
         ('generate_reference.py', catalogue, 'docs/language-reference.md'),
-        ('generate_roadmap.py', phases, 'docs/roadmap.md'),
         ('generate_bets.py', context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
     ]
     for filename, source, path in inputs:
@@ -128,7 +150,8 @@ def check_catalogue_and_roadmap(context: ValidationContext) -> None:
     check_dependencies(tasks)
     require(sections == set(range(1, 20)), f'Design coverage mismatch: {sections}')
     check_catalogue(catalogue, tasks)
-    check_generated_documents(context, catalogue, phases)
+    check_generated_documents(context, catalogue)
+    check_roadmap_export(context)
     check_task_links(context, tasks)
     context.record('catalogue', 'Unique IDs, scope labels, semantic table regeneration, and task mappings pass.', len(catalogue))
     context.record('roadmap', 'All tasks remain open, have success/design contracts, and form an acyclic earlier-dependency graph.', len(tasks))

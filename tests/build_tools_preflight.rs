@@ -152,9 +152,10 @@ fn preflight_matches_preview_components_by_their_installed_aliases() {
     let complete = fixture
         .check(false, None, None)
         .expect("check both installed preview aliases");
+    let complete_stderr = String::from_utf8_lossy(&complete.stderr);
     assert!(
         complete.status.success(),
-        "rustup's unsuffixed installed aliases must satisfy the pin"
+        "rustup's unsuffixed installed aliases must satisfy the pin: {complete_stderr}"
     );
     for missing in ["llvm-tools-preview", "rustc-codegen-cranelift-preview"] {
         fixture

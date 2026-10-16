@@ -22,10 +22,11 @@ class ValidationReport(unittest.TestCase):
     """Run the complete checker on copied source inputs and inspect persistent side effects."""
 
     def setUp(self):
+        """Run report checks against disposable source copies, away from repository files."""
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        for folder in ('docs', 'spec', 'tools'):
+        for folder in ('docs', 'scripts', 'spec', 'tools'):
             shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__'))
         for path in ROOT.iterdir():
             if path.is_file():
@@ -45,11 +46,13 @@ class ValidationReport(unittest.TestCase):
                 if path.is_file() and '__pycache__' not in path.parts}
 
     def test_successful_default_check_does_not_mutate_inputs_or_report(self):
+        """Keep the default validation path read-only after confirming a valid report."""
         before = self.source_bytes()
         self.assertEqual(self.run_main([]), 0)
         self.assertEqual(self.source_bytes(), before)
 
     def test_invalid_json_report_is_rejected_without_replacement(self):
+        """Reject malformed prior evidence without silently replacing the report."""
         self.report.write_text('{')
         before = self.source_bytes()
         with self.assertRaises(SystemExit):
@@ -57,6 +60,7 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(self.source_bytes(), before)
 
     def test_stale_and_falsified_reports_fail_without_mutation(self):
+        """Reject altered counts, status, or omitted checks without changing that evidence."""
         original = json.loads(self.report.read_text())
         mutations = ('count', 'status', 'not_run')
         for mutation in mutations:
@@ -74,6 +78,7 @@ class ValidationReport(unittest.TestCase):
             self.assertEqual(self.source_bytes(), before)
 
     def test_source_failure_leaves_report_untouched_even_with_write_requested(self):
+        """Validate every source before allowing explicit report regeneration."""
         (self.root / 'spec/cost-cases.json').write_text('{')
         for arguments in ([], ['--write']):
             before = self.source_bytes()
@@ -82,6 +87,7 @@ class ValidationReport(unittest.TestCase):
             self.assertEqual(self.source_bytes(), before)
 
     def test_explicit_write_repairs_report_after_source_validation(self):
+        """Limit a successful write request to the generated validation report."""
         self.report.write_text('{')
         before = self.source_bytes()
         self.assertEqual(self.run_main(['--write']), 0)

@@ -40,12 +40,17 @@ before:
    explicitly uncalibrated until an executor exists. A pull request that
    changes a registered threshold without an authorized amendment fails the
    `Design contracts` workflow, even if it also recomputes the stored digest.
-4. Run `python3 tools/check_evidence.py` on a proof-evidence record and see a
-   timeout, skipped harness, unsatisfied `cover`, negative control that failed
-   for the wrong reason, unaudited or uncovered trusted assumption, stale
-   binding, focused run, self-reported verdict, or expired exception rejected
+4. Run the following command and see a not-run proof-evidence record rejected
    with a specific reason code, while a complete record is admitted at the
-   level it has earned (`proof`, `bounded`, or `tested`).
+   level it has earned (`proof`, `bounded`, or `tested`):
+
+   ```sh
+   $PY scripts/check_evidence.py \
+     --as-of 2026-10-10 \
+     --require proof \
+     spec/proof-evidence.example.json
+   ```
+
 5. See roadmap tasks 1.1.1 to 1.1.4 ticked in the canonical `docs/roadmap.md`,
    with the checker confirming that each tick is backed by evidence.
 
@@ -101,17 +106,30 @@ Term definitions used throughout:
 - C-EP-6. The design-model checker remains a documentation-model checker. It
   must not claim Rust compilation, Kani, Verus, or Polars results; the
   `NOT_RUN` list in `tools/check_docs.py` stays truthful.
-- C-EP-7. Python tooling follows the existing `tools/` conventions (modules
-  in `tools/docs_validation/`, `unittest` plus pinned Hypothesis with
-  `derandomize=True`, dependencies pinned in `tools/requirements.txt`). No
-  Python file exceeds 400 lines. Checks perform no network access.
+- C-EP-7. Checker logic lives in `tools/docs_validation/` and follows the
+  existing `tools/` conventions (`unittest` plus pinned Hypothesis with
+  `derandomize=True`, dependencies pinned in `tools/requirements.txt`).
+  Runnable helper scripts live in `scripts/` and follow
+  `docs/scripting-standards.md` (`uv` shebang, PEP 723 block, Python 3.14,
+  Cyclopts with `INPUT_*` environment support, pytest suites in
+  `scripts/tests/` named after the script); when the checker needs a helper's
+  logic it loads the script by path rather than duplicating it. No Python file
+  exceeds 400 lines. Checks perform no network access.
 - C-EP-8. No Rust library behaviour, public API, or Rust dependency changes.
-  The only Rust-adjacent edit is `publish = false` in `Cargo.toml` (D05).
-  Calibration probes live outside the repository's Cargo package (see `EP-M4`).
+  Rust-adjacent edits are `publish = false` in `Cargo.toml` (D05) and the
+  narrowly scoped test-harness exception in
+  `tests/support/build_tools_preflight.rs` and
+  `tests/build_tools_preflight.rs`. The fixture clears inherited environment
+  settings before running fake build tools, and the alias check includes child
+  diagnostics on failure. The task owner's instruction to repair gate failures
+  authorizes these test-only changes; they do not alter library behaviour or
+  the public API. Calibration probes live outside the repository's Cargo
+  package (see `EP-M4`).
 - C-EP-9. Checks are deterministic for a given commit. The evidence gate
   never reads the wall clock; `make design-check` injects the HEAD commit date
   as `--as-of`, and the base revision for freeze checks as `--base-rev`. No
-  check reads environment variables.
+  evidence-gate or design-check path reads environment variables. The exporter's
+  `INPUT_*` CLI support remains as specified in C-EP-7.
 - C-EP-10. Fail closed. Until a log parser registered for a verifier
   re-derives a record's verdict from a committed raw log (task 1.2.4 onward),
   no record from that verifier can be admitted at `proof` or `bounded`. Until
@@ -228,8 +246,24 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   approval, calibration, host identity, and evidence-state expectations.
 - [x] (2026-10-15) R2 clarified checker-backed component satisfaction in MS-3
   and VO-4; implementation alignment remains pending in PRs #17 and #18.
-- [ ] `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode exporter and
-  drift validator (separate stacked pull request, sponsor-directed).
+- [x] (2026-10-11) `EP-M0` Make `docs/roadmap.md` canonical with a Wenmode
+  exporter and drift validator (sponsor-directed, delivered in PR #11). The
+  export matches the previous `spec/roadmap.json` apart from the intended
+  per-task `status` field. On 2026-10-11 the exporter moved to
+  `scripts/export_roadmap.py` (Cyclopts, PEP 723) per the sponsor. Review
+  repairs reject missing or repeated task fields and empty roadmaps or phases,
+  validate Goals references and phase body node types, check overall status,
+  and cover code blocks and thematic breaks in CLI tests. All 30 focused
+  exporter cases pass, including `INPUT_CHECK`, malformed-input line reporting,
+  and a 60-example derandomized round-trip property that observes every
+  structural class; 3 checker-gate cases pass in
+  `tools/tests/test_roadmap_export_gate.py`. Seeded faults (dropped details,
+  ignored ticks) fail the suite. The script runs through its `uv` shebang, and
+  `make design-check` passes with the documented `uv` requirements environment.
+  The full local gates pass after moving block-node validation to the
+  inline-text boundary, and CodeScene reports no issues; final validation
+  evidence is recorded in PR #11.
+- [x] (2026-10-11) Sponsor approval of this revision.
 - [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
@@ -345,10 +379,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   than changing the pack-wide `revision` (`0.2`). Date/Author: 2026-10-10.
 - Decision: exceptions live in `spec/exceptions.json`, referenced by
   identifier. Date/Author: 2026-10-10.
-- Decision: keep `tools/check_evidence.py` with documented exit codes.
+- Decision: keep `scripts/check_evidence.py` with documented exit codes.
   Date/Author: 2026-10-10.
-- Decision: follow existing `tools/` conventions rather than
-  `docs/scripting-standards.md`. Date/Author: 2026-10-10.
+- Decision: runnable helper scripts go in `scripts/` under
+  `docs/scripting-standards.md`, with pytest suites in `scripts/tests/`;
+  checker modules stay in `tools/docs_validation/` under `unittest`. The
+  roadmap exporter is `scripts/export_roadmap.py`;
+  `scripts/generate_decisions.py` and `scripts/check_evidence.py` follow the
+  same rule. Existing `tools/generate_*.py` generators are not moved in this
+  step. Rationale: the sponsor named `scripts/` as the expected home for helper
+  scripts (2026-10-11), replacing the planning agent's earlier choice to follow
+  `tools/` conventions. Date/Author: 2026-10-11, sponsor.
 - Decision: milestones land sequentially on stacked branches. Date/Author:
   2026-10-10.
 - Decision: the kernel-contract `evidence.status` vocabulary is unchanged;
@@ -386,9 +427,22 @@ here; implementation alignment remains pending in PRs #17 and #18.
 
 ## Outcomes & retrospective
 
-Not started. Complete at each milestone boundary and at completion, comparing
-the result with `Purpose / big picture` and reconciling every discovery with
-the artefacts in `Conformance basis` before setting the status to `COMPLETE`.
+EP-M0 makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
+drift-checked export. The retired generator is removed; the Wenmode exporter,
+checker integration, workflow documentation, and independent round-trip tests
+are in place. Review found that suffix text after the Terms of Reference
+citation could be discarded and that non-paragraph phase nodes could escape the
+structured malformed-input error. The review repair now validates the complete
+Goals reference and rejects non-paragraph phase nodes at their source line. It
+also adds independent all-open, mixed, and all-done status checks. The focused
+exporter suite passes 30 cases. All seven local gates pass on
+`722d140a9fd170233d020b1f761d437dd7180d1d`: 329 tests (one skipped) and one
+doctest, 115 design-check unit cases, 30 pytest cases, and a clean CodeScene
+delta. Hosted `build-test` and `design-check` pass at that head; the optional
+`Test under Act` step is skipped. The plan was approved for implementation on
+2026-10-11; individual decisions remain accepted by identifier, and later
+milestones follow the approved plan's declared gates. The exporter is expected
+to retire when mapsplice#144 adds native JSON export and validation.
 
 ## Context and orientation
 
@@ -456,7 +510,7 @@ TD §15 candidate ADRs -> D07 -> EP-M1a, EP-M2 -> docs/decision-register.md disp
 TD §§4-7, §17.3, §17.5 -> R2 -> D08-D10, D14 -> SC-* -> EP-M3 -> ADR-0006, ADR-0007 -> tools/tests/test_semantic_contracts.py
 ToR Q2, S7 -> TD §12, §14 V13, §17.8, §18.5 -> D11, D12 -> AC-* -> EP-M4 -> ADR-0008 -> tools/tests/test_preregistration.py
 TD §17.1-17.2, V14, V20 -> R8 -> PF14.structural@1.1.4 -> EP-M5 -> ADR-0009 -> tools/tests/test_evidence_gate.py
-D15 -> EP-M0 -> docs/roadmap.md canonical -> tools/tests/test_roadmap_export.py
+D15 -> EP-M0 -> docs/roadmap.md canonical -> scripts/tests/test_export_roadmap.py
 Roadmap 1.1.1-1.1.4 -> EP-M6 -> ticked in docs/roadmap.md -> tools/tests/test_roadmap_status.py
 ```
 
@@ -665,12 +719,14 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   Method: an exact-equality test on the real roadmap; a Hypothesis round-trip
   property that renders generated roadmap structures with an independent
   test-only renderer (the former generator's layout) and exports them back;
-  parameterized malformed-input cases. Artefact:
-  `tools/tests/test_roadmap_export.py`. Non-vacuity: a changed task title, a
-  changed `Requires` reference, and a changed checkbox in an in-memory roadmap
-  each make the drift check fail and name the item; a heading at the wrong
-  level is rejected rather than dropped; the property records generated phase,
-  step, task, and detail counts and fails if any class is absent.
+  parameterized malformed-input cases; command-line exit codes. Artefacts:
+  `scripts/tests/test_export_roadmap.py` (pytest) and
+  `tools/tests/test_roadmap_export_gate.py` (the checker rejects a stale
+  export). Non-vacuity: a changed task title, a changed `Requires` reference,
+  and a changed checkbox in an in-memory roadmap each make the drift check fail
+  and name the item; a heading at the wrong level is rejected rather than
+  dropped; the property records generated phase, step, task, and detail counts
+  and fails if any class is absent.
 - VO-1 (admission correctness, MS-0 to MS-2, P1 to P4). Method: exhaustive
   enumeration of all 345,600 abstract states against an independent interpreter
   of the ADR-0009 rule table in
@@ -875,8 +931,11 @@ full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
-- Add `wenmode==0.15.2` to `tools/requirements.txt`.
-- Add `tools/docs_validation/roadmap_markdown.py`: parse the region between
+- Add `wenmode==0.15.2`, `cyclopts==5.2.0`, and `pytest==9.1.1` to
+  `tools/requirements.txt`, and run `pytest -q scripts/tests` from
+  `make design-check`.
+- Add `scripts/export_roadmap.py` (a `uv` script with a PEP 723 block and a
+  Cyclopts command line) whose parser parses the region between
   `<!-- roadmap:start -->` and `<!-- roadmap:end -->` with Wenmode's
   GitHub-flavoured preset into the existing structure (phases with `number`,
   `title`, `idea`, `goals`, `context`, `gate`; steps with `number`, `title`,
@@ -885,14 +944,15 @@ full gates (Stage D).
   state. Top-level `revision` comes from the preamble's "Revision" line;
   `status` is computed from checkbox states. Unknown structure raises an error
   naming the source line.
-- Add `tools/export_roadmap.py`: write `spec/roadmap.json` from the Markdown,
-  or with `--check` exit 1 and print a unified diff when the committed export
-  has drifted.
+- The script writes `spec/roadmap.json` from the Markdown, or with `--check`
+  (or `INPUT_CHECK=true`) exits 1 and prints a unified diff when the committed
+  export has drifted. The checker loads it by path through
+  `ValidationContext.load_script`.
 - In `tools/docs_validation/ledger.py`, replace the JSON-to-Markdown drift
   comparison for the roadmap with the export drift comparison. Remove
   `tools/generate_roadmap.py`. Move its rendering layout into
-  `tools/tests/support/roadmap_render.py` as the independent test-only renderer
-  used by VO-0.
+  `scripts/tests/roadmap_render.py` as the independent test-only renderer used
+  by VO-0. The checker's Python-source check also parses `scripts/`.
 - Update `docs/validation.md` (reproduction steps),
   `docs/developers-guide.md` (roadmap workflow: edit `docs/roadmap.md`,
   preferably with `mapsplice` for structural edits, then run the exporter),
@@ -916,7 +976,7 @@ full gates (Stage D).
   `superseded_by`, `accepted_by`, `accepted_on`, `approval_reference`, `adr`,
   and `retired_statements`. Add the eight candidate ADR subjects with
   dispositions.
-- Add `tools/generate_decisions.py`, rendering `docs/decision-register.md`
+- Add `scripts/generate_decisions.py`, rendering `docs/decision-register.md`
   between `<!-- decisions:start -->` and `<!-- decisions:end -->` with one
   anchored heading per decision.
 - Turn the generator list in `ledger.check_generated_documents` into a table
@@ -1121,7 +1181,7 @@ and the bet register's measurement sentences.
   `spec/evidence-reason-codes.json`, in one change.
 - Implement the pure `tools/docs_validation/evidence_gate.py`
   (`abstract_record`, `admit`), have `roadmap_status.py` consume it, and add
-  `tools/check_evidence.py`. Tests: VO-1 to VO-4.
+  `scripts/check_evidence.py`. Tests: VO-1 to VO-4.
 - Add `docs/evidence-and-decision-records.md` (the component document for
   producers: schema, reason codes, exit codes, log-parser and trust-scanner
   obligations, kernel-contract status mapping). Update technical design §17.1
@@ -1208,11 +1268,13 @@ Green and refactor, then regenerate and check idempotence:
 
 ```bash
 $PY -m unittest discover -s tools/tests
-$PY tools/export_roadmap.py
-for g in reference bets decisions; do $PY tools/generate_$g.py; done
+$PY scripts/export_roadmap.py
+for g in reference bets; do $PY tools/generate_$g.py; done
+$PY scripts/generate_decisions.py
 $PY tools/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
-$PY tools/export_roadmap.py --check
-for g in reference bets decisions; do $PY tools/generate_$g.py; done
+$PY scripts/export_roadmap.py --check
+for g in reference bets; do $PY tools/generate_$g.py; done
+$PY scripts/generate_decisions.py
 git diff --exit-code -- docs/ spec/ && echo idempotent
 ```
 
@@ -1235,7 +1297,7 @@ The planned example uses VO-1's `none/not-run` witness, with every other
 blocking condition satisfied.
 
 ```bash
-$PY tools/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json; echo "exit=$?"
+$PY scripts/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json; echo "exit=$?"
 ```
 
 ```plaintext
@@ -1260,7 +1322,7 @@ Behavioural acceptance:
    "no CODEOWNERS", D12 as delegated), each with its chosen option, date, and
    approval reference, plus all eight candidate ADR subjects.
 2. `docs/roadmap.md` shows 1.1.1 to 1.1.4 ticked and no other ticked task;
-   `tools/export_roadmap.py --check` passes.
+   `scripts/export_roadmap.py --check` passes.
 3. Reinserting "The classes remain proposed pending ToR Q4." into
    `docs/technical-design.md`, or writing "Q4 remains open", makes
    `make design-check` fail and name D03.
@@ -1306,19 +1368,22 @@ New specification files: `spec/decision-register.schema.json`,
 `spec/calibration/`, `spec/exceptions.json`, `spec/exception.schema.json`,
 `spec/evidence-reason-codes.json`. `spec/roadmap.json` becomes a derived export.
 
-New tooling: `tools/export_roadmap.py`, `tools/generate_decisions.py`,
-`tools/check_evidence.py`, `tools/calibration/cardinality-probe/`, and
-`tools/docs_validation/` modules `roadmap_markdown.py`, `decisions.py`,
-`roadmap_status.py`, `freeze.py`, `package_policy.py`, `contract_examples.py`,
-`grammar.py`, `preregistration.py`, `evidence_gate.py`. Removed:
-`tools/generate_roadmap.py`.
+New tooling: helper scripts `scripts/export_roadmap.py`,
+`scripts/generate_decisions.py`, and `scripts/check_evidence.py`; the probe
+`tools/calibration/cardinality-probe/`; and `tools/docs_validation/` modules
+`decisions.py`, `roadmap_status.py`, `freeze.py`, `package_policy.py`,
+`contract_examples.py`, `grammar.py`, `preregistration.py`, `evidence_gate.py`.
+Removed: `tools/generate_roadmap.py`.
 
-New tests in `tools/tests/`: `test_roadmap_export.py`,
+New pytest suites in `scripts/tests/`: `test_export_roadmap.py` (with
+`conftest.py` and the test-only `roadmap_render.py`),
+`test_generate_decisions.py`, and `test_check_evidence.py`. New `unittest`
+modules in `tools/tests/`: `test_roadmap_export_gate.py`,
 `test_decision_register.py`, `test_roadmap_status.py`, `test_freeze.py`,
 `test_package_policy.py`, `test_semantic_contracts.py`, `test_macro_grammar.py`,
 `test_preregistration.py`, `test_exceptions.py`, `test_evidence_gate.py`,
-`test_evidence_records.py`, support module `support/roadmap_render.py`, and
-fixtures `evidence_gate_rules.json` and `evidence/`.
+`test_evidence_records.py`, and fixtures `evidence_gate_rules.json` and
+`evidence/`.
 
 ## Interfaces and dependencies
 
@@ -1349,16 +1414,17 @@ def admit(record: AbstractRecord) -> Admission: ...
 `admit` is pure and total over `AbstractRecord`; `abstract_record` raises
 `ValidationError` only for schema-invalid records.
 
-`tools/check_evidence.py --as-of DATE [--require LEVEL] [--bindings FILE]
+`scripts/check_evidence.py --as-of DATE [--require LEVEL] [--bindings FILE]
 RECORD…`
 prints `path: level [reasons]` per record and exits 0 when every record meets
 `--require` (default `tested`), 1 when any falls short, and 2 for
 schema-invalid input or usage errors.
 
-`tools/export_roadmap.py [--check]` exits 0 when the export is written or
-matches, 1 on drift (printing a unified diff), and 2 on malformed roadmap
-structure (printing the source line). `roadmap_markdown.py` exposes
-`parse_roadmap(text: str) -> dict`.
+`scripts/export_roadmap.py [--check] [--roadmap PATH] [--export PATH]` (or
+`INPUT_CHECK=true`) exits 0 when the export is written or matches, 1 on drift
+(printing a unified diff), and 2 on malformed roadmap structure (printing the
+source line). The script exposes `parse_roadmap(text: str) -> dict` and
+`RoadmapStructureError` for the checker.
 
 `roadmap_status.py` exposes
 `check_task_status(context, roadmap, decisions, components) -> None`;
@@ -1419,3 +1485,8 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   counterexample; the result cannot be promoted or replace verifier evidence.
   MS-3 and VO-4 now state this contract, and EP-M5 requires MS-3 plus all MS-4
   closure conditions for the tick. Alignment in PRs #17 and #18 remains pending.
+- 2026-10-11, helper scripts relocated per the sponsor: the roadmap exporter is
+  `scripts/export_roadmap.py` under the scripting standards (Cyclopts, PEP 723,
+  pytest suites in `scripts/tests/`), and the planned decision generator and
+  evidence checker follow the same rule. Checker modules stay in
+  `tools/docs_validation/`. Remaining milestones are unchanged.

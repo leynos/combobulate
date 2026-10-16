@@ -113,6 +113,7 @@ impl ToolFixture {
             command.arg("--coverage");
         }
         command
+            .env_clear()
             .env("PATH", format!("{}:/usr/bin:/bin", self.path))
             .env("FAKE_COMPONENTS", self.path.join("components").as_str())
             .env("FAKE_TOOLCHAINS", self.path.join("toolchains").as_str())
