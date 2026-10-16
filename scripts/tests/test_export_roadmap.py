@@ -329,6 +329,14 @@ def presence_class(condition: bool, present: str, absent: str) -> str:
     return present if condition else absent
 
 
+def task_feature_classes(tasks: list[dict]) -> set[str]:
+    """Label task features; e.g. no requirements yields ``no-requires``."""
+    return {
+        presence_class(any(task['requires'] for task in tasks), 'has-requires', 'no-requires'),
+        presence_class(any(task['status'] == 'done' for task in tasks), 'has-done', 'all-open'),
+    }
+
+
 def structural_classes(structure: dict) -> set[str]:
     """Describe generated counts and classes for the property coverage gate."""
     phases = structure['phases']
@@ -343,9 +351,8 @@ def structural_classes(structure: dict) -> set[str]:
         | count_classes('detail', detail_count)
         | {
             presence_class(detail_count > 0, 'has-details', 'no-details'),
-            presence_class(any(task['requires'] for task in tasks), 'has-requires', 'no-requires'),
-            presence_class(any(task['status'] == 'done' for task in tasks), 'has-done', 'all-open'),
         }
+        | task_feature_classes(tasks)
     )
     classes.update(f'task-detail-count={count}' for count in set(task_detail_counts))
     return classes
