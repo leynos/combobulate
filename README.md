@@ -857,7 +857,7 @@ The build baseline comes from
 identity, build-contract tests, and engineering guides, repairs the inherited
 complexity findings, and replaces its product design with the Combobulate
 revision 0.2 archive. See the
-[bootstrap decision](docs/adr-001-repository-bootstrap.md).
+[bootstrap decision](docs/adrs/adr-0001-repository-bootstrap.md).
 
 ## Licence
 

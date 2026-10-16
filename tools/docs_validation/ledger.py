@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from types import ModuleType
 
 from .context import ValidationContext, require, same_typed_value
 from .markdown import generated_matches
@@ -115,15 +116,38 @@ def check_roadmap_export(context: ValidationContext) -> None:
     )
 
 
-def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
-    """Check generated contents against masters, allowing only Markdown formatting."""
-    inputs = [
-        ('generate_reference.py', catalogue, 'docs/language-reference.md'),
-        ('generate_bets.py', context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
+def generated_documents(context: ValidationContext, catalogue: list[dict]) -> list[tuple[ModuleType, object, str]]:
+    """List each generator module with its master data and generated document.
+
+    For example, the decision generator owns the rendered register document::
+
+        >>> from pathlib import Path
+        >>> context = ValidationContext(Path.cwd())
+        >>> catalogue = context.load('spec/vocabulary.json')['entries']
+        >>> any(path == 'docs/decision-register.md'
+        ...     for _, _, path in generated_documents(context, catalogue))
+        True
+    """
+    return [
+        (context.load_generator('generate_reference.py'), catalogue, 'docs/language-reference.md'),
+        (context.load_generator('generate_bets.py'), context.load('spec/bets.json')['bets'], 'docs/testable-bets.md'),
+        (context.load_script('generate_decisions.py'), context.load('spec/decisions.json'), 'docs/decision-register.md'),
     ]
-    for filename, source, path in inputs:
-        generator = context.load_generator(filename)
-        text = (context.root / path).read_text()
+
+
+def check_generated_documents(context: ValidationContext, catalogue: list[dict]) -> None:
+    """Check generated contents against masters, allowing only Markdown formatting.
+
+    From the repository root, every generated document matches its master::
+
+        >>> from pathlib import Path
+        >>> context = ValidationContext(Path.cwd())
+        >>> catalogue = context.load('spec/vocabulary.json')['entries']
+        >>> check_generated_documents(context, catalogue) is None
+        True
+    """
+    for generator, source, path in generated_documents(context, catalogue):
+        text = (context.root / path).read_text(encoding='utf-8')
         require(generated_matches(text, generator.render(source), generator.START, generator.END),
                 f'Generated content drift: {path}')
 

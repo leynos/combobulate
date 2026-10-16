@@ -23,13 +23,15 @@ implemented API or completed verification.
 - [Source register](references.md): technical sources and evidence limits.
 - [Design validation](validation.md): documentation checks and outstanding
   implementation/verifier obligations.
-- [Bootstrap decision](adr-001-repository-bootstrap.md): scaffold provenance,
-  repository integration, and complexity repair boundaries.
+- [Decision register](decision-register.md): decisions that control
+  acceptance, their authority, options, approval references, and ADRs.
+- [ADR-0001: repository bootstrap](adrs/adr-0001-repository-bootstrap.md):
+  scaffold provenance, repository integration, and complexity repair boundaries.
 
 ## Execution plans
 
 - [Roadmap 1.1: resolve the decisions that control acceptance][roadmap-1-1]:
-  approved ExecPlan for step 1.1.
+  approved ExecPlan; `EP-M0` and `EP-M1a` complete, with `EP-M1b` pending.
 
 [roadmap-1-1]: execplans/1-1-resolve-acceptance-control-decisions.md
 

@@ -20,6 +20,7 @@ from docs_validation.contracts import (
     check_kernel_envelope, check_proof_evidence_envelope, check_revision_contracts,
 )
 from docs_validation.costs import check_cost_examples
+from docs_validation.decisions import check_decision_register
 from docs_validation.ledger import check_catalogue_and_roadmap
 from docs_validation.markdown import check_markdown
 from docs_validation.semantics import check_examples
@@ -54,11 +55,19 @@ def report_data(context: ValidationContext, status: str) -> dict:
 
 
 def collect_checks(context: ValidationContext) -> None:
-    """Run source-only checks; the existing evidence report cannot affect their results."""
+    """Run source-only checks; the evidence report cannot affect their results.
+
+    For example, collecting checks records the decision-register result::
+
+        >>> context = ValidationContext(ROOT)
+        >>> collect_checks(context)
+        >>> any(row['check'] == 'decision-register' for row in context.results)
+        True
+    """
     for path in context.json_paths():
         json.loads(path.read_text(encoding='utf-8'))
     for check in (
-        check_markdown, check_catalogue_and_roadmap, check_kernel_envelope,
+        check_markdown, check_catalogue_and_roadmap, check_decision_register, check_kernel_envelope,
         check_examples, check_revision_contracts,
         check_proof_evidence_envelope, check_cost_examples, check_tool_sources,
     ):

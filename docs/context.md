@@ -5,6 +5,9 @@ reviewers, extension authors, and adopting projects. Companions:
 `terms-of-reference.md`, `technical-design.md`, `roadmap.md`,
 `language-reference.md`, and `references.md`.
 
+Decisions that control acceptance, with their authority, options, and status,
+are recorded in the [decision register](decision-register.md).
+
 ## 1. Product context
 
 Combobulate is a proposed Rust library for expressing computations over arrays

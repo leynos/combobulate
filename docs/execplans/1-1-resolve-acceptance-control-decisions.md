@@ -5,8 +5,9 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: APPROVED (the sponsor approved this plan for implementation on
-2026-10-11)
+Status: IN PROGRESS (the sponsor approved this revision for implementation on
+2026-10-11 by invoking the implementation workflow; `EP-M0` and `EP-M1a` are
+complete, and `EP-M1b` is pending)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -264,7 +265,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   inline-text boundary, and CodeScene reports no issues; final validation
   evidence is recorded in PR #11.
 - [x] (2026-10-11) Sponsor approval of this revision.
-- [ ] `EP-M1a` ADR relocation, decision register, generator, and anchors.
+- [x] (2026-10-11) `EP-M1a` ADR relocation, decision register, generator, and
+  anchors (branch `1-1-decision-register`, stacked on `EP-M0`). Evidence: ADR
+  001 moved to `docs/adrs/adr-0001-repository-bootstrap.md` with every link
+  updated and the style guide amended (D07); `spec/decisions.json` holds D01 to
+  D15 (all `proposed`) and the eight candidate ADR subjects; 11 pytest cases in
+  `scripts/tests/test_generate_decisions.py` (red first: module missing) and 33
+  `unittest` cases in `tools/tests/test_decision_register.py` pass; seeded
+  mutations (open-status pattern disabled, supersession check removed) each
+  fail their control; a hand edit of `docs/decision-register.md` fails the
+  drift check (VO-14).
 - [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
@@ -274,6 +284,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: generated register text containing `Batch<DVec3>` failed
+  `make fmt` (markdownlint MD033, inline HTML). Evidence: `make fmt` exit 2
+  naming `docs/decision-register.md`. Impact: register master text puts code
+  identifiers in backticks.
+- Observation: `tools/tests/test_docs_validation.py` pinned the checked
+  Markdown count at 10. Impact: it now derives the count from
+  `DESIGN_DOCUMENTS`, so adding a design document needs no test edit.
 - Observation: the checker forbids any completed roadmap task.
   Evidence: `tools/docs_validation/ledger.py` `check_task_links` fails with
   "Roadmap has fabricated completed tasks"; `tools/generate_roadmap.py` always
@@ -315,6 +332,23 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M1a` exceeded the per-milestone line tolerance (about 1,600
+  net added lines against 1,500, excluding the generated register region and
+  the validation report). The overrun is the register master itself
+  (`spec/decisions.json`, 522 lines of indented JSON for 15 decisions and 8
+  candidate subjects), not added scope; file count (24) is within tolerance.
+  Escalated to the sponsor in the milestone pull request rather than
+  compressing the master's formatting to fit. Date/Author: 2026-10-11,
+  implementing agent.
+- Decision: in `EP-M1a`, VO-5's question coverage is checked over live
+  records (`proposed` or `accepted`), because acceptances arrive in `EP-M2` to
+  `EP-M4`. Coverage by accepted records then follows from closure: tasks 1.1.1
+  to 1.1.4 cite the decisions for Q1, Q2, Q4, Q7, and Q8, and MS-4 forbids a
+  tick while a cited decision is not accepted. The register's `authorities` map
+  is optional in the schema and required by the checker once any record is
+  accepted, and it must cite an accepted D01. Options include the alternatives
+  the sponsor chose where they differ from the recommendation (D12 option B,
+  D13 option B). Date/Author: 2026-10-11, implementing agent.
 - Decision: record the sponsor's answers to D01 to D15 as given in the Lody
   session on 2026-10-10 (see `Sponsor decisions`). Approval references use
   `kind: session` with the verbatim answers; the sponsor's merge of the
@@ -443,6 +477,13 @@ delta. Hosted `build-test` and `design-check` pass at that head; the optional
 2026-10-11; individual decisions remain accepted by identifier, and later
 milestones follow the approved plan's declared gates. The exporter is expected
 to retire when mapsplice#144 adds native JSON export and validation.
+
+Pre-merge assessment on 2026-10-15 found gaps in the EP-M1a authority,
+supersession, and generator CLI checks. The repairs bind authority to accepted
+D01 and C-EP-1's `leynos` login, require an accepted replacement before
+supersession, and preserve generated headings while allowing paragraph
+rewrapping. VO-5 and VO-14 now name these invariants and their negative
+controls.
 
 ## Context and orientation
 
@@ -787,14 +828,16 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   cannot be ticked.
 - VO-5 (decision register integrity). Invariants: unique identifiers; unique
   subjects among accepted, non-superseded records; every in-scope ToR question
-  covered by an accepted record; accepted records carry `decided_option`,
+  covered by a live record; accepted records carry `decided_option`,
   `accepted_on`, and a structured approval reference whose `author_login` is
-  `leynos` and whose `names_decisions` includes the record; proposed records
-  carry no approval fields; two-way, acyclic supersession links; each cited ADR
-  exists under `docs/adrs/` with an agreeing `Status` line; dates validated
-  with the `jsonschema` format checker. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity: one in-memory negative
-  control per invariant, each with a distinct message; the real register passes.
+  `leynos` and whose `names_decisions` includes the record; the authority map
+  cites accepted D01; proposed records carry no approval fields; a replacement
+  is accepted before it supersedes an accepted record; supersession links are
+  two-way and acyclic; each cited ADR exists under `docs/adrs/` with an agreeing
+  `Status` line; dates are validated with the `jsonschema` format checker.
+  Artefact: `tools/tests/test_decision_register.py`. Non-vacuity includes
+  coordinated authority-map and approval changes, a non-D01 source, and a
+  proposed replacement; each negative control has its own message.
 - VO-6 (five-document consistency). Invariants: each governing document links
   `decision-register.md`; each accepted question's ToR §9 row links its
   register anchor; after whitespace and inline-Markdown normalization, no
@@ -884,7 +927,9 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   every generator and the roadmap exporter are covered by the checker; rerun on
   a clean tree, they yield no diff. Artefact:
   `tools/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity: a
-  hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails.
+  hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails. The
+  generator CLI rejects a word-preserving loss of a decision heading while
+  permitting ordinary paragraph rewrapping.
 - VO-15 (bet and task links are two-way). Artefact:
   `tools/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
   memory fails.
@@ -921,11 +966,11 @@ Trusted, not verified here:
 ## Plan of work
 
 Milestones run in order on stacked branches. The sponsor approved this plan on
-2026-10-11; `EP-M0` is sponsor-directed, and later milestones follow the
-approved plan. All decisions they need have been answered. Each milestone
-follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables,
-fixtures, and tests and observe the expected failure (Stage B); implement until
-the focused tests pass (Stage C); tidy, run the generators and exporter and
+2026-10-11. `EP-M0` and `EP-M1a` are complete, and `EP-M1b` is pending; all
+decisions they need have been answered. Each milestone follows Red, Green,
+Refactor: draft as `proposed` (Stage A); add rule tables, fixtures, and tests
+and observe the expected failure (Stage B); implement until the focused tests
+pass (Stage C); tidy, run the generators and exporter and
 `check_docs.py --write`, review the report diff, and have `scrutineer` run the
 full gates (Stage D).
 
