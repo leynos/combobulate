@@ -100,14 +100,14 @@ class DesignWorkflowContract(unittest.TestCase):
 
     def _run_workflow_base_step(
         self,
-        script: str,
         repository: Path,
-        output: Path,
         date_command: Path,
         event: str,
         before: str,
     ) -> dict[str, str]:
-        """Execute the workflow shell with fixture refs and capture outputs."""
+        """Execute the checked workflow with fixture refs and capture outputs."""
+        script = self._workflow_base_step()
+        output = repository.parent / 'github-output'
         output.unlink(missing_ok=True)
         environment = os.environ.copy()
         environment.update({
@@ -211,7 +211,6 @@ class DesignWorkflowContract(unittest.TestCase):
             date_command.chmod(
                 date_command.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
             )
-            script = self._workflow_base_step()
             cases = (
                 ('pull_request', '', base_revision, ''),
                 ('push', base_revision, base_revision, ''),
@@ -223,8 +222,7 @@ class DesignWorkflowContract(unittest.TestCase):
             for event, before, expected_revision, expected_date in cases:
                 with self.subTest(event=event, before=before):
                     outputs = self._run_workflow_base_step(
-                        script, repository, directory / 'github-output',
-                        date_command, event, before,
+                        repository, date_command, event, before,
                     )
                     self.assertEqual(
                         outputs,
@@ -244,19 +242,16 @@ class DesignWorkflowContract(unittest.TestCase):
             date_command.chmod(
                 date_command.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
             )
-            output = directory / 'github-output'
-
             with self.assertRaises(
                 subprocess.CalledProcessError,
                 msg='the pull-request selector must fail when Git cannot find a merge base',
             ):
                 self._run_workflow_base_step(
-                    self._workflow_base_step(), repository, output,
-                    date_command, 'pull_request', '',
+                    repository, date_command, 'pull_request', '',
                 )
 
             self.assertFalse(
-                output.exists(),
+                (repository.parent / 'github-output').exists(),
                 'the failed merge-base lookup must not write an empty freeze revision',
             )
 
