@@ -274,7 +274,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `unittest` cases in `tools/tests/test_decision_register.py` pass; seeded
   mutations (open-status pattern disabled, supersession check removed) each
   fail their control; a hand edit of `docs/decision-register.md` fails the
-  drift check (VO-14).- [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
+  drift check (VO-14).
+- [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
@@ -964,12 +965,12 @@ Trusted, not verified here:
 
 ## Plan of work
 
-Milestones run in order on stacked branches. The sponsor approved this plan
-on 2026-10-11. `EP-M0` and `EP-M1a` are complete, and `EP-M1b` is pending;
-all decisions they need have been answered. Each milestone follows Red,
-Green, Refactor: draft as `proposed` (Stage A); add rule tables, fixtures,
-and tests and observe the expected failure (Stage B); implement until the
-focused tests pass (Stage C); tidy, run the generators and exporter and
+Milestones run in order on stacked branches. The sponsor approved this plan on
+2026-10-11. `EP-M0` and `EP-M1a` are complete, and `EP-M1b` is pending; all
+decisions they need have been answered. Each milestone follows Red, Green,
+Refactor: draft as `proposed` (Stage A); add rule tables, fixtures, and tests
+and observe the expected failure (Stage B); implement until the focused tests
+pass (Stage C); tidy, run the generators and exporter and
 `check_docs.py --write`, review the report diff, and have `scrutineer` run the
 full gates (Stage D).
 
