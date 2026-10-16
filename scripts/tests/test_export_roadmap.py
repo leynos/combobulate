@@ -150,7 +150,7 @@ def test_phase_without_steps_is_rejected_at_its_heading():
 ])
 def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
     """Reject incomplete task contracts and name the absent required field."""
-    edited = remove_first_task_bullet(ROADMAP, label)
+    edited = remove_first_task_bullet(ALL_OPEN_ROADMAP, label)
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
     assert raised.value.line == line_of(edited, '- [ ] 1.1.1.'), 'missing task detail must name its task'
@@ -159,7 +159,7 @@ def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
 
 def test_duplicate_task_success_bullet_is_rejected():
     """Reject repeated success criteria instead of silently choosing one value."""
-    edited = replace_once(ROADMAP, '- [ ] 1.1.2.', '  - Success: duplicate.\n- [ ] 1.1.2.')
+    edited = replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.2.', '  - Success: duplicate.\n- [ ] 1.1.2.')
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
     assert raised.value.line == line_of(edited, '  - Success: duplicate.'), 'duplicate error must name its bullet'
@@ -168,8 +168,8 @@ def test_duplicate_task_success_bullet_is_rejected():
 
 @pytest.mark.parametrize(('text', 'line'), [
     pytest.param(f'Revision 0.2, 6 October 2026.\n\n{START}\n\n#### 1. Too deep\n\n{END}\n', 5, id='heading-level'),
-    pytest.param(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'),
-                 line_of(ROADMAP, '- [ ] 1.1.1. Record'), id='task-without-checkbox'),
+    pytest.param(replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'),
+                 line_of(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record'), id='task-without-checkbox'),
     pytest.param(replace_once(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.', '  - Mystery note.'),
                  line_of(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.'), id='unlabelled-bullet'),
     pytest.param(replace_once(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.', '  - [x] A ticked detail.'),
@@ -253,9 +253,10 @@ def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
 def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
     """Reserve exit two for malformed input and include its source line in diagnostics."""
     roadmap, export = workspace
-    roadmap.write_text(replace_once(ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'), encoding='utf-8')
+    roadmap.write_text(replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'),
+                        encoding='utf-8')
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 2, 'malformed input exits 2'
-    assert f':{line_of(ROADMAP, "- [ ] 1.1.1. Record")}:' in capsys.readouterr().err
+    assert f':{line_of(ALL_OPEN_ROADMAP, "- [ ] 1.1.1. Record")}:' in capsys.readouterr().err
 
 
 def test_cli_reads_check_flag_from_environment(workspace, monkeypatch):
