@@ -5,9 +5,10 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (the sponsor approved this revision for implementation on
+Status: BLOCKED (the sponsor approved this revision for implementation on
 2026-10-11 by invoking the implementation workflow; `EP-M0`, `EP-M1a`,
-`EP-M1b`, and `EP-M2` are complete; `EP-M3` is next)
+`EP-M1b`, and `EP-M2` implementation is complete, but the EP-M2 scope
+escalation awaits explicit sponsor confirmation; `EP-M3` is next)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -289,14 +290,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Evidence: ADR-0002 to ADR-0005 accepted; D01 to D07 and D13 accepted in
   `spec/decisions.json` with `kind: session` references quoting the sponsor's
   answers, D01 and D13 on option B; the five governing documents reconciled,
-  with 12 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
+  with 13 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
   Q4, Q7, and Q8 link their register anchors; `Cargo.toml` sets
   `publish = false` and `cargo publish --dry-run` refuses; 4 cases in
   `tools/tests/test_package_policy.py` (red first) and 6 real-document VO-6
   controls pass for the retired Q4 sentence (including a wrapped form), the
   restored roadmap preamble while task 1.1.1 remains checked, "Q4 remains
   open", and removal of the Q4 anchor; each failure names D03. Task 1.1.1 is
-  ticked with its completion record, and the checker reports it backed.
+  ticked with its completion record, and the checker reports it backed. The
+  committed validation report contains 17 checks; the freeze check reports
+  separately.
 - [x] (2026-10-15) Rebased `EP-M2` onto roadmap-closure head `2df245d`.
 - [x] (2026-10-15) Rebased `EP-M2` onto updated roadmap-closure head
   `62768a8`, retaining its fail-closed PR merge-base assignment and
@@ -463,6 +466,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   overrun is disclosed to the sponsor in PR #13 for review. Evidence:
   [current-head assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6183978863).
   Date/Author: 2026-10-15, implementing agent.
+- EP-M2 scope escalation: the current-head completeness assessment found 27
+  changed files and 1,100 net added lines, including the split property-test
+  module; the file count exceeds the 25-file trigger while the net line count
+  remains below 1,500. The split preserves the roadmap round-trip property
+  coverage while bringing `scripts/tests/test_export_roadmap.py` below the
+  400-line limit. The sponsor's acceptance of ADR-0002 to ADR-0005 does not
+  explicitly accept this scope overrun. Sponsor confirmation is pending in PR
+  #14; do not merge or begin `EP-M3` until it is given. Evidence:
+  [current-head completeness assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6235254133).
+  Date/Author: 2026-10-17, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
