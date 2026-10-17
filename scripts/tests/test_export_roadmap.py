@@ -143,7 +143,7 @@ def test_phase_without_steps_is_rejected_at_its_heading():
     """Point to the phase heading when its body contains no numbered step."""
     text = (f'Revision 0.2, 6 October 2026.\n\n{START}\n\n'
             '## 1. Empty phase\n\nIdea: A phase without steps.\n\n'
-            'Goals: G1 in `terms-of-reference.md` `6.\n\nContext.\n\nGate: Not ready.\n\n'
+            'Goals: G1 in `terms-of-reference.md` §6.\n\nContext.\n\nGate: Not ready.\n\n'
             f'{END}\n')
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(text)
@@ -233,8 +233,8 @@ def test_phase_rejects_nonparagraph_body_with_line_and_cli_exit_two(
 def test_goals_reference_rejects_unrecognized_trailing_text():
     """Prevent trailing Goals text from disappearing during structural export."""
     edited = replace_once(ROADMAP,
-                          'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` `6.',
-                          'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` `6. Additional acceptance rule.')
+                          'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` §6.',
+                          'Goals: G1, G2, G6, G7, G8 in `terms-of-reference.md` §6. Additional acceptance rule.')
     expected_line = line_of(edited, 'Goals: G1, G2, G6, G7, G8')
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)

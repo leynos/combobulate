@@ -1137,21 +1137,14 @@ Trusted, not verified here:
 ## Plan of work
 
 Milestones run in order on stacked branches. `EP-M0` was sponsor-directed and
-is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`,
-`EP-M1b`, and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through
-`EP-M6` outstanding. All decisions they need have been answered. Each
-milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add
-rule tables, fixtures, and tests and observe the expected failure (Stage B);
-implement until the focused tests pass (Stage C); tidy, run the generators
-and exporter and `check_docs.py --write`, review the report diff, and have
-`scrutineer` run the full gates (Stage D).
-`EP-M1b`, and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through
-`EP-M6` outstanding. All decisions they need have been answered. Each
-milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add
-rule tables, fixtures, and tests and observe the expected failure (Stage B);
-implement until the focused tests pass (Stage C); tidy, run the generators
-and exporter and `check_docs.py --write`, review the report diff, and have
-`scrutineer` run the full gates (Stage D).
+is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`, `EP-M1b`,
+and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through `EP-M6`
+outstanding. All decisions they need have been answered. Each milestone follows
+Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables, fixtures,
+and tests and observe the expected failure (Stage B); implement until the
+focused tests pass (Stage C); tidy, run the generators and exporter and
+`check_docs.py --write`, review the report diff, and have `scrutineer` run the
+full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
