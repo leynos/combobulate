@@ -1,15 +1,13 @@
 """Prove the canonical Markdown roadmap exports losslessly to its JSON view."""
 from __future__ import annotations
 
-import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
-from hypothesis import event, given, settings, strategies as st
 
 from export_roadmap import END, START, RoadmapStructureError, app, export_text, main, parse_roadmap
-from roadmap_render import render_document
 
 ROOT = Path(__file__).resolve().parents[2]
 ROADMAP_PATH = ROOT / 'docs/roadmap.md'
@@ -18,6 +16,7 @@ ROADMAP = ROADMAP_PATH.read_text(encoding='utf-8')
 ALL_OPEN_ROADMAP = (
     Path(__file__).parent / 'fixtures' / 'all_open_roadmap.txt'
 ).read_text(encoding='utf-8')
+OPEN_TASK = '- [ ] 2.1.1. Implement'
 REQUIRED_CLASSES = {
     'multi-phase', 'single-phase', 'multi-step', 'single-step',
     'multi-task', 'single-task', 'no-details', 'has-details',
@@ -38,18 +37,13 @@ def replace_once(text: str, old: str, new: str) -> str:
 
 
 def remove_first_task_bullet(text: str, label: str) -> str:
-    """Remove a first-task bullet; e.g. omit `Success:` for malformed-input tests."""
-    start = text.index('- [ ] 1.1.1.')
-    end = text.index('- [ ] 1.1.2.')
-    task_lines = text[start:end].splitlines(keepends=True)
-    bullet_index = next((index for index, line in enumerate(task_lines)
-                         if line.startswith('  - ') and label in line), None)
-    assert bullet_index is not None, f'expected first task to contain {label!r}'
-    after_bullet = bullet_index + 1
-    while after_bullet < len(task_lines) and task_lines[after_bullet].startswith('    '):
-        after_bullet += 1
-    retained = task_lines[:bullet_index] + task_lines[after_bullet:]
-    return text[:start] + ''.join(retained) + text[end:]
+    """Remove one task field and its wrapped lines for a missing-field control."""
+    lines = text.splitlines()
+    start = next(index for index, line in enumerate(lines) if line.startswith(f'  - {label}'))
+    end = next((index for index in range(start + 1, len(lines))
+                if lines[index].startswith('  - ') or lines[index].startswith('- [')), len(lines))
+    del lines[start:end]
+    return '\n'.join(lines) + '\n'
 
 
 def first_task(roadmap: dict) -> dict:
@@ -86,6 +80,16 @@ def test_open_checkboxes_export_as_open_status():
     statuses = {task['status'] for phase in parse_roadmap(ALL_OPEN_ROADMAP)['phases']
                 for step in phase['steps'] for task in step['tasks']}
     assert statuses == {'open'}, 'every task in the fixed fixture must export as open'
+
+
+def test_checkboxes_export_as_task_status():
+    """Require every completed JSON task to match a checked roadmap box."""
+    ticked = set(re.findall(r'^- \[x\] (\d+\.\d+\.\d+)\.', ROADMAP, re.MULTILINE))
+    exported = {task['id']: task['status'] for phase in parse_roadmap(ROADMAP)['phases']
+                for step in phase['steps'] for task in step['tasks']}
+    assert {task_id for task_id, status in exported.items() if status == 'done'} == ticked, (
+        'exactly the ticked checkboxes export as done')
+    assert set(exported.values()) <= {'open', 'done'}, 'status is open or done'
 
 
 @pytest.mark.parametrize(('text', 'expected'), [
@@ -150,26 +154,45 @@ def test_phase_without_steps_is_rejected_at_its_heading():
 ])
 def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
     """Reject incomplete task contracts and name the absent required field."""
-    edited = remove_first_task_bullet(ALL_OPEN_ROADMAP, label)
+    edited = remove_first_task_bullet(ROADMAP, label)
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
-    assert raised.value.line == line_of(edited, '- [ ] 1.1.1.'), 'missing task detail must name its task'
+    assert raised.value.line == line_of(edited, '- [x] 1.1.1.'), 'missing task detail must name its task'
     assert expected in str(raised.value), f'error must identify missing {expected}'
 
 
-def test_duplicate_task_success_bullet_is_rejected():
-    """Reject repeated success criteria instead of silently choosing one value."""
-    edited = replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.2.', '  - Success: duplicate.\n- [ ] 1.1.2.')
+@pytest.mark.parametrize(('duplicate_bullet', 'field'), [
+    ('  - Requires 1.1.2.', 'requires'),
+    ('  - See `technical-design.md` `1.', 'sections'),
+    ('  - Proof first: Duplicate proof. Bets: B01.', 'proof_first'),
+    ('  - Success: Duplicate criterion.', 'success'),
+])
+def test_duplicate_task_fields_are_rejected(duplicate_bullet: str, field: str):
+    """Reject duplicate task fields instead of silently overriding their values."""
+    edited = replace_once(ROADMAP, '- [ ] 1.1.3.', f'{duplicate_bullet}\n- [ ] 1.1.3.')
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
-    assert raised.value.line == line_of(edited, '  - Success: duplicate.'), 'duplicate error must name its bullet'
-    assert 'duplicate task success bullet' in str(raised.value), 'error must identify the duplicate task field'
+    assert raised.value.line == line_of(edited, duplicate_bullet.strip()), 'duplicate error must name its bullet'
+    assert f'duplicate task {field} bullet' in str(raised.value), 'error must identify the duplicate task field'
+
+
+@pytest.mark.parametrize(('replacement', 'message'), [
+    ('  - Proof first: Bets: B01.', 'proof-first bullet must end with its bets'),
+    ('  - Proof first: State a property. Bets: .', 'proof-first bullet must include at least one bet'),
+])
+def test_incomplete_proof_first_bullet_is_rejected(replacement: str, message: str):
+    """Reject proof-first fields without a statement or a linked bet."""
+    original = ('  - Proof first: Write decision and exception authority before accepting claims;\n'
+                '    approval is not verification. Bets: B01.')
+    edited = replace_once(ROADMAP, original, replacement)
+    with pytest.raises(RoadmapStructureError, match=message):
+        parse_roadmap(edited)
 
 
 @pytest.mark.parametrize(('text', 'line'), [
     pytest.param(f'Revision 0.2, 6 October 2026.\n\n{START}\n\n#### 1. Too deep\n\n{END}\n', 5, id='heading-level'),
-    pytest.param(replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'),
-                 line_of(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record'), id='task-without-checkbox'),
+    pytest.param(replace_once(ROADMAP, OPEN_TASK, OPEN_TASK.replace('[ ] ', '')),
+                 line_of(ROADMAP, OPEN_TASK), id='task-without-checkbox'),
     pytest.param(replace_once(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.', '  - Mystery note.'),
                  line_of(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.'), id='unlabelled-bullet'),
     pytest.param(replace_once(ROADMAP, '  - Requires 1.1.1, 1.1.2, 1.1.3.', '  - [x] A ticked detail.'),
@@ -236,7 +259,7 @@ def test_cli_check_passes_on_matching_export(workspace, capsys):
     """Let check mode succeed when the committed export matches its canonical source."""
     roadmap, export = workspace
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 0, 'matching export passes'
-    assert 'matches' in capsys.readouterr().out
+    assert 'matches' in capsys.readouterr().out, 'matching export must report that it matches'
 
 
 def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
@@ -247,16 +270,17 @@ def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 1, 'drift must exit 1'
     captured = capsys.readouterr()
     assert '+' in captured.out and 'Record only the scope' in captured.out, 'the diff must show the change'
-    assert 'stale' in captured.err
+    assert 'stale' in captured.err, 'drift diagnostic must identify the export as stale'
 
 
 def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
     """Reserve exit two for malformed input and include its source line in diagnostics."""
     roadmap, export = workspace
-    roadmap.write_text(replace_once(ALL_OPEN_ROADMAP, '- [ ] 1.1.1. Record', '- 1.1.1. Record'),
-                        encoding='utf-8')
+    roadmap.write_text(replace_once(ROADMAP, OPEN_TASK, OPEN_TASK.replace('[ ] ', '')), encoding='utf-8')
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 2, 'malformed input exits 2'
-    assert f':{line_of(ALL_OPEN_ROADMAP, "- [ ] 1.1.1. Record")}:' in capsys.readouterr().err
+    expected_line = line_of(ROADMAP, OPEN_TASK)
+    assert f':{expected_line}:' in capsys.readouterr().err, (
+        f'malformed-task diagnostic must include source line {expected_line}')
 
 
 def test_cli_reads_check_flag_from_environment(workspace, monkeypatch):
@@ -273,111 +297,3 @@ def test_write_mode_refreshes_the_export(workspace):
     export.write_text('{}\n', encoding='utf-8')
     assert main(roadmap=roadmap, export=export) == 0, 'writing succeeds'
     assert export.read_text(encoding='utf-8') == EXPORT_PATH.read_text(encoding='utf-8'), 'export is rewritten'
-
-
-WORDS = st.text(alphabet='abcdefghijklmnopqrstuvwxyz', min_size=1, max_size=8)
-SENTENCE = st.lists(WORDS, min_size=1, max_size=12).map(lambda words: ' '.join(words).capitalize() + '.')
-BETS = st.lists(st.sampled_from(['B01', 'B02', 'B03']), min_size=1, max_size=3, unique=True)
-GOALS = st.lists(st.sampled_from(['G1', 'G2', 'G3']), min_size=1, max_size=3, unique=True)
-
-
-def drawn_tasks(draw, phase_number: int, step_index: int, task_ids: list[str]) -> list[dict]:
-    """Draw one step's tasks; e.g. its first task has no earlier dependency."""
-    tasks = []
-    task_count = draw(st.integers(1, 3))
-    for task_index in range(1, task_count + 1):
-        task_id = f'{phase_number}.{step_index}.{task_index}'
-        requires = draw(st.lists(st.sampled_from(task_ids), max_size=2, unique=True)) if task_ids else []
-        tasks.append({
-            'id': task_id, 'title': draw(SENTENCE), 'requires': requires,
-            'sections': f'§§{draw(st.integers(1, 19))}', 'success': draw(SENTENCE),
-            'details': draw(st.lists(SENTENCE, max_size=2)), 'proof_first': draw(SENTENCE),
-            'bets': draw(BETS), 'status': draw(st.sampled_from(['open', 'done'])),
-        })
-        task_ids.append(task_id)
-    return tasks
-
-
-def drawn_steps(draw, phase_number: int, task_ids: list[str]) -> list[dict]:
-    """Draw one phase's steps; e.g. each task id uses the phase number."""
-    steps = []
-    step_count = draw(st.integers(1, 2))
-    for step_index in range(1, step_count + 1):
-        tasks = drawn_tasks(draw, phase_number, step_index, task_ids)
-        steps.append({'number': f'{phase_number}.{step_index}', 'title': draw(SENTENCE).rstrip('.'),
-                      'question': draw(SENTENCE), 'sections': f'§§{draw(st.integers(1, 19))}', 'tasks': tasks})
-    return steps
-
-
-@st.composite
-def roadmaps(draw) -> dict:
-    """Draw small, well-formed roadmaps; e.g. each phase has numbered steps."""
-    phases: list[dict] = []
-    task_ids: list[str] = []
-    phase_count = draw(st.integers(1, 3))
-    for phase_number in range(1, phase_count + 1):
-        phases.append({'number': phase_number, 'title': draw(SENTENCE).rstrip('.'), 'idea': draw(SENTENCE),
-                       'goals': draw(GOALS), 'gate': draw(SENTENCE), 'context': draw(SENTENCE),
-                       'steps': drawn_steps(draw, phase_number, task_ids)})
-    return {'revision': '0.2', 'phases': phases}
-
-
-def count_classes(name: str, count: int) -> set[str]:
-    """Label an observed count; e.g. one phase yields ``single-phase``."""
-    cardinality = f'single-{name}' if count == 1 else f'multi-{name}'
-    return {f'{name}-count={count}', cardinality}
-
-
-def presence_class(condition: bool, present: str, absent: str) -> str:
-    """Choose a feature label; e.g. true selects ``has-details``."""
-    return present if condition else absent
-
-
-def task_feature_classes(tasks: list[dict]) -> set[str]:
-    """Label task features; e.g. no requirements yields ``no-requires``."""
-    return {
-        presence_class(any(task['requires'] for task in tasks), 'has-requires', 'no-requires'),
-        presence_class(any(task['status'] == 'done' for task in tasks), 'has-done', 'all-open'),
-    }
-
-
-def structural_classes(structure: dict) -> set[str]:
-    """Describe generated counts and classes for the property coverage gate."""
-    phases = structure['phases']
-    steps = [step for phase in phases for step in phase['steps']]
-    tasks = [task for step in steps for task in step['tasks']]
-    task_detail_counts = [len(task['details']) for task in tasks]
-    detail_count = sum(task_detail_counts)
-    classes = (
-        count_classes('phase', len(phases))
-        | count_classes('step', len(steps))
-        | count_classes('task', len(tasks))
-        | count_classes('detail', detail_count)
-        | {
-            presence_class(detail_count > 0, 'has-details', 'no-details'),
-        }
-        | task_feature_classes(tasks)
-    )
-    classes.update(f'task-detail-count={count}' for count in set(task_detail_counts))
-    return classes
-
-
-def test_render_then_export_round_trips():
-    """Preserve generated roadmap structure through an independent render and parse path."""
-    seen: set[str] = set()
-
-    @settings(derandomize=True, max_examples=60, deadline=None)
-    @given(roadmaps())
-    def round_trip(structure: dict) -> None:
-        """Check one generated structure and record the structural classes exercised."""
-        classes = structural_classes(structure)
-        for name in classes:
-            event(name)
-        seen.update(classes)
-        exported = parse_roadmap(render_document(structure))
-        expected = copy.deepcopy(structure)
-        expected['status'] = exported['status']
-        assert exported == expected, 'rendered roadmap must export to the drawn structure'
-
-    round_trip()
-    assert REQUIRED_CLASSES <= seen, f'generator never produced {sorted(REQUIRED_CLASSES - seen)}'

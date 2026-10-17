@@ -245,12 +245,14 @@ precondition or weaker postcondition can break downstream proofs without a Rust
 signature change. Executable/specification and backend-profile changes
 invalidate affected evidence.
 
-No blanket source-API compatibility machinery is proposed for this unreleased,
-pre-1.0 library. Ordinary domain wrappers and backend adapters have semantic
-jobs; they do not preserve obsolete interfaces. The draft supplementary
-contract guidance and its status appear in `references.md` §D-CONTRACT.
+This unreleased, pre-1.0 library uses no blanket source-API compatibility
+machinery ([D06](decision-register.md#d06)). Ordinary domain wrappers and
+backend adapters have semantic jobs; they do not preserve obsolete interfaces.
+The draft supplementary contract guidance and its status appear in
+`references.md` §D-CONTRACT.
 
+The core release boundary is accepted ([D03](decision-register.md#d03)).
 Unresolved choices include a dependency/toolchain baseline, quantitative
-performance and compile-cost gates, the accepted core release boundary, and
-actual trasic adoption access. The ToR owns those questions. The design and
-roadmap refer to them rather than manufacture answers.
+performance and compile-cost gates, and actual trasic adoption access. The ToR
+owns those questions. The design and roadmap refer to them rather than
+manufacture answers.

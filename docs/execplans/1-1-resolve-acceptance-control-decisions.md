@@ -5,9 +5,10 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (the sponsor approved this revision for implementation on
-2026-10-11 by invoking the implementation workflow; `EP-M0` and `EP-M1a` are
-complete, and `EP-M1b` is complete; `EP-M2` through `EP-M6` remain pending)
+Status: BLOCKED (the sponsor approved this revision for implementation on
+2026-10-11 by invoking the implementation workflow; `EP-M0`, `EP-M1a`,
+`EP-M1b`, and `EP-M2` implementation is complete, but the EP-M2 scope
+escalation awaits explicit sponsor confirmation; `EP-M3` is next)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -284,7 +285,41 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   the base-revision comparison; every obligation has one component per linked
   task, with `PF14.structural@1.1.4` accepting `tested` from
   `checker:evidence-gate`; `make design-check BASE_REV=...` passes.
-- [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
+- [x] (2026-10-11) `EP-M2` Task 1.1.1: authority, scope, licence, and API
+  policy recorded (branch `1-1-governance-decisions`, stacked on `EP-M1b`).
+  Evidence: ADR-0002 to ADR-0005 accepted; D01 to D07 and D13 accepted in
+  `spec/decisions.json` with `kind: session` references quoting the sponsor's
+  answers, D01 and D13 on option B; the five governing documents reconciled,
+  with 13 replaced sentences listed in `retired_statements`; ToR §9 rows Q1,
+  Q4, Q7, and Q8 link their register anchors; `Cargo.toml` sets
+  `publish = false` and `cargo publish --dry-run` refuses; 4 cases in
+  `tools/tests/test_package_policy.py` (red first) and 6 real-document VO-6
+  controls pass for the retired Q4 sentence (including a wrapped form), the
+  restored roadmap preamble while task 1.1.1 remains checked, "Q4 remains
+  open", and removal of the Q4 anchor; each failure names D03. Task 1.1.1 is
+  ticked with its completion record, and the checker reports it backed. The
+  committed validation report contains 17 checks; the freeze check reports
+  separately.
+- [x] (2026-10-15) Rebased `EP-M2` onto roadmap-closure head `2df245d`.
+- [x] (2026-10-15) Rebased `EP-M2` onto updated roadmap-closure head
+  `62768a8`, retaining its fail-closed PR merge-base assignment and
+  missing-base workflow regression.
+- [x] (2026-10-15) Resolved the current-head CodeRabbit assessment finding:
+  registered the superseded roadmap preamble under D03 and added a
+  real-document negative control that restores it while task 1.1.1 remains
+  checked.
+- [x] (2026-10-15) Reconciled current-head review findings: retired the stale
+  roadmap claim under D03 with a wrapped-text regression; require D01 release
+  approval alongside task 4.3.3 in the scope documents; document
+  `check_manifest`'s call boundary; test composed and lifecycle-controlled
+  package policy; and document the touched test helpers and cases. The
+  corrected regression uses Markdown normalization so formatter wrapping cannot
+  invalidate its mutation.
+- [x] (2026-10-15) Reconciled the formal review findings: group ADRs by coherent
+  subject with a recorded rationale; use a typed Cargo manifest projection and
+  complete NumPy-style interface documentation; and keep publication disabled
+  until an accepted D05 supersession and validated task 4.3.3 closure are both
+  present.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
@@ -292,6 +327,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: tests written while nothing was accepted or ticked assumed
+  that state (the exporter's all-open assertion and its 1.1.1 checkbox
+  controls; register tests seeded from the committed register). Evidence: they
+  failed once 1.1.1 was ticked and D01 to D07 accepted. Impact: checkbox
+  controls now target task 2.1.1, the all-open assertion derives the expected
+  ticks from the Markdown, and synthetic register tests start from a
+  `proposed_register()` baseline, so later milestones do not break them.
 - Observation: the hosted `build-test` job failed `make check-fmt` on the
   plan itself for #9, #11, and #12. Evidence: CI pins mdtablefix 0.6.0, whose
   `--renumber` treats a wrapped line beginning "2026." as an ordered-list item;
@@ -343,6 +385,20 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   documentation, 2026-10-10). Impact: calibration extrapolates to that class.
 - Observation: ISC already appears in `Cargo.toml`, `LICENSE`, and
   `README.md` through ADR 001; D04 ratifies it.
+- Observation: rebasing `EP-M2` onto the updated roadmap-closure branch brought
+  in a `RoadmapBuilder`, explicit parser-node checks, and a typed
+  `RevisionJsonReader` for historical freeze comparisons. Impact: retain those
+  boundaries and their tests; keep package policy scoped to
+  `ValidationContext.root`, and keep real-document governance controls and
+  generated supersession properties in separate test modules so the invariant
+  module stays within the 400-line limit.
+- Observation: the CodeRabbit completeness assessment found that the
+  superseded roadmap preamble, "All work remains proposed and open.", was not
+  in D03's `retired_statements`, and that restoring it beside the completed
+  task checkbox passed the consistency check
+  ([assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6194483690)).
+  Impact: add the sentence to D03 and a real-document negative control that
+  keeps task 1.1.1 checked.
 
 ## Decision log
 
@@ -388,6 +444,18 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   while ungoverned tasks have none to cite. The composed test records that
   valid case and still rejects missing completion evidence and citations to
   unaccepted decisions. Date/Author: 2026-10-15, implementing agent.
+- EP-M2 rebase integration: keep the roadmap-closure parser and revision-reader
+  seams, preserve the governance package-policy check at the repository-root
+  boundary, and move generated supersession cases into
+  `tools/tests/test_supersession_properties.py`. This retains the parent
+  branch's parser and freeze improvements, keeps the governance check narrow,
+  and preserves all cases within the per-file line limit. Date/Author:
+  2026-10-15, implementing agent.
+- EP-M2 follow-up rebase integration: retain roadmap-closure's standalone
+  `git merge-base` assignment and executable missing-base workflow regression.
+  The governance branch changes neither file; keeping both preserves the
+  design-check workflow's fail-closed PR freeze-base selection. Date/Author:
+  2026-10-15, implementing agent.
 - EP-M1b scope escalation: the current-head completeness assessment found
   1,757 net added lines across 25 changed files, excluding
   `docs/validation-results.json`. The file count is within tolerance; the net
@@ -398,6 +466,18 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   overrun is disclosed to the sponsor in PR #13 for review. Evidence:
   [current-head assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6183978863).
   Date/Author: 2026-10-15, implementing agent.
+- EP-M2 scope escalation: the current-head completeness assessment measured
+  26 changed files and 1,072 net added lines before the test split. Moving
+  retained roadmap round-trip property coverage to its own module brings the
+  candidate to 27 changed files and 1,104 net added lines; the file count
+  exceeds the 25-file trigger while the net line count remains below 1,500. The
+  split preserves that coverage while bringing
+  `scripts/tests/test_export_roadmap.py` below the 400-line limit. The
+  sponsor's acceptance of ADR-0002 to ADR-0005 does not explicitly accept this
+  scope overrun. Sponsor confirmation is pending in PR #14; do not merge or
+  begin `EP-M3` until it is given. Evidence:
+  [current-head completeness assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6235254133).
+  Date/Author: 2026-10-17, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
@@ -480,8 +560,13 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - Decision: admission levels are `proof`, `bounded`, `tested`, `restricted`,
   and `rejected`; `restricted` never satisfies a component. Date/Author:
   2026-10-10.
-- Decision: one decision per ADR, ADR-0002 to ADR-0009. Date/Author:
-  2026-10-10.
+- Decision (revised 2026-10-15): ADRs group decisions by coherent subject;
+  distinct decisions keep separate identifiers, and an ADR may record related
+  outcomes with shared rationale and consequences. ADR-0002 groups governance
+  authority, exception policy, and the absence of CODEOWNERS (D01, D02, D13);
+  ADR-0004 groups licence and publication (D04, D05), which answer ToR Q7.
+  Splitting these records would duplicate their shared context without making
+  the authority or outcome boundaries clearer. Date/Author: 2026-10-15.
 - Decision: the proof-evidence schema gains `schema_version` (value 2) rather
   than changing the pack-wide `revision` (`0.2`). Date/Author: 2026-10-10.
 - Decision: exceptions live in `spec/exceptions.json`, referenced by
@@ -534,7 +619,7 @@ here; implementation alignment remains pending in PRs #17 and #18.
 
 ## Outcomes & retrospective
 
-EP-M0 makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
+`EP-M0` makes `docs/roadmap.md` the canonical roadmap and `spec/roadmap.json` a
 drift-checked export. The retired generator is removed; the Wenmode exporter,
 checker integration, workflow documentation, and independent round-trip tests
 are in place. Review found that suffix text after the Terms of Reference
@@ -551,12 +636,35 @@ delta. Hosted `build-test` and `design-check` pass at that head; the optional
 milestones follow the approved plan's declared gates. The exporter is expected
 to retire when mapsplice#144 adds native JSON export and validation.
 
+`EP-M1a` added the decision register, ADR naming convention, generated
+register, and governing-document anchors. The register kept decisions proposed,
+leaving acceptance to later work; this preserves the distinction between
+recording a candidate and accepting it.
+
+`EP-M1b` added evidence-gated roadmap completion, obligation components, and
+the base-revision freeze check. A completed task now requires linked evidence,
+and frozen acceptance controls cannot be edited without an approved change.
+
 Pre-merge assessment on 2026-10-15 found gaps in the EP-M1a authority,
 supersession, and generator CLI checks. The repairs bind authority to accepted
 D01 and C-EP-1's `leynos` login, require an accepted replacement before
 supersession, and preserve generated headings while allowing paragraph
 rewrapping. VO-5 and VO-14 now name these invariants and their negative
 controls.
+
+`EP-M2` accepted D01 to D07 and D13, recorded the rationale in ADR-0002 to
+ADR-0005, reconciled the five governing documents, and backed roadmap task
+1.1.1 with its completion artefacts. The package check enforces the accepted
+licence and publication policy. These results meet the governance and
+release-policy outcomes in `Purpose / big picture`; contract records,
+calibrated controls, proof evidence, and final reconciliation remain for
+`EP-M3` to `EP-M6`.
+
+The staged register and evidence checks keep acceptance separate from
+implementation progress: milestone completion alone does not accept a decision
+or satisfy a roadmap obligation. Continue recording evidence at each milestone
+boundary, then reconcile the remaining outcomes before setting the status to
+`COMPLETE`.
 
 ## Context and orientation
 
@@ -920,10 +1028,12 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `retired_statements` text of an accepted decision appears; no governing
   document matches `(pending|open|unresolved|remains? proposed)` within 60
   characters of an accepted question's identifier. Artefact:
-  `tools/tests/test_decision_register.py`. Non-vacuity: after D03's acceptance,
-  reinserting "The classes remain proposed pending ToR Q4." (also rewrapped
-  across two lines), writing "Q4 remains open", or deleting the ToR §9 anchor
-  each fails.
+  `tools/tests/test_decision_register.py` and
+  `tools/tests/test_decision_register_integration.py`. Non-vacuity: after D03's
+  acceptance, reinserting "The classes remain proposed pending ToR Q4." (also
+  rewrapped across two lines), restoring "All work remains proposed and open."
+  while task 1.1.1 stays checked, writing "Q4 remains open", or deleting the
+  ToR §9 anchor each fails.
 - VO-7 (base-revision freeze). Invariant: compared with `--base-rev`, the
   check rejects a frozen-field change to a registered control without a new
   amendment whose `replaces` equals the previous digest; an edited or removed
@@ -1041,14 +1151,15 @@ Trusted, not verified here:
 
 ## Plan of work
 
-Milestones run in order on stacked branches. The sponsor approved this plan on
-2026-10-11. `EP-M0`, `EP-M1a`, and `EP-M1b` are complete; `EP-M2` through
-`EP-M6` remain pending. All decisions they need have been answered. Each
-milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule
-tables, fixtures, and tests and observe the expected failure (Stage B);
-implement until the focused tests pass (Stage C); tidy, run the generators and
-exporter and `check_docs.py --write`, review the report diff, and have
-`scrutineer` run the full gates (Stage D).
+Milestones run in order on stacked branches. `EP-M0` was sponsor-directed and
+is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`, `EP-M1b`,
+and `EP-M2` are complete; `EP-M3` is next, with `EP-M3` through `EP-M6`
+outstanding. All decisions they need have been answered. Each milestone follows
+Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables, fixtures,
+and tests and observe the expected failure (Stage B); implement until the
+focused tests pass (Stage C); tidy, run the generators and exporter and
+`check_docs.py --write`, review the report diff, and have `scrutineer` run the
+full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
@@ -1450,8 +1561,9 @@ Behavioural acceptance:
 2. `docs/roadmap.md` shows 1.1.1 to 1.1.4 ticked and no other ticked task;
    `scripts/export_roadmap.py --check` passes.
 3. Reinserting "The classes remain proposed pending ToR Q4." into
-   `docs/technical-design.md`, or writing "Q4 remains open", makes
-   `make design-check` fail and name D03.
+   `docs/technical-design.md`, restoring "All work remains proposed and open."
+   in the roadmap preamble while task 1.1.1 remains checked, or writing "Q4
+   remains open", makes `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
    `make design-check BASE_REV=origin/main` fail and name AC-03.
 5. `check_evidence.py` rejects a `resource-exhausted` fixture, reports a

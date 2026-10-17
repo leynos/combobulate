@@ -185,11 +185,15 @@ class ComponentsAndCompletions(unittest.TestCase):
 class RealRoadmap(unittest.TestCase):
     """The committed roadmap passes closure, and PF14.structural@1.1.4 is wired to the evidence gate."""
 
-    def test_committed_roadmap_passes_after_the_checks_it_depends_on(self):
-        """Run the committed roadmap after checks that checker-sourced components consume."""
+    def test_committed_roadmap_precedes_package_policy_that_consumes_it(self):
+        """Validate task closure before package policy consumes that result."""
         context = ValidationContext(ROOT)
         collect_checks(context)
-        self.assertEqual(context.results[-1]['check'], 'roadmap-status', 'closure runs after every other check')
+        checks = [row['check'] for row in context.results]
+        self.assertIn('roadmap-status', checks, 'the composed checker must run roadmap closure')
+        self.assertIn('package-policy', checks, 'the composed checker must run package policy')
+        self.assertLess(checks.index('roadmap-status'), checks.index('package-policy'),
+                        'package policy must run after validated roadmap closure')
 
     def test_artefact_outside_the_repository_does_not_resolve(self):
         """Keep artefact resolution within the repository and require any anchor to exist."""

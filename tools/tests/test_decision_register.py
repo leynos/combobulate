@@ -12,9 +12,8 @@ from jsonschema import ValidationError
 
 from docs_validation.context import ValidationContext
 from docs_validation.decisions import (
-    GOVERNING_DOCUMENTS, check_adr_files, check_adr_links,
-    check_governing_documents, check_register_records, check_supersession, normalize,
-    validate_register,
+    GOVERNING_DOCUMENTS, check_adr_files, check_adr_links, check_governing_documents,
+    check_register_records, normalize, validate_register,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -25,6 +24,16 @@ ADR_PATH = 'docs/adrs/adr-0003-initial-release-scope.md'
 ACCEPTED_ADR = f'# Architectural decision record (ADR) 0003: Initial release scope\n\n## Status\n\nAccepted.\n'
 RETIRED = 'The classes remain proposed pending ToR Q4.'
 REGISTER_LINK = 'See the [decision register](decision-register.md).\n'
+
+
+def proposed_register() -> dict:
+    """Return the committed register with every decision reset to proposed, as a synthetic baseline."""
+    register = copy.deepcopy(REGISTER)
+    register.pop('authorities', None)
+    for entry in register['decisions']:
+        entry.update({'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+                      'approval_reference': None, 'adr': None, 'retired_statements': []})
+    return register
 
 
 def record(register: dict, decision_id: str) -> dict:
@@ -44,7 +53,7 @@ def accept(register: dict, decision_id: str) -> None:
 
 def accepted_register() -> dict:
     """Return a register in which D01 and D03 are accepted, D03 with its ADR and a retired statement."""
-    register = copy.deepcopy(REGISTER)
+    register = proposed_register()
     register['authorities'] = {'decision': 'D01', 'roles': {'sponsor': 'leynos', 'technical-owner': 'leynos'}}
     accept(register, 'D01')
     accept(register, 'D03')
@@ -81,12 +90,14 @@ class RegisterInvariants(unittest.TestCase):
         check_register_records(register)
 
     def test_duplicate_identifier_fails(self):
-        register = copy.deepcopy(REGISTER)
+        """Reject records whose repeated identifier makes decision lookup ambiguous."""
+        register = proposed_register()
         register['decisions'].append(copy.deepcopy(record(register, 'D03')))
         self.assert_rejected(register, 'Duplicate decision D03')
 
     def test_unknown_recommendation_fails(self):
-        register = copy.deepcopy(REGISTER)
+        """Reject a recommendation that does not name a declared option."""
+        register = proposed_register()
         record(register, 'D03')['recommendation'] = 'Z'
         self.assert_rejected(register, 'Unknown recommended option in D03')
 
@@ -126,7 +137,8 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D01 is accepted but the register names no authorities')
 
     def test_authorities_must_cite_an_accepted_decision(self):
-        register = copy.deepcopy(REGISTER)
+        """Require the authority map to be grounded in an accepted D01 record."""
+        register = proposed_register()
         register['authorities'] = {'decision': 'D01', 'roles': {'sponsor': 'leynos', 'technical-owner': 'leynos'}}
         self.assert_rejected(register, 'Authorities cite D01, which is not an accepted decision')
 
@@ -142,20 +154,31 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'Accepted decisions D03 and D04 share a subject')
 
     def test_every_in_scope_question_needs_a_live_record(self):
-        register = copy.deepcopy(REGISTER)
+        """Keep every in-scope question linked to a proposed or accepted decision."""
+        register = proposed_register()
         record(register, 'D03')['lifecycle'] = 'withdrawn'
         self.assert_rejected(register, 'In-scope questions without a live decision: Q4')
 
     def test_one_way_supersession_fails(self):
-        register = copy.deepcopy(REGISTER)
+        """Reject supersession when only the replacement side records the link."""
+        register = proposed_register()
         record(register, 'D04')['supersedes'] = ['D03']
         self.assert_rejected(register, 'One-way supersession D04 -> D03')
 
     def test_supersession_cycle_fails(self):
+        """Reject a pair of accepted decisions that supersede each other."""
         register = accepted_register()
         accept(register, 'D04')
+        live_proposal = copy.deepcopy(record(register, 'D03'))
+        live_proposal.update({
+            'id': 'D17', 'subject': 'Open alternative for Q4', 'lifecycle': 'proposed',
+            'decided_option': None, 'accepted_by': None, 'accepted_on': None,
+            'approval_reference': None, 'adr': None, 'supersedes': [], 'superseded_by': None,
+            'retired_statements': [],
+        })
+        register['decisions'].append(live_proposal)
         for older, newer in (('D03', 'D04'), ('D04', 'D03')):
-            record(register, older)['superseded_by'] = newer
+            record(register, older).update(lifecycle='superseded', superseded_by=newer)
             record(register, newer)['supersedes'] = [older]
         self.assert_rejected(register, 'Supersession cycle through D03')
 
@@ -174,7 +197,8 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D16 must be accepted before superseding D03')
 
     def test_candidate_must_cite_a_known_decision(self):
-        register = copy.deepcopy(REGISTER)
+        """Reject candidate ADR metadata that points to an absent decision."""
+        register = proposed_register()
         register['candidate_adrs'][0]['decision'] = 'D99'
         self.assert_rejected(register, 'CA1 cites unknown D99')
 
@@ -201,8 +225,15 @@ class RegisterSchema(unittest.TestCase):
             validate_register(register, SCHEMA)
 
     def test_accepted_record_identity_must_be_the_plan_sponsor(self):
+        """Require accepted records to retain the sponsor's recorded identity."""
         register = accepted_register()
         record(register, 'D03')['accepted_by'] = 'someone-else'
+        with self.assertRaises(ValidationError):
+            validate_register(register, SCHEMA)
+
+    def test_approval_author_is_fixed_to_the_sponsor(self):
+        """Prevent accepted-record metadata from substituting another approval author."""
+        register = accepted_register()
         record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
@@ -285,3 +316,8 @@ class GoverningDocuments(unittest.TestCase):
     def test_normalization_strips_inline_markdown(self):
         self.assertEqual(normalize('*Q4* `remains`\n [open](x.md)'), 'Q4 remains open',
                          'normalization must strip emphasis, code, links, and wrapping')
+
+
+
+if __name__ == '__main__':
+    unittest.main()
