@@ -466,14 +466,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   overrun is disclosed to the sponsor in PR #13 for review. Evidence:
   [current-head assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6183978863).
   Date/Author: 2026-10-15, implementing agent.
-- EP-M2 scope escalation: the current-head completeness assessment found 27
-  changed files and 1,100 net added lines, including the split property-test
-  module; the file count exceeds the 25-file trigger while the net line count
-  remains below 1,500. The split preserves the roadmap round-trip property
-  coverage while bringing `scripts/tests/test_export_roadmap.py` below the
-  400-line limit. The sponsor's acceptance of ADR-0002 to ADR-0005 does not
-  explicitly accept this scope overrun. Sponsor confirmation is pending in PR
-  #14; do not merge or begin `EP-M3` until it is given. Evidence:
+- EP-M2 scope escalation: the current-head completeness assessment measured
+  26 changed files and 1,072 net added lines before the test split. Moving
+  retained roadmap round-trip property coverage to its own module brings the
+  candidate to 27 changed files and 1,100 net added lines; the file count
+  exceeds the 25-file trigger while the net line count remains below 1,500. The
+  split preserves that coverage while bringing
+  `scripts/tests/test_export_roadmap.py` below the 400-line limit. The
+  sponsor's acceptance of ADR-0002 to ADR-0005 does not explicitly accept this
+  scope overrun. Sponsor confirmation is pending in PR #14; do not merge or
+  begin `EP-M3` until it is given. Evidence:
   [current-head completeness assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6235254133).
   Date/Author: 2026-10-17, implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
