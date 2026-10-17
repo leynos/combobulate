@@ -166,7 +166,7 @@ def check_questions(register: dict, records: dict[str, dict]) -> None:
 
 
 def check_supersession(records: dict[str, dict]) -> None:
-    """Require two-way, acyclic supersession links; a one-way or circular link fails.
+    """Require linked, acyclic supersession chains to end at an accepted decision.
 
     For example, D02 may supersede D01 when both records name the relationship::
 

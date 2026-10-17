@@ -7,7 +7,7 @@ be kept up to date as work proceeds.
 
 Status: IN PROGRESS (the sponsor approved this revision for implementation on
 2026-10-11 by invoking the implementation workflow; `EP-M0` and `EP-M1a` are
-complete, and `EP-M1b` is pending)
+complete, and `EP-M1b` is complete; `EP-M2` through `EP-M6` remain pending)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -275,7 +275,15 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   mutations (open-status pattern disabled, supersession check removed) each
   fail their control; a hand edit of `docs/decision-register.md` fails the
   drift check (VO-14).
-- [ ] `EP-M1b` Roadmap status, obligation components, and freeze check.
+- [x] (2026-10-11) `EP-M1b` Roadmap status, obligation components, and freeze
+  check (branch `1-1-roadmap-closure`, stacked on `EP-M1a`). Evidence: 27
+  `unittest` cases in `tools/tests/test_roadmap_status.py` and
+  `tools/tests/test_freeze.py` (red first: modules missing) pass, covering a
+  chain and a diamond, every MS-4 failure reason, fail-closed record
+  components, a checker-sourced component, and a temporary Git repository for
+  the base-revision comparison; every obligation has one component per linked
+  task, with `PF14.structural@1.1.4` accepting `tested` from
+  `checker:evidence-gate`; `make design-check BASE_REV=...` passes.
 - [ ] `EP-M2` Task 1.1.1: authority, scope, licence, and API policy recorded.
 - [ ] `EP-M3` Task 1.1.2: semantic and macro contract records.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
@@ -284,6 +292,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Surprises & discoveries
 
+- Observation: the hosted `build-test` job failed `make check-fmt` on the
+  plan itself for #9, #11, and #12. Evidence: CI pins mdtablefix 0.6.0, whose
+  `--renumber` treats a wrapped line beginning "2026." as an ordered-list item;
+  the local 0.6.1 does not. Impact: the line was reworded in the plan branch
+  and the stack rebased (range-diff showed identical patches); local formatting
+  checks now also run mdtablefix 0.6.0 before publication.
 - Observation: generated register text containing `Batch<DVec3>` failed
   `make fmt` (markdownlint MD033, inline HTML). Evidence: `make fmt` exit 2
   naming `docs/decision-register.md`. Impact: register master text puts code
@@ -332,6 +346,65 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M1b` milestone review dispositions. Fixed: completion
+  artefacts must resolve inside the repository; the real-roadmap closure test
+  runs the full check sequence so a tick that relies on a checker-sourced
+  component is judged with that check's result; the scheduled workflow passes
+  its run date as `AS_OF` so expiry surfaces while `main` is idle; the two
+  public checker functions gained parameter documentation. Declined: annotating
+  every `unittest` method's return type, because the existing `tools/tests/`
+  suites do not, and the one untyped helper parameter was annotated instead.
+  The re-review's request to require at least one decision in every completion
+  record was declined: MS-4 requires each cited decision to be accepted, and
+  many later tasks (for example 2.1.1) are governed by no register decision, so
+  a mandatory citation would invite invented ones. The second re-review noted
+  that the freeze check covers only decisions; that is the intended `EP-M1b`
+  scope, because the control and exception registers do not exist yet. `EP-M4`
+  and `EP-M5` now state that each register joins `freeze.FROZEN_DOCUMENTS` in
+  the commit that creates it, and the module docstring says so. Date/Author:
+  2026-10-11, implementing agent.
+- EP-M1b review repair: supersession must lead through records with valid
+  D01-authorized acceptance and `accepted` or `superseded` lifecycle, then
+  terminate at an accepted replacement. Links remain two-way and acyclic. This
+  prevents an unapproved record from retiring an accepted decision.
+  Date/Author: 2026-10-15, implementing agent.
+- EP-M1b review conformance repair: the [CodeRabbit completeness
+  assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6182674988)
+  found `tools/tests/test_decision_register.py` over the 400-line limit. Move
+  supersession lifecycle cases to `tools/tests/test_supersession_lifecycle.py`.
+  Rebasing onto the updated parent added generator-catalogue coverage and
+  raised the invariant module above the limit again, so move composed-checker
+  and generated-document tests to
+  `tools/tests/test_decision_register_integration.py`. Preserve all regression
+  cases and update the generated Python-source count. Date/Author: 2026-10-15,
+  implementing agent.
+- EP-M1b follow-up review: add a composed test for a ticked roadmap with valid
+  and invalid evidence, CLI success and failure coverage for `--as-of` and
+  `--base-rev`, workflow and Make argument-propagation checks, and generated
+  properties for dependency states, citations, component evidence, artefact
+  containment, and frozen decision mutations. Add the missing test descriptions
+  reported by CodeRabbit's docstring check. The repeated request to reject an
+  empty decision list remains declined: MS-4 constrains each cited decision,
+  while ungoverned tasks have none to cite. The composed test records that
+  valid case and still rejects missing completion evidence and citations to
+  unaccepted decisions. Date/Author: 2026-10-15, implementing agent.
+- EP-M1b scope escalation: the current-head completeness assessment found
+  1,757 net added lines across 25 changed files, excluding
+  `docs/validation-results.json`. The file count is within tolerance; the net
+  line count exceeds the 1,500-line trigger in `Tolerances`. The per-task
+  obligation components and regression suites provide the requested closure,
+  freeze, and workflow evidence; removing those tests to meet the line limit
+  would weaken acceptance coverage. No regression coverage was removed. The
+  overrun is disclosed to the sponsor in PR #13 for review. Evidence:
+  [current-head assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6183978863).
+  Date/Author: 2026-10-15, implementing agent.
+- Decision: the freeze check's result is printed, not recorded in
+  `docs/validation-results.json`, so the committed report is identical with and
+  without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
+  accepting only `proof` with `evidence_source: record`; the owning task may
+  refine a component before any evidence exists. `spec/task-completion.json`
+  starts empty; each closing milestone adds its task's record. Date/Author:
+  2026-10-11, implementing agent.
 - Decision: `EP-M1a` exceeded the per-milestone line tolerance (about 1,600
   net added lines against 1,500, excluding the generated register region and
   the validation report). The overrun is the register master itself
@@ -832,12 +905,15 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `accepted_on`, and a structured approval reference whose `author_login` is
   `leynos` and whose `names_decisions` includes the record; the authority map
   cites accepted D01; proposed records carry no approval fields; a replacement
-  is accepted before it supersedes an accepted record; supersession links are
-  two-way and acyclic; each cited ADR exists under `docs/adrs/` with an agreeing
-  `Status` line; dates are validated with the `jsonschema` format checker.
-  Artefact: `tools/tests/test_decision_register.py`. Non-vacuity includes
-  coordinated authority-map and approval changes, a non-D01 source, and a
-  proposed replacement; each negative control has its own message.
+  is accepted before it supersedes an accepted record; supersession chains use
+  two-way, acyclic links between accepted or superseded records with valid
+  D01-authorized acceptance, and terminate at an accepted replacement; each
+  cited ADR exists under `docs/adrs/` with an agreeing `Status` line; dates are
+  validated with the `jsonschema` format checker. Artefacts:
+  `tools/tests/test_decision_register.py` and
+  `tools/tests/test_supersession_lifecycle.py`. Non-vacuity includes
+  coordinated authority-map and approval changes, a non-D01 source, proposed
+  and withdrawn replacements; each negative control has its own message.
 - VO-6 (five-document consistency). Invariants: each governing document links
   `decision-register.md`; each accepted question's ToR §9 row links its
   register anchor; after whitespace and inline-Markdown normalization, no
@@ -966,13 +1042,13 @@ Trusted, not verified here:
 ## Plan of work
 
 Milestones run in order on stacked branches. The sponsor approved this plan on
-2026-10-11. `EP-M0` and `EP-M1a` are complete, and `EP-M1b` is pending; all
-decisions they need have been answered. Each milestone follows Red, Green,
-Refactor: draft as `proposed` (Stage A); add rule tables, fixtures, and tests
-and observe the expected failure (Stage B); implement until the focused tests
-pass (Stage C); tidy, run the generators and exporter and
-`check_docs.py --write`, review the report diff, and have `scrutineer` run the
-full gates (Stage D).
+2026-10-11. `EP-M0`, `EP-M1a`, and `EP-M1b` are complete; `EP-M2` through
+`EP-M6` remain pending. All decisions they need have been answered. Each
+milestone follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule
+tables, fixtures, and tests and observe the expected failure (Stage B);
+implement until the focused tests pass (Stage C); tidy, run the generators and
+exporter and `check_docs.py --write`, review the report diff, and have
+`scrutineer` run the full gates (Stage D).
 
 ### EP-M0. Make `docs/roadmap.md` canonical (separate stacked pull request)
 
@@ -1120,7 +1196,10 @@ full gates (Stage D).
 - Add `spec/acceptance-controls.schema.json`, `spec/acceptance-controls.json`,
   `spec/measurement-record.schema.json` (binding `control_id` and
   `control_digest`; a `purpose` of `calibration` or `acceptance`), and
-  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16).
+  `tools/docs_validation/preregistration.py` (VO-11, VO-12, VO-16). Register
+  `spec/acceptance-controls.json` in `freeze.FROZEN_DOCUMENTS` with its
+  amendment-chain rule, so VO-7 covers controls from the commit that creates
+  them.
 
 Calibration (D12), recorded in `docs/acceptance-calibration.md` and machine
 records under `spec/calibration/`:
@@ -1223,7 +1302,9 @@ and the bet register's measurement sentences.
   spelling the gate enforces).
 - Add `spec/exceptions.json` with its schema, update the example and
   `check_proof_evidence_envelope`, and single-source reason codes in
-  `spec/evidence-reason-codes.json`, in one change.
+  `spec/evidence-reason-codes.json`, in one change. Register
+  `spec/exceptions.json` in `freeze.FROZEN_DOCUMENTS` (an accepted exception is
+  replaced, never altered).
 - Implement the pure `tools/docs_validation/evidence_gate.py`
   (`abstract_record`, `admit`), have `roadmap_status.py` consume it, and add
   `scripts/check_evidence.py`. Tests: VO-1 to VO-4.
