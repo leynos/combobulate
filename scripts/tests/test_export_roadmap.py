@@ -259,7 +259,7 @@ def test_cli_check_passes_on_matching_export(workspace, capsys):
     """Let check mode succeed when the committed export matches its canonical source."""
     roadmap, export = workspace
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 0, 'matching export passes'
-    assert 'matches' in capsys.readouterr().out
+    assert 'matches' in capsys.readouterr().out, 'matching export must report that it matches'
 
 
 def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
@@ -270,7 +270,7 @@ def test_cli_check_reports_drift_with_a_diff(workspace, capsys):
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 1, 'drift must exit 1'
     captured = capsys.readouterr()
     assert '+' in captured.out and 'Record only the scope' in captured.out, 'the diff must show the change'
-    assert 'stale' in captured.err
+    assert 'stale' in captured.err, 'drift diagnostic must identify the export as stale'
 
 
 def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
@@ -278,7 +278,9 @@ def test_cli_reports_malformed_structure_with_exit_two(workspace, capsys):
     roadmap, export = workspace
     roadmap.write_text(replace_once(ROADMAP, OPEN_TASK, OPEN_TASK.replace('[ ] ', '')), encoding='utf-8')
     assert run_cli('--check', '--roadmap', str(roadmap), '--export', str(export)) == 2, 'malformed input exits 2'
-    assert f':{line_of(ROADMAP, OPEN_TASK)}:' in capsys.readouterr().err
+    expected_line = line_of(ROADMAP, OPEN_TASK)
+    assert f':{expected_line}:' in capsys.readouterr().err, (
+        f'malformed-task diagnostic must include source line {expected_line}')
 
 
 def test_cli_reads_check_flag_from_environment(workspace, monkeypatch):

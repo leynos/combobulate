@@ -469,7 +469,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - EP-M2 scope escalation: the current-head completeness assessment measured
   26 changed files and 1,072 net added lines before the test split. Moving
   retained roadmap round-trip property coverage to its own module brings the
-  candidate to 27 changed files and 1,102 net added lines; the file count
+  candidate to 27 changed files and 1,104 net added lines; the file count
   exceeds the 25-file trigger while the net line count remains below 1,500. The
   split preserves that coverage while bringing
   `scripts/tests/test_export_roadmap.py` below the 400-line limit. The
