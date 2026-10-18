@@ -6,23 +6,35 @@ import itertools
 import socket
 import sys
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from hypothesis import given, settings, strategies as st
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError
 
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
-    FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_amendment_chain, check_completeness, check_sources,
-    check_host_identity, frozen_digest, verdict,
+    FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_acceptance_workflow,
+    check_amendment_chain, check_calibration_record, check_ci_calibration, check_ci_measurement, check_completeness,
+    check_control_bindings, check_host_identity, check_measurement_binding, check_sources, frozen_digest, verdict,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTER = ValidationContext(ROOT).load('spec/acceptance-controls.json')
 CONTROL = REGISTER['controls'][0]
+CI_CONTROL = next(item for item in REGISTER['controls'] if item['id'] == 'AC-07')
 SPONSOR = 'leynos'
+REGISTER_VALIDATOR = Draft202012Validator(
+    ValidationContext(ROOT).load('spec/acceptance-controls.schema.json'),
+    format_checker=Draft202012Validator.FORMAT_CHECKER,
+)
+RECORD_VALIDATOR = Draft202012Validator(
+    ValidationContext(ROOT).load('spec/measurement-record.schema.json'),
+    format_checker=Draft202012Validator.FORMAT_CHECKER,
+)
+RECORD_OUTCOMES = sorted(OUTCOME_VERDICTS)
 
 
 def amended(control: dict, field: str, value: object) -> dict:
@@ -37,12 +49,49 @@ def amended(control: dict, field: str, value: object) -> dict:
     return edited
 
 
+def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None) -> dict:
+    """Build one schema-valid measurement record for the first control."""
+    entry = {'id': 'fixture', 'purpose': purpose, 'control_ids': [CONTROL['id']],
+             'control_digest': None if purpose == 'calibration' else (digest or CONTROL['digest']),
+             'recorded_on': '2026-10-12',
+             'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
+                          'memory_gib': 16, 'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
+             'toolchains': {}, 'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
+                                              'metric': 'wall time', 'unit': 's', 'samples': [1], 'median': 1}]}
+    if purpose == 'acceptance':
+        entry['outcome'] = outcome
+        entry['runner_image'] = 'ubuntu-24.04'
+    RECORD_VALIDATOR.validate(entry)
+    return entry
+
+
+def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
+    """Build an AC-07 record in newest-first order with timestamped job attempts."""
+    entry = record(outcome, digest=CI_CONTROL['digest'])
+    entry['control_ids'] = [CI_CONTROL['id']]
+    workload = entry['workloads'][0]
+    workload['id'] = 'ci-build-test'
+    attempts = []
+    newest_start = datetime(2026, 10, 12, 12, tzinfo=UTC)
+    for index, (conclusion, seconds) in enumerate(conclusions):
+        start = newest_start - timedelta(minutes=index)
+        finish = start + timedelta(seconds=seconds)
+        attempts.append({'run_id': str(index + 1), 'run_number': index + 1, 'attempt': 1,
+                         'conclusion': conclusion, 'wall_seconds': seconds,
+                         'started_at': start.isoformat().replace('+00:00', 'Z'),
+                         'completed_at': finish.isoformat().replace('+00:00', 'Z'),
+                         'url': f'https://github.com/leynos/combobulate/actions/runs/{index + 1}'})
+    workload['attempts'] = attempts
+    workload['samples'] = [attempt['wall_seconds'] for attempt in attempts]
+    RECORD_VALIDATOR.validate(entry)
+    return entry
+
+
 class Registration(unittest.TestCase):
-    """VO-11: every frozen field is digested, and changes need an approved amendment chain."""
+    """VO-11: frozen protocols are typed, digested, and governed by an approved chain."""
 
     def test_committed_register_passes(self):
-        # Only the host name is supplied: user names leak through home paths, which the
-        # check always rejects, and a generic CI user such as `runner` is an ordinary word.
+        # Home-path checks catch user names; a generic CI account name is ordinary text.
         check_acceptance_controls(ValidationContext(ROOT), (socket.gethostname(),))
 
     def test_register_lists_the_frozen_fields(self):
@@ -70,13 +119,35 @@ class Registration(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
             check_amendment_chain(control, SPONSOR)
 
+    def test_post_measurement_change_requires_a_new_control_identifier(self):
+        control = amended(CONTROL, 'seeds', [7])
+        with self.assertRaisesRegex(AssertionError, 'later changes require a new control identifier'):
+            check_amendment_chain(control, SPONSOR, [record('pass')])
+
+    def test_protocol_content_is_typed_after_digest_recalculation(self):
+        for field, value in (('seeds', None), ('registered_on', 'not-a-date'), ('decision_rule', 'bad threshold')):
+            with self.subTest(field=field):
+                control = copy.deepcopy(CONTROL)
+                if field == 'decision_rule':
+                    control['frozen'][field]['thresholds']['budget'] = value
+                else:
+                    control['frozen'][field] = value
+                digest = frozen_digest(control)
+                control['registered_digest'] = digest
+                control['digest'] = digest
+                candidate = copy.deepcopy(REGISTER)
+                candidate['controls'] = [control if item['id'] == control['id'] else item
+                                          for item in REGISTER['controls']]
+                with self.assertRaises(ValidationError,
+                                       msg=f'{field} must fail schema validation with a recomputed digest'):
+                    REGISTER_VALIDATOR.validate(candidate)
+
     def test_changed_source_needs_an_amendment(self):
-        control = next(item for item in REGISTER['controls'] if item['id'] == 'AC-07')
+        control = copy.deepcopy(CI_CONTROL)
         check_sources(control, ROOT)
-        stale = copy.deepcopy(control)
-        stale['frozen']['workload']['sources'][0]['sha256'] = '0' * 64
+        control['frozen']['workload']['sources'][0]['sha256'] = '0' * 64
         with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml changed since registration'):
-            check_sources(stale, ROOT)
+            check_sources(control, ROOT)
 
     def test_every_frozen_field_changes_the_digest(self):
         exercised: set[str] = set()
@@ -95,29 +166,8 @@ class Registration(unittest.TestCase):
         self.assertEqual(exercised, set(FROZEN_FIELDS), 'every frozen field must be exercised')
 
 
-RECORD_OUTCOMES = sorted(OUTCOME_VERDICTS)
-
-
-RECORD_VALIDATOR = Draft202012Validator(ValidationContext(ROOT).load('spec/measurement-record.schema.json'),
-                                        format_checker=Draft202012Validator.FORMAT_CHECKER)
-
-
-def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None) -> dict:
-    """Build one schema-valid measurement record for the first control."""
-    entry = {'id': 'fixture', 'purpose': purpose, 'control_ids': [CONTROL['id']],
-             'control_digest': digest or CONTROL['digest'], 'recorded_on': '2026-10-12',
-             'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
-                          'memory_gib': 16, 'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
-             'toolchains': {}, 'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
-                                              'metric': 'wall time', 'unit': 's', 'samples': [1], 'median': 1}]}
-    if purpose == 'acceptance':
-        entry['outcome'] = outcome
-    RECORD_VALIDATOR.validate(entry)
-    return entry
-
-
 class Outcomes(unittest.TestCase):
-    """VO-12: exhaustive enumeration of outcome sequences; nothing but passes can pass."""
+    """VO-12: retries count, and only current-digest records decide the current verdict."""
 
     def test_failure_like_outcomes_never_pass(self):
         for outcome in ('budget-exceeded', 'resource-exhausted', 'missing', 'inconclusive'):
@@ -136,9 +186,50 @@ class Outcomes(unittest.TestCase):
             records = [record(outcome, purpose='calibration')]
             self.assertEqual(verdict(CONTROL, records), 'not-run', 'calibration never satisfies a control')
 
-    def test_records_for_a_superseded_digest_do_not_count(self):
-        self.assertEqual(verdict(CONTROL, [record('pass', digest='0' * 64)]), 'not-run',
-                         'evidence must bind the current digest')
+    def test_unknown_digest_is_rejected_before_aggregation(self):
+        with self.assertRaisesRegex(AssertionError, 'cites unknown digest'):
+            verdict(CONTROL, [record('pass', digest='0' * 64)])
+
+    def test_unknown_control_id_is_rejected(self):
+        unknown = record('pass')
+        unknown['control_ids'] = ['AC-99']
+        controls = {item['id']: item for item in REGISTER['controls']}
+        with self.assertRaisesRegex(AssertionError, 'cites unknown control AC-99'):
+            check_control_bindings(controls, unknown)
+
+    def test_historical_digest_is_valid_but_does_not_count_for_current_digest(self):
+        control = amended(CONTROL, 'seeds', [7])
+        historical = record('pass', digest=CONTROL['digest'])
+        self.assertFalse(check_measurement_binding(control, historical),
+                         'known earlier digests remain valid historical bindings')
+        self.assertEqual(verdict(control, [historical]), 'not-run',
+                         'a historical result cannot satisfy the amended current digest')
+
+    def test_record_before_registration_is_rejected(self):
+        earlier = record('pass')
+        earlier['recorded_on'] = '2026-10-10'
+        with self.assertRaisesRegex(AssertionError, 'predates registration'):
+            check_measurement_binding(CONTROL, earlier)
+
+    def test_shared_development_host_cannot_supply_acceptance_evidence(self):
+        shared_host = record('pass')
+        shared_host['hardware']['class'] = 'shared-development-host'
+        with self.assertRaises(ValidationError, msg='acceptance records must use the hosted runner class'):
+            RECORD_VALIDATOR.validate(shared_host)
+        with self.assertRaisesRegex(AssertionError, 'not measured on the registered'):
+            check_measurement_binding(CONTROL, shared_host)
+
+    def test_acceptance_runner_image_must_match_registration(self):
+        wrong_image = record('pass')
+        wrong_image['runner_image'] = 'ubuntu-latest'
+        with self.assertRaises(ValidationError, msg='schema must reject an unpinned acceptance image'):
+            RECORD_VALIDATOR.validate(wrong_image)
+        with self.assertRaisesRegex(AssertionError, 'does not use AC-01'):
+            check_measurement_binding(CONTROL, wrong_image)
+
+    def test_calibration_directory_rejects_acceptance_record_directly(self):
+        with self.assertRaisesRegex(AssertionError, 'acceptance evidence belongs in spec/measurements'):
+            check_calibration_record('spec/calibration/fixture.json', record('pass'))
 
     def test_seeded_mapping_fault_is_detected(self):
         faulty = dict(OUTCOME_VERDICTS, **{'resource-exhausted': 'pass'})
@@ -146,6 +237,52 @@ class Outcomes(unittest.TestCase):
         self.assertEqual(set(outcomes), {'pass'}, 'the seeded fault would pass an exhausted run')
         self.assertEqual(verdict(CONTROL, [record('pass'), record('resource-exhausted')]), 'fail',
                          'the real mapping fails it')
+
+
+class WorkflowAndCi(unittest.TestCase):
+    """Pin the hosted CI control and prevent failures hiding in the p90 tail."""
+
+    def test_workflow_runner_and_timeout_match_ac07(self):
+        check_acceptance_workflow({'jobs': {'build-test': {'runs-on': 'ubuntu-24.04', 'timeout-minutes': 8}}},
+                                  CI_CONTROL)
+        with self.assertRaisesRegex(AssertionError, 'runner.*does not match AC-07'):
+            check_acceptance_workflow({'jobs': {'build-test': {'runs-on': 'ubuntu-latest',
+                                                                 'timeout-minutes': 8}}}, CI_CONTROL)
+        with self.assertRaisesRegex(AssertionError, 'timeout.*does not match AC-07'):
+            check_acceptance_workflow({'jobs': {'build-test': {'runs-on': 'ubuntu-24.04',
+                                                                 'timeout-minutes': 9}}}, CI_CONTROL)
+
+    def test_two_timeouts_fail_even_when_fast_successes_keep_p90_low(self):
+        attempts = [('success', 1.0)] * 18 + [('timed_out', 480.0)] * 2
+        with self.assertRaisesRegex(AssertionError, 'must fail when a build-test attempt fails'):
+            check_ci_measurement(CI_CONTROL, ci_record('pass', attempts))
+        failed = ci_record('fail', attempts)
+        check_ci_measurement(CI_CONTROL, failed)
+        self.assertEqual(verdict(CI_CONTROL, [failed]), 'fail',
+                         'timeouts fail AC-07 even when nearest-rank p90 is within budget')
+
+    def test_calibration_p90_must_fit_registered_budget(self):
+        calibration = ValidationContext(ROOT).load('spec/calibration/ci-history.json')
+        control = copy.deepcopy(CI_CONTROL)
+        workload = next(item for item in calibration['workloads'] if item['id'] == 'ci-build-test')
+        workload['samples'] = [500.0] * 20
+        workload['median'] = 500.0
+        for attempt in workload['attempts']:
+            attempt['wall_seconds'] = 500.0
+            started_at = datetime.fromisoformat(attempt['started_at'].replace('Z', '+00:00'))
+            attempt['completed_at'] = (started_at + timedelta(seconds=500)).isoformat().replace('+00:00', 'Z')
+        control['frozen']['calibration']['derivation'] = 'nearest-rank p90 500 s.'
+        with self.assertRaisesRegex(AssertionError, 'calibration p90 500.0 s exceeds its 480 s budget'):
+            check_ci_calibration(control, {'spec/calibration/ci-history.json': calibration})
+
+    def test_calibration_derivation_must_match_the_recorded_attempt_p90(self):
+        calibration = ValidationContext(ROOT).load('spec/calibration/ci-history.json')
+        control = copy.deepcopy(CI_CONTROL)
+        control['frozen']['calibration']['derivation'] = (
+            'Nearest-rank p90 212.0 s of 20 eligible attempts x 2, rounded up to whole minutes.'
+        )
+        with self.assertRaisesRegex(AssertionError, 'derivation does not match its recorded attempt p90'):
+            check_ci_calibration(control, {'spec/calibration/ci-history.json': calibration})
 
 
 class HostIdentity(unittest.TestCase):

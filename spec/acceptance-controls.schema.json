@@ -7,12 +7,12 @@
   "required": ["revision", "frozen_fields", "outcome_verdicts", "controls"],
   "properties": {
     "revision": {"const": "0.2"},
-    "frozen_fields": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "frozen_fields": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
     "outcome_verdicts": {
       "type": "object",
       "additionalProperties": {"enum": ["pass", "fail", "inconclusive"]}
     },
-    "controls": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/control"}}
+    "controls": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/control_record"}}
   },
   "$defs": {
     "text": {"type": "string", "minLength": 1},
@@ -23,68 +23,127 @@
       "required": ["path", "sha256"],
       "properties": {"path": {"$ref": "#/$defs/text"}, "sha256": {"$ref": "#/$defs/digest"}}
     },
-    "control": {
+    "calibration": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "record", "derivation"],
+          "properties": {
+            "status": {"const": "calibrated"},
+            "record": {"type": "string", "pattern": "^spec/calibration/[a-z0-9-]+\\.json$"},
+            "derivation": {"$ref": "#/$defs/text"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reason"],
+          "properties": {"status": {"const": "not-calibrated"}, "reason": {"$ref": "#/$defs/text"}}
+        }
+      ]
+    },
+    "analysis_script": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "requirement"],
+          "properties": {
+            "path": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/text"}]},
+            "requirement": {"$ref": "#/$defs/text"}
+          }
+        }
+      ]
+    },
+    "control_description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description"],
+      "properties": {"description": {"$ref": "#/$defs/text"}}
+    },
+    "frozen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workload", "control", "sizes", "seeds", "timed_region", "metric", "unit", "estimand",
+        "statistic", "decision_rule", "warmup", "interleaving", "samples", "outlier_policy",
+        "environment", "cache_policy", "proof_scope", "measurement_tool", "analysis_script",
+        "calibration", "registered_on", "authority"
+      ],
+      "properties": {
+        "workload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["description", "sources"],
+          "properties": {
+            "description": {"$ref": "#/$defs/text"},
+            "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}}
+          }
+        },
+        "control": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/control_description"}]},
+        "sizes": {"$ref": "#/$defs/text"},
+        "seeds": {"$ref": "#/$defs/text"},
+        "timed_region": {"$ref": "#/$defs/text"},
+        "metric": {"$ref": "#/$defs/text"},
+        "unit": {"$ref": "#/$defs/text"},
+        "estimand": {"$ref": "#/$defs/text"},
+        "statistic": {"$ref": "#/$defs/text"},
+        "decision_rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["thresholds", "pass_when", "inconclusive", "extension"],
+          "properties": {
+            "thresholds": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {"type": "number", "minimum": 0}
+            },
+            "pass_when": {"$ref": "#/$defs/text"},
+            "inconclusive": {"$ref": "#/$defs/text"},
+            "extension": {"$ref": "#/$defs/text"}
+          }
+        },
+        "warmup": {"$ref": "#/$defs/text"},
+        "interleaving": {"$ref": "#/$defs/text"},
+        "samples": {"$ref": "#/$defs/text"},
+        "outlier_policy": {"$ref": "#/$defs/text"},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["image", "runner_class", "toolchains"],
+          "properties": {
+            "image": {"const": "ubuntu-24.04"},
+            "runner_class": {"$ref": "#/$defs/text"},
+            "toolchains": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {"$ref": "#/$defs/text"}
+            }
+          }
+        },
+        "cache_policy": {"$ref": "#/$defs/text"},
+        "proof_scope": {"$ref": "#/$defs/text"},
+        "measurement_tool": {"$ref": "#/$defs/text"},
+        "analysis_script": {"$ref": "#/$defs/analysis_script"},
+        "calibration": {"$ref": "#/$defs/calibration"},
+        "registered_on": {"type": "string", "format": "date"},
+        "authority": {"$ref": "#/$defs/text"}
+      }
+    },
+    "control_record": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "title", "tasks", "requirements", "frozen", "registered_digest", "digest", "amendments"],
       "properties": {
         "id": {"type": "string", "pattern": "^AC-[0-9]{2}$"},
         "title": {"$ref": "#/$defs/text"},
-        "tasks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "requirements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+        "requirements": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+        "frozen": {"$ref": "#/$defs/frozen"},
         "registered_digest": {"$ref": "#/$defs/digest"},
         "digest": {"$ref": "#/$defs/digest"},
-        "frozen": {
-          "type": "object",
-          "required": ["workload", "decision_rule", "environment", "calibration", "registered_on", "authority"],
-          "properties": {
-            "workload": {
-              "type": "object",
-              "required": ["description", "sources"],
-              "properties": {
-                "description": {"$ref": "#/$defs/text"},
-                "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}}
-              }
-            },
-            "decision_rule": {
-              "type": "object",
-              "required": ["thresholds", "pass_when", "inconclusive", "extension"],
-              "properties": {
-                "thresholds": {"type": "object", "minProperties": 1},
-                "pass_when": {"$ref": "#/$defs/text"},
-                "inconclusive": {"$ref": "#/$defs/text"},
-                "extension": {"$ref": "#/$defs/text"}
-              }
-            },
-            "environment": {
-              "type": "object",
-              "required": ["image", "runner_class", "toolchains"],
-              "properties": {"image": {"const": "ubuntu-24.04"}, "runner_class": {"$ref": "#/$defs/text"}}
-            },
-            "calibration": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["status", "record", "derivation"],
-                  "properties": {
-                    "status": {"const": "calibrated"},
-                    "record": {"type": "string", "pattern": "^spec/calibration/[a-z0-9-]+\\.json$"},
-                    "derivation": {"$ref": "#/$defs/text"}
-                  }
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["status", "reason"],
-                  "properties": {"status": {"const": "not-calibrated"}, "reason": {"$ref": "#/$defs/text"}}
-                }
-              ]
-            },
-            "registered_on": {"type": "string", "format": "date"},
-            "authority": {"$ref": "#/$defs/text"}
-          }
-        },
         "amendments": {
           "type": "array",
           "items": {

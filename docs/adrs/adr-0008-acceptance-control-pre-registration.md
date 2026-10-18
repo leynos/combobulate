@@ -54,10 +54,20 @@ with the evidence recorded.
   append-only chain. The design checks compare with the pull request's merge
   base, so changing a threshold and its digest together without an amendment
   fails. A change made after an acceptance measurement is a new control
-  identifier, and the original result is retained.
+  identifier, and the original control and result are retained. Each acceptance
+  record must cite a registered current or historical digest, postdate the
+  registration of that digest, and use the hosted acceptance environment.
+  Historical records remain valid evidence for their original digest but do not
+  contribute to the verdict for a newer digest.
 - Outcomes. `budget-exceeded`, `resource-exhausted`, and a record missing
   because its job was killed are failures; `inconclusive` is never a pass.
   Every retry is recorded and counts.
+- CI control (`AC-07`). The rolling window contains the 20 most recent
+  eligible `build-test` job attempts on main and pull requests, including
+  reruns and every conclusion. The p90 uses all available attempt durations;
+  any failed, timed-out, cancelled, resource-exhausted, or missing attempt
+  fails the control independently of the p90. The job pins
+  `runs-on: ubuntu-24.04` and its timeout to the registered eight-minute budget.
 - Thresholds (D12). Calibrate on a development machine with parallelism
   pinned to the runner's 4 vCPUs, take the median of repeated runs, and record
   compile-admission queueing separately. Extrapolate with a factor measured on

@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 58
+      "count": 59
     },
     {
       "check": "contract-examples",
@@ -113,7 +113,7 @@
     {
       "check": "acceptance-controls",
       "status": "pass",
-      "detail": "Controls carry every frozen field, digests close their amendment chains, calibration records are cited and host-free, and no calibration record counts as acceptance evidence.",
+      "detail": "Typed frozen protocols close their approved digest chains; measurement records bind known controls, registered dates and the hosted image; calibration evidence is excluded from acceptance verdicts.",
       "count": 7
     },
     {

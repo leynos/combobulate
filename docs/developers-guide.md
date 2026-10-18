@@ -545,6 +545,15 @@ validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout
 formatting can preserve the contract without creating false generator drift.
 
+Acceptance-control helpers in `tools/docs_validation/preregistration.py` and
+`tools/docs_validation/ci_controls.py` belong only to the documentation-pack
+checker. Keep filesystem reads and schema loading in the composition path
+rooted at `check_acceptance_controls`; its private loaders pass decoded records
+to rule checks. `_CiAttemptSummary` carries AC-07 attempt facts only between
+its measurement helpers. Tests may call named rule checks directly, but these
+helpers and the summary are not general GitHub Actions parsers or repository
+file APIs.
+
 `check_manifest` in `tools/docs_validation/package_policy.py` is an internal
 package-policy helper. `check_package_policy` is its only production caller and
 supplies the D04/D05 decision state. The checker runs after roadmap closure:

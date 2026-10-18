@@ -6,7 +6,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 be kept up to date as work proceeds.
 
 Status: IN_PROGRESS (the sponsor approved the EP-M2 scope exception on
-2026-10-18; `EP-M2` is merged, `EP-M3` is complete, and `EP-M4` is next)
+2026-10-18; `EP-M2` is merged, `EP-M3` and `EP-M4` are complete, and `EP-M5` is
+next)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -376,6 +377,28 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   threshold-plus-digest edit rejected without an amendment, and host-identity
   scans with the local host name supplied at test time; the CI `build-test` job
   has `timeout-minutes: 8` (`AC-07`); task 1.1.3 ticked and backed.
+- (2026-10-18) `EP-M4` review follow-up (CodeRabbit
+  [completeness assessment](https://github.com/leynos/combobulate/pull/16#issuecomment-6254898410)):
+  AC-07 now samples eligible job attempts without a success filter, retains
+  conclusions, and fails on any unsuccessful attempt independently of p90; the
+  workflow pins `ubuntu-24.04`. Measurement validation rejects unknown or
+  premature bindings, shared-host acceptance records, calibration-directory
+  acceptance records, and in-place amendments after measurement; typed schemas
+  validate each frozen field and calendar date. The CI calibration now records
+  a failed `Design contracts` attempt instead of hiding it. Polars now has five
+  cold runs (`60`, `62.24`, `163.21`, `231.47`, and `381.84` s; median `163.21`
+  s); the last two used empty Cargo targets and `SCCACHE_RECACHE=1` through
+  managed sccache, keeping compiler work in the shared admission queue. The
+  registered 10-minute ceiling remains unchanged. Calibration validation also
+  checks attempt timestamps, medians, and the registered p90 budget. This
+  follow-up remains under review until its candidate gates and sponsor
+  assessment pass. CodeScene complexity findings moved AC-07 attempt checks to
+  `tools/docs_validation/ci_controls.py`; `_CiAttemptSummary` carries only the
+  facts those checks compose, and the developer guide records the boundary.
+  `cs delta origin/main` reports no issues after that refactor. The attempt
+  data yield p90 220 s (rank 18 of 20); the draft registration retains that
+  derivation and its matching initial digest. The eight-minute threshold is
+  unchanged and the amendment chain remains empty.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
@@ -406,6 +429,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   other agents). Impact: the factor uses medians of a workload run on both
   machines, and thresholds round up generously; noisy local wall times inflate
   thresholds rather than tighten them.
+- Observation: design validation initially rejected AC-07's capitalized
+  `Nearest-rank` derivation because its parser matched only lower-case text.
+  Recomputing the percentile confirms 220 s at rank 18 of the 20 recorded
+  attempts. The draft registration and initial digest therefore remain bound to
+  220 s; the eight-minute threshold and empty amendment chain are unchanged.
+  Later changes still require a sponsor-approved amendment under ADR-0008.
 - Observation: tests written while nothing was accepted or ticked assumed
   that state (the exporter's all-open assertion and its 1.1.1 checkbox
   controls; register tests seeded from the committed register). Evidence: they
@@ -508,6 +537,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   with parallelism pinned to 4 jobs. Calibration reused the existing user-level
   Verus build rather than installing a second copy. Date/Author: 2026-10-11,
   implementing agent.
+- Decision: AC-07's measurement window includes the 20 most recent eligible
+  `build-test` job attempts by start time, including retries and every
+  conclusion. A failed, timed-out, cancelled, resource-exhausted, or missing
+  attempt fails independently of the duration p90; no status filter can remove
+  it. Pin the job to `ubuntu-24.04` and validate runner and timeout against
+  AC-07. Date/Author: 2026-10-18, implementing agent under D12 delegation.
 - Decision: `EP-M3` exceeded the per-milestone line tolerance (about 2,800
   net added lines against 1,500, excluding the regenerated reference table, the
   register region, the export, and the report; 24 files, within the file
@@ -1313,11 +1348,11 @@ Trusted, not verified here:
 
 Milestones run in order on stacked branches. `EP-M0` was sponsor-directed and
 is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`, `EP-M1b`,
-`EP-M2`, and `EP-M3` are complete; `EP-M4` is next, with `EP-M4` through
-`EP-M6` outstanding. All decisions they need have been answered. Each milestone
-follows Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables,
-fixtures, and tests and observe the expected failure (Stage B); implement until
-the focused tests pass (Stage C); tidy, run the generators and exporter and
+`EP-M2`, `EP-M3`, and `EP-M4` are complete; `EP-M5` and `EP-M6` remain
+outstanding. All decisions they need have been answered. Each milestone follows
+Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables, fixtures,
+and tests and observe the expected failure (Stage B); implement until the
+focused tests pass (Stage C); tidy, run the generators and exporter and
 `check_docs.py --write`, review the report diff, and have `scrutineer` run the
 full gates (Stage D).
 
@@ -1495,9 +1530,10 @@ records under `spec/calibration/`:
    recorded as provisional), each with `-j4` to match the runner's vCPUs, five
    runs, median reported. Compile-admission queue time (the `[build-limits]`
    waiting lines) is recorded separately and excluded.
-4. CI workload: the last 20 `Design contracts` and `CI` workflow runs on
-   `main` and pull requests via `gh run list` and `gh run view`, critical-path
-   wall time excluding queue time.
+4. CI workload: select the 20 most recent eligible job attempts by start time
+   from `Design contracts` and `CI` workflow runs on `main` and pull requests.
+   Enumerate each rerun separately and retain every conclusion; do not filter
+   by status. Record critical-path wall time excluding queue time.
 5. Runtime workloads (AC-05) cannot be calibrated yet because no executor
    exists; their thresholds are set from the design target with the protocol
    frozen, and labelled as not calibrated.
@@ -1534,8 +1570,10 @@ Controls to register, with the protocol from the review retained:
   must pass, each reported; labelled not calibrated.
 - AC-06 (V9, V13): tracked peak never exceeds the admitted bound; a counting
   `GlobalAlloc` reports untracked allocation.
-- AC-07: pull request CI critical-path wall time, p90 over the last 20 runs,
-  calibrated; `timeout-minutes` equals the budget.
+- AC-07: pull request CI critical-path wall time, nearest-rank p90 over the
+  last 20 eligible job attempts including all conclusions and reruns; any
+  unsuccessful or missing attempt fails independently of p90, and
+  `timeout-minutes` equals the budget on the pinned `ubuntu-24.04` runner.
 
 Frozen fields per control: workload and control source paths and digests,
 sizes, seeds, timed region; metric, unit, estimand, statistic, decision rule

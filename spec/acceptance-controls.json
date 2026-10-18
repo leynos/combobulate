@@ -451,11 +451,11 @@
       ],
       "frozen": {
         "workload": {
-          "description": "The CI build-test job, the critical path of pull request checks.",
+          "description": "The CI build-test job, the critical path of pull request checks; every eligible attempt counts.",
           "sources": [
             {
               "path": ".github/workflows/ci.yml",
-              "sha256": "c4f72ddbc4e86fe7578b6c0f27f5a86d962c8e0275efb3f1283584596655b280"
+              "sha256": "88b934ae8f51125f9ce83c3b22faa2e83c17457d8e86989827efa3428e0e8c31"
             }
           ]
         },
@@ -465,20 +465,20 @@
         "timed_region": "Job start to completion, excluding queueing.",
         "metric": "Job wall time.",
         "unit": "minutes",
-        "estimand": "The 90th percentile of the last 20 successful runs.",
-        "statistic": "p90 over a rolling window of 20 runs.",
+        "estimand": "The 90th percentile of durations for the 20 most recent eligible build-test job attempts, regardless of conclusion.",
+        "statistic": "Nearest-rank p90 over a rolling window of 20 job attempts; reruns and failed attempts remain in the window.",
         "decision_rule": {
           "thresholds": {
             "p90_minutes": 8,
             "timeout_minutes": 8
           },
-          "pass_when": "The rolling p90 is within the budget; the job sets timeout-minutes equal to the budget.",
-          "inconclusive": "Fewer than 20 runs is inconclusive.",
+          "pass_when": "All 20 attempts conclude success and their nearest-rank p90 is within the 8-minute budget; any failed, timed-out, cancelled, resource-exhausted, or missing attempt fails independently of p90.",
+          "inconclusive": "Fewer than 20 eligible attempts is inconclusive; an unsuccessful or missing attempt is a failure, even if the p90 is within budget.",
           "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design §17.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
-        "samples": "Last 20 successful runs on main and pull requests.",
+        "samples": "The 20 most recently started build-test job attempts on main and pull requests, including every rerun and conclusion.",
         "outlier_policy": "None.",
         "environment": {
           "image": "ubuntu-24.04",
@@ -493,18 +493,18 @@
         },
         "cache_policy": "The workflow's own caches.",
         "proof_scope": "Not applicable.",
-        "measurement_tool": "GitHub Actions job timestamps via the REST API.",
+        "measurement_tool": "GitHub Actions job timestamps from the REST API, with each workflow rerun recorded as an attempt.",
         "analysis_script": null,
         "calibration": {
           "status": "calibrated",
           "record": "spec/calibration/ci-history.json",
-          "derivation": "p90 219.0 s of the last 20 runs x 2, rounded up to whole minutes."
+          "derivation": "Nearest-rank p90 220.0 s of 20 eligible attempts x 2, rounded up to whole minutes."
         },
         "registered_on": "2026-10-11",
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
-      "registered_digest": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
-      "digest": "faf289f234f3518c69af776b3c28c77d957137b7df85b5b939fc68baa829bd02",
+      "registered_digest": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
+      "digest": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
       "amendments": []
     }
   ]

@@ -24,7 +24,7 @@
     "python": "3.14.7",
     "polars": "0.55.2 (provisional; lazy feature)"
   },
-  "conditions": "Shared host with a shared compile-admission queue; parallelism pinned to 4 jobs; sccache unavailable, so every compilation was uncached.",
+  "conditions": "Shared host with a shared compile-admission queue and parallelism pinned to 4 jobs. The three initial Polars cold runs compiled with sccache unavailable; two added cold runs used empty Cargo targets and SCCACHE_RECACHE=1 through managed sccache so compile results were recomputed. No compile-admission waiting line was captured for the added runs.",
   "workloads": [
     {
       "id": "native-cold",
@@ -93,16 +93,18 @@
     {
       "id": "polars-cold",
       "description": "Cold build: calibration probe with --features polars (Polars 0.55.2, lazy)",
-      "command": "CARGO_BUILD_JOBS=4 cargo build --features polars",
+      "command": "CARGO_BUILD_JOBS=4 SCCACHE_RECACHE=1 CARGO_TARGET_DIR=<empty> cargo build --features polars",
       "metric": "wall time",
       "unit": "s",
       "samples": [
         381.84,
         231.47,
-        163.21
+        163.21,
+        60.0,
+        62.24
       ],
-      "median": 231.47,
-      "notes": "No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
+      "median": 163.21,
+      "notes": "Five cold builds are reported. The two additional empty-target builds used the managed sccache wrapper with SCCACHE_RECACHE=1; Cargo reported all dependencies as Compiling. No compile-admission waiting line was captured; wall time may still include unobserved contention from other builds on the host."
     },
     {
       "id": "polars-incremental",

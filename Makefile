@@ -92,7 +92,7 @@ act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 		--container-options "--volume $(ACT_GIT_COMMON_DIR):$(ACT_GIT_COMMON_DIR):ro" \
 		--secret GITHUB_TOKEN \
 		--env ACT=true \
-		--platform "ubuntu-latest=$(ACT_RUNNER_IMAGE)" \
+		--platform "ubuntu-24.04=$(ACT_RUNNER_IMAGE)" \
 		--workflows .github/workflows/ci.yml --job build-test
 
 act-contract-smoke: check-build-tools ## Check Act step routing with local action and command fixtures

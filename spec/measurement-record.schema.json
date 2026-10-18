@@ -9,9 +9,19 @@
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "purpose": {"enum": ["calibration", "acceptance"]},
-    "control_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^AC-[0-9]{2}$"}},
+    "control_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^AC-[0-9]{2}$"}
+    },
     "control_digest": {"oneOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"type": "null"}]},
-    "recorded_on": {"type": "string", "format": "date"},
+    "recorded_on": {
+      "type": "string",
+      "format": "date",
+      "description": "Acceptance measurement date, not the later date when its record is committed."
+    },
+    "runner_image": {"const": "ubuntu-24.04"},
     "outcome": {"enum": ["pass", "fail", "budget-exceeded", "resource-exhausted", "inconclusive", "missing"]},
     "hardware": {
       "type": "object",
@@ -27,8 +37,8 @@
         "kernel_major": {"type": "integer", "minimum": 1}
       }
     },
-    "toolchains": {"type": "object", "additionalProperties": {"type": "string"}},
-    "conditions": {"type": "string"},
+    "toolchains": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}},
+    "conditions": {"type": "string", "minLength": 1},
     "workloads": {
       "type": "array",
       "minItems": 1,
@@ -42,9 +52,39 @@
           "command": {"type": "string", "minLength": 1},
           "metric": {"type": "string", "minLength": 1},
           "unit": {"type": "string", "minLength": 1},
-          "samples": {"type": "array", "minItems": 1, "items": {"type": ["number", "string"]}},
-          "median": {"type": ["number", "string"]},
-          "notes": {"type": "string"}
+          "samples": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "oneOf": [
+                {"type": "number", "minimum": 0},
+                {"type": "string", "minLength": 1}
+              ]
+            }
+          },
+          "median": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "string", "minLength": 1}]},
+          "notes": {"type": "string", "minLength": 1},
+          "attempts": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["run_id", "run_number", "attempt", "conclusion", "wall_seconds", "started_at", "completed_at", "url"],
+              "properties": {
+                "run_id": {"type": "string", "pattern": "^[0-9]+$"},
+                "run_number": {"type": "integer", "minimum": 1},
+                "attempt": {"type": "integer", "minimum": 1},
+                "conclusion": {
+                  "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]
+                },
+                "wall_seconds": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
+                "started_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+                "completed_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+                "url": {"type": "string", "format": "uri", "pattern": "^https://github\\.com/"}
+              }
+            }
+          }
         }
       }
     }
@@ -52,8 +92,23 @@
   "allOf": [
     {
       "if": {"properties": {"purpose": {"const": "acceptance"}}},
-      "then": {"required": ["outcome"], "properties": {"control_digest": {"type": "string"}}},
-      "else": {"not": {"required": ["outcome"]}}
+      "then": {
+        "required": ["outcome", "runner_image"],
+        "properties": {
+          "control_ids": {"maxItems": 1},
+          "control_digest": {"type": "string"},
+          "hardware": {
+            "properties": {
+              "class": {"const": "github-hosted-runner"},
+              "os_family": {"const": "Ubuntu 24.04"}
+            }
+          }
+        }
+      },
+      "else": {
+        "not": {"required": ["outcome"]},
+        "properties": {"control_digest": {"type": "null"}}
+      }
     }
   ]
 }
