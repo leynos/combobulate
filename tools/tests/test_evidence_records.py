@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hypothesis import given, settings, strategies as st
 
 from docs_validation import evidence_gate as gate
-from docs_validation.evidence_gate import AbstractRecord, abstract_record, is_valid
+from docs_validation.evidence_gate import AdmissionContext, AbstractRecord, abstract_record, is_valid
 from evidence_fixtures import AS_OF, BINDINGS, PARSERS, VALID, VALIDATOR, concrete, round_trip
 
 
@@ -52,13 +52,15 @@ class ConcreteMapping(unittest.TestCase):
         record.update(claim=text, outcome_detail=text, recorded_on=date.isoformat(), declared_assumptions=assumptions)
         record['method'].update(version=text, command=text, solver=text)
         record['binding'].update(target=text, semantic_policy=text)
-        self.assertEqual(abstract_record(record, exceptions, BINDINGS, AS_OF, PARSERS), state,
+        context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS)
+        self.assertEqual(abstract_record(record, context), state,
                          'only documented fields may affect the abstraction')
 
     def test_unregistered_parser_makes_the_verdict_self_reported(self):
         state = next(item for item in VALID if item.verdict_source == 'log-parser')
         record, exceptions = concrete(state)
-        self.assertEqual(abstract_record(record, exceptions, BINDINGS, AS_OF).verdict_source, 'self-reported',
+        context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF)
+        self.assertEqual(abstract_record(record, context).verdict_source, 'self-reported',
                          'without a registered parser a verdict is self-reported (C-EP-10)')
 
     def test_seeded_mapping_fault_fails_the_round_trip(self):

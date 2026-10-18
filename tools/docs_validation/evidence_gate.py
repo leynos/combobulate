@@ -65,6 +65,16 @@ class AbstractRecord:
     verdict_source: str
 
 
+@dataclass(frozen=True, slots=True)
+class AdmissionContext:
+    """Carry caller-owned inputs used only while abstracting one evidence record."""
+
+    exceptions: Mapping[str, Mapping[str, object]]
+    bindings: Mapping[str, Mapping[str, str]]
+    as_of: datetime.date
+    log_parsers: frozenset[str] = frozenset()
+
+
 @dataclass(frozen=True)
 class Admission:
     """A level and its reason codes; blocking reasons always mean `rejected`."""
@@ -89,36 +99,28 @@ def is_valid(state: AbstractRecord) -> bool:
 
 def blocking_reasons(state: AbstractRecord) -> tuple[str, ...]:
     """MS-1: one reason code per failed condition, in field order."""
-    reasons: list[str] = []
-    if state.kind in EXECUTED and state.outcome != 'verified':
-        reasons.append(f'outcome-{state.outcome}')
-    if state.witness != 'all-satisfied':
-        reasons.append(f'witness-{state.witness}')
-    if state.controls != 'all-required-rejected-as-intended':
-        reasons.append(f'control-{state.controls}')
-    if state.kind in VERIFIERS and state.trust in {'audited-uncovered', 'unaudited'}:
-        reasons.append('trust-uncovered' if state.trust == 'audited-uncovered' else 'trust-unaudited')
-    if state.exception in {'expired', 'not-yet-valid', 'malformed'}:
-        reasons.append(f'exception-{state.exception}')
-    if state.binding != 'current':
-        reasons.append(f'binding-{state.binding}')
-    if state.run_mode == 'focused':
-        reasons.append('run-focused')
-    if state.kind in VERIFIERS and state.verdict_source == 'self-reported':
-        reasons.append('verdict-self-reported')
-    if state.kind == 'none':
-        reasons.append('not-run')
-    if state.kind == 'trust-declaration' and state.exception != 'active':
-        reasons.append('trust-without-exception')
-    return tuple(reasons)
+    reasons = (
+        (state.kind in EXECUTED and state.outcome != 'verified', f'outcome-{state.outcome}'),
+        (state.witness != 'all-satisfied', f'witness-{state.witness}'),
+        (state.controls != 'all-required-rejected-as-intended', f'control-{state.controls}'),
+        (state.kind in VERIFIERS and state.trust in {'audited-uncovered', 'unaudited'},
+         {'audited-uncovered': 'trust-uncovered', 'unaudited': 'trust-unaudited'}.get(state.trust, '')),
+        (state.exception in {'expired', 'not-yet-valid', 'malformed'}, f'exception-{state.exception}'),
+        (state.binding != 'current', f'binding-{state.binding}'),
+        (state.run_mode == 'focused', 'run-focused'),
+        (state.kind in VERIFIERS and state.verdict_source == 'self-reported', 'verdict-self-reported'),
+        (state.kind == 'none', 'not-run'),
+        (state.kind == 'trust-declaration' and state.exception != 'active', 'trust-without-exception'),
+    )
+    return tuple(reason for applies, reason in reasons if applies)
 
 
 def base_level(state: AbstractRecord) -> Level:
     """MS-2 without exceptions: bounded evidence with partial bounds is only `bounded`."""
-    if state.kind == 'deductive' or (state.kind == 'bounded' and state.bounds == 'type-complete'):
+    if state.kind == 'deductive':
         return Level.PROOF
     if state.kind == 'bounded':
-        return Level.BOUNDED
+        return Level.PROOF if state.bounds == 'type-complete' else Level.BOUNDED
     return Level.TESTED if state.kind == 'test' else Level.RESTRICTED
 
 
@@ -193,9 +195,7 @@ def binding_state(record: Mapping[str, object], bindings: Mapping[str, Mapping[s
     return 'current' if current is not None and all(current.get(key) == binding[key] for key in keys) else 'stale'
 
 
-def abstract_record(record: Mapping[str, object], exceptions: Mapping[str, Mapping[str, object]],
-                    bindings: Mapping[str, Mapping[str, str]], as_of: datetime.date,
-                    log_parsers: frozenset[str] = frozenset()) -> AbstractRecord:
+def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord:
     """Map a schema-valid record to the abstract model; validate against the schema first.
 
     A verdict counts as parsed only when the record names a log and its tool has
@@ -204,16 +204,17 @@ def abstract_record(record: Mapping[str, object], exceptions: Mapping[str, Mappi
     """
     method = record['method']
     source = record['verdict_source']
-    parsed = source['kind'] == 'log-parser' and source['log'] is not None and method['tool'] in log_parsers
+    parsed = (source['kind'] == 'log-parser' and source['log'] is not None
+              and method['tool'] in context.log_parsers)
     exception_id = record['exception']
     if exception_id is None:
         exception = 'none'
     else:
-        entry = exceptions.get(str(exception_id))
-        exception = 'malformed' if entry is None else exception_state(entry, as_of)
+        entry = context.exceptions.get(str(exception_id))
+        exception = 'malformed' if entry is None else exception_state(entry, context.as_of)
     return AbstractRecord(
         kind=str(record['evidence_kind']), outcome=str(record['outcome']), bounds=str(record['bounds']['kind']),
         witness=witness_state(record['success_witnesses']), controls=controls_state(record['negative_controls']),
-        trust=trust_state(record['trust_audit']), exception=exception, binding=binding_state(record, bindings),
+        trust=trust_state(record['trust_audit']), exception=exception, binding=binding_state(record, context.bindings),
         run_mode=str(method['run_mode']), verdict_source='log-parser' if parsed else 'self-reported',
     )

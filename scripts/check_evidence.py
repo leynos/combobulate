@@ -22,9 +22,10 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Annotated
 
 import cyclopts
-from cyclopts import App
+from cyclopts import App, Parameter
 from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,11 +37,23 @@ class EvidenceCliConfiguration:
     """Inputs shared by one CLI invocation and its per-record evaluator."""
 
     validator: Draft202012Validator
-    parsers: frozenset[str]
-    exceptions: dict[str, dict]
-    bindings: dict[str, dict]
-    as_of: datetime.date
+    admission_context: AdmissionContext
     required_level: str
+
+
+@dataclass(frozen=True)
+class EvidenceCliOptions:
+    """Flat CLI option group; its fields retain the public long-option names."""
+
+    as_of: Annotated[str, Parameter(help='Evaluation date, YYYY-MM-DD; it decides exception validity.')]
+    require: Annotated[str, Parameter(help='Minimum level for success: proof, bounded, or tested.')] = 'tested'
+    bindings: Annotated[
+        Path, Parameter(help='JSON map from component to its current executable, specification, and source identity.')
+    ] = ROOT / 'spec/evidence-bindings.json'
+    log_parsers: Annotated[
+        Path, Parameter(help='JSON document listing tools with registered log parsers.')
+    ] = ROOT / 'spec/evidence-reason-codes.json'
+    exceptions: Annotated[Path, Parameter(help='The exception register.')] = ROOT / 'spec/exceptions.json'
 
 
 def load_json(path: Path) -> dict:
@@ -74,8 +87,7 @@ def evaluate_record(path: Path, configuration: EvidenceCliConfiguration) -> tupl
     if errors:
         print(f'{path}: schema-invalid: {errors[0].message}', file=sys.stderr)
         return 0, True
-    abstract = abstract_record(record, configuration.exceptions, configuration.bindings,
-                               configuration.as_of, configuration.parsers)
+    abstract = abstract_record(record, configuration.admission_context)
     admission = admit(abstract)
     print(report_line(path, admission.level.value, admission.reasons))
     required = Level(configuration.required_level)
@@ -86,31 +98,24 @@ app = App(help=__doc__.splitlines()[0], config=cyclopts.config.Env('INPUT_', com
 
 
 @app.default
-def main(*records: Path, as_of: str, require: str = 'tested', bindings: Path = ROOT / 'spec/evidence-bindings.json',
-         log_parsers: Path = ROOT / 'spec/evidence-reason-codes.json',
-         exceptions: Path = ROOT / 'spec/exceptions.json') -> int:
+def main(
+    *records: Path,
+    options: Annotated[EvidenceCliOptions, Parameter(name='*')],
+) -> int:
     """Admit each record and compare its level with the requirement; e.g. a planned record exits 1.
 
     Parameters
     ----------
     records
         Evidence record files to admit.
-    as_of
-        Evaluation date, YYYY-MM-DD; it decides exception validity.
-    require
-        Minimum level for success: proof, bounded, or tested.
-    bindings
-        JSON map from component to its current executable, specification, and source identity.
-    log_parsers
-        JSON document whose `registered_log_parsers` lists tools with registered log parsers.
-    exceptions
-        The exception register.
+    options
+        Flat options preserving their documented command-line names.
     """
-    from docs_validation.evidence_gate import Level
+    from docs_validation.evidence_gate import AdmissionContext, Level
 
     try:
-        date = datetime.date.fromisoformat(as_of)
-        wanted = Level(require)
+        date = datetime.date.fromisoformat(options.as_of)
+        wanted = Level(options.require)
     except ValueError as error:
         print(f'usage error: {error}', file=sys.stderr)
         return 2
@@ -120,12 +125,13 @@ def main(*records: Path, as_of: str, require: str = 'tested', bindings: Path = R
     try:
         validator = Draft202012Validator(load_json(ROOT / 'spec/proof-evidence.schema.json'),
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
-        parsers = frozenset(load_json(log_parsers)['registered_log_parsers'])
-        register, current = exception_register(exceptions), load_json(bindings)
+        parsers = frozenset(load_json(options.log_parsers)['registered_log_parsers'])
+        register, current = exception_register(options.exceptions), load_json(options.bindings)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
         return 2
-    configuration = EvidenceCliConfiguration(validator, parsers, register, current, date, wanted.value)
+    admission_context = AdmissionContext(register, current, date, parsers)
+    configuration = EvidenceCliConfiguration(validator, admission_context, wanted.value)
 
     status, invalid = 0, False
     for path in records:

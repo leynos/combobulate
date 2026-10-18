@@ -1012,6 +1012,15 @@ numerical policy, backend profile, bounds, assumptions, termination scope,
 positive witness, negative control, and result artefacts. A schema-valid record
 establishes only that these fields exist. It does not establish the proposition.
 
+The implementation keeps record abstraction pure. `AdmissionContext` is the
+frozen, call-scoped bundle of the exception register, current bindings,
+evaluation date, and registered log parsers consumed by `abstract_record`. The
+evidence-record and command-line adapters assemble it from explicit inputs; the
+gate does not load files, read the clock, or discover parsers. Tests may
+construct the same context to check the abstraction. Any additional producer
+must compose the context from its own explicit inputs rather than add
+environment or filesystem access to the gate.
+
 Public claims distinguish successful-result correctness from success
 conditions. An implementation that always returns `Err` must fail a success
 witness. A masked-map proof with only inactive cells must also include a

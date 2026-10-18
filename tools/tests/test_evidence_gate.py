@@ -43,23 +43,52 @@ def rank(field: str, value: str, kind: str) -> int:
     return WORSE[field].get(value, DEFAULT_RANK.get(field, 0))
 
 
-def interpret(state: AbstractRecord) -> tuple[str, tuple[str, ...]]:
-    """An independent interpreter of the rule-table fixture, sharing no code with the gate."""
-    values = vars(state)
+def validity_failure(values: dict[str, str]) -> tuple[str, tuple[str, ...]] | None:
+    """Return the fixture's invalid result when one validity rule fails."""
     for rule in RULES['validity']:
         branch = rule['then'] if values[rule['if']['field']] in rule['if']['in'] else rule['else']
         value = values[branch['field']]
-        if ('in' in branch and value not in branch['in']) or ('not_in' in branch and value in branch['not_in']):
+        if branch_rejects_value(branch, value):
             return RULES['invalid']['level'], tuple(RULES['invalid']['reasons'])
-    reasons = tuple(rule['bad'][values[rule['field']]] for rule in RULES['blocking']
-                    if (rule['kinds'] == 'any' or values['kind'] in rule['kinds']) and values[rule['field']] in rule['bad'])
+    return None
+
+
+def branch_rejects_value(branch: dict, value: str) -> bool:
+    """Evaluate one fixture branch's inclusion or exclusion constraint."""
+    return (('in' in branch and value not in branch['in'])
+            or ('not_in' in branch and value in branch['not_in']))
+
+
+def blocking_fixture_reasons(values: dict[str, str]) -> tuple[str, ...]:
+    """Collect blocking reasons in the order declared by the fixture."""
+    return tuple(rule['bad'][values[rule['field']]] for rule in RULES['blocking']
+                 if blocking_rule_applies(rule, values))
+
+
+def blocking_rule_applies(rule: dict, values: dict[str, str]) -> bool:
+    """Match a fixture rule against the current kind and field value."""
+    kind_matches = rule['kinds'] == 'any' or values['kind'] in rule['kinds']
+    return kind_matches and values[rule['field']] in rule['bad']
+
+
+def fixture_base_level(values: dict[str, str]) -> str:
+    """Find the base level whose complete field condition matches the fixture state."""
+    return next(entry['level'] for entry in RULES['base_levels']
+                if all(values[key] == wanted for key, wanted in entry['when'].items()))
+
+
+def interpret(state: AbstractRecord) -> tuple[str, tuple[str, ...]]:
+    """Interpret the rule fixture independently of the production gate."""
+    values = vars(state)
+    invalid = validity_failure(values)
+    if invalid is not None:
+        return invalid
+    reasons = blocking_fixture_reasons(values)
     if reasons:
         return RULES['blocked']['level'], reasons
     if values['exception'] == 'active':
         return RULES['exception_active']['level'], tuple(RULES['exception_active']['reasons'])
-    level = next(entry['level'] for entry in RULES['base_levels']
-                 if all(values[key] == wanted for key, wanted in entry['when'].items()))
-    return level, ()
+    return fixture_base_level(values), ()
 
 
 def as_pair(admission: Admission) -> tuple[str, tuple[str, ...]]:
@@ -99,31 +128,47 @@ class RuleTable(unittest.TestCase):
 class AdmissionProperties(unittest.TestCase):
     """P1 to P4 over the full enumeration."""
 
+    def assert_degradation_does_not_raise_level(self, state, valid, level):
+        """Check every valid worse value of each field against the current admission level."""
+        for field, ranks in WORSE.items():
+            current = getattr(state, field)
+            for value in RULES['domains'][field]:
+                worse = replace(state, **{field: value})
+                if worse not in valid or rank(field, value, state.kind) <= rank(field, current, state.kind):
+                    continue
+                self.assertLessEqual(RANK[ADMISSIONS[worse].level.value], level,
+                                     f'{state} -> {field}={value}')
+
     def test_p1_degradation_never_raises_the_level(self):
         valid = set(VALID)
         for state in VALID:
             level = RANK[ADMISSIONS[state].level.value]
-            for field, ranks in WORSE.items():
-                current = getattr(state, field)
-                for value in RULES['domains'][field]:
-                    worse = replace(state, **{field: value})
-                    if worse in valid and rank(field, value, state.kind) > rank(field, current, state.kind):
-                        self.assertLessEqual(RANK[ADMISSIONS[worse].level.value], level, f'{state} -> {field}={value}')
+            self.assert_degradation_does_not_raise_level(state, valid, level)
+
+    def assert_reason_remedy(self, state, admission, reason, field_of):
+        """Check that one applicable remedy removes exactly its own blocking reason."""
+        if reason in {'not-run', 'trust-without-exception', 'exception-active'}:
+            return
+        field = field_of[reason]
+        remedied = replace(state, **{field: REMEDY[field]})
+        if not is_valid(remedied):
+            return
+        expected = tuple(item for item in admission.reasons if item != reason)
+        actual = tuple(item for item in ADMISSIONS[remedied].reasons if item != 'exception-active')
+        self.assertEqual(actual, expected, f'{state} remedy {reason}')
+
+    def assert_rejection_and_remedies(self, state, field_of):
+        """Check the rejection classification and each single-reason repair."""
+        admission = ADMISSIONS[state]
+        self.assertEqual(admission.level is Level.REJECTED,
+                         bool(admission.reasons) and admission.reasons != ('exception-active',), f'{state}')
+        for reason in admission.reasons:
+            self.assert_reason_remedy(state, admission, reason, field_of)
 
     def test_p2_rejection_exactly_when_blocked_and_each_remedy_removes_one_reason(self):
         field_of = {reason: rule['field'] for rule in RULES['blocking'] for reason in rule['bad'].values()}
         for state in VALID:
-            admission = ADMISSIONS[state]
-            self.assertEqual(admission.level is Level.REJECTED, bool(admission.reasons)
-                             and admission.reasons != ('exception-active',), f'{state}')
-            for reason in admission.reasons:
-                if reason in {'not-run', 'trust-without-exception', 'exception-active'}:
-                    continue
-                remedied = replace(state, **{field_of[reason]: REMEDY[field_of[reason]]})
-                if is_valid(remedied):
-                    expected = tuple(item for item in admission.reasons if item != reason)
-                    actual = tuple(item for item in ADMISSIONS[remedied].reasons if item != 'exception-active')
-                    self.assertEqual(actual, expected, f'{state} remedy {reason}')
+            self.assert_rejection_and_remedies(state, field_of)
 
     def test_p3_exceptions_never_satisfy_a_component(self):
         satisfying = {Level.PROOF, Level.BOUNDED, Level.TESTED}

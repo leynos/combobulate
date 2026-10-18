@@ -4,9 +4,10 @@ This module is the single owner of obligation-component satisfaction (MS-3)
 and task closure (MS-4). A ticked task in `docs/roadmap.md` must have ticked
 prerequisites, a completion record in `spec/task-completion.json` whose cited
 decisions are accepted and whose artefacts resolve, and a satisfied component
-for every proof obligation linked to it. A task that meets every condition but
-is not ticked is reported rather than failed, so a tick remains a deliberate
-claim. Until the evidence gate lands, record-sourced components fail closed.
+for every proof obligation linked to it. Record-sourced components use admitted
+evidence at the component's bound source revision. A task that meets every
+condition but is not ticked is reported rather than failed, so a tick remains a
+deliberate claim.
 """
 from __future__ import annotations
 
@@ -176,6 +177,21 @@ def task_closure(inputs: ClosureInputs) -> tuple[list[str], list[str]]:
     return ticked, eligible
 
 
+def _anchor_problem(target: Path, anchor: str) -> ArtefactProblem | None:
+    """Check a resolved Markdown file for one heading anchor; only the path resolver calls this."""
+    try:
+        text = target.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        return ArtefactProblem('is not valid UTF-8 text')
+    except OSError as error:
+        return ArtefactProblem(f'cannot be read ({error})')
+    try:
+        has_anchor = anchor in headings(text)
+    except ValueError as error:
+        return ArtefactProblem(f'cannot be parsed ({error})')
+    return None if has_anchor else ArtefactProblem(f'has no heading anchor {anchor!r}')
+
+
 def artefact_resolver(context: ValidationContext) -> Callable[[str], ArtefactProblem | None]:
     """Resolve a repository artefact, returning a named problem when it cannot support a tick.
 
@@ -200,19 +216,7 @@ def artefact_resolver(context: ValidationContext) -> Callable[[str], ArtefactPro
             return ArtefactProblem('resolves outside the repository')
         if not target.is_file():
             return ArtefactProblem('does not resolve to a file')
-        if not anchor:
-            return None
-        try:
-            text = target.read_text(encoding='utf-8')
-        except UnicodeDecodeError:
-            return ArtefactProblem('is not valid UTF-8 text')
-        except OSError as error:
-            return ArtefactProblem(f'cannot be read ({error})')
-        try:
-            has_anchor = anchor in headings(text)
-        except ValueError as error:
-            return ArtefactProblem(f'cannot be parsed ({error})')
-        return None if has_anchor else ArtefactProblem(f'has no heading anchor {anchor!r}')
+        return _anchor_problem(target, anchor) if anchor else None
 
     return resolve
 

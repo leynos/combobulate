@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hypothesis import given, settings, strategies as st
 
 from docs_validation.context import ValidationContext
-from docs_validation.evidence_gate import Level, abstract_record, admit, exception_state
+from docs_validation.evidence_gate import (
+    AbstractRecord, AdmissionContext, Level, abstract_record, admit, exception_state,
+)
 from docs_validation.exceptions import check_exceptions, exception_problems
 from evidence_fixtures import AS_OF, BINDINGS, PARSERS, VALID, concrete
 
@@ -41,10 +43,11 @@ class ValidityWindow(unittest.TestCase):
                 self.assertEqual(state_on(day), expected, f'{day} must be {expected}')
 
     def test_complete_active_exception_restricts(self):
-        state = next(item for item in VALID if item.exception == 'active' and item.kind == 'deductive'
-                     and item.binding == 'current' and item.witness == 'all-satisfied'
-                     and item.controls == 'all-required-rejected-as-intended' and item.trust == 'audited-none'
-                     and item.run_mode == 'full-profile' and item.verdict_source == 'log-parser')
+        state = AbstractRecord(
+            kind='deductive', outcome='verified', bounds='not-applicable', witness='all-satisfied',
+            controls='all-required-rejected-as-intended', trust='audited-none', exception='active',
+            binding='current', run_mode='full-profile', verdict_source='log-parser',
+        )
         self.assertEqual(admit(state).level, Level.RESTRICTED, 'an active exception yields restricted, never proof')
 
     def test_release_gate_expires_an_exception_before_its_date(self):
@@ -123,8 +126,10 @@ class DateSensitivity(unittest.TestCase):
     @given(st.sampled_from(VALID), st.dates(datetime.date(2026, 1, 1), datetime.date(2027, 12, 31)))
     def test_as_of_changes_only_the_exception_state(self, state, day):
         record, exceptions = concrete(state)
-        baseline = abstract_record(record, exceptions, BINDINGS, AS_OF, PARSERS)
-        moved = abstract_record(record, exceptions, BINDINGS, day, PARSERS)
+        baseline_context = AdmissionContext(exceptions, BINDINGS, AS_OF, PARSERS)
+        moved_context = AdmissionContext(exceptions, BINDINGS, day, PARSERS)
+        baseline = abstract_record(record, baseline_context)
+        moved = abstract_record(record, moved_context)
         self.assertEqual(moved.__class__(**{**vars(baseline), 'exception': moved.exception}), moved,
                          'only the exception field may depend on the date')
 

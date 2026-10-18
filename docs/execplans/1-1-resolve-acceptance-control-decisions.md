@@ -414,6 +414,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `proof`), and rejects resource-exhausted and self-reported fixtures with
   their reasons; `PF14.structural@1.1.4` is satisfied by the passing
   `evidence-gate` check and task 1.1.4 is ticked.
+- [x] (2026-10-18) EP-M5 review repair: group the evidence gate's explicit
+  caller inputs in `AdmissionContext`, retain the flat `check_evidence.py`
+  option names through Cyclopts, and reduce the reported complexity hotspots.
+  The CodeScene delta improves `contracts.py` mean complexity from 4.89 to
+  4.50, with no new or degraded findings. The sequential candidate gates
+  `make check-fmt`, `make lint`, `make typecheck`, `make test` (329 passed, one
+  skipped, doctest passed), `make markdownlint`, `make nixie`, and
+  `make design-check AS_OF=2026-10-18 BASE_REV=origin/1-1-acceptance-controls`
+  (341 unittest and 64 pytest) all passed on the same candidate patch. Logs use
+  suffix `-20261018-8.out` under `/tmp`.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
 ## Surprises & discoveries
@@ -1885,13 +1895,21 @@ class Admission:
     level: Level
     reasons: tuple[str, ...]
 
-def abstract_record(record: Mapping[str, object], exceptions: Mapping[str, Mapping[str, object]],
-                    bindings: Mapping[str, str], as_of: datetime.date) -> AbstractRecord: ...
+@dataclasses.dataclass(frozen=True, slots=True)
+class AdmissionContext:
+    exceptions: Mapping[str, Mapping[str, object]]
+    bindings: Mapping[str, Mapping[str, str]]
+    as_of: datetime.date
+    log_parsers: frozenset[str] = frozenset()
+
+def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord: ...
 def admit(record: AbstractRecord) -> Admission: ...
 ```
 
-`admit` is pure and total over `AbstractRecord`; `abstract_record` raises
-`ValidationError` only for schema-invalid records.
+`admit` and `abstract_record` are pure. The adapters validate the concrete
+record against schema version 2 before calling `abstract_record`; the gate
+receives its exception, binding, date, and parser inputs through the
+call-scoped context.
 
 `scripts/check_evidence.py --as-of DATE [--require LEVEL] [--bindings FILE]
 RECORD…`

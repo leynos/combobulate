@@ -17,7 +17,7 @@ from collections.abc import Mapping
 from jsonschema import Draft202012Validator
 
 from .context import ValidationContext, require
-from .evidence_gate import Admission, Level, abstract_record, admit, all_states, is_valid
+from .evidence_gate import Admission, AdmissionContext, Level, abstract_record, admit, all_states, is_valid
 from .exceptions import annotated_exceptions, ticked_tasks
 
 SATISFYING = {Level.PROOF, Level.BOUNDED, Level.TESTED}
@@ -45,7 +45,9 @@ def admit_record(record: Mapping[str, object], context: ValidationContext, input
     if as_of is None:
         exceptions = {key: dict(entry) | {'problems': ['no-evaluation-date']} for key, entry in exceptions.items()}
         as_of = datetime.date.min
-    return admit(abstract_record(record, exceptions, bindings, as_of, parsers))
+    return admit(abstract_record(record, AdmissionContext(
+        exceptions=exceptions, bindings=bindings, as_of=as_of, log_parsers=parsers,
+    )))
 
 
 def admitted_evidence(context: ValidationContext) -> dict[str, list[tuple[Admission, dict]]]:

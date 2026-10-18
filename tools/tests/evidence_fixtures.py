@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from jsonschema import Draft202012Validator
 
 from docs_validation.context import ValidationContext
-from docs_validation.evidence_gate import AbstractRecord, abstract_record, all_states, is_valid
+from docs_validation.evidence_gate import AbstractRecord, AdmissionContext, abstract_record, all_states, is_valid
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTEXT = ValidationContext(ROOT)
@@ -65,7 +65,9 @@ def concrete(state: AbstractRecord) -> tuple[dict, dict]:
 def round_trip(state: AbstractRecord) -> AbstractRecord:
     """Abstract the concrete record built for a state."""
     record, exceptions = concrete(state)
-    return abstract_record(record, exceptions, BINDINGS, AS_OF, PARSERS)
+    return abstract_record(record, AdmissionContext(
+        exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS,
+    ))
 
 
 VALID = [state for state in all_states() if is_valid(state)]
