@@ -100,11 +100,17 @@ class RealGoverningDocuments(unittest.TestCase):
         name = 'docs/roadmap.md'
         roadmap = self.documents[name]
         completed_task = '- [x] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API'
-        current_preamble = 'Task 1.1.1 is complete; all other work remains\nproposed and open.'
         old_preamble = 'All work remains proposed and open.'
         self.assertIn(completed_task, roadmap,
                       'the real roadmap must show task 1.1.1 complete before mutation')
-        restored = roadmap.replace(current_preamble, old_preamble, 1)
+        sections = roadmap.split('\n\n', 2)
+        revision, separator, _status = sections[1].partition('. ')
+        self.assertTrue(separator,
+                        'the roadmap preamble must separate revision from task status')
+        self.assertIn('proposed and open.', sections[1],
+                      'the current roadmap preamble must state its open work status')
+        sections[1] = f'{revision}. {old_preamble}'
+        restored = '\n\n'.join(sections)
         self.assertNotEqual(restored, roadmap,
                             'the current roadmap preamble must be present for mutation')
         self.assertIn(completed_task, restored,

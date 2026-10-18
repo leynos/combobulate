@@ -19,6 +19,7 @@ from pathlib import Path
 from jsonschema import ValidationError
 
 from docs_validation.context import ValidationContext, require, same_typed_value
+from docs_validation.contract_examples import check_contract_examples
 from docs_validation.contracts import (
     check_kernel_envelope, check_proof_evidence_envelope, check_revision_contracts,
 )
@@ -30,6 +31,7 @@ from docs_validation.markdown import check_markdown
 from docs_validation.package_policy import check_package_policy
 from docs_validation.revision_reader import git_json_at_revision
 from docs_validation.roadmap_status import check_roadmap_status
+from docs_validation.semantic_contracts import check_macro_grammar, check_semantic_contracts
 from docs_validation.semantics import check_examples
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +79,7 @@ def collect_checks(context: ValidationContext) -> None:
         check_markdown, check_catalogue_and_roadmap, check_decision_register, check_kernel_envelope,
         check_examples, check_revision_contracts,
         check_proof_evidence_envelope, check_cost_examples, check_tool_sources,
+        check_contract_examples, check_semantic_contracts, check_macro_grammar,
         check_roadmap_status, check_package_policy,
     ):
         check(context)

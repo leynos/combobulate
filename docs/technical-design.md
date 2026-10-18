@@ -312,13 +312,19 @@ Both routes implement the same ordered neighbourhood and numeric contract.
 
 ### 6.1. Dtypes and exceptional values
 
+[ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md) records
+the contracts of this section as `SC-01` to `SC-09` and `SC-11` in
+`spec/semantic-contracts.json`, each with executable examples, seeded
+mutations, and a proof sketch.
+
 Core scalar dtypes are Bool, I64, and F64. Bool is not a hidden integer
 subtype. Mixed I64/F64 arithmetic requires an explicit cast except for `div`,
-which means true division to F64. `idiv` truncates towards zero; `rem` follows
-the truncating quotient. Checked integer operations reject overflow, including
-the specified MIN/-1 division/remainder case. The conversion of large I64
-values to F64 can round and remains explicit except within documented true
-division and aggregate definitions.
+which converts each operand to F64 (round to nearest, ties to even) and then
+applies IEEE division ([D14](decision-register.md#d14)). `idiv` truncates
+towards zero; `rem` follows the truncating quotient. Checked integer operations
+reject overflow, including the specified MIN/-1 division/remainder case. The
+conversion of large I64 values to F64 can round and remains explicit except
+within documented true division and aggregate definitions.
 
 F64 arithmetic follows the selected floating implementation's operation
 semantics. Ordinary division, square root, logarithm, and power can produce
@@ -334,8 +340,11 @@ than merely applying Kleene logic to a mixed-validity reduction: `any` and
 values in original order and then applies the normal empty-input rule.
 
 `min`/`max` are binary numeric operations; `minimum`/`maximum` are aggregates.
-The proposed binary contract propagates NaN, with signed-zero ties choosing
-negative zero for min and positive zero for max. Diagnostic predicates produce
+The binary contract follows IEEE 754-2019 `minimum` and `maximum`
+([D09](decision-register.md#d09)): null takes precedence over NaN, NaN
+propagates, and signed-zero ties choose negative zero for min and positive zero
+for max. An empty F64 `sum` is positive zero, while `sum([-0.0])` is negative
+zero, because a singleton passes through. Diagnostic predicates produce
 non-null masks: `is_null` tests validity; `is_nan` and `is_finite` return false
 for a null input. Selection with an unknown mask returns an invalid result
 cell; it does not reinterpret unknown as false unless a selection policy says
@@ -387,13 +396,15 @@ row-major order. `.axis(...)` restricts the aggregate; `.keep_dims()` retains
 extent-one axes. Generic `reduce(f)` retains its distinct last-axis default.
 
 Core `mean` converts inputs to F64, right-sums them, and divides by the count.
-It rejects an empty input after null policy and counts above 2^53 for the exact
-count-conversion range. `variance` uses a specified two-pass definition:
-compute that mean, right-sum squared deviations, and divide by `count-ddof`.
-`stddev` applies square root to the result. The default `ddof` is zero and the
-count must exceed it. This deliberately simple reference definition is not a
-claim of optimal numerical conditioning. Alternative stable or parallel
-reducers require an explicit name or numeric policy and measured comparison.
+Without an explicit F64 `.identity(value)`, it rejects an empty input after
+null policy; counts above 2^53 fail with `CountTooLarge` because they exceed
+the exact count-conversion range. `variance` uses the specified two-pass
+definition in `SC-11`: compute that mean, right-sum squared deviations, and
+divide by `count-ddof`. `stddev` applies square root to the result. The default
+`ddof` is zero and the count must exceed it. This deliberately simple reference
+definition is not a claim of optimal numerical conditioning. Alternative stable
+or parallel reducers require an explicit name or numeric policy and measured
+comparison.
 
 Registered empty identities include typed zero for sum/add, one for
 product/mul, false for any/or, and true for all/and. Minimum, maximum, and mean
@@ -410,7 +421,10 @@ this contract.
 
 ## 7. Macro grammar, application, and source provenance
 
-The central spelling remains unchanged:
+[ADR-0007](adrs/adr-0007-comb-macro-grammar-and-staging.md) records the
+grammar, the operator precedence ([D08](decision-register.md#d08)), and the
+staging rules below as contract `SC-10`, with the corpus in
+`spec/macro-grammar.json`. The central spelling remains unchanged:
 
 ```rust
 let centre = verb! {
@@ -442,9 +456,11 @@ of graph objects; applying descriptors to graph arguments uses the DSL
 application form. Arbitrary unknown host calls require `host { ... }` or a
 native-kernel wrapper rather than inference from a function's name.
 
-Arithmetic keeps familiar precedence. The macro lowers comparisons to array
-nodes because ordinary Rust `PartialEq` returns bool (E-RUST-EQ). `&`, `|`, and
-`!` denote elementwise Boolean logic. Array `&&` and `||` fail with a
+Arithmetic keeps Rust precedence, with `|>` split first as the lowest,
+left-associative operator; a comparison mixed unparenthesized with `&`, `|`, or
+`^` is rejected, as are comparison chains. The macro lowers comparisons to
+array nodes because ordinary Rust `PartialEq` returns bool (E-RUST-EQ). `&`,
+`|`, and `!` denote elementwise Boolean logic. Array `&&` and `||` fail with a
 diagnostic that directs the user to elementwise logic or a guarded operation.
 The grammar must preserve `||` inside an explicit ordinary host closure rather
 than misclassify host Rust as DSL syntax.
@@ -1054,8 +1070,12 @@ result.origin[j] = input.origin[indices[j]]
 
 Invalid cells retain invalidity; the model does not expose hidden invalid
 payloads as meaningful scalar values. Typed cells remain atomic until an
-explicit component operation. This lets a consumer prove alignment of rays and
-normals without proving the numerical implementation of normal transformation.
+explicit component operation (cell atomicity, `SC-08`), and a failed or
+cancelled operation leaves its destination unchanged (atomic output commit,
+`SC-09`; [D10](decision-register.md#d10)). Each semantic contract record
+carries the proof sketch that its discharging obligation component must prove.
+This lets a consumer prove alignment of rays and normals without proving the
+numerical implementation of normal transformation.
 
 ### 17.4. Checked inputs and source-scoped witnesses
 
