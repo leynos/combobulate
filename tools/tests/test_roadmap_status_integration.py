@@ -24,13 +24,19 @@ class TickedRoadmapIntegration(unittest.TestCase):
         self.root = Path(self.directory.name)
         (self.root / 'docs').mkdir()
         (self.root / 'spec').mkdir()
+        (self.root / 'spec/evidence').mkdir()
         (self.root / 'docs/roadmap.md').write_text('- [x] 1.1.1. Example task.\n', encoding='utf-8')
         (self.root / 'docs/evidence.md').write_text('# Evidence\n', encoding='utf-8')
         self.roadmap = {'phases': [{'steps': [{'tasks': [
             {'id': '1.1.1', 'status': 'done', 'requires': []},
         ]}]}]}
         self.write_json('spec/roadmap.json', self.roadmap)
-        self.write_json('spec/decisions.json', {'decisions': []})
+        self.write_json('spec/decisions.json', {
+            'authorities': {'roles': {'sponsor': 'sponsor'}}, 'decisions': [],
+        })
+        self.write_json('spec/exceptions.json', {'exceptions': []})
+        self.write_json('spec/evidence-bindings.json', {'bindings': []})
+        self.write_json('spec/evidence-reason-codes.json', {'registered_log_parsers': []})
         self.write_json('spec/proof-obligations.json', {'obligations': []})
         self.write_json('spec/traceability.json', {'requirements': [], 'verification': []})
         self.write_json('spec/task-completion.json', {'tasks': [{
@@ -67,7 +73,7 @@ class TickedRoadmapIntegration(unittest.TestCase):
         """Reject a tick when its cited decision is not accepted."""
         self.write_json('spec/decisions.json', {'decisions': [
             {'id': 'D01', 'lifecycle': 'proposed'},
-        ]})
+        ], 'authorities': {'roles': {'sponsor': 'sponsor'}}})
         self.write_json('spec/task-completion.json', {'tasks': [{
             'task': '1.1.1', 'decisions': ['D01'], 'artefacts': ['docs/evidence.md'],
         }]})

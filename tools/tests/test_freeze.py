@@ -221,7 +221,8 @@ class BaseRevisionChecks(unittest.TestCase):
         summary = check_frozen(self.context, 'base', self.read_base)
         self.assertIn('no frozen registers', summary, 'a new register freezes nothing yet')
         self.assertEqual(self.reads, [('base', 'spec/decisions.json'),
-                                      ('base', 'spec/acceptance-controls.json')],
+                                      ('base', 'spec/acceptance-controls.json'),
+                                      ('base', 'spec/exceptions.json')],
                          'the checker reads each frozen register from the requested base')
 
     def test_fake_reader_supplies_the_register_compared_with_the_head(self) -> None:
@@ -275,7 +276,7 @@ class GitRevisionReaderIntegration(unittest.TestCase):
 
         with self.assertRaisesRegex(AssertionError, 'Accepted decision D04 was edited'):
             check_frozen(context, 'HEAD', reader)
-        with self.assertRaisesRegex(AssertionError, 'Cannot read spec/decisions.json at base revision'):
+        with self.assertRaisesRegex(AssertionError, 'Cannot resolve base revision no-such-revision'):
             check_frozen(context, 'no-such-revision', reader)
 
 

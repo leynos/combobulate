@@ -104,6 +104,7 @@ class DesignWorkflowContract(unittest.TestCase):
         date_command: Path,
         event: str,
         before: str,
+        base_sha: str = '',
     ) -> dict[str, str]:
         """Execute the checked workflow with fixture refs and capture outputs."""
         script = self._workflow_base_step()
@@ -111,7 +112,7 @@ class DesignWorkflowContract(unittest.TestCase):
         output.unlink(missing_ok=True)
         environment = os.environ.copy()
         environment.update({
-            'BASE_REF': 'main',
+            'BASE_SHA': base_sha,
             'BEFORE': before,
             'EVENT': event,
             'GITHUB_OUTPUT': str(output),
@@ -139,8 +140,8 @@ class DesignWorkflowContract(unittest.TestCase):
 
         steps = workflow['jobs']['design-check']['steps']
         base_step = next(step for step in steps if step.get('id') == 'base')
-        self.assertIn('git merge-base "origin/$BASE_REF" HEAD', base_step['run'],
-                      'pull requests must compare frozen decisions with their merge base')
+        self.assertIn('git merge-base "$BASE_SHA" HEAD', base_step['run'],
+                      'pull requests must compare frozen decisions with the event base commit')
         self.assertIn('date -u +%F', base_step['run'],
                       'scheduled expiry checks must use the workflow run date')
 
@@ -212,17 +213,17 @@ class DesignWorkflowContract(unittest.TestCase):
                 date_command.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
             )
             cases = (
-                ('pull_request', '', base_revision, ''),
-                ('push', base_revision, base_revision, ''),
-                ('push', 'missing-revision', '', ''),
-                ('push', '', '', ''),
-                ('schedule', '', '', '2031-02-03'),
-                ('workflow_dispatch', '', '', ''),
+                ('pull_request', '', base_revision, '', base_revision),
+                ('push', base_revision, base_revision, '', ''),
+                ('push', 'missing-revision', '', '', ''),
+                ('push', '', '', '', ''),
+                ('schedule', '', '', '2031-02-03', ''),
+                ('workflow_dispatch', '', '', '', ''),
             )
-            for event, before, expected_revision, expected_date in cases:
+            for event, before, expected_revision, expected_date, base_sha in cases:
                 with self.subTest(event=event, before=before):
                     outputs = self._run_workflow_base_step(
-                        repository, date_command, event, before,
+                        repository, date_command, event, before, base_sha,
                     )
                     self.assertEqual(
                         outputs,
@@ -236,7 +237,6 @@ class DesignWorkflowContract(unittest.TestCase):
             directory = Path(directory_name)
             repository = directory / 'repository'
             self._make_git_fixture(repository)
-            self._run_git(repository, 'update-ref', '-d', 'refs/remotes/origin/main')
             date_command = directory / 'date'
             date_command.write_text(f'#!{sys.executable}\nprint("2031-02-03")\n', encoding='utf-8')
             date_command.chmod(
@@ -247,7 +247,7 @@ class DesignWorkflowContract(unittest.TestCase):
                 msg='the pull-request selector must fail when Git cannot find a merge base',
             ):
                 self._run_workflow_base_step(
-                    repository, date_command, 'pull_request', '',
+                    repository, date_command, 'pull_request', '', 'missing-base-revision',
                 )
 
             self.assertFalse(

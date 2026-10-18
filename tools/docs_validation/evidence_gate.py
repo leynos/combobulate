@@ -43,6 +43,10 @@ class Level(enum.Enum):
 
 
 LEVEL_RANK = {Level.PROOF: 4, Level.BOUNDED: 3, Level.TESTED: 2, Level.RESTRICTED: 1, Level.REJECTED: 0}
+EXCEPTION_PROBLEM_STATES = {
+    frozenset(): None,
+    frozenset({'past-release-gate'}): 'expired',
+}
 
 
 @dataclass(frozen=True)
@@ -136,11 +140,12 @@ def field_names() -> tuple[str, ...]:
 
 
 def exception_state(exception: Mapping[str, object] | None, as_of: datetime.date) -> str:
-    """Classify an exception for a date (D02): valid from approval until `invalid_from`, at most 90 days."""
+    """Classify an exception under D02; a passed release gate expires it immediately."""
     if exception is None:
         return 'none'
-    if exception.get('problems'):
-        return 'malformed'
+    problem_state = EXCEPTION_PROBLEM_STATES.get(frozenset(exception.get('problems', [])), 'malformed')
+    if problem_state is not None:
+        return problem_state
     approved = datetime.date.fromisoformat(str(exception['approved_on']))
     invalid_from = datetime.date.fromisoformat(str(exception['invalid_from']))
     if as_of < approved:

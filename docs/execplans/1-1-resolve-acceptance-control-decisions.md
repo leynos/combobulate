@@ -5,9 +5,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN_PROGRESS (the sponsor approved the EP-M2 scope exception on
-2026-10-18; `EP-M2` is merged, `EP-M3` and `EP-M4` are complete, and `EP-M5` is
-next)
+Status: IN PROGRESS (`EP-M0` to `EP-M5` are complete; `EP-M6` reconciliation,
+roadmap closure, and final gates are under way)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).

@@ -108,6 +108,30 @@ def index_completions(completion: dict, tasks: Mapping[str, dict], decisions: Ma
     return records
 
 
+def has_counterexample_for_revision(records: list[tuple[Admission, dict]], revision: str) -> bool:
+    """Check only record-sourced roadmap evidence for a counterexample at one revision."""
+    return any(record['outcome'] == 'counterexample' and record['binding']['source_revision'] == revision
+               for _, record in records)
+
+
+def record_component_failure(component: dict, records: list[tuple[Admission, dict]]) -> str | None:
+    """Adjudicate record evidence for roadmap closure; only the component router calls this helper."""
+    if not records:
+        return f"component {component['id']} has no evidence record"
+    latest_date = max(record['recorded_on'] for _, record in records)
+    latest_records = [(admission, record) for admission, record in records
+                      if record['recorded_on'] == latest_date]
+    if len(latest_records) != 1:
+        return f"component {component['id']} has {len(latest_records)} records on latest recorded_on date {latest_date}"
+    admission, latest = latest_records[0]
+    revision = latest['binding']['source_revision']
+    if has_counterexample_for_revision(records, revision):
+        return f"component {component['id']} has a counterexample at source revision {revision}"
+    if admission.level.value not in component['accepts']:
+        return f"component {component['id']} evidence is {admission.level.value} ({', '.join(admission.reasons)})"
+    return None
+
+
 def component_failure(component: dict, passed_checks: frozenset[str],
                       evidence: Mapping[str, list[tuple[Admission, dict]]]) -> str | None:
     """Explain why a component is unsatisfied (MS-3), or return None when it is satisfied."""
@@ -115,17 +139,7 @@ def component_failure(component: dict, passed_checks: frozenset[str],
     if source.startswith(CHECKER_SOURCE):
         check = source.removeprefix(CHECKER_SOURCE)
         return None if check in passed_checks else f"component {component['id']} needs check {check} to pass"
-    records = evidence.get(component['id'], [])
-    if not records:
-        return f"component {component['id']} has no evidence record"
-    admission, latest = max(records, key=lambda entry: entry[1]['recorded_on'])
-    revision = latest['binding']['source_revision']
-    if any(record['outcome'] == 'counterexample' and record['binding']['source_revision'] == revision
-           for _, record in records):
-        return f"component {component['id']} has a counterexample at source revision {revision}"
-    if admission.level.value not in component['accepts']:
-        return f"component {component['id']} evidence is {admission.level.value} ({', '.join(admission.reasons)})"
-    return None
+    return record_component_failure(component, evidence.get(component['id'], []))
 
 
 def closure_failures(task_id: str, inputs: ClosureInputs) -> list[str]:

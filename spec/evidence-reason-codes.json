@@ -28,7 +28,7 @@
     "control-required-missing": "A required negative control did not run.",
     "trust-uncovered": "A trusted item (assume, admit, external_body, stub, and similar) is not covered by a declared assumption or exception.",
     "trust-unaudited": "The trusted items were not audited.",
-    "exception-expired": "The cited exception passed its invalid_from date.",
+    "exception-expired": "The cited exception passed its invalid_from date or release-gate task.",
     "exception-not-yet-valid": "The cited exception is not yet approved on the evaluation date.",
     "exception-malformed": "The cited exception is unknown or breaks D02.",
     "binding-stale": "The executable, specification, or source revision differs from the current binding.",

@@ -14,18 +14,18 @@ A record lives in `spec/evidence/` and follows
 evidence for exactly one proof-obligation component, named in `component` as
 `PFnn.<method>@<task>`. The fields that decide admission are:
 
-| Field               | Meaning                                                                                               |
-| ------------------- | ----------------------------------------------------------------------------------------------------- |
-| `evidence_kind`     | `deductive` (Verus), `bounded` (Kani), `test`, `trust-declaration`, or `none` (planned)               |
-| `outcome`           | The verifier's or test's result; anything but `verified` blocks admission                             |
-| `bounds.kind`       | `type-complete` or `partial` for bounded evidence; otherwise `not-applicable`                         |
-| `success_witnesses` | At least one; each Kani `cover!` is listed; any `unsatisfied` or `not-observed` blocks admission      |
-| `negative_controls` | At least one; each must be `rejected-as-intended`, and rejection for another reason blocks            |
-| `trust_audit`       | Audited trusted items, each covered by a declared assumption or exception, or else blocking           |
-| `binding`           | Executable and specification digests and source revision, compared with `spec/evidence-bindings.json` |
-| `method.run_mode`   | `full-profile`; a `focused` run blocks admission                                                      |
-| `verdict_source`    | `log-parser` (with the committed log and its digest) or `self-reported`                               |
-| `exception`         | `null` or an identifier in `spec/exceptions.json`                                                     |
+| Field               | Meaning                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `evidence_kind`     | `deductive` (Verus), `bounded` (Kani), `test`, `trust-declaration`, or `none` (planned)                            |
+| `outcome`           | The verifier's or test's result; anything but `verified` blocks admission                                          |
+| `bounds.kind`       | `type-complete` or `partial` for bounded evidence; otherwise `not-applicable`                                      |
+| `success_witnesses` | At least one; each Kani `cover!` is listed; any `unsatisfied` or `not-observed` blocks admission                   |
+| `negative_controls` | At least one; every required control must be `rejected-as-intended`; any `accepted` or `rejected-otherwise` blocks |
+| `trust_audit`       | Audited trusted items, each covered by a declared assumption or exception, or else blocking                        |
+| `binding`           | Executable and specification digests and source revision, compared with `spec/evidence-bindings.json`              |
+| `method.run_mode`   | `full-profile`; a `focused` run blocks admission                                                                   |
+| `verdict_source`    | `log-parser` (with the committed log and its digest) or `self-reported`                                            |
+| `exception`         | `null` or an identifier in `spec/exceptions.json`                                                                  |
 
 _Table 1: Fields that decide admission._
 
@@ -76,6 +76,11 @@ parser, or exception files; the test fixtures in
 `tools/tests/fixtures/evidence/` use a test-only parser registry so the
 `bounded` level is reachable.
 
+At least one record is required, and `--require` accepts `proof`, `bounded`, or
+`tested`. A configuration file that cannot be loaded is a usage error;
+unreadable or schema-invalid record files produce exit 2 while the command
+continues reporting the remaining inputs.
+
 ## Exceptions
 
 `spec/exceptions.json` (schema `spec/exception.schema.json`) holds trusted
@@ -83,8 +88,10 @@ boundary exceptions under decision D02. An exception names its component,
 owner, narrowed claim, reason, release gate (task 4.3.3 or 6.3.4), approval by
 the sponsor, `approved_on`, and `invalid_from`. It is valid from `approved_on`
 up to, but excluding, `invalid_from`, for at most 90 days. Renewal is a new
-exception with a new identifier. An approved exception is never edited; the
-freeze check rejects an edit or deletion.
+exception with a new identifier. Passing its release-gate task expires it
+immediately, even when `invalid_from` is later. The expired entry remains
+history and cannot admit new evidence. An approved exception is never edited;
+the freeze check rejects an edit or deletion.
 
 ## Decisions, controls, and completion records
 

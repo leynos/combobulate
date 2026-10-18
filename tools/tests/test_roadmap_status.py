@@ -149,6 +149,17 @@ class TaskClosure(unittest.TestCase):
         self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
                              'evidence is bounded')
 
+    def test_same_day_latest_records_fail_closed(self):
+        component_id = 'PF14.proof@1.1.1'
+        components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
+        first = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
+        second = first | {'binding': {'source_revision': 'r2'}}
+        evidence = {component_id: [(Admission(Level.PROOF, ()), first), (Admission(Level.PROOF, ()), second)]}
+        failures = closure_failures('1.1.1', inputs(ticked(chain(), '1.1.1'), components=components,
+                                                   evidence=evidence))
+        self.assertIn(f'component {component_id} has 2 records on latest recorded_on date 2026-10-10', failures,
+                      'same-day latest records are ambiguous and cannot close a task')
+
     def test_supported_but_unticked_task_is_reported_not_failed(self):
         """Report supported open work as eligible while keeping it unticked."""
         ticks, eligible = task_closure(inputs(ticked(chain(), '1.1.1')))

@@ -103,17 +103,17 @@ class RoadmapClosureProperties(unittest.TestCase):
     def test_checker_component_tracks_its_named_check(self, check, passed):
         """Satisfy generated checker components exactly when their named check passes."""
         component = {'id': 'PF01.test@1.1.1', 'evidence_source': f'checker:{check}', 'evidence': []}
-        result = component_failure(component, frozenset({check}) if passed else frozenset())
+        result = component_failure(component, frozenset({check}) if passed else frozenset(), {})
         self.assertEqual(result is None, passed,
                          'checker-sourced evidence must follow the matching current-run check')
 
     @GENERATED
     @given(evidence=st.lists(st.text(max_size=20), max_size=5))
-    def test_record_component_fails_closed_for_generated_evidence(self, evidence):
-        """Keep arbitrary record payloads inadmissible until the evidence gate exists."""
+    def test_record_component_needs_an_admitted_record(self, evidence):
+        """Keep component payloads from bypassing the evidence admission gate."""
         component = {'id': 'PF01.proof@1.1.1', 'evidence_source': 'record', 'evidence': evidence}
-        result = component_failure(component, frozenset({'unrelated-check'}))
-        self.assertIsNotNone(result, 'record evidence must remain fail-closed before EP-M5')
+        result = component_failure(component, frozenset({'unrelated-check'}), {})
+        self.assertIsNotNone(result, 'record-sourced evidence must pass through admission before closure')
 
     @GENERATED
     @given(parts=st.lists(st.from_regex(r'[a-z][a-z0-9_-]{0,7}', fullmatch=True), min_size=1, max_size=4))

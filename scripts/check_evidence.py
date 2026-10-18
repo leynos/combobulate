@@ -20,6 +20,7 @@ from __future__ import annotations
 import datetime
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 import cyclopts
@@ -29,10 +30,17 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 
-from docs_validation.evidence_gate import Level, abstract_record, admit  # noqa: E402
-from docs_validation.exceptions import annotated_exceptions, ticked_tasks  # noqa: E402
 
-RANK = {Level.PROOF: 4, Level.BOUNDED: 3, Level.TESTED: 2, Level.RESTRICTED: 1, Level.REJECTED: 0}
+@dataclass(frozen=True)
+class EvidenceCliConfiguration:
+    """Inputs shared by one CLI invocation and its per-record evaluator."""
+
+    validator: Draft202012Validator
+    parsers: frozenset[str]
+    exceptions: dict[str, dict]
+    bindings: dict[str, dict]
+    as_of: datetime.date
+    required_level: str
 
 
 def load_json(path: Path) -> dict:
@@ -40,15 +48,38 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def report_line(path: Path, level: Level, reasons: tuple[str, ...]) -> str:
+def report_line(path: Path, level: str, reasons: tuple[str, ...]) -> str:
     """Format one result; e.g. 'spec/x.json: rejected [not-run]'."""
-    return f"{path}: {level.value} [{', '.join(reasons)}]"
+    return f"{path}: {level} [{', '.join(reasons)}]"
 
 
 def exception_register(path: Path) -> dict[str, dict]:
     """Load exceptions with their D02 problems attached, as the gate expects."""
+    from docs_validation.exceptions import annotated_exceptions, ticked_tasks
+
     sponsor = load_json(ROOT / 'spec/decisions.json')['authorities']['roles']['sponsor']
     return annotated_exceptions(load_json(path), sponsor, ticked_tasks(load_json(ROOT / 'spec/roadmap.json')))
+
+
+def evaluate_record(path: Path, configuration: EvidenceCliConfiguration) -> tuple[int, bool]:
+    """Validate one input against the immutable settings for this CLI invocation."""
+    from docs_validation.evidence_gate import LEVEL_RANK, Level, abstract_record, admit
+
+    try:
+        record = load_json(path)
+    except (OSError, ValueError) as error:
+        print(f'{path}: unreadable: {error}', file=sys.stderr)
+        return 0, True
+    errors = sorted(configuration.validator.iter_errors(record), key=lambda error: list(error.path))
+    if errors:
+        print(f'{path}: schema-invalid: {errors[0].message}', file=sys.stderr)
+        return 0, True
+    abstract = abstract_record(record, configuration.exceptions, configuration.bindings,
+                               configuration.as_of, configuration.parsers)
+    admission = admit(abstract)
+    print(report_line(path, admission.level.value, admission.reasons))
+    required = Level(configuration.required_level)
+    return int(LEVEL_RANK[admission.level] < LEVEL_RANK[required]), False
 
 
 app = App(help=__doc__.splitlines()[0], config=cyclopts.config.Env('INPUT_', command=False))
@@ -75,6 +106,8 @@ def main(*records: Path, as_of: str, require: str = 'tested', bindings: Path = R
     exceptions
         The exception register.
     """
+    from docs_validation.evidence_gate import Level
+
     try:
         date = datetime.date.fromisoformat(as_of)
         wanted = Level(require)
@@ -84,27 +117,21 @@ def main(*records: Path, as_of: str, require: str = 'tested', bindings: Path = R
     if not records or wanted not in {Level.PROOF, Level.BOUNDED, Level.TESTED}:
         print('usage error: give at least one record and require proof, bounded, or tested', file=sys.stderr)
         return 2
-    validator = Draft202012Validator(load_json(ROOT / 'spec/proof-evidence.schema.json'),
-                                     format_checker=Draft202012Validator.FORMAT_CHECKER)
-    parsers = frozenset(load_json(log_parsers)['registered_log_parsers'])
-    register, current = exception_register(exceptions), load_json(bindings)
+    try:
+        validator = Draft202012Validator(load_json(ROOT / 'spec/proof-evidence.schema.json'),
+                                         format_checker=Draft202012Validator.FORMAT_CHECKER)
+        parsers = frozenset(load_json(log_parsers)['registered_log_parsers'])
+        register, current = exception_register(exceptions), load_json(bindings)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
+        return 2
+    configuration = EvidenceCliConfiguration(validator, parsers, register, current, date, wanted.value)
+
     status, invalid = 0, False
     for path in records:
-        try:
-            record = load_json(path)
-        except (OSError, ValueError) as error:
-            print(f'{path}: unreadable: {error}', file=sys.stderr)
-            invalid = True
-            continue
-        errors = sorted(validator.iter_errors(record), key=lambda error: list(error.path))
-        if errors:
-            print(f'{path}: schema-invalid: {errors[0].message}', file=sys.stderr)
-            invalid = True
-            continue
-        admission = admit(abstract_record(record, register, current, date, parsers))
-        print(report_line(path, admission.level, admission.reasons))
-        if RANK[admission.level] < RANK[wanted]:
-            status = 1
+        record_status, record_invalid = evaluate_record(path, configuration)
+        status = max(status, record_status)
+        invalid = invalid or record_invalid
     return 2 if invalid else status
 
 

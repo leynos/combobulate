@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import datetime
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,8 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hypothesis import given, settings, strategies as st
 
+from docs_validation.context import ValidationContext
 from docs_validation.evidence_gate import Level, abstract_record, admit, exception_state
-from docs_validation.exceptions import exception_problems
+from docs_validation.exceptions import check_exceptions, exception_problems
 from evidence_fixtures import AS_OF, BINDINGS, PARSERS, VALID, concrete
 
 APPROVED, INVALID_FROM = datetime.date(2026, 10, 1), datetime.date(2026, 11, 1)
@@ -44,6 +47,16 @@ class ValidityWindow(unittest.TestCase):
                      and item.run_mode == 'full-profile' and item.verdict_source == 'log-parser')
         self.assertEqual(admit(state).level, Level.RESTRICTED, 'an active exception yields restricted, never proof')
 
+    def test_release_gate_expires_an_exception_before_its_date(self):
+        exception = ENTRY | {'problems': ['past-release-gate']}
+        self.assertEqual(exception_state(exception, APPROVED), 'expired',
+                         'a completed release gate ends an exception immediately')
+
+    def test_other_d02_problems_remain_malformed_after_release_gate(self):
+        exception = ENTRY | {'problems': ['past-release-gate', 'approver-not-sponsor']}
+        self.assertEqual(exception_state(exception, APPROVED), 'malformed',
+                         'release-gate expiry does not excuse another D02 violation')
+
 
 class Malformed(unittest.TestCase):
     """Each D02 violation has its own reason."""
@@ -73,6 +86,34 @@ class Malformed(unittest.TestCase):
     def test_ninety_days_is_allowed(self):
         self.assertEqual(self.problems(invalid_from=(APPROVED + datetime.timedelta(days=90)).isoformat()), [],
                          'exactly 90 days is within D02')
+
+
+class RegisterCheck(unittest.TestCase):
+    """A released exception remains valid history and cannot be used again."""
+
+    def test_passed_release_gate_is_valid_expired_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            spec = root / 'spec'
+            spec.mkdir()
+            project_root = Path(__file__).resolve().parents[2]
+            (spec / 'exception.schema.json').write_text(
+                (project_root / 'spec/exception.schema.json').read_text(encoding='utf-8'), encoding='utf-8')
+            (spec / 'exceptions.json').write_text(
+                json.dumps({'revision': '0.2', 'exceptions': [ENTRY]}), encoding='utf-8')
+            (spec / 'decisions.json').write_text(
+                json.dumps({'authorities': {'roles': {'sponsor': 'leynos'}}}), encoding='utf-8')
+            (spec / 'roadmap.json').write_text(
+                json.dumps({'phases': [{'steps': [{'tasks': [{'id': '4.3.3', 'status': 'done'}]}]}]}),
+                encoding='utf-8')
+
+            context = ValidationContext(root)
+            check_exceptions(context)
+
+        self.assertEqual(context.results[-1]['count'], 1, 'the expired exception remains in the register')
+        self.assertEqual(context.results[-1]['detail'],
+                         'D02-compliant exception records: 1; expired at release gate: 1.',
+                         'the check reports release-gate expiry as history rather than failure')
 
 
 class DateSensitivity(unittest.TestCase):

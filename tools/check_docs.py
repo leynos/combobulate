@@ -83,8 +83,8 @@ def collect_checks(context: ValidationContext) -> None:
         check_examples, check_revision_contracts,
         check_proof_evidence_envelope, check_cost_examples, check_tool_sources,
         check_contract_examples, check_semantic_contracts, check_macro_grammar,
-        check_package_policy, check_acceptance_controls, check_exceptions, check_evidence_gate,
-        check_roadmap_status,
+        check_acceptance_controls, check_exceptions, check_evidence_gate,
+        check_roadmap_status, check_package_policy,
     ):
         check(context)
 

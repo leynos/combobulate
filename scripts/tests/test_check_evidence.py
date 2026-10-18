@@ -65,6 +65,24 @@ def test_schema_invalid_record_exits_two(tmp_path, capsys):
     assert 'schema-invalid' in capsys.readouterr().err
 
 
+@pytest.mark.parametrize('option', ['--bindings', '--log-parsers', '--exceptions'])
+def test_unreadable_configuration_exits_two(option, tmp_path, capsys):
+    missing = str(tmp_path / 'missing.json')
+    settings = {'--bindings': str(FIXTURES / 'bindings.json'),
+                '--log-parsers': str(FIXTURES / 'log-parsers.json'),
+                '--exceptions': str(ROOT / 'spec/exceptions.json')}
+    settings[option] = missing
+    arguments = ['--as-of', '2026-10-10']
+    for name, path in settings.items():
+        arguments.extend((name, path))
+    arguments.append(fixture('complete-test'))
+
+    assert run(*arguments) == 2, 'an unreadable configuration is a usage error'
+    error = capsys.readouterr().err
+    assert 'usage error: cannot load configuration' in error, 'configuration failures have a usage diagnostic'
+    assert 'Traceback' not in error, 'configuration failures do not leak a traceback'
+
+
 def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
     broken = tmp_path / 'broken.json'
     broken.write_text('{not json', encoding='utf-8')

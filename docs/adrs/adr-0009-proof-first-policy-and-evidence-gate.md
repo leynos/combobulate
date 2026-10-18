@@ -137,7 +137,8 @@ under ADR-0005 (D06): a strengthened precondition or a weakened postcondition
 is breaking even without a Rust signature change. Released proof-interface
 changes and exceptions are accepted by the D01 authority. Exceptions follow D02
 and live in `spec/exceptions.json`. An exception names a narrowed claim, an
-owner, and a release gate, and it lasts at most 90 days.
+owner, and a release gate, and it lasts at most 90 days. Passing that gate
+expires it immediately, even when its `invalid_from` date is later.
 
 ## Command line
 
