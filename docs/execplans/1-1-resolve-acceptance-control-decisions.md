@@ -476,10 +476,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   begin `EP-M3` until it is given. Evidence:
   [current-head completeness assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6235254133).
   Date/Author: 2026-10-17, implementing agent.
-- EP-M2 scope approval: the sponsor approved the documented exception of 27
-  scoped changed files and 1,104 net added lines on 2026-10-18. This exceeds
-  the 25-file trigger and remains below the 1,500-line ceiling. The approval
-  clears the scope-approval hold for merging PR #14. Evidence:
+- EP-M2 scope approval: the sponsor approved the exception for the 27-file,
+  1,104-net-line scope snapshot at head `6952cbb` on 2026-10-18. This approval
+  record adds four net lines: head `33e7f9b` measured 27 files and 1,108 net
+  added lines. This correction adds two net lines, bringing the current
+  candidate to 1,110. Both totals remain below the 1,500-line ceiling, clearing
+  the scope hold for PR #14. Evidence:
   [sponsor approval in the review session](https://lody.ai/leynos/sessions/2c0cdbfb-b00b-4153-935a-908f717ebeb3).
   Date/Author: 2026-10-18, sponsor approval; recorded by implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
