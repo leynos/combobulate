@@ -87,6 +87,46 @@ class PackagePolicy(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'publish = false'):
                 check_package_policy(context)
 
+    def test_invalid_d05_supersession_links_keep_publication_disabled(self):
+        """Reject missing, unknown, and proposed D05 replacement links."""
+        cases = (
+            ('unknown replacement', 'D99', 'accepted', ['D05']),
+            ('missing reciprocal link', 'D16', 'accepted', None),
+            ('unknown reciprocal target', 'D16', 'accepted', ['D99']),
+            ('proposed replacement', 'D16', 'proposed', ['D05']),
+        )
+        for label, superseded_by, lifecycle, reciprocal_link in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write_release_fixture(root, publish=True)
+                decision_path = root / 'spec/decisions.json'
+                records = json.loads(decision_path.read_text(encoding='utf-8'))['decisions']
+                d05 = next(record for record in records if record['id'] == 'D05')
+                replacement = next(record for record in records if record['id'] == 'D16')
+                d05['superseded_by'] = superseded_by
+                replacement['lifecycle'] = lifecycle
+                if reciprocal_link is None:
+                    replacement.pop('supersedes')
+                else:
+                    replacement['supersedes'] = reciprocal_link
+                decision_path.write_text(json.dumps({'decisions': records}), encoding='utf-8')
+                context = ValidationContext(root)
+                self.add_validated_core_closure(context)
+
+                with self.assertRaisesRegex(AssertionError, 'publish = false'):
+                    check_package_policy(context)
+
+    def test_completed_core_dossier_without_passed_roadmap_check_stays_unpublished(self):
+        """Require a passing roadmap check even when task 4.3.3 is recorded done."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_release_fixture(root, publish=True)
+            context = ValidationContext(root)
+            self.write_core_completion(context)
+
+            with self.assertRaisesRegex(AssertionError, 'publish = false'):
+                check_package_policy(context)
+
     def test_accepted_d05_supersession_and_validated_core_closure_allow_publication(self):
         """Lift the D05 guard only after both recorded release conditions pass."""
         with tempfile.TemporaryDirectory() as directory:
@@ -115,14 +155,17 @@ class PackagePolicy(unittest.TestCase):
         ]
         (root / 'spec/decisions.json').write_text(json.dumps({'decisions': decisions}), encoding='utf-8')
 
-    @staticmethod
-    def add_validated_core_closure(context: ValidationContext) -> None:
-        """Model task closure only after the composed roadmap check has passed."""
+    def write_core_completion(self, context: ValidationContext) -> None:
+        """Model task 4.3.3 and its completion record without checker results."""
         (context.root / 'spec/roadmap.json').write_text(json.dumps({
             'phases': [{'steps': [{'tasks': [{'id': '4.3.3', 'status': 'done'}]}]}],
         }), encoding='utf-8')
         (context.root / 'spec/task-completion.json').write_text(
             json.dumps({'tasks': [{'task': '4.3.3'}]}), encoding='utf-8')
+
+    def add_validated_core_closure(self, context: ValidationContext) -> None:
+        """Add the successful roadmap result required for an eligible release."""
+        self.write_core_completion(context)
         context.record('roadmap-status', 'task 4.3.3 closure conditions pass', 1)
 
     def test_publishable_manifest_fails(self):

@@ -471,18 +471,19 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   exceeds the 25-file trigger while the net line count remains below 1,500. The
   split preserves that coverage while bringing
   `scripts/tests/test_export_roadmap.py` below the 400-line limit. The
-  sponsor's acceptance of ADR-0002 to ADR-0005 does not explicitly accept this
-  scope overrun. Sponsor confirmation is pending in PR #14; do not merge or
-  begin `EP-M3` until it is given. Evidence:
+  sponsor's acceptance of ADR-0002 to ADR-0005 did not explicitly accept this
+  scope overrun. The 2026-10-17 assessment linked below recorded sponsor
+  confirmation for PR #14 as pending; the sponsor supplied it on 2026-10-18, as
+  recorded under EP-M2 scope approval below. Evidence:
   [current-head completeness assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6235254133).
-  Date/Author: 2026-10-17, implementing agent.
+  Date/Author: 2026-10-17, implementing agent; status updated 2026-10-18.
 - EP-M2 scope approval: on 2026-10-18, the sponsor approved the 27-file
   exception for PR #14 after reviewing head `4e67bfe` (1,399 additions, 289
   deletions, 1,110 net lines). This approval covers this approval record,
-  bringing the current candidate to 1,111 net lines. The earlier `6952cbb`
+  bringing the `bafbc11` candidate to 1,111 net lines. The earlier `6952cbb`
   snapshot (27 files, 1,104 net lines) remains its historical measurement;
-  later records add seven net lines. The hold clears on sponsor approval, not
-  on staying below 1,500 lines. Evidence:
+  records through `bafbc11` add seven net lines. The hold clears on sponsor
+  approval, not on staying below 1,500 lines. Evidence:
   [sponsor approval in the review session](https://lody.ai/leynos/sessions/2c0cdbfb-b00b-4153-935a-908f717ebeb3).
   Date/Author: 2026-10-18, sponsor approval; recorded by implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
