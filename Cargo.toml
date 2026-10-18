@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Inspectable array and typed-collection algebra for Rust"
 license = "ISC"
+# Not published until the Core acceptance dossier (task 4.3.3) passes and the
+# sponsor approves release: decision D05, docs/adrs/adr-0004-licence-and-publication.md.
+publish = false
 repository = "https://github.com/leynos/combobulate"
 homepage = "https://github.com/leynos/combobulate"
 readme = "README.md"

@@ -41,7 +41,7 @@ exceptions, and proof-API changes.
 
 Terms-of-reference questions: Q1, Q8. Authority: sponsor.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -53,9 +53,11 @@ Recommendation rationale: Terms of reference §9 already names "Sponsor and
 technical owner" as the authority for Q2 and Q4; choosing the sponsor alone
 would require amending that column.
 
-Decision: pending.
+Decision: option B, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Sponsor and technical owner @leynos"
 
-ADR: none yet.
+ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
 
 ### D02
 
@@ -63,7 +65,7 @@ Subject: Trusted-boundary exception policy.
 
 Terms-of-reference questions: Q8. Authority: sponsor.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -76,9 +78,11 @@ Recommendation rationale: Bounded lifetimes force each exception to be
 revisited, and a narrowed claim keeps an exception from being read as proof
 (technical design §17.2, GAP9).
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
 
 ### D03
 
@@ -86,7 +90,7 @@ Subject: Initial release scope.
 
 Terms-of-reference questions: Q4. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -97,9 +101,11 @@ Options:
 Recommendation rationale: The split already maps every requirement to a roadmap
 phase and keeps integration work out of the Core acceptance dossier.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0003](adrs/adr-0003-initial-release-scope.md).
 
 ### D04
 
@@ -107,7 +113,7 @@ Subject: Package licence.
 
 Terms-of-reference questions: Q7. Authority: sponsor.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -117,9 +123,11 @@ Options:
 Recommendation rationale: ISC is permissive and is already in place through
 ADR-0001; ratification removes the open question without changing any file.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0004](adrs/adr-0004-licence-and-publication.md).
 
 ### D05
 
@@ -127,7 +135,7 @@ Subject: External publication policy.
 
 Terms-of-reference questions: Q7. Authority: sponsor.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -137,9 +145,11 @@ Options:
 Recommendation rationale: Publication before the Core dossier would promise
 distribution terms for an unproven library.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted. Ensure this is clearly documented in the developer's guide."
 
-ADR: none yet.
+ADR: [ADR-0004](adrs/adr-0004-licence-and-publication.md).
 
 ### D06
 
@@ -147,7 +157,7 @@ Subject: Pre-1.0 API and public proof-interface compatibility policy.
 
 Terms-of-reference questions: none. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -162,9 +172,11 @@ Recommendation rationale: It applies the existing no-compatibility-machinery
 constraint to both the Rust API and the proof interface that downstream proofs
 depend on.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted"
 
-ADR: none yet.
+ADR: [ADR-0005](adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md).
 
 ### D07
 
@@ -172,7 +184,7 @@ Subject: Dispositions of the candidate ADR subjects.
 
 Terms-of-reference questions: none. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -186,7 +198,16 @@ Options:
 Recommendation rationale: Each subject is decided where its evidence arises;
 subjects that depend on unrun bets are deferred to the tasks that run them.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "Accepted. Please update the documentation style guide to place ADRs in
+`docs/adrs/` with naming pattern `adr-nnnn-foo-bar-qux.md` where `nnnn` is a
+four digit index and `foo-bar-qux` is the title slug. Similarly, RFCs in
+`docs/rfcs/` with naming pattern `rfc-nnnn-foo-bar-qux.md`  This breaks from
+current DF12 standards, but the current practice is really starting to bug me
+and I want to take this opportunity to revise it. If it goes well, we will
+update the centralized documentation style guide in `agent-helper-scripts`
+documentation library."
 
 ADR: none yet.
 
@@ -313,7 +334,7 @@ Subject: Governance enforcement.
 
 Terms-of-reference questions: none. Authority: sponsor.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -328,9 +349,12 @@ Options:
 Recommendation rationale: Code-owner review would make an unauthorized register
 edit a blocked merge rather than a reviewer catch.
 
-Decision: pending.
+Decision: option B, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+Answer: "No, we don't do `.github/CODEOWNERS`. If we magically acquire another
+dev, we can change this."
 
-ADR: none yet.
+ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
 
 ### D14
 

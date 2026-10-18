@@ -11,9 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from check_docs import collect_checks
 from docs_validation.context import ValidationContext
-from docs_validation.decisions import check_decision_register
+from docs_validation.decisions import (
+    GOVERNING_DOCUMENTS, check_decision_register, check_governing_documents, check_register_records,
+    normalize,
+)
 from docs_validation.ledger import check_generated_documents, generated_documents
-from test_decision_register import REGISTER
+from test_decision_register import REGISTER, RETIRED
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -63,6 +66,81 @@ class RealRegister(unittest.TestCase):
         with patch.object(Path, 'read_text', read_text):
             with self.assertRaisesRegex(AssertionError, 'Generated content drift: docs/decision-register.md'):
                 check_generated_documents(context, context.load('spec/vocabulary.json')['entries'])
+
+
+class RealGoverningDocuments(unittest.TestCase):
+    """Keep accepted decisions reconciled with the committed governing documents."""
+
+    def setUp(self) -> None:
+        """Load fresh register records and governing-document copies per mutation."""
+        self.records = check_register_records(REGISTER)
+        self.documents = {name: (ROOT / name).read_text(encoding='utf-8') for name in GOVERNING_DOCUMENTS}
+
+    def assert_rejected(self, message: str) -> None:
+        """Require a mutated document set to fail with its decision-specific reason."""
+        with self.assertRaisesRegex(AssertionError, message):
+            check_governing_documents(self.records, self.documents)
+
+    def test_committed_documents_pass(self) -> None:
+        """The five committed governing documents satisfy accepted decisions."""
+        check_governing_documents(self.records, self.documents)
+
+    def test_reinserted_q4_sentence_names_d03(self) -> None:
+        """Reject a retired release-scope sentence with its decision identifier."""
+        self.documents['docs/technical-design.md'] += f'\n{RETIRED}\n'
+        self.assert_rejected('still states text retired by D03')
+
+    def test_rewrapped_q4_sentence_names_d03(self) -> None:
+        """Detect the retired sentence across a Markdown line wrap."""
+        self.documents['docs/technical-design.md'] += '\nThe classes remain proposed\npending ToR Q4.\n'
+        self.assert_rejected('still states text retired by D03')
+
+    def test_restored_roadmap_preamble_names_d03_and_keeps_task_ticked(self) -> None:
+        """Reject the old roadmap preamble while task 1.1.1 remains complete."""
+        name = 'docs/roadmap.md'
+        roadmap = self.documents[name]
+        completed_task = '- [x] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API'
+        current_preamble = 'Task 1.1.1 is complete; all other work remains\nproposed and open.'
+        old_preamble = 'All work remains proposed and open.'
+        self.assertIn(completed_task, roadmap,
+                      'the real roadmap must show task 1.1.1 complete before mutation')
+        restored = roadmap.replace(current_preamble, old_preamble, 1)
+        self.assertNotEqual(restored, roadmap,
+                            'the current roadmap preamble must be present for mutation')
+        self.assertIn(completed_task, restored,
+                      'restoring the preamble must leave task 1.1.1 checked')
+        self.documents[name] = restored
+        self.assert_rejected('still states text retired by D03')
+
+    def test_stale_roadmap_adr_claim_names_d03_and_keeps_task_ticked(self) -> None:
+        """Reject stale claims that no ADR has been accepted after task 1.1.1."""
+        name = 'docs/roadmap.md'
+        roadmap = self.documents[name]
+        completed_task = '- [x] 1.1.1. Record the scope, decision authority, licence, and pre-1.0 API'
+        retired_claim = ('The foundational phase resolves candidate ADRs identified in '
+                         '`technical-design.md` §15; no accepted ADR or ExecPlan exists in this evidence set.')
+        self.assertIn(completed_task, roadmap,
+                      'the real roadmap must show task 1.1.1 complete before mutation')
+        self.assertNotIn(normalize(retired_claim), normalize(roadmap),
+                         'the current roadmap must not contain the retired ADR claim')
+        restored = f'{roadmap.rstrip()}\n\n{retired_claim}\n'
+        self.assertNotEqual(restored, roadmap,
+                            'the retired ADR claim must change the roadmap for mutation')
+        self.assertIn(completed_task, restored,
+                      'restoring the stale claim must leave task 1.1.1 checked')
+        self.documents[name] = restored
+        self.assert_rejected('still states text retired by D03')
+
+    def test_q4_described_as_open_names_d03(self) -> None:
+        """Reject a live document that describes the accepted Q4 scope as open."""
+        self.documents['docs/roadmap.md'] += '\nQ4 remains open.\n'
+        self.assert_rejected(r'docs/roadmap.md describes Q4 \(D03\)')
+
+    def test_deleted_q4_anchor_names_d03(self) -> None:
+        """Require the Terms of Reference Q4 row to retain its decision anchor."""
+        terms = self.documents['docs/terms-of-reference.md']
+        self.documents['docs/terms-of-reference.md'] = terms.replace('decision-register.md#d03', 'decision-register.md')
+        self.assert_rejected('ToR §9 row Q4 must link decision-register.md#d03')
 
 
 if __name__ == '__main__':
