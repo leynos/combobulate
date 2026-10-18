@@ -446,7 +446,9 @@
       "id": "EX38",
       "contract": "SC-04",
       "operation": "cast",
-      "input": 9007199254740993,
+      "input": {
+        "i64": "9007199254740993"
+      },
       "to": "F64",
       "expected": {
         "f64": "9007199254740992.0"
@@ -547,7 +549,9 @@
       "contract": "SC-05",
       "operation": "div",
       "args": [
-        9007199254740993,
+        {
+          "i64": "9007199254740993"
+        },
         3
       ],
       "expected": {
@@ -990,6 +994,58 @@
       "expected": {
         "f64": "inf"
       }
+    },
+    {
+      "id": "EX84",
+      "contract": "SC-01",
+      "operation": "reduce",
+      "binary": "add",
+      "input": [],
+      "expected_error": "EmptyReduction"
+    },
+    {
+      "id": "EX85",
+      "contract": "SC-01",
+      "operation": "fold_left",
+      "binary": "add",
+      "input": [],
+      "expected_error": "EmptyReduction"
+    },
+    {
+      "id": "EX86",
+      "contract": "SC-08",
+      "operation": "batch_axis",
+      "cell": "DVec3",
+      "shape": [
+        2,
+        3
+      ],
+      "axis": -1,
+      "expected_error": "AxisOutOfRange"
+    },
+    {
+      "id": "EX87",
+      "contract": "SC-04",
+      "operation": "sub",
+      "args": [
+        1,
+        {
+          "f64": "2.0"
+        }
+      ],
+      "expected_error": "DtypeMismatch"
+    },
+    {
+      "id": "EX88",
+      "contract": "SC-04",
+      "operation": "mul",
+      "args": [
+        1,
+        {
+          "f64": "2.0"
+        }
+      ],
+      "expected_error": "DtypeMismatch"
     }
   ],
   "semantic_changes_from_0_1": "none"

@@ -26,7 +26,7 @@
       "name": "sub",
       "signature": "(numeric, numeric) -> numeric",
       "shape": "Same shape or scalar extension.",
-      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates. Contract: SC-04.",
       "execution": "Pointwise; no reassociation or operand reordering by default.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -39,7 +39,7 @@
       "name": "mul",
       "signature": "(numeric, numeric) -> numeric",
       "shape": "Same shape or scalar extension.",
-      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates. Contract: SC-04.",
       "execution": "Pointwise; no reassociation or operand reordering by default.",
       "scope": "Core",
       "roadmap_tasks": [

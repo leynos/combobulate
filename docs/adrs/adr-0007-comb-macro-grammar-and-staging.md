@@ -74,8 +74,8 @@ structure.
 
 ## Operator precedence
 
-Levels follow the Rust Reference[^rust-precedence], restricted to the DSL
-subset and listed strongest first.
+Levels follow the Rust Reference[^1], restricted to the DSL subset and listed
+strongest first.
 
 | Level          | Operators                   | Associativity |
 | -------------- | --------------------------- | ------------- |
@@ -124,6 +124,6 @@ _Table 1: `comb!` operator precedence, strongest first._
 - Token-level entries (`a|>b`, `a | > b`) are tagged `phase2_only`, because
   only the real token stream can distinguish joint from separate tokens.
 
-[^rust-precedence]: The Rust Reference, "Expressions: Expression precedence",
+[^1]: The Rust Reference, "Expressions: Expression precedence",
     <https://doc.rust-lang.org/reference/expressions.html#expression-precedence>,
     retrieved 2026-10-11.

@@ -313,7 +313,7 @@ Both routes implement the same ordered neighbourhood and numeric contract.
 ### 6.1. Dtypes and exceptional values
 
 [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md) records
-the contracts of this section as `SC-01` to `SC-09` in
+the contracts of this section as `SC-01` to `SC-09` and `SC-11` in
 `spec/semantic-contracts.json`, each with executable examples, seeded
 mutations, and a proof sketch.
 
@@ -397,13 +397,14 @@ extent-one axes. Generic `reduce(f)` retains its distinct last-axis default.
 
 Core `mean` converts inputs to F64, right-sums them, and divides by the count.
 Without an explicit F64 `.identity(value)`, it rejects an empty input after
-null policy; counts above 2^53 exceed the exact count-conversion range.
-`variance` uses the specified two-pass definition in `SC-11`: compute that
-mean, right-sum squared deviations, and divide by `count-ddof`. `stddev`
-applies square root to the result. The default `ddof` is zero and the count
-must exceed it. This deliberately simple reference definition is not a claim of
-optimal numerical conditioning. Alternative stable or parallel reducers require
-an explicit name or numeric policy and measured comparison.
+null policy; counts above 2^53 fail with `CountTooLarge` because they exceed
+the exact count-conversion range. `variance` uses the specified two-pass
+definition in `SC-11`: compute that mean, right-sum squared deviations, and
+divide by `count-ddof`. `stddev` applies square root to the result. The default
+`ddof` is zero and the count must exceed it. This deliberately simple reference
+definition is not a claim of optimal numerical conditioning. Alternative stable
+or parallel reducers require an explicit name or numeric policy and measured
+comparison.
 
 Registered empty identities include typed zero for sum/add, one for
 product/mul, false for any/or, and true for all/and. Minimum, maximum, and mean

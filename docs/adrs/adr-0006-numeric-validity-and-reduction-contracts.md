@@ -78,7 +78,7 @@ backend could substitute a cheaper but different aggregation.
 
 ## Consequences
 
-- `spec/examples.json` holds tagged-scalar examples (`EX21` to `EX81`) for
+- `spec/examples.json` holds tagged-scalar examples (`EX21` to `EX88`) for
   every rule, and each contract names seeded mutations (left association, floor
   division, an erroring empty sum, an identity used as a seed, implicit
   promotion, NaN-ignoring `min`, two-valued logic, exact-quotient `div`, cell

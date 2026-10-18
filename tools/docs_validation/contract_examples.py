@@ -50,28 +50,29 @@ def encode(value: object) -> object:
 
 
 def dtype(value: object) -> str | None:
-    """Name a scalar's dtype; Bool is not an integer subtype, and null has none."""
+    """Name a scalar dtype; e.g. ``dtype(True)`` is ``'Bool'``."""
     if value is None:
         return None
     return {bool: 'Bool', int: 'I64', float: 'F64'}[type(value)]
 
 
 def same_dtype(left: object, right: object, mutations: Mutations) -> None:
-    """Reject mixed operands; the 'implicit-promotion' mutation silently widens instead."""
+    """Reject mixed operands; e.g. I64 plus F64 raises ``DtypeMismatch``."""
     if dtype(left) != dtype(right) and 'implicit-promotion' not in mutations:
         raise SemanticFailure('DtypeMismatch')
 
 
 def checked_i64(value: int) -> int:
-    """Reject results outside I64."""
+    """Reject results outside I64; e.g. ``checked_i64(3)`` returns ``3``."""
     if not I64_MIN <= value <= I64_MAX:
         raise SemanticFailure('IntegerOverflow')
     return value
 
 
 def arithmetic(operation: Callable[[object, object], object]) -> Callable[..., object]:
-    """Lift an operation to null-propagating, same-dtype, checked-I64 arithmetic."""
+    """Lift arithmetic rules; e.g. an addition wrapper maps ``(2, 3)`` to ``5``."""
     def apply(left: object, right: object, mutations: Mutations) -> object:
+        """Apply the lifted operation; e.g. adding ``2`` and ``3`` returns ``5``."""
         if left is None or right is None:
             return None
         same_dtype(left, right, mutations)
@@ -81,7 +82,7 @@ def arithmetic(operation: Callable[[object, object], object]) -> Callable[..., o
 
 
 def ieee_div(left: float, right: float) -> float:
-    """IEEE 754 division, including zero divisors; Python's own division raises instead."""
+    """Apply IEEE 754 division; e.g. ``ieee_div(1.0, 0.0)`` returns infinity."""
     if right == 0.0:
         if left == 0.0 or math.isnan(left):
             return math.nan
@@ -90,7 +91,7 @@ def ieee_div(left: float, right: float) -> float:
 
 
 def div(left: object, right: object, mutations: Mutations) -> object:
-    """Convert each operand to F64 with ties-to-even, then divide (D14)."""
+    """Convert to F64 before division; e.g. ``div(5, 2)`` returns ``2.5``."""
     if left is None or right is None:
         return None
     if 'exact-quotient-div' in mutations and type(left) is int and type(right) is int and right != 0:
@@ -99,7 +100,7 @@ def div(left: object, right: object, mutations: Mutations) -> object:
 
 
 def integer_quotient(left: object, right: object, mutations: Mutations) -> tuple[int, int] | None:
-    """Return the truncating quotient and remainder; zero and MIN/-1 fail."""
+    """Return quotient and remainder; e.g. ``integer_quotient(-7, 2)`` gives ``(-3, -1)``."""
     if left is None or right is None:
         return None
     require(type(left) is int and type(right) is int, 'idiv and rem take I64 operands')
@@ -125,8 +126,9 @@ def rem(left: object, right: object, mutations: Mutations) -> object:
 
 
 def extremum(pick_left: Callable[[object, object], bool], zero_sign: float) -> Callable[..., object]:
-    """Build IEEE 754-2019 minimum or maximum: null first, then NaN, then signed-zero ties (D09)."""
+    """Build an IEEE extremum; e.g. minimum of ``-0.0`` and ``+0.0`` is ``-0.0``."""
     def apply(left: object, right: object, mutations: Mutations) -> object:
+        """Apply the extremum rule; e.g. null paired with a value returns null."""
         if left is None or right is None:
             return None
         same_dtype(left, right, mutations)
@@ -142,8 +144,9 @@ def extremum(pick_left: Callable[[object, object], bool], zero_sign: float) -> C
 
 
 def kleene(table: Callable[[bool, bool], bool], absorbing: bool | None) -> Callable[..., object]:
-    """Build three-valued logic; an absorbing operand decides the result even beside unknown."""
+    """Build three-valued logic; e.g. false AND unknown is false."""
     def apply(left: object, right: object, mutations: Mutations) -> object:
+        """Apply the truth table; e.g. false AND unknown returns false."""
         if 'two-valued-logic' in mutations:
             left, right = bool(left), bool(right)
         require(all(value is None or type(value) is bool for value in (left, right)), 'logic takes Bool operands')
@@ -169,7 +172,7 @@ BINARY: dict[str, Callable[..., object]] = {
 
 
 def cast(value: object, target: str) -> object:
-    """Convert explicitly (V031): Bool to 0/1, I64 to F64 with ties-to-even, checked F64 to I64."""
+    """Convert explicitly; e.g. ``cast(True, 'I64')`` returns ``1``."""
     if value is None or dtype(value) == target:
         return value
     if target == 'Bool':
@@ -198,7 +201,9 @@ AGGREGATES: dict[str, tuple[str, Callable[[str], object] | None]] = {
 
 
 def right_reduce(name: str, values: list, mutations: Mutations) -> object:
-    """Reduce with exact right association; a singleton passes through unchanged."""
+    """Reduce with exact right association; e.g. sub over [10, 3, 2] yields 9."""
+    if not values:
+        raise SemanticFailure('EmptyReduction')
     operation = BINARY[name]
     if 'left-reduce' in mutations:
         result = values[0]
@@ -211,22 +216,33 @@ def right_reduce(name: str, values: list, mutations: Mutations) -> object:
     return result
 
 
+def left_fold(name: str, values: list, mutations: Mutations) -> object:
+    """Fold with left association; e.g. sub over [10, 3, 2] yields 5."""
+    if not values:
+        raise SemanticFailure('EmptyReduction')
+    operation = BINARY[name]
+    result = values[0]
+    for value in values[1:]:
+        result = operation(result, value, mutations)
+    return result
+
+
 def null_policy(values: list, skip_nulls: bool) -> list | None:
-    """Apply the aggregate null policy first: propagate by default, or drop invalid values in order."""
+    """Apply aggregate null policy; e.g. skip mode turns ``[1, None]`` into ``[1]``."""
     if skip_nulls:
         return [value for value in values if value is not None]
     return None if any(value is None for value in values) else values
 
 
 def checked_identity(identity: object, element_dtype: str) -> object:
-    """Require an explicit identity to match the output dtype."""
+    """Require identity dtype agreement; e.g. ``checked_identity(0, 'I64')`` returns ``0``."""
     if dtype(identity) != element_dtype:
         raise SemanticFailure('IdentityDtype')
     return identity
 
 
 def empty_result(name: str, case: dict, mutations: Mutations) -> object:
-    """Return an aggregate's empty-lane result; identities are never seeds."""
+    """Return an empty aggregate result; e.g. an empty I64 sum is ``0``."""
     if 'identity' in case:
         return checked_identity(decode(case['identity']), 'F64' if name == 'mean' else case['dtype'])
     if name == 'mean':
@@ -238,7 +254,7 @@ def empty_result(name: str, case: dict, mutations: Mutations) -> object:
 
 
 def aggregate(name: str, case: dict, mutations: Mutations) -> object:
-    """Evaluate one whole-cell aggregate (V058 to V064) over a rank-one input."""
+    """Evaluate a whole-cell aggregate; e.g. ``sum([1, 2])`` returns ``3``."""
     if 'identity' in case:
         checked_identity(decode(case['identity']), 'F64' if name == 'mean' else case['dtype'])
     values = null_policy(decode(case['input']), case.get('skip_nulls', False))
@@ -284,23 +300,23 @@ def variance(case: dict, mutations: Mutations) -> object:
 
 
 def mean_count(case: dict, mutations: Mutations) -> object:
-    """Admit a mean count up to and including 2^53, the exact count-conversion range (D09)."""
+    """Admit exactly representable counts; e.g. ``2**53`` passes and ``2**53 + 1`` fails."""
     if case['count'] > MEAN_COUNT_LIMIT:
         raise SemanticFailure('CountTooLarge')
     return True
 
 
 def batch_axis(case: dict, mutations: Mutations) -> object:
-    """Treat each typed cell as one element (D10): cardinality excludes components, axes index the frame."""
+    """Count frame elements; e.g. shape ``[2, 3]`` has cardinality ``6``."""
     shape = case['shape']
     rank = len(shape) + (1 if 'cell-flattening' in mutations else 0)
-    if case['axis'] >= rank:
+    if not 0 <= case['axis'] < rank:
         raise SemanticFailure('AxisOutOfRange')
     return math.prod(shape)
 
 
 def atomic_commit(case: dict, mutations: Mutations) -> object:
-    """Return the destination after a commit; failure before commit leaves it unchanged (D10)."""
+    """Commit all output or none; e.g. pre-commit failure preserves the destination."""
     destination, output, fail_at = list(case['destination']), case['output'], case['fail_at']
     if fail_at is None:
         return list(output)
@@ -310,13 +326,15 @@ def atomic_commit(case: dict, mutations: Mutations) -> object:
 
 
 def evaluate_contract(case: dict, mutations: Mutations = frozenset()) -> object:
-    """Evaluate one contract example; e.g. {'operation': 'idiv', 'args': [-7, 2]} gives -3."""
+    """Evaluate one contract case; e.g. ``idiv(-7, 2)`` gives ``-3``."""
     operation = case['operation']
     if operation in BINARY:
         left, right = decode(case['args'])
         return BINARY[operation](left, right, mutations)
     if operation == 'reduce':
         return right_reduce(case['binary'], decode(case['input']), mutations)
+    if operation == 'fold_left':
+        return left_fold(case['binary'], decode(case['input']), mutations)
     if operation == 'cast':
         return cast(decode(case['input']), case['to'])
     if operation in {'variance', 'stddev'}:
@@ -329,7 +347,7 @@ def evaluate_contract(case: dict, mutations: Mutations = frozenset()) -> object:
 
 
 def outcome(case: dict, mutations: Mutations = frozenset()) -> object:
-    """Return an encoded result or {'error': name}, so outcomes compare exactly."""
+    """Encode result or error; e.g. division by zero gives ``{'error': 'DivisionByZero'}``."""
     try:
         return encode(evaluate_contract(case, mutations))
     except SemanticFailure as error:
@@ -337,14 +355,29 @@ def outcome(case: dict, mutations: Mutations = frozenset()) -> object:
 
 
 def expected_outcome(case: dict) -> object:
-    """Normalize a case's expectation to the shape `outcome` returns."""
+    """Normalize a recorded expectation; e.g. an expected error becomes its error mapping."""
     if 'expected_error' in case:
         return {'error': case['expected_error']}
     return encode(decode(case['expected']))
 
 
 def check_contract_examples(context: ValidationContext) -> None:
-    """Evaluate every contract example and require each to match its expectation."""
+    """Evaluate every contract example against its recorded expectation.
+
+    Parameters
+    ----------
+    context : ValidationContext
+        Repository root and cached specification documents.
+
+    Raises
+    ------
+    AssertionError
+        If an example is duplicated, malformed, or differs from the model.
+
+    Examples
+    --------
+    A mismatched EX record fails validation with its identifier.
+    """
     cases = context.load('spec/examples.json')['contract_cases']
     ids = [case['id'] for case in cases]
     require(len(ids) == len(set(ids)), 'Duplicate contract example ID')

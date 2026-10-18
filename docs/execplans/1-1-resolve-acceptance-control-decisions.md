@@ -319,16 +319,34 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   until an accepted D05 supersession and validated task 4.3.3 closure are both
   present.
 - [x] (2026-10-11) `EP-M3` Task 1.1.2: semantic and macro contract records
-  (branch `1-1-semantic-contracts`, stacked on `EP-M2`). Evidence: ADR-0006 and
-  ADR-0007 accepted; D08, D09, D10, and D14 accepted with session references
-  (D08 and D09 share one answer); `spec/semantic-contracts.json` holds `SC-01`
-  to `SC-10` with 51 handwritten tagged-scalar examples (`EX21` to `EX71`) and
-  a 28-entry `comb!` corpus (`G01` to `G28`); 29 catalogue contracts cite their
-  records; seven superseded names are excluded; 211 `unittest` cases pass,
-  including 26 new ones (VO-8 to VO-10 negative controls, four Hypothesis
-  properties, and the ADR-0007 table agreement); every seeded mutation changes
-  at least one outcome; the recognizer is 198 lines; task 1.1.2 ticked and
-  backed.
+  (branch `1-1-semantic-contracts`, stacked on `EP-M2`). At the 2026-10-11
+  snapshot, ADR-0006 and ADR-0007 accepted; D08, D09, D10, and D14 accepted
+  with session references (D08 and D09 share one answer);
+  `spec/semantic-contracts.json` holds `SC-01` to `SC-10` with 51 handwritten
+  tagged-scalar examples (`EX21` to `EX71`) and a 28-entry `comb!` corpus
+  (`G01` to `G28`); 29 catalogue contracts cite their records; seven superseded
+  names are excluded; 211 `unittest` cases pass, including 26 new ones (VO-8 to
+  VO-10 negative controls, four Hypothesis properties, and the ADR-0007 table
+  agreement); every seeded mutation changes at least one outcome; the
+  recognizer is 198 lines; task 1.1.2 ticked and backed.
+- [ ] (2026-10-18) Current-head review follow-up: preserve the 10/11 evidence
+  above as a dated historical snapshot. Reconcile contract coverage for empty
+  reductions, negative axes, mixed-dtype arithmetic, and pipeline arguments;
+  correct tagged wide integers and traceability; add bounded properties for
+  variance and atomic commit; and update documentation models and their API
+  examples. The current candidate has 68 tagged-scalar examples and 29 grammar
+  corpus entries. It measures 24 authored files, 3,991 additions, and 131
+  deletions (3,860 net lines) against `origin/1-1-governance-decisions`,
+  excluding regenerated language-reference and validation-result tables. The
+  final local sequence passed: `make check-fmt`, `make lint`, `make typecheck`,
+  `make test` (329 passed, one skipped, one doctest passed),
+  `make markdownlint` (including spelling), `make nixie`, and
+  `make design-check BASE_REV=origin/main` (290 unittest, 49 pytest). The
+  initial preflight lacked `llvm-tools-preview`; `make install-build-tools`
+  restored the pinned component. Design-check then caught a negative-control
+  test routed to the semantic checker instead of the grammar checker; the test
+  now calls `check_macro_grammar` with the mutated corpus. Hosted CI and review
+  equilibrium remain pending.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.

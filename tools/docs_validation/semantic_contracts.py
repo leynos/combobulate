@@ -30,20 +30,73 @@ REQUIRED_MACRO_FORMS = {
 
 
 def catalogue_names(entry: dict) -> set[str]:
-    """Return an entry's names without Markdown code marks; e.g. '`comb!`' gives {'comb!'}."""
+    """Return catalogue names without Markdown code marks.
+
+    Parameters
+    ----------
+    entry : dict
+        Vocabulary entry containing a slash-separated ``name`` field.
+
+    Returns
+    -------
+    set[str]
+        Normalized names suitable for comparison with excluded names.
+
+    Examples
+    --------
+    ``'`comb!` / `verb!`'`` yields ``{'comb!', 'verb!'}``.
+    """
     names = {name.strip(' `') for name in entry['name'].split('/')}
     return {re.sub(r'^(\.[A-Za-z_]\w*)\s*\(.*\)$', r'\1', name) for name in names}
 
 
 def check_excluded_names(register: dict, catalogue: list[dict]) -> None:
-    """Reject a superseded name reappearing as a catalogue name (VO-10)."""
+    """Reject a superseded name if it reappears in the catalogue.
+
+    Parameters
+    ----------
+    register : dict
+        Contract register with its ``excluded_names`` list.
+    catalogue : list[dict]
+        Current vocabulary entries.
+
+    Raises
+    ------
+    AssertionError
+        If an excluded name appears in the current vocabulary.
+
+    Examples
+    --------
+    A catalogue containing ``cells`` fails when that name is excluded.
+    """
     names = set().union(*(catalogue_names(entry) for entry in catalogue))
     for excluded in register['excluded_names']:
         require(excluded['name'] not in names, f"Excluded name {excluded['name']} appears in the catalogue")
 
 
 def mutation_changes(record: dict, mutation: str, cases: dict[str, dict], grammar: dict) -> bool:
-    """Report whether one seeded mutation changes any of a record's example outcomes."""
+    """Check that a seeded mutation changes one recorded outcome.
+
+    Parameters
+    ----------
+    record : dict
+        Contract record naming examples to compare.
+    mutation : str
+        Seeded change to apply to the model.
+    cases : dict[str, dict]
+        Example and grammar corpus indexed by identifier.
+    grammar : dict
+        Precedence document used by grammar examples.
+
+    Returns
+    -------
+    bool
+        Whether any selected example differs under the mutation.
+
+    Examples
+    --------
+    Floor division changes the recorded outcome of ``idiv(-7, 2)``.
+    """
     changed = False
     for example in record['examples']:
         if example.startswith('G'):
@@ -55,7 +108,24 @@ def mutation_changes(record: dict, mutation: str, cases: dict[str, dict], gramma
 
 
 def check_record(record: dict, context: dict) -> None:
-    """Check one record's links, examples, mutations, and discharge targets."""
+    """Check one record's decisions, links, examples, mutations, and proof targets.
+
+    Parameters
+    ----------
+    record : dict
+        Semantic contract record under validation.
+    context : dict
+        Resolved decisions, catalogue, examples, errors, tasks, and components.
+
+    Raises
+    ------
+    AssertionError
+        If any referenced artefact is missing or violates the record.
+
+    Examples
+    --------
+    An unknown catalogue identifier is rejected with the contract ID.
+    """
     rid = record['id']
     decision = context['decisions'].get(record['decision'])
     require(decision is not None and decision['lifecycle'] == 'accepted', f'{rid} cites a decision that is not accepted')
@@ -65,6 +135,19 @@ def check_record(record: dict, context: dict) -> None:
         require(rid in entry['contract'], f'Catalogue entry {catalogue_id} must cite {rid} in its contract')
     for relation in record['error_relation']:
         require(relation['error'] in context['error_codes'], f"{rid} uses unregistered error {relation['error']}")
+    if rid == 'SC-01':
+        require(any(relation['error'] == 'EmptyReduction'
+                    and 'reduce' in relation['condition'] and 'fold_left' in relation['condition']
+                    for relation in record['error_relation']),
+                'SC-01 must register EmptyReduction for empty reduce and fold_left lanes')
+    if rid == 'SC-04':
+        required_catalogue_ids = {'V001', 'V002', 'V003', 'V031'}
+        require(required_catalogue_ids <= set(record['catalogue_ids']),
+                'SC-04 must cite add, sub, mul, and cast catalogue entries')
+    if rid == 'SC-08':
+        require(any(relation['error'] == 'AxisOutOfRange' and 'negative' in relation['condition'].lower()
+                    for relation in record['error_relation']),
+                'SC-08 must register rejection of negative axes')
     for example in record['examples']:
         case = context['cases'].get(example)
         require(case is not None, f'{rid} cites unknown example {example}')
@@ -80,7 +163,24 @@ def check_record(record: dict, context: dict) -> None:
 
 
 def check_semantic_contracts(context: ValidationContext) -> None:
-    """Validate the contract register against its schema and every artefact it cites."""
+    """Validate contract records against their schema and cited artefacts.
+
+    Parameters
+    ----------
+    context : ValidationContext
+        Repository root and cached JSON documents for this validation run.
+
+    Raises
+    ------
+    AssertionError
+        If contract links or executable witnesses disagree.
+    jsonschema.ValidationError
+        If a record violates the Draft 2020-12 schema.
+
+    Examples
+    --------
+    An unregistered error code fails validation before evidence is recorded.
+    """
     register = context.load('spec/semantic-contracts.json')
     Draft202012Validator(context.load('spec/semantic-contract.schema.json')).validate(register)
     ids = [record['id'] for record in register['contracts']]
@@ -110,7 +210,22 @@ def check_semantic_contracts(context: ValidationContext) -> None:
 
 
 def adr_precedence(text: str) -> list[tuple[list[str], str]]:
-    """Read the ADR-0007 precedence table rows as (operators, associativity), strongest first."""
+    """Read ADR-0007 precedence rows strongest first.
+
+    Parameters
+    ----------
+    text : str
+        Full ADR-0007 Markdown source.
+
+    Returns
+    -------
+    list[tuple[list[str], str]]
+        Operator groups paired with their associativity.
+
+    Examples
+    --------
+    The first returned row contains the strongest operator level.
+    """
     section = text.split('## Operator precedence', 1)[1].split('\n## ', 1)[0]
     rows = [re.split(r'(?<!\\)\|', line)[1:-1] for line in section.splitlines() if line.startswith('|') and '`' in line]
     return [([op.replace('\\|', '|') for op in re.findall(r'`([^`]+)`', cells[1])], cells[2].strip().lower())
@@ -118,7 +233,22 @@ def adr_precedence(text: str) -> list[tuple[list[str], str]]:
 
 
 def check_macro_grammar(context: ValidationContext) -> None:
-    """Require the corpus to parse as recorded, cover every rule, and agree with ADR-0007 (VO-9)."""
+    """Validate grammar forms, examples, coverage, and ADR agreement.
+
+    Parameters
+    ----------
+    context : ValidationContext
+        Repository root and cached specification documents.
+
+    Raises
+    ------
+    AssertionError
+        If a corpus parse, rule-coverage, production, or precedence check fails.
+
+    Examples
+    --------
+    Removing the pipeline-argument witness fails the grammar coverage check.
+    """
     grammar = context.load('spec/macro-grammar.json')
     forms = {form['name']: (form['production'], form['catalogue_id']) for form in grammar['forms']}
     require(len(forms) == len(grammar['forms']), 'Macro grammar form names must be unique')
@@ -130,7 +260,8 @@ def check_macro_grammar(context: ValidationContext) -> None:
         require(getattr(actual, 'tree', getattr(actual, 'rule', None)) == expected,
                 f"Grammar corpus {entry['id']} expected {expected}, got {actual}")
     covered = {tag for entry in grammar['corpus'] for tag in entry['covers']}
-    required = {level['name'] for level in grammar['precedence']} | {rule['rule'] for rule in grammar['rejections']}
+    required = ({level['name'] for level in grammar['precedence']}
+                | {rule['rule'] for rule in grammar['rejections']} | {'pipeline-argument'})
     require(required <= covered, f"Grammar corpus misses {', '.join(sorted(required - covered))}")
     adr = (context.root / 'docs/adrs/adr-0007-comb-macro-grammar-and-staging.md').read_text(encoding='utf-8')
     grammar_section = adr.split('```plaintext', 1)[1].split('```', 1)[0]
@@ -169,6 +300,6 @@ def check_macro_grammar(context: ValidationContext) -> None:
     table = [(level['operators'], level['associativity']) for level in grammar['precedence']]
     require(adr_precedence(adr) == table, 'spec/macro-grammar.json disagrees with the ADR-0007 precedence table')
     context.record('macro-grammar', 'The comb! corpus parses as recorded in the documentation model, covers every '
-                                    'precedence level and rejection rule, and agrees with ADR-0007. The published '
-                                    'array! literal also derives from the recorded productions. Task 2.3.1 replays '
-                                    'the comb! corpus through trybuild.', len(grammar['corpus']))
+                                    'precedence level and rejection rule plus pipeline call arguments, and agrees '
+                                    'with ADR-0007. The published array! literal also derives from the recorded '
+                                    'productions. Task 2.3.1 replays the corpus through trybuild.', len(grammar['corpus']))

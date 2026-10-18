@@ -37,15 +37,15 @@
     },
     {
       "name": ".pipe",
-      "reason": "A .pipe accepting every descriptor was superseded by the application protocol (context.md §6)."
+      "reason": "A .pipe accepting every descriptor was superseded by the application protocol (context.md \u00a76)."
     },
     {
       "name": "&&",
-      "reason": "Array && is rejected; & is elementwise logic (technical design §7)."
+      "reason": "Array && is rejected; & is elementwise logic (technical design \u00a77)."
     },
     {
       "name": "||",
-      "reason": "Array || is rejected; | is elementwise logic (technical design §7)."
+      "reason": "Array || is rejected; | is elementwise logic (technical design \u00a77)."
     }
   ],
   "contracts": [
@@ -78,6 +78,10 @@
         {
           "condition": "An explicit axis reduction is applied to a rank-zero value.",
           "error": "AxisOutOfRange"
+        },
+        {
+          "condition": "An empty reduce or fold_left lane has no registered or explicit identity.",
+          "error": "EmptyReduction"
         }
       ],
       "mutation_frame": "Pure: no input, destination, or host state is modified.",
@@ -85,7 +89,9 @@
       "empty_rule": "Empty reduce and fold_left lanes use only a registered or explicit identity, else EmptyReduction; empty scans return an empty lane without applying f.",
       "examples": [
         "EX21",
-        "EX22"
+        "EX22",
+        "EX84",
+        "EX85"
       ],
       "seeded_mutations": [
         {
@@ -165,7 +171,8 @@
       ],
       "discharged_by": [
         "PF07.proof@2.2.2",
-        "PF07.proof@2.2.3"
+        "PF07.proof@2.2.3",
+        "PF07.proof@2.2.4"
       ],
       "proof_sketch": "Verus: prove lemma_identity_only_on_empty(s, id): s.len() > 0 implies aggregate_with_identity(s, id) == aggregate(s), and s.len() == 0 implies it equals id. Kani: harnesses over symbolic lanes of length 0 to 3 assert the registered identities and that an identity never changes a nonempty result, with cover!() for each length."
     },
@@ -220,6 +227,8 @@
       "decision": "D07",
       "catalogue_ids": [
         "V001",
+        "V002",
+        "V003",
         "V031"
       ],
       "preconditions": [
@@ -265,7 +274,9 @@
         "EX44",
         "EX45",
         "EX46",
-        "EX47"
+        "EX47",
+        "EX87",
+        "EX88"
       ],
       "seeded_mutations": [
         {
@@ -406,6 +417,7 @@
       ],
       "discharged_by": [
         "PF07.proof@2.2.2",
+        "PF07.proof@2.2.4",
         "PF07.proof@6.2.1"
       ],
       "proof_sketch": "Verus: specify ieee_minimum over f64 bit patterns with explicit NaN and signed-zero cases and prove the executable refines it for nullable operands. Kani: a harness over symbolic f64 pairs asserts NaN propagation, the signed-zero ordering, and null precedence, with cover!() for each case, and a negative control in which f64::min (minNum) is rejected."
@@ -426,7 +438,7 @@
       ],
       "error_relation": [
         {
-          "condition": "An axis at or beyond the frame rank.",
+          "condition": "An axis is negative or at or beyond the frame rank.",
           "error": "AxisOutOfRange"
         }
       ],
@@ -435,7 +447,8 @@
       "empty_rule": "A frame with a zero extent has cardinality zero.",
       "examples": [
         "EX68",
-        "EX69"
+        "EX69",
+        "EX86"
       ],
       "seeded_mutations": [
         {

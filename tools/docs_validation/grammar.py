@@ -47,7 +47,27 @@ class Node:
 
 
 def tokenize(source: str) -> list[str]:
-    """Split source into tokens; a `host { ... }` block becomes one opaque 'host' token."""
+    """Split a source string into DSL tokens, treating a host block as one token.
+
+    Parameters
+    ----------
+    source : str
+        Expression text from the grammar corpus.
+
+    Returns
+    -------
+    list[str]
+        Ordered tokens with host blocks represented by ``'host'``.
+
+    Raises
+    ------
+    Rejection
+        If the source contains an invalid token or an unclosed host block.
+
+    Examples
+    --------
+    ``tokenize('x + 1')`` returns ``['x', '+', '1']``.
+    """
     tokens, position = [], 0
     while position < len(source.rstrip()):
         match = TOKEN.match(source, position)
@@ -73,9 +93,31 @@ class Parser:
         self.tokens, self.table, self.mutations, self.position = tokens, table, mutations, 0
 
     def peek(self) -> str | None:
+        """Return the next token without consuming it; e.g. ``['x']`` yields ``'x'``."""
         return self.tokens[self.position] if self.position < len(self.tokens) else None
 
     def take(self, expected: str | None = None) -> str:
+        """Consume the next token, optionally requiring a spelling.
+
+        Parameters
+        ----------
+        expected : str or None, optional
+            Required token spelling, when the caller needs one.
+
+        Returns
+        -------
+        str
+            The consumed token.
+
+        Raises
+        ------
+        Rejection
+            If input is exhausted or the token differs from ``expected``.
+
+        Examples
+        --------
+        ``take('(')`` consumes and returns ``'('`` when it is next.
+        """
         token = self.peek()
         if token is None or (expected is not None and token != expected):
             raise Rejection('syntax')
@@ -83,7 +125,22 @@ class Parser:
         return token
 
     def arguments(self) -> list[str]:
-        """Parse call arguments; `&name` is a host reference such as rows(&centre)."""
+        """Parse a parenthesized argument list, including host references.
+
+        Returns
+        -------
+        list[str]
+            One tree per argument.
+
+        Raises
+        ------
+        Rejection
+            If an argument or closing parenthesis is malformed.
+
+        Examples
+        --------
+        ``rows(&centre)`` records its reference argument as ``(ref centre)``.
+        """
         self.take('(')
         items: list[str] = []
         while self.peek() != ')':
@@ -91,13 +148,14 @@ class Parser:
                 self.take()
                 items.append(f'(ref {self.take()})')
             else:
-                items.append(self.expression(0).tree)
+                items.append(self.pipeline().tree)
             if self.peek() == ',':
                 self.take()
         self.take(')')
         return items
 
     def atom(self) -> Node:
+        """Parse one operand; e.g. token ``x`` becomes a node with tree ``'x'``."""
         token = self.take()
         if token in {'|', '||'}:
             raise Rejection('closure-outside-host')
@@ -117,7 +175,27 @@ class Parser:
         return Node(token)
 
     def postfix(self, node: Node) -> Node:
-        """Apply method calls; e.g. x.sum().axis(1)."""
+        """Apply any method calls that follow an operand.
+
+        Parameters
+        ----------
+        node : Node
+            Initial receiver expression.
+
+        Returns
+        -------
+        Node
+            Receiver wrapped in each method call.
+
+        Raises
+        ------
+        Rejection
+            If a method name or argument list is malformed.
+
+        Examples
+        --------
+        ``x.sum().axis(1)`` produces two nested method nodes.
+        """
         while self.peek() == '.':
             self.take()
             name = self.take()
@@ -125,7 +203,22 @@ class Parser:
         return node
 
     def operator(self) -> tuple[str, int, str] | None:
-        """Return the next binary operator with its level and associativity, or reject it by rule."""
+        """Read the next operator and its precedence metadata.
+
+        Returns
+        -------
+        tuple[str, int, str] or None
+            Operator, binding level, and associativity, or ``None`` at a boundary.
+
+        Raises
+        ------
+        Rejection
+            If the next token is forbidden or absent from the precedence table.
+
+        Examples
+        --------
+        A configured ``+`` is returned with its left-associative binding.
+        """
         token = self.peek()
         if token is None or token in {')', ',', '|>'}:
             return None
@@ -140,7 +233,29 @@ class Parser:
         return (token, *self.table[token])
 
     def combine(self, op: str, left: Node, right: Node) -> Node:
-        """Build a binary node, enforcing the comparison rules of D08."""
+        """Build a binary tree node and enforce comparison constraints.
+
+        Parameters
+        ----------
+        op : str
+            Binary operator spelling.
+        left, right : Node
+            Parsed operands.
+
+        Returns
+        -------
+        Node
+            Parenthesized operator tree.
+
+        Raises
+        ------
+        Rejection
+            If comparison-chain or comparison-bitwise rules are violated.
+
+        Examples
+        --------
+        Combining ``a`` and ``b`` with ``+`` yields ``'(+ a b)'``.
+        """
         comparison = self.table.get(op, (0, ''))[1] == 'none'
         if comparison and 'allow-comparison-mix' not in self.mutations:
             if any(not side.grouped and side.op in BITWISE for side in (left, right)):
@@ -150,6 +265,27 @@ class Parser:
         return Node(f'({op} {left.tree} {right.tree})', op)
 
     def expression(self, minimum: int) -> Node:
+        """Parse operators whose binding level meets ``minimum``.
+
+        Parameters
+        ----------
+        minimum : int
+            Lowest operator binding level accepted at this recursion depth.
+
+        Returns
+        -------
+        Node
+            The parsed expression tree.
+
+        Raises
+        ------
+        Rejection
+            If an operand or operator is invalid under the grammar.
+
+        Examples
+        --------
+        ``a + b * c`` groups multiplication before addition.
+        """
         left = self.postfix(self.atom())
         while (found := self.operator()) is not None and found[1] >= minimum:
             op, level, associativity = found
@@ -159,7 +295,22 @@ class Parser:
         return left
 
     def pipeline(self) -> Node:
-        """Split on |> first: the lowest operator, left-associative unless mutated."""
+        """Parse pipeline stages after splitting at the lowest-precedence operator.
+
+        Returns
+        -------
+        Node
+            A left-associated pipeline unless the mutation requests otherwise.
+
+        Raises
+        ------
+        Rejection
+            If any stage is invalid.
+
+        Examples
+        --------
+        ``a |> b |> c`` becomes ``'(|> (|> a b) c)'``.
+        """
         stages = [self.expression(0)]
         while self.peek() == '|>':
             self.take()
@@ -176,7 +327,24 @@ class Parser:
 
 
 def precedence_table(grammar: dict, mutations: frozenset[str] = frozenset()) -> dict[str, tuple[int, str]]:
-    """Map each operator to (binding level, associativity); higher binds tighter."""
+    """Map each operator to its binding level and associativity.
+
+    Parameters
+    ----------
+    grammar : dict
+        Parsed macro grammar document.
+    mutations : frozenset[str], optional
+        Seeded deviations used to prove corpus sensitivity.
+
+    Returns
+    -------
+    dict[str, tuple[int, str]]
+        Operator bindings; larger levels bind more tightly.
+
+    Examples
+    --------
+    The table gives ``*`` a tighter binding level than ``+``.
+    """
     levels = [level for level in grammar['precedence'] if level['name'] not in {'unary', 'pipe'}]
     table = {op: (len(levels) - index, level['associativity'])
              for index, level in enumerate(levels) for op in level['operators']}
@@ -187,7 +355,26 @@ def precedence_table(grammar: dict, mutations: frozenset[str] = frozenset()) -> 
 
 
 def parse(source: str, grammar: dict, mutations: frozenset[str] = frozenset()) -> Parsed | Rejected:
-    """Recognize one corpus source; e.g. parse('a < b < c', grammar) is Rejected('comparison-chain')."""
+    """Recognize one source and return its tree or named rejection.
+
+    Parameters
+    ----------
+    source : str
+        Expression to recognize.
+    grammar : dict
+        Precedence and rejection rules from ``spec/macro-grammar.json``.
+    mutations : frozenset[str], optional
+        Seeded deviations used by negative controls.
+
+    Returns
+    -------
+    Parsed or Rejected
+        Parsed tree on acceptance, or the rule that rejected the source.
+
+    Examples
+    --------
+    A comparison chain returns ``Rejected('comparison-chain')``.
+    """
     try:
         parser = Parser(tokenize(source), precedence_table(grammar, mutations), mutations)
         tree = parser.pipeline().tree

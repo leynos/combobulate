@@ -380,6 +380,16 @@
       "covers": [
         "method"
       ]
+    },
+    {
+      "id": "G29",
+      "source": "f(a |> b)",
+      "expect": "accept",
+      "tree": "(call f (|> a b))",
+      "covers": [
+        "pipe",
+        "pipeline-argument"
+      ]
     }
   ],
   "forms": [
