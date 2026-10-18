@@ -5,10 +5,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: BLOCKED (the sponsor approved this revision for implementation on
-2026-10-11 by invoking the implementation workflow; `EP-M0`, `EP-M1a`,
-`EP-M1b`, and `EP-M2` implementation is complete, but the EP-M2 scope
-escalation awaits explicit sponsor confirmation; `EP-M3` is next)
+Status: IN_PROGRESS (the sponsor approved the EP-M2 scope exception on
+2026-10-18; `EP-M2` is ready to merge and `EP-M3` is next)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -478,6 +476,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   begin `EP-M3` until it is given. Evidence:
   [current-head completeness assessment](https://github.com/leynos/combobulate/pull/14#issuecomment-6235254133).
   Date/Author: 2026-10-17, implementing agent.
+- EP-M2 scope approval: the sponsor approved the documented exception of 27
+  scoped changed files and 1,104 net added lines on 2026-10-18. This exceeds
+  the 25-file trigger and remains below the 1,500-line ceiling. The approval
+  clears the scope-approval hold for merging PR #14. Evidence:
+  [sponsor approval in the review session](https://lody.ai/leynos/sessions/2c0cdbfb-b00b-4153-935a-908f717ebeb3).
+  Date/Author: 2026-10-18, sponsor approval; recorded by implementing agent.
 - Decision: the freeze check's result is printed, not recorded in
   `docs/validation-results.json`, so the committed report is identical with and
   without `BASE_REV`. Obligation components default to `PFnn.proof@<task>`
