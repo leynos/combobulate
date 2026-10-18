@@ -441,9 +441,9 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   bound was inaccurate. Added SC-11 and its PF07 task 2.2.4 component, examples
   and mutations; completed the five-form EBNF and SC-10 catalogue links;
   aligned the model and records; and corrected the termination bound. This
-  follow-up brings EP-M3 to about 3,100 net added lines, excluding generated
-  tables and reports, across 25 files. No Verus or Kani proof was run.
-  Date/Author: 2026-10-18, implementing agent.
+  follow-up brings EP-M3 to 3,184 net added lines across 24 authored files,
+  excluding the generated reference table and validation report. No Verus or
+  Kani proof was run. Date/Author: 2026-10-18, implementing agent.
 - Decision: `EP-M1b` milestone review dispositions. Fixed: completion
   artefacts must resolve inside the repository; the real-roadmap closure test
   runs the full check sequence so a tick that relies on a checker-sourced
