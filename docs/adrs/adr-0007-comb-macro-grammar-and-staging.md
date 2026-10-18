@@ -115,14 +115,24 @@ _Table 1: `comb!` operator precedence, strongest first._
 ## Consequences
 
 - `spec/macro-grammar.json` records all five macro forms and the corpus
-  (`G01` to `G28`), covering every precedence level and rejection rule; a
-  documentation-model recognizer checks it until task 2.3.1 replays every
-  expression entry as a `trybuild` pass or fail fixture.
+  (`G01` to `G29`), covering every precedence level, rejection rule, and
+  pipeline expression inside a call argument; a documentation-model recognizer
+  checks it until task 2.3.1 replays every expression entry as a `trybuild`
+  pass or fail fixture.
 - Seeded grammar mutations (swapped `*` and `+`, right-associative `|>`,
   accepted `&&`, allowed comparison mixing) each change at least one corpus
   outcome.
 - Token-level entries (`a|>b`, `a | > b`) are tagged `phase2_only`, because
   only the real token stream can distinguish joint from separate tokens.
+
+### Addendum (2026-10-18): corpus and `array!` correction
+
+The accepted corpus now contains `G01` to `G29`. `G29` records pipeline
+expressions inside call arguments, such as `f(a |> b)`. Review of the published
+`array!` example X003 found that the original production added an extra bracket
+pair around `array-literal`. The production now passes the `array!` wrapper
+directly to the recursive `array-literal` production, as recorded in commit
+`02ac5635faa823407ed1ed37e9fcfa00bbe05d37`.
 
 [^1]: The Rust Reference, "Expressions: Expression precedence",
     <https://doc.rust-lang.org/reference/expressions.html#expression-precedence>,
