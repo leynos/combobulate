@@ -56,10 +56,12 @@ class ContractRegister(unittest.TestCase):
     """VO-8: every record is complete and every link resolves; each fault has its own message."""
 
     def assert_rejected(self, name: str, document: dict, message: str) -> None:
+        """Require a replacement document to fail with its targeted message."""
         with self.assertRaisesRegex(AssertionError, message):
             run_with({name: document})
 
     def test_committed_register_passes(self):
+        """Require the committed semantic contract register to pass validation."""
         check_semantic_contracts(ValidationContext(ROOT))
 
     def test_composed_checker_records_semantic_contract_checks_once(self):
@@ -93,14 +95,17 @@ class ContractRegister(unittest.TestCase):
         validator.validate(register)
 
     def test_required_seeded_mutations_are_present(self):
+        """Require every planned semantic mutation to appear in a contract."""
         named = {mutation['id'] for entry in CONTRACTS['contracts'] for mutation in entry['seeded_mutations']}
         self.assertLessEqual(REQUIRED_MUTATIONS, named, 'every planned seeded mutation must be named by a record')
 
     def test_unknown_catalogue_entry_fails(self):
+        """Reject a contract that cites an unknown vocabulary entry."""
         register = contracts_with(lambda r: record(r, 'SC-03')['catalogue_ids'].append('V999'))
         self.assert_rejected('spec/semantic-contracts.json', register, 'SC-03 cites unknown catalogue entry V999')
 
     def test_catalogue_entry_must_cite_its_contract(self):
+        """Reject a catalogue record missing its required contract citation."""
         vocabulary = CONTEXT.load('spec/vocabulary.json')
         entry = next(item for item in vocabulary['entries'] if item['id'] == 'V005')
         entry['contract'] = entry['contract'].replace(' Contract: SC-03.', '')
@@ -132,34 +137,41 @@ class ContractRegister(unittest.TestCase):
                              'SC-08 must register rejection of negative axes')
 
     def test_unregistered_error_fails(self):
+        """Reject an error relation that names no registered error code."""
         register = contracts_with(lambda r: record(r, 'SC-03')['error_relation'].append(
             {'condition': 'Anything.', 'error': 'Oops'}))
         self.assert_rejected('spec/semantic-contracts.json', register, 'SC-03 uses unregistered error Oops')
 
     def test_example_owned_by_another_contract_fails(self):
+        """Reject an example cited by a contract other than its owner."""
         register = contracts_with(lambda r: record(r, 'SC-03')['examples'].append('EX21'))
         self.assert_rejected('spec/semantic-contracts.json', register, 'EX21 belongs to SC-01, not SC-03')
 
     def test_uncited_example_fails(self):
+        """Reject an example that no semantic contract cites."""
         register = contracts_with(lambda r: record(r, 'SC-03')['examples'].remove('EX37'))
         self.assert_rejected('spec/semantic-contracts.json', register, 'Contract examples cited by no record: EX37')
 
     def test_vacuous_mutation_fails(self):
+        """Reject a seeded mutation that changes no example outcome."""
         register = contracts_with(lambda r: record(r, 'SC-03')['seeded_mutations'].append(
             {'id': 'no-op', 'description': 'Changes nothing.'}))
         self.assert_rejected('spec/semantic-contracts.json', register, 'Seeded mutation no-op changes no outcome of SC-03')
 
     def test_unknown_discharge_target_fails(self):
+        """Reject a contract that cites an unknown proof obligation."""
         register = contracts_with(lambda r: record(r, 'SC-03')['discharged_by'].append('PF07.proof@9.9.9'))
         self.assert_rejected('spec/semantic-contracts.json', register, 'SC-03 is discharged by unknown PF07.proof@9.9.9')
 
     def test_contract_needs_an_accepted_decision(self):
+        """Reject a contract that cites a decision which is not accepted."""
         decisions = CONTEXT.load('spec/decisions.json')
         entry = next(item for item in decisions['decisions'] if item['id'] == 'D14')
         entry['lifecycle'] = 'proposed'
         self.assert_rejected('spec/decisions.json', decisions, 'SC-05 cites a decision that is not accepted')
 
     def test_superseded_name_cannot_return_to_the_catalogue(self):
+        """Reject vocabulary entries that restore names marked superseded."""
         for name, normalized in (('cells', 'cells'), ('.pipe(f)', '.pipe')):
             with self.subTest(name=name):
                 vocabulary = CONTEXT.load('spec/vocabulary.json')
@@ -169,6 +181,7 @@ class ContractRegister(unittest.TestCase):
                                      f'Excluded name {normalized} appears in the catalogue')
 
     def test_macro_grammar_covers_all_five_public_forms(self):
+        """Require grammar validation for each public macro form."""
         check_macro_grammar(ValidationContext(ROOT))
 
     def test_macro_grammar_requires_pipeline_argument_coverage(self):
@@ -183,6 +196,7 @@ class ContractRegister(unittest.TestCase):
                 check_macro_grammar(context)
 
     def test_macro_grammar_rejects_a_missing_public_form_production(self):
+        """Reject ADR grammar text that omits a supported public production."""
         source = (ROOT / 'docs/adrs/adr-0007-comb-macro-grammar-and-staging.md').read_text(encoding='utf-8')
         source = source.replace(
             'host-block    = "host" , "{" , rust-token-tree , "}" ;        (* host Rust, evaluated once *)\n', '', 1)
@@ -201,13 +215,16 @@ class TaggedScalars(unittest.TestCase):
     """Tagged encoding keeps signed zeros, NaN payloads, and wide integers distinct."""
 
     def test_signed_zeros_stay_distinct(self):
+        """Preserve different encodings for negative and positive zero."""
         self.assertNotEqual(encode(-0.0), encode(0.0), 'negative and positive zero must not compare equal')
 
     def test_nan_round_trips_by_bits(self):
+        """Preserve a tagged NaN payload through decode and encode."""
         tagged = {'f64_bits': '0x7ff8000000000001'}
         self.assertEqual(encode(decode(tagged)), tagged, 'a NaN payload must survive decoding and encoding')
 
     def test_wide_integer_round_trips(self):
+        """Decode the minimum signed integer without losing precision."""
         self.assertEqual(decode({'i64': '-9223372036854775808'}), -(2**63), 'I64::MIN must decode exactly')
 
 
@@ -222,6 +239,7 @@ class ContractProperties(unittest.TestCase):
     @GENERATED
     @given(I64, I64.filter(lambda value: value != 0))
     def test_truncating_division_identity(self, left, right):
+        """Check quotient identity, remainder magnitude, and sign for I64 pairs."""
         try:
             quotient = evaluate_contract({'operation': 'idiv', 'args': [left, right]})
         except SemanticFailure:
@@ -235,6 +253,7 @@ class ContractProperties(unittest.TestCase):
     @GENERATED
     @given(st.floats(allow_nan=False), st.floats(allow_nan=False))
     def test_ieee_minimum_is_commutative_and_ordered(self, left, right):
+        """Check bitwise commutativity and ordering for IEEE minimum."""
         first = evaluate_contract({'operation': 'min', 'args': [encode(left), encode(right)]})
         second = evaluate_contract({'operation': 'min', 'args': [encode(right), encode(left)]})
         self.assertEqual(bits(first), bits(second), 'minimum is commutative bit for bit, signed zeros included')
@@ -243,6 +262,7 @@ class ContractProperties(unittest.TestCase):
     @GENERATED
     @given(st.floats(allow_nan=False))
     def test_nan_propagates_through_minimum_and_maximum(self, value):
+        """Require both IEEE extrema to propagate a NaN operand."""
         nan = {'f64_bits': '0x7ff8000000000000'}
         for operation in ('min', 'max'):
             result = evaluate_contract({'operation': operation, 'args': [encode(value), nan]})
@@ -251,6 +271,7 @@ class ContractProperties(unittest.TestCase):
     @GENERATED
     @given(I64)
     def test_i64_to_f64_round_trip_is_exact_below_two_to_the_53(self, value):
+        """Require I64 values in the exact range to survive an F64 round trip."""
         converted = evaluate_contract({'operation': 'cast', 'input': value, 'to': 'F64'})
         if abs(value) <= 2**53:
             back = evaluate_contract({'operation': 'cast', 'input': encode(converted), 'to': 'I64'})
@@ -306,6 +327,7 @@ class ContractProperties(unittest.TestCase):
                          'failure before output commit preserves the complete original destination')
 
     def test_every_contract_example_matches_its_expectation(self):
+        """Require model outcomes to match every tagged contract example."""
         for case in CONTEXT.load('spec/examples.json')['contract_cases']:
             with self.subTest(case=case['id']):
                 expected = {'error': case['expected_error']} if 'expected_error' in case else encode(
@@ -314,6 +336,7 @@ class ContractProperties(unittest.TestCase):
                                 'the documentation model must reproduce the typed example')
 
     def test_large_finite_deviations_overflow_to_ieee_infinity(self):
+        """Preserve IEEE infinity when finite squared deviations overflow."""
         cases = {case['id']: case for case in CONTEXT.load('spec/examples.json')['contract_cases']}
         for example_id in ('EX82', 'EX83'):
             with self.subTest(example=example_id):
@@ -343,6 +366,7 @@ class ContractProperties(unittest.TestCase):
                                  'add, sub, and mul must reject implicit dtype promotion')
 
     def test_contract_example_rejects_bool_integer_expectation_coercion(self):
+        """Reject a Boolean result when an integer expectation is recorded."""
         examples = copy.deepcopy(CONTEXT.load('spec/examples.json'))
         next(case for case in examples['contract_cases'] if case['id'] == 'EX26')['expected'] = 0
         context = ValidationContext(ROOT)

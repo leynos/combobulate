@@ -334,19 +334,20 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   reductions, negative axes, mixed-dtype arithmetic, and pipeline arguments;
   correct tagged wide integers and traceability; add bounded properties for
   variance and atomic commit; and update documentation models and their API
-  examples. The current candidate has 68 tagged-scalar examples and 29 grammar
-  corpus entries. It measures 24 authored files, 3,991 additions, and 131
-  deletions (3,860 net lines) against `origin/1-1-governance-decisions`,
-  excluding regenerated language-reference and validation-result tables. The
-  final local sequence passed: `make check-fmt`, `make lint`, `make typecheck`,
-  `make test` (329 passed, one skipped, one doctest passed),
-  `make markdownlint` (including spelling), `make nixie`, and
-  `make design-check BASE_REV=origin/main` (290 unittest, 49 pytest). The
-  initial preflight lacked `llvm-tools-preview`; `make install-build-tools`
-  restored the pinned component. Design-check then caught a negative-control
-  test routed to the semantic checker instead of the grammar checker; the test
-  now calls `check_macro_grammar` with the mutated corpus. Hosted CI and review
-  equilibrium remain pending.
+  examples. The current candidate has 11 semantic contracts (`SC-01` to
+  `SC-11`); 37 catalogue entries cite one or more contracts; 68 tagged-scalar
+  examples (`EX21` to `EX88`); and 29 grammar corpus entries (`G01` to `G29`).
+  It measures 24 authored files, 4,026 additions, and 131 deletions (3,895 net
+  lines) against `origin/1-1-governance-decisions`, excluding regenerated
+  language-reference and validation-result tables. The final local sequence
+  passed: `make check-fmt`, `make lint`, `make typecheck`, `make test` (329
+  passed, one skipped, one doctest passed), `make markdownlint` (including
+  spelling), `make nixie`, and `make design-check BASE_REV=origin/main` (290
+  unittest, 49 pytest). The initial preflight lacked `llvm-tools-preview`;
+  `make install-build-tools` restored the pinned component. Design-check then
+  caught a negative-control test routed to the semantic checker instead of the
+  grammar checker; the test now calls `check_macro_grammar` with the mutated
+  corpus. Hosted CI and review equilibrium remain pending.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.

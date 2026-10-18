@@ -25,9 +25,11 @@ def run_with(grammar: dict | None = None, adr: str | None = None) -> None:
     original_load, original_read = context.load, Path.read_text
 
     def load(name: str) -> dict:
+        """Load the supplied corpus override or the repository document."""
         return copy.deepcopy(grammar) if grammar is not None and name == 'spec/macro-grammar.json' else original_load(name)
 
     def read_text(path: Path, *args, **kwargs) -> str:
+        """Read overridden ADR text while delegating all other paths."""
         return adr if adr is not None and path == ADR_PATH else original_read(path, *args, **kwargs)
 
     with patch.object(context, 'load', load), patch.object(Path, 'read_text', read_text):
@@ -38,9 +40,11 @@ class Corpus(unittest.TestCase):
     """The corpus parses as recorded, covers every rule, and distinguishes each seeded mutation."""
 
     def test_committed_corpus_passes(self):
+        """Require the committed grammar corpus to pass its checker."""
         check_macro_grammar(ValidationContext(ROOT))
 
     def test_each_seeded_mutation_changes_an_entry(self):
+        """Require every seeded mutation to change a recorded parse result."""
         for mutation in MUTATIONS:
             with self.subTest(mutation=mutation):
                 changed = [entry['id'] for entry in GRAMMAR['corpus']
@@ -48,27 +52,32 @@ class Corpus(unittest.TestCase):
                 self.assertTrue(changed, f'mutation {mutation} must change at least one corpus outcome')
 
     def test_pipe_is_lowest_and_left_associative(self):
+        """Keep pipes below addition in precedence and left-associative."""
         self.assertEqual(parse('a + b |> c |> d', GRAMMAR), Parsed('(|> (|> (+ a b) c) d)'),
                          '|> binds looser than + and groups to the left')
 
     def test_comparison_mix_is_rejected_in_both_nestings(self):
+        """Reject unparenthesized comparison and bitwise operator mixtures."""
         for source in ('a | b == c', 'a == b & c'):
             with self.subTest(source=source):
                 self.assertEqual(parse(source, GRAMMAR), Rejected('comparison-bitwise-mix'), 'mixing needs parentheses')
 
     def test_wrong_recorded_tree_fails(self):
+        """Reject a corpus tree that disagrees with the parsed source."""
         grammar = copy.deepcopy(GRAMMAR)
         grammar['corpus'][4]['tree'] = '(* (+ a b) c)'
         with self.assertRaisesRegex(AssertionError, 'Grammar corpus G05 expected'):
             run_with(grammar=grammar)
 
     def test_missing_rule_coverage_fails(self):
+        """Reject a corpus that omits required precedence coverage."""
         grammar = copy.deepcopy(GRAMMAR)
         grammar['corpus'] = [entry for entry in grammar['corpus'] if 'range' not in entry['covers']]
         with self.assertRaisesRegex(AssertionError, 'Grammar corpus misses range'):
             run_with(grammar=grammar)
 
     def test_precedence_table_must_agree_with_adr_0007(self):
+        """Reject precedence-table drift between the grammar and ADR."""
         text = ADR_PATH.read_text(encoding='utf-8')
         swapped = text.replace('| Shift          |', '| Shiftx         |').replace('`<<` `>>`', '`>>` `<<`')
         self.assertNotEqual(swapped, text, 'the control must edit the table')
@@ -76,6 +85,7 @@ class Corpus(unittest.TestCase):
             run_with(adr=swapped)
 
     def test_array_macro_production_must_derive_its_published_example(self):
+        """Reject an extra bracket layer in the published ``array!`` production."""
         text = ADR_PATH.read_text(encoding='utf-8')
         extra_bracket = text.replace(
             'array-macro   = "array!" , array-literal ;',
