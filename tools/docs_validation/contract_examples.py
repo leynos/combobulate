@@ -275,7 +275,8 @@ def variance(case: dict, mutations: Mutations) -> object:
         second_moment = ieee_div(squared_total, float(len(values)))
         result = second_moment - mean * mean
         return math.sqrt(result) if case['operation'] == 'stddev' else result
-    squared_deviations = [(value - mean) ** 2 for value in f64_values]
+    deviations = [value - mean for value in f64_values]
+    squared_deviations = [deviation * deviation for deviation in deviations]
     squared_total = right_reduce('add', squared_deviations, mutations)
     denominator = float(len(values) if 'ignore-ddof' in mutations else len(values) - ddof)
     result = ieee_div(squared_total, denominator)

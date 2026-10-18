@@ -96,7 +96,7 @@
       "check": "contract-examples",
       "status": "pass",
       "detail": "Tagged-scalar examples of the accepted numeric, validity, reduction, cell, and commit contracts evaluate as recorded in the documentation model.",
-      "count": 61
+      "count": 63
     },
     {
       "check": "semantic-contracts",

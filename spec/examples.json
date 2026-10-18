@@ -958,6 +958,38 @@
       ],
       "ddof": -1,
       "expected_error": "InvalidDegreesOfFreedom"
+    },
+    {
+      "id": "EX82",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        {
+          "f64": "1e+200"
+        },
+        {
+          "f64": "-1e+200"
+        }
+      ],
+      "expected": {
+        "f64": "inf"
+      }
+    },
+    {
+      "id": "EX83",
+      "contract": "SC-11",
+      "operation": "stddev",
+      "input": [
+        {
+          "f64": "1e+200"
+        },
+        {
+          "f64": "-1e+200"
+        }
+      ],
+      "expected": {
+        "f64": "inf"
+      }
     }
   ],
   "semantic_changes_from_0_1": "none"

@@ -196,6 +196,13 @@ class ContractProperties(unittest.TestCase):
                 self.assertTrue(same_typed_value(outcome(case), expected),
                                 'the documentation model must reproduce the typed example')
 
+    def test_large_finite_deviations_overflow_to_ieee_infinity(self):
+        cases = {case['id']: case for case in CONTEXT.load('spec/examples.json')['contract_cases']}
+        for example_id in ('EX82', 'EX83'):
+            with self.subTest(example=example_id):
+                self.assertEqual(outcome(cases[example_id]), {'f64': 'inf'},
+                                 'finite F64 deviations whose squares overflow produce positive infinity')
+
     def test_contract_example_rejects_bool_integer_expectation_coercion(self):
         examples = copy.deepcopy(CONTEXT.load('spec/examples.json'))
         next(case for case in examples['contract_cases'] if case['id'] == 'EX26')['expected'] = 0
