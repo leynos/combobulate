@@ -61,11 +61,14 @@ class ValidationContext:
 
     ``as_of`` is injected by the caller (``make design-check`` passes the HEAD
     commit date) so date-dependent checks never read the wall clock.
+    ``source_revision`` identifies the checked-out commit for evidence bound to
+    this validation run.
     """
 
     root: Path
     results: list[dict[str, object]] = field(default_factory=list)
     as_of: date | None = None
+    source_revision: str | None = None
 
     def load(self, name: str) -> dict:
         """Read JSON beneath the root; e.g. context.load('spec/bets.json')."""

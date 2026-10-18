@@ -22,12 +22,17 @@ evidence for exactly one proof-obligation component, named in `component` as
 | `success_witnesses` | At least one; each Kani `cover!` is listed; any `unsatisfied` or `not-observed` blocks admission                   |
 | `negative_controls` | At least one; every required control must be `rejected-as-intended`; any `accepted` or `rejected-otherwise` blocks |
 | `trust_audit`       | Audited trusted items, each covered by a declared assumption or exception, or else blocking                        |
-| `binding`           | Executable and specification digests and source revision, compared with `spec/evidence-bindings.json`              |
+| `binding`           | Complete schema-defined verification binding, compared with `spec/evidence-bindings.json`                          |
 | `method.run_mode`   | `full-profile`; a `focused` run blocks admission                                                                   |
 | `verdict_source`    | `log-parser` (with the committed log and its digest) or `self-reported`                                            |
 | `exception`         | `null` or an identifier in `spec/exceptions.json`                                                                  |
 
 _Table 1: Fields that decide admission._
+
+Current-binding comparison covers every schema field: executable and
+specification digests, source revision, target, features, semantic policy,
+backend profile, and implementation relation. A change to any field makes the
+record stale until the registered binding is updated.
 
 The schema enforces the validity predicate: an executed kind has an outcome
 other than `not-run`, `none` and trust declarations have `not-run`, and only

@@ -18,6 +18,15 @@ def _git_output(root: Path, arguments: list[str], failure: str) -> bytes:
     return result.stdout
 
 
+def git_head_revision(root: Path) -> str:
+    """Return the checked-out commit used to bind current-run checker results."""
+    output = _git_output(
+        root, ['rev-parse', '--verify', '--end-of-options', 'HEAD^{commit}'],
+        'Cannot resolve the current source revision',
+    )
+    return output.decode('ascii').strip()
+
+
 def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
     """Read JSON from Git; return None only when the path is absent at the revision.
 

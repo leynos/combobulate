@@ -21,8 +21,12 @@ TEMPLATE = CONTEXT.load('spec/proof-evidence.example.json')
 AS_OF = datetime.date(2026, 10, 11)
 DIGEST = 'a' * 64
 REVISION = 'b' * 40
-BINDINGS = {TEMPLATE['component']: {'executable_digest': DIGEST, 'specification_digest': DIGEST,
-                                    'source_revision': REVISION}}
+CURRENT_BINDING = TEMPLATE['binding'] | {
+    'executable_digest': DIGEST,
+    'specification_digest': DIGEST,
+    'source_revision': REVISION,
+}
+BINDINGS = {TEMPLATE['component']: CURRENT_BINDING}
 PARSERS = frozenset({'kani'})
 EXCEPTION_DATES = {'active': ('2026-10-01', '2026-11-01'), 'expired': ('2026-08-01', '2026-10-01'),
                    'not-yet-valid': ('2026-10-20', '2026-11-20')}

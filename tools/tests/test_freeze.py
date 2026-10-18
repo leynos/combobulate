@@ -15,8 +15,8 @@ from hypothesis import given, settings, strategies as st
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.freeze import check_controls_frozen, check_decisions_frozen, check_frozen
-from docs_validation.revision_reader import git_json_at_revision
+from docs_validation.freeze import check_controls_frozen, check_decisions_frozen, check_exceptions_frozen, check_frozen
+from docs_validation.revision_reader import git_head_revision, git_json_at_revision
 
 DecisionRecord = dict[str, object]
 DecisionRegister = dict[str, list[DecisionRecord]]
@@ -187,6 +187,44 @@ class ControlFreeze(unittest.TestCase):
             check_controls_frozen(base, removed_history)
 
 
+EXCEPTION = {
+    'id': 'EXC-0001',
+    'component': 'PF14.structural@1.1.4',
+    'owner': 'leynos',
+    'approved_by': 'leynos',
+    'approval_reference': 'https://example.org/approval',
+    'approved_on': '2026-10-12',
+    'invalid_from': '2026-11-01',
+    'narrowed_claim': 'The named trust boundary remains explicit.',
+    'release_gate': '4.3.3',
+    'reason': 'A concrete exception record for freeze tests.',
+}
+
+
+def exceptions(*entries: dict) -> dict:
+    """Wrap exception entries in a minimal register."""
+    return {'exceptions': [copy.deepcopy(entry) for entry in entries]}
+
+
+class ExceptionFreeze(unittest.TestCase):
+    """VO-7: approved exceptions are immutable and replaced by new identifiers."""
+
+    def test_unchanged_exception_passes(self):
+        """Preserve an approved exception without rewriting its record."""
+        check_exceptions_frozen(exceptions(EXCEPTION), exceptions(EXCEPTION))
+
+    def test_editing_an_approved_exception_fails(self):
+        """Reject changing the narrowed claim on an approved exception."""
+        edited = EXCEPTION | {'narrowed_claim': 'A broadened claim.'}
+        with self.assertRaisesRegex(AssertionError, 'Approved exception EXC-0001 was altered or deleted'):
+            check_exceptions_frozen(exceptions(EXCEPTION), exceptions(edited))
+
+    def test_deleting_an_approved_exception_fails(self):
+        """Reject deleting an approved exception rather than adding a replacement."""
+        with self.assertRaisesRegex(AssertionError, 'Approved exception EXC-0001 was altered or deleted'):
+            check_exceptions_frozen(exceptions(EXCEPTION), exceptions())
+
+
 class BaseRevisionChecks(unittest.TestCase):
     """Freeze rules consume an injected reader, independent of Git command details."""
 
@@ -260,6 +298,27 @@ class GitRevisionReaderIntegration(unittest.TestCase):
         """Run a fixture Git command with local identity and signing disabled."""
         subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
                         '-c', 'commit.gpgsign=false', *args], cwd=self.root, check=True, capture_output=True)
+
+    def test_head_revision_reads_the_current_commit(self) -> None:
+        """Bind checker evidence to the repository's checked-out commit."""
+        expected = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=self.root, check=True,
+                                  capture_output=True, text=True).stdout.strip()
+        self.assertEqual(git_head_revision(self.root), expected,
+                         'the revision adapter must return the checked-out commit')
+
+    def test_changed_committed_exception_fails_through_freeze_dispatch(self) -> None:
+        """Run the registered exception freeze check against a real Git base revision."""
+        register_path = self.root / 'spec/exceptions.json'
+        register_path.write_text(json.dumps(exceptions(EXCEPTION)), encoding='utf-8')
+        self.git('add', 'spec/exceptions.json')
+        self.git('commit', '-q', '-m', 'Add approved exception')
+        base_revision = git_head_revision(self.root)
+        register_path.write_text(
+            json.dumps(exceptions(EXCEPTION | {'reason': 'Edited in place.'})), encoding='utf-8'
+        )
+        context = ValidationContext(self.root)
+        with self.assertRaisesRegex(AssertionError, 'Approved exception EXC-0001 was altered or deleted'):
+            check_frozen(context, base_revision, partial(git_json_at_revision, self.root))
 
     def test_git_reader_detects_a_changed_committed_decision(self) -> None:
         """Use Git for the base snapshot, then reject the changed working-tree record."""

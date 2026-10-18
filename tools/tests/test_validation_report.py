@@ -40,7 +40,18 @@ class ValidationReport(unittest.TestCase):
             if path.is_file() and path.name != '.git':
                 shutil.copy2(path, self.root / path.name)
         self.report = self.root / 'docs/validation-results.json'
+        self.initialise_repository()
         self.assertEqual(self.run_main(['--write']), 0)
+
+    def initialise_repository(self) -> None:
+        """Give the current-revision checker a committed fixture checkout."""
+        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(['git', 'add', '-A'], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(
+            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
+             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Create validation fixture'],
+            cwd=self.root, check=True, capture_output=True,
+        )
 
     def run_main(self, arguments: list[str]) -> int:
         """Execute the checker against copied inputs and capture its evidence output."""

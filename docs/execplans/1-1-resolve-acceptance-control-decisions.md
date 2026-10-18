@@ -424,6 +424,22 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make design-check AS_OF=2026-10-18 BASE_REV=origin/1-1-acceptance-controls`
   (341 unittest and 64 pytest) all passed on the same candidate patch. Logs use
   suffix `-20261018-8.out` under `/tmp`.
+- [x] (2026-10-19) EP-M5 completeness-assessment repair: enforce current-run,
+  current-source checker closure with the counterexample veto; select record
+  evidence only within the registered current binding; compare every binding
+  profile field; exhaustively check schema validity and round-trips across the
+  full abstract state space; add approved-exception freeze controls. Update the
+  ADR and contributor references to match these rules. Restack the four child
+  commits from the
+  [prior PR #16 head](https://github.com/leynos/combobulate/commit/6559ba4e3cedf79b27f99885ff6c72a377d3833f)
+  onto the updated PR #16 head `fdf35b38af44`, preserving the EP-M4 review
+  history and regenerating the validation report. CodeScene reports
+  contracts.py mean complexity improving from 4.89 to 4.50, with no new or
+  degraded findings. Sequential gates passed: `make check-fmt`, `make lint`,
+  `make typecheck`, `make test` (329 passed, one skipped; doctest passed),
+  `make markdownlint`, `make nixie`, and
+  `make design-check BASE_REV=origin/1-1-acceptance-controls` (368 unittest, 64
+  pytest). Logs use suffix `-rebased.out` under `/tmp`.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
 ## Surprises & discoveries

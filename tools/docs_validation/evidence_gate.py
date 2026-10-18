@@ -30,6 +30,10 @@ RUN_MODES = ('full-profile', 'focused')
 VERDICT_SOURCES = ('log-parser', 'self-reported')
 EXECUTED = frozenset({'deductive', 'bounded', 'test'})
 VERIFIERS = frozenset({'deductive', 'bounded'})
+BINDING_FIELDS = (
+    'executable_digest', 'specification_digest', 'source_revision', 'target', 'features',
+    'semantic_policy', 'backend_profile', 'implementation_relation',
+)
 
 
 class Level(enum.Enum):
@@ -70,7 +74,7 @@ class AdmissionContext:
     """Carry caller-owned inputs used only while abstracting one evidence record."""
 
     exceptions: Mapping[str, Mapping[str, object]]
-    bindings: Mapping[str, Mapping[str, str]]
+    bindings: Mapping[str, Mapping[str, object]]
     as_of: datetime.date
     log_parsers: frozenset[str] = frozenset()
 
@@ -185,14 +189,14 @@ def controls_state(controls: list[Mapping[str, object]]) -> str:
     return 'all-required-rejected-as-intended'
 
 
-def binding_state(record: Mapping[str, object], bindings: Mapping[str, Mapping[str, str]]) -> str:
-    """Compare a record's executable, specification, and source identity with the current bindings."""
+def binding_state(record: Mapping[str, object], bindings: Mapping[str, Mapping[str, object]]) -> str:
+    """Compare every schema-defined binding field with the registered current profile."""
     binding = record['binding']
-    keys = ('executable_digest', 'specification_digest', 'source_revision')
-    if any(binding[key] is None for key in keys):
+    if any(binding[key] is None for key in ('executable_digest', 'specification_digest', 'source_revision')):
         return 'incomplete'
     current = bindings.get(str(record['component']))
-    return 'current' if current is not None and all(current.get(key) == binding[key] for key in keys) else 'stale'
+    expected = {key: binding[key] for key in BINDING_FIELDS}
+    return 'current' if current == expected else 'stale'
 
 
 def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord:

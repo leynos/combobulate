@@ -1012,6 +1012,12 @@ numerical policy, backend profile, bounds, assumptions, termination scope,
 positive witness, negative control, and result artefacts. A schema-valid record
 establishes only that these fields exist. It does not establish the proposition.
 
+Current-binding comparison covers every schema-defined `binding` field:
+executable and specification digests, source revision, target, features,
+semantic policy, backend profile, and implementation relation. A changed target
+or verification profile is stale evidence even when the source revision and
+digests match.
+
 The implementation keeps record abstraction pure. `AdmissionContext` is the
 frozen, call-scoped bundle of the exception register, current bindings,
 evaluation date, and registered log parsers consumed by `abstract_record`. The

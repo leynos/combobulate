@@ -48,7 +48,7 @@ class EvidenceCliOptions:
     as_of: Annotated[str, Parameter(help='Evaluation date, YYYY-MM-DD; it decides exception validity.')]
     require: Annotated[str, Parameter(help='Minimum level for success: proof, bounded, or tested.')] = 'tested'
     bindings: Annotated[
-        Path, Parameter(help='JSON map from component to its current executable, specification, and source identity.')
+        Path, Parameter(help='JSON map from component to its complete current executable and verification profile.')
     ] = ROOT / 'spec/evidence-bindings.json'
     log_parsers: Annotated[
         Path, Parameter(help='JSON document listing tools with registered log parsers.')

@@ -92,11 +92,17 @@ reason codes are single-sourced in `spec/evidence-reason-codes.json`.
 
 - MS-3. A proof-obligation component (`PFnn.<method>@<task>`) lists the
   levels it accepts, a subset of `proof`, `bounded`, and `tested`; never
-  `restricted`. It is satisfied when its latest record is admitted at an
-  accepted level and no record at that source revision reports a
-  counterexample. A component whose evidence source is `checker:<check>` is
-  satisfied when that design check passes in the same run. For example,
-  `PF14.structural@1.1.4` cites the `evidence-gate` check.
+  `restricted`. Record-sourced components fail closed when no record matches
+  the current binding. The latest record by `recorded_on` among current-binding
+  records must be admitted at an accepted level; ties fail closed. Any record
+  at that source revision that reports a counterexample vetoes satisfaction,
+  regardless of its admission level. A component whose evidence source is
+  `checker:<check>` is satisfied when the latest result for that check passes
+  in the same validation run at the current source revision, the component
+  accepts `tested`, and no evidence record for it reports a counterexample at
+  that revision. A checker result is `tested` evidence only and needs no
+  separate verifier record. For example, `PF14.structural@1.1.4` cites the
+  `evidence-gate` check.
 - MS-4. A roadmap task may be ticked only when its prerequisites are ticked,
   its completion record cites accepted decisions and resolvable artefacts, and
   every component linked to it is satisfied.

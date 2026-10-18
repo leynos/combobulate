@@ -510,18 +510,25 @@ be ticked, every cited decision to be accepted, every artefact to resolve, and
 every proof-obligation component linked to the task to be satisfied. Components
 live in `spec/proof-obligations.json` as `PFnn.<method>@<task>`, each listing
 the admission levels (`proof`, `bounded`, `tested`) that satisfy it. A
-component whose `evidence_source` is `checker:<check>` is satisfied when that
-check passes in the same run; a `record` component fails closed until the
-evidence gate admits a proof-evidence record for it. A task that meets every
-condition but is not ticked is reported, not failed, so ticking stays a
-deliberate act.
+component whose `evidence_source` is `checker:<check>` is satisfied when the
+latest result passes in the current validation run at the current source
+revision, the component accepts `tested`, and no evidence record for it reports
+a counterexample at that revision. Checker results are `tested` evidence and
+need no separate verifier record. A `record` component fails closed unless its
+latest record by `recorded_on` matches the current binding and reaches an
+accepted level; same-day ties fail closed. A counterexample at the selected
+source revision vetoes closure regardless of its admission level. A task that
+meets every condition but is not ticked is reported, not failed, so ticking
+stays a deliberate act.
 
-Record-sourced closure requires one record on the latest `recorded_on` date;
-same-day ties fail closed. The private `record_component_failure` path owns
-this record-specific check and is called only by the component adjudicator. Its
-counterexample predicate is scoped to that same path. The evidence CLI builds
-`EvidenceCliConfiguration` once and passes it only to the per-record evaluator,
-so all inputs share one fixed set of bindings and registries.
+The private `record_component_failure` and `_checker_result_failure` paths are
+called only by `component_failure`; `_current_binding_records` and
+`_records_on_latest_date` are confined to record selection. Record closure
+filters to current-binding records before choosing the latest date, then
+applies the counterexample veto to every record at the selected source
+revision. The evidence CLI builds `EvidenceCliConfiguration` once and passes it
+only to the per-record evaluator, so all inputs share one fixed set of bindings
+and registries.
 
 Proof evidence for a record-sourced component goes in `spec/evidence/` as a
 schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
