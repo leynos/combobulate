@@ -169,7 +169,10 @@ def test_missing_required_task_bullet_is_rejected(label: str, expected: str):
 ])
 def test_duplicate_task_fields_are_rejected(duplicate_bullet: str, field: str):
     """Reject duplicate task fields instead of silently overriding their values."""
-    edited = replace_once(ROADMAP, '- [ ] 1.1.3.', f'{duplicate_bullet}\n- [ ] 1.1.3.')
+    task_marker = re.search(r'^- \[[ x]\] 1\.1\.3\.', ROADMAP, re.MULTILINE)
+    assert task_marker is not None, 'roadmap must contain task 1.1.3 with either checkbox state'
+    marker = task_marker.group()
+    edited = replace_once(ROADMAP, marker, f'{duplicate_bullet}\n{marker}')
     with pytest.raises(RoadmapStructureError) as raised:
         parse_roadmap(edited)
     assert raised.value.line == line_of(edited, duplicate_bullet.strip()), 'duplicate error must name its bullet'

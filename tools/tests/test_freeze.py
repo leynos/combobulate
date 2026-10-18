@@ -122,7 +122,7 @@ class BaseRevisionChecks(unittest.TestCase):
     def read_base(self, revision: str, path: str) -> dict | None:
         """Return a fixed base value and record the requested repository path."""
         self.reads.append((revision, path))
-        return copy.deepcopy(self.base)
+        return copy.deepcopy(self.base) if path == 'spec/decisions.json' else None
 
     def write(self, value: DecisionRegister) -> None:
         """Write the current register read by the freeze check."""
@@ -139,7 +139,8 @@ class BaseRevisionChecks(unittest.TestCase):
         self.write(register(ACCEPTED))
         summary = check_frozen(self.context, 'base', self.read_base)
         self.assertIn('no frozen registers', summary, 'a new register freezes nothing yet')
-        self.assertEqual(self.reads, [('base', 'spec/decisions.json')],
+        self.assertEqual(self.reads, [('base', 'spec/decisions.json'),
+                                      ('base', 'spec/acceptance-controls.json')],
                          'the checker reads each frozen register from the requested base')
 
     def test_fake_reader_supplies_the_register_compared_with_the_head(self) -> None:
