@@ -180,6 +180,14 @@ class PackagePolicy(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'publish = false'):
             check_manifest({'package': package})
 
+    def test_registry_list_publish_flag_fails(self):
+        """Reject registry allow-lists while the D05 publication gate stands."""
+        for registries in (['crates-io'], ['private-registry']):
+            with self.subTest(registries=registries):
+                package = MANIFEST['package'] | {'publish': registries}
+                with self.assertRaisesRegex(AssertionError, 'publish = false'):
+                    check_manifest({'package': package})
+
     def test_other_licence_fails(self):
         """Reject a package licence that disagrees with accepted D04."""
         manifest = {'package': MANIFEST['package'] | {'license': 'MIT'}}
