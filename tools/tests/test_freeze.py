@@ -69,9 +69,13 @@ CONTROL = {'id': 'AC-03', 'registered_digest': 'a' * 64, 'digest': 'a' * 64, 'am
            'frozen': {'decision_rule': {'thresholds': {'upper_bound_ratio': 1.25}}}}
 
 
-def controls(*entries: dict) -> dict:
+def controls(*entries: dict, outcome_verdicts: dict | None = None) -> dict:
     """Wrap control records in a minimal register."""
-    return {'controls': [copy.deepcopy(entry) for entry in entries]}
+    return {
+        'frozen_fields': ['control'],
+        'outcome_verdicts': copy.deepcopy(outcome_verdicts if outcome_verdicts is not None else {'pass': 'pass'}),
+        'controls': [copy.deepcopy(entry) for entry in entries],
+    }
 
 
 def amendment(replaces: str, new_digest: str) -> dict:
@@ -104,6 +108,27 @@ class ControlFreeze(unittest.TestCase):
     def test_deleted_control_fails(self):
         with self.assertRaisesRegex(AssertionError, 'Registered control AC-03 was deleted'):
             check_controls_frozen(controls(CONTROL), controls())
+
+    def test_outcome_verdict_mapping_is_frozen(self):
+        base = controls(CONTROL)
+        edited_maps = (
+            ('added key', {'pass': 'pass', 'fail': 'fail'}),
+            ('removed key', {}),
+            ('changed value', {'pass': 'fail'}),
+        )
+        for change, outcome_verdicts in edited_maps:
+            with self.subTest(change=change):
+                with self.assertRaisesRegex(AssertionError, 'Registered outcome_verdicts mapping was edited in place',
+                                            msg=f'{change} to the registered mapping must fail'):
+                    check_controls_frozen(base, controls(CONTROL, outcome_verdicts=outcome_verdicts))
+
+    def test_frozen_field_list_is_frozen(self):
+        base = controls(CONTROL)
+        edited = controls(CONTROL)
+        edited['frozen_fields'].append('analysis')
+        with self.assertRaisesRegex(AssertionError, 'Registered frozen_fields list was edited in place',
+                                    msg='the digest input declaration must not change in place'):
+            check_controls_frozen(base, edited)
 
 
 class BaseRevisionChecks(unittest.TestCase):

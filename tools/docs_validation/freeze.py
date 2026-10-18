@@ -39,7 +39,11 @@ def check_decisions_frozen(base: dict, head: dict) -> None:
 
 
 def check_controls_frozen(base: dict, head: dict) -> None:
-    """Allow a registered control to change only by appending an amendment that replaces the base digest."""
+    """Freeze register metadata; permit control changes only through appended amendments."""
+    require(head.get('frozen_fields') == base.get('frozen_fields'),
+            'Registered frozen_fields list was edited in place')
+    require(head.get('outcome_verdicts') == base.get('outcome_verdicts'),
+            'Registered outcome_verdicts mapping was edited in place')
     head_controls = {control['id']: control for control in head['controls']}
     for control in base['controls']:
         current = head_controls.get(control['id'])

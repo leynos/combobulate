@@ -6,7 +6,7 @@ import itertools
 import socket
 import sys
 import unittest
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -18,7 +18,8 @@ from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
     FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_acceptance_workflow,
     check_amendment_chain, check_calibration_record, check_ci_calibration, check_ci_measurement, check_completeness,
-    check_control_bindings, check_host_identity, check_measurement_binding, check_sources, frozen_digest, verdict,
+    check_control_bindings, check_frozen_fields, check_host_identity, check_measurement_binding,
+    check_outcome_verdicts, check_sources, frozen_digest, verdict,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,7 +43,9 @@ def amended(control: dict, field: str, value: object) -> dict:
     edited = copy.deepcopy(control)
     edited['frozen'][field] = value
     new_digest = frozen_digest(edited)
-    edited['amendments'].append({'date': '2026-10-12', 'approved_by': SPONSOR,
+    previous_date = edited['amendments'][-1]['date'] if edited['amendments'] else edited['frozen']['registered_on']
+    amendment_date = (date.fromisoformat(previous_date) + timedelta(days=1)).isoformat()
+    edited['amendments'].append({'date': amendment_date, 'approved_by': SPONSOR,
                                  'approval_reference': 'https://example.org/approval',
                                  'replaces': edited['digest'], 'new_digest': new_digest, 'reason': 'Test.'})
     edited['digest'] = new_digest
@@ -97,6 +100,14 @@ class Registration(unittest.TestCase):
     def test_register_lists_the_frozen_fields(self):
         self.assertEqual(REGISTER['frozen_fields'], list(FROZEN_FIELDS), 'the register must state its frozen fields')
 
+    def test_register_frozen_fields_match_digest_implementation(self):
+        check_frozen_fields(REGISTER)
+        candidate = copy.deepcopy(REGISTER)
+        candidate['frozen_fields'][-1] = 'unhashed-field'
+        with self.assertRaisesRegex(AssertionError, 'must match the executable digest fields',
+                                    msg='the declared frozen fields must match the digest implementation'):
+            check_frozen_fields(candidate)
+
     def test_missing_calibration_reference_fails(self):
         control = copy.deepcopy(CONTROL)
         del control['frozen']['calibration']
@@ -113,15 +124,54 @@ class Registration(unittest.TestCase):
     def test_correct_amendment_passes(self):
         check_amendment_chain(amended(CONTROL, 'seeds', [7]), SPONSOR)
 
+    def test_amendment_before_first_measurement_remains_authorized(self):
+        control = amended(CONTROL, 'seeds', [7])
+        measurement = record('pass', digest=control['digest'])
+        measurement['recorded_on'] = '2026-10-13'
+        check_amendment_chain(control, SPONSOR, [measurement])
+        self.assertTrue(check_measurement_binding(control, measurement),
+                        'a measurement after an approved amendment binds the amended digest')
+
+    def test_amendment_cannot_backdate_measurement_authority(self):
+        control = amended(CONTROL, 'seeds', [7])
+        control['amendments'][0]['date'] = '2026-10-10'
+        between_registration_and_record = record('pass', digest=control['digest'])
+        between_registration_and_record['recorded_on'] = '2026-10-11'
+        with self.assertRaisesRegex(AssertionError, 'amendment date cannot predate its previous effective date'):
+            check_amendment_chain(control, SPONSOR, [between_registration_and_record])
+
+    def test_amendment_date_must_follow_the_previous_amendment(self):
+        control = amended(amended(CONTROL, 'seeds', [7]), 'seeds', [8])
+        control['amendments'][-1]['date'] = '2026-10-11'
+        with self.assertRaisesRegex(AssertionError, 'amendment date cannot predate its previous effective date'):
+            check_amendment_chain(control, SPONSOR)
+
+    def test_register_outcome_map_matches_executable_verdicts(self):
+        check_outcome_verdicts(REGISTER)
+        altered_maps = (
+            dict(OUTCOME_VERDICTS) | {'new-outcome': 'fail'},
+            {key: value for key, value in OUTCOME_VERDICTS.items() if key != 'missing'},
+            dict(OUTCOME_VERDICTS) | {'resource-exhausted': 'pass'},
+        )
+        for outcome_map in altered_maps:
+            with self.subTest(outcome_map=outcome_map):
+                candidate = copy.deepcopy(REGISTER)
+                candidate['outcome_verdicts'] = outcome_map
+                with self.assertRaisesRegex(AssertionError, 'must match the executable outcome mapping',
+                                            msg='runtime semantics must reject a changed outcome map'):
+                    check_outcome_verdicts(candidate)
+                with self.assertRaises(ValidationError, msg='the register schema must reject a changed outcome map'):
+                    REGISTER_VALIDATOR.validate(candidate)
+
     def test_amendment_needs_the_sponsor(self):
         control = amended(CONTROL, 'seeds', [7])
         control['amendments'][-1]['approved_by'] = 'someone-else'
         with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
             check_amendment_chain(control, SPONSOR)
 
-    def test_post_measurement_change_requires_a_new_control_identifier(self):
+    def test_amendment_on_measurement_date_requires_a_new_control_identifier(self):
         control = amended(CONTROL, 'seeds', [7])
-        with self.assertRaisesRegex(AssertionError, 'later changes require a new control identifier'):
+        with self.assertRaisesRegex(AssertionError, 'must predate the earliest acceptance measurement'):
             check_amendment_chain(control, SPONSOR, [record('pass')])
 
     def test_protocol_content_is_typed_after_digest_recalculation(self):
@@ -260,6 +310,41 @@ class WorkflowAndCi(unittest.TestCase):
         check_ci_measurement(CI_CONTROL, failed)
         self.assertEqual(verdict(CI_CONTROL, [failed]), 'fail',
                          'timeouts fail AC-07 even when nearest-rank p90 is within budget')
+
+    def test_untimed_failed_attempt_is_a_valid_failed_measurement(self):
+        failed = record('fail', digest=CI_CONTROL['digest'])
+        failed['control_ids'] = [CI_CONTROL['id']]
+        workload = failed['workloads'][0]
+        workload['id'] = 'ci-build-test'
+        workload['samples'] = []
+        workload['median'] = 'not available'
+        workload['attempts'] = [{
+            'run_id': '21',
+            'run_number': 21,
+            'attempt': 1,
+            'conclusion': 'timed_out',
+            'wall_seconds': None,
+            'started_at': '2026-10-12T12:00:00Z',
+            'completed_at': None,
+            'url': 'https://github.com/leynos/combobulate/actions/runs/21',
+        }]
+
+        RECORD_VALIDATOR.validate(failed)
+        check_ci_measurement(CI_CONTROL, failed)
+        self.assertEqual(verdict(CI_CONTROL, [failed]), 'fail',
+                         'an untimed failed AC-07 attempt must remain a failed measurement')
+        passing = copy.deepcopy(failed)
+        passing['outcome'] = 'pass'
+        with self.assertRaisesRegex(AssertionError, 'must fail when a build-test attempt fails',
+                                    msg='an untimed failed attempt must never be recorded as a pass'):
+            check_ci_measurement(CI_CONTROL, passing)
+
+    def test_other_controls_still_require_a_sample(self):
+        no_samples = record('pass')
+        no_samples['workloads'][0]['samples'] = []
+        no_samples['workloads'][0]['median'] = 'not available'
+        with self.assertRaises(ValidationError, msg='non-AC-07 records still require measured samples'):
+            RECORD_VALIDATOR.validate(no_samples)
 
     def test_calibration_p90_must_fit_registered_budget(self):
         calibration = ValidationContext(ROOT).load('spec/calibration/ci-history.json')

@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -47,27 +48,49 @@ def check_completeness(control: Mapping[str, object]) -> None:
     require(not extra, f"{control['id']} has unregistered frozen fields: {', '.join(extra)}")
 
 
+def check_outcome_verdicts(register: Mapping[str, object]) -> None:
+    """Keep the declared outcome map identical to executable verdict semantics."""
+    require(register.get('outcome_verdicts') == OUTCOME_VERDICTS,
+            'Registered outcome_verdicts must match the executable outcome mapping')
+
+
+def check_frozen_fields(register: Mapping[str, object]) -> None:
+    """Keep the declared frozen-field list identical to the digest implementation."""
+    require(register.get('frozen_fields') == list(FROZEN_FIELDS),
+            'Registered frozen_fields must match the executable digest fields')
+
+
 def check_amendment_chain(
     control: Mapping[str, object], sponsor: str, acceptance_records: Iterable[Mapping[str, object]] = (),
 ) -> None:
-    """Require a sponsor-approved digest chain and no in-place post-measurement change."""
+    """Validate sponsor approvals, amendment dates, and the registered digest chain."""
+    require(control['digest'] == frozen_digest(control),
+            f"{control['id']} digest does not match its frozen fields")
     previous = control['registered_digest']
+    previous_date = date.fromisoformat(control['frozen']['registered_on'])
+    measurements = [
+        date.fromisoformat(record['recorded_on']) for record in acceptance_records
+        if record['purpose'] == 'acceptance' and control['id'] in record['control_ids']
+    ]
+    earliest_measurement = min(measurements, default=None)
     seen_digests = {previous}
     for amendment in control['amendments']:
+        amendment_date = date.fromisoformat(amendment['date'])
+        require(amendment_date >= previous_date,
+                f"{control['id']} amendment date cannot predate its previous effective date "
+                f"{previous_date.isoformat()}")
+        if earliest_measurement is not None:
+            require(amendment_date < earliest_measurement,
+                    f"{control['id']} amendment must predate the earliest acceptance measurement "
+                    f"{earliest_measurement.isoformat()}; later changes require a new control identifier")
         require(amendment['replaces'] == previous, f"{control['id']} amendment does not replace digest {previous}")
         require(amendment['approved_by'] == sponsor, f"{control['id']} amendment is not approved by the sponsor")
         require(amendment['new_digest'] not in seen_digests,
                 f"{control['id']} amendment repeats a digest in its chain")
         previous = amendment['new_digest']
+        previous_date = amendment_date
         seen_digests.add(previous)
     require(control['digest'] == previous, f"{control['id']} digest is not the end of its amendment chain")
-    require(control['digest'] == frozen_digest(control), f"{control['id']} digest does not match its frozen fields")
-    has_measurement = any(
-        record['purpose'] == 'acceptance' and control['id'] in record['control_ids']
-        for record in acceptance_records
-    )
-    require(not (control['amendments'] and has_measurement),
-            f"{control['id']} has acceptance measurements; later changes require a new control identifier")
 
 
 def check_sources(control: Mapping[str, object], root: Path) -> None:
@@ -171,6 +194,8 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
         context.load('spec/acceptance-controls.schema.json'),
         format_checker=Draft202012Validator.FORMAT_CHECKER,
     ).validate(register)
+    check_outcome_verdicts(register)
+    check_frozen_fields(register)
     record_schema = Draft202012Validator(context.load('spec/measurement-record.schema.json'),
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
     records = _load_calibration_records(context, record_schema, extra_names)

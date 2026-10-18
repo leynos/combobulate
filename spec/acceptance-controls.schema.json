@@ -10,7 +10,16 @@
     "frozen_fields": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
     "outcome_verdicts": {
       "type": "object",
-      "additionalProperties": {"enum": ["pass", "fail", "inconclusive"]}
+      "additionalProperties": false,
+      "required": ["pass", "fail", "budget-exceeded", "resource-exhausted", "inconclusive", "missing"],
+      "properties": {
+        "pass": {"const": "pass"},
+        "fail": {"const": "fail"},
+        "budget-exceeded": {"const": "fail"},
+        "resource-exhausted": {"const": "fail"},
+        "inconclusive": {"const": "inconclusive"},
+        "missing": {"const": "fail"}
+      }
     },
     "controls": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/control_record"}}
   },
