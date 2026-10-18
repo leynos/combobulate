@@ -422,16 +422,28 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   agent.
 - Decision: in `EP-M3`, contract records whose rules come from technical
   design §6 rather than from D08 to D14 (association, empty identities,
-  conversion, integer division, Kleene logic) cite D07, the accepted decision
-  that assigned numerical and array semantics to ADR-0006. Error relations name
-  registered codes only; `Propagated` marks an operation's own failure passing
-  through unchanged, and `MacroSyntax` a grammar rejection. The examples were
-  written by hand from the contracts, not generated from the model, so the
-  model is checked against them. Deviation: the two models
+  conversion, integer division, Kleene logic, variance) cite D07, the accepted
+  decision that assigned numerical and array semantics to ADR-0006. Error
+  relations name registered codes only; `Propagated` marks an operation's own
+  failure passing through unchanged, and `MacroSyntax` a grammar rejection. The
+  examples were written by hand from the contracts, not generated from the
+  model, so the model is checked against them. Deviation: the two models
   (`contract_examples.py`, `grammar.py`) were written before their test suites
   rather than after a red run; non-vacuity rests on the handwritten
   expectations, the seeded mutations each changing an outcome, and the
   in-memory negative controls. Date/Author: 2026-10-11, implementing agent.
+- Decision: the EP-M3 completeness assessment
+  ([assessment](https://github.com/leynos/combobulate/pull/15#issuecomment-6250448132))
+  found six repairable gaps before acceptance: the variance/stddev rule was
+  not recorded, the macro EBNF omitted four public forms, empty-mean identity
+  and identity-dtype rules disagreed, typed outcomes used Python's coercive
+  equality, excluded method names were not normalized, and the exact scan work
+  bound was inaccurate. Added SC-11 and its PF07 task 2.2.4 component, examples
+  and mutations; completed the five-form EBNF and SC-10 catalogue links;
+  aligned the model and records; and corrected the termination bound. This
+  follow-up brings EP-M3 to about 3,100 net added lines, excluding generated
+  tables and reports, across 25 files. No Verus or Kani proof was run.
+  Date/Author: 2026-10-18, implementing agent.
 - Decision: `EP-M1b` milestone review dispositions. Fixed: completion
   artefacts must resolve inside the repository; the real-roadmap closure test
   runs the full check sequence so a tick that relies on a checker-sourced

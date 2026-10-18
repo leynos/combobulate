@@ -381,5 +381,32 @@
         "method"
       ]
     }
+  ],
+  "forms": [
+    {
+      "name": "comb!",
+      "production": "comb-macro",
+      "catalogue_id": "X001"
+    },
+    {
+      "name": "verb!",
+      "production": "verb-macro",
+      "catalogue_id": "X004"
+    },
+    {
+      "name": "host { ... }",
+      "production": "host-block",
+      "catalogue_id": "E001"
+    },
+    {
+      "name": "arr!",
+      "production": "arr-macro",
+      "catalogue_id": "X002"
+    },
+    {
+      "name": "array!",
+      "production": "array-macro",
+      "catalogue_id": "X003"
+    }
   ]
 }

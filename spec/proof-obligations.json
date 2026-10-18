@@ -339,11 +339,12 @@
       "tasks": [
         "2.2.2",
         "2.2.3",
+        "2.2.4",
         "2.2.5",
         "6.2.1"
       ],
-      "scope": "Prove traversal/association and integer checks. IEEE bit/policy reasoning is distinct from real arithmetic or transcendental accuracy.",
-      "non_vacuity": "Right subtraction 9 versus left 5, singleton -0, MAX grouping, wrong-count finalizer and unapproved merge mutations.",
+      "scope": "Prove traversal/association, integer checks, and ordered two-pass mean/variance finalization. IEEE bit/policy reasoning is distinct from real arithmetic or transcendental accuracy.",
+      "non_vacuity": "Right subtraction 9 versus left 5, singleton -0, MAX grouping, correct-count and ddof finalizers, count <= ddof failure, and unapproved merge mutations.",
       "components": [
         {
           "id": "PF07.proof@2.2.2",
@@ -359,6 +360,16 @@
           "id": "PF07.proof@2.2.3",
           "method": "proof",
           "task": "2.2.3",
+          "accepts": [
+            "proof"
+          ],
+          "evidence_source": "record",
+          "evidence": []
+        },
+        {
+          "id": "PF07.proof@2.2.4",
+          "method": "proof",
+          "task": "2.2.4",
           "accepts": [
             "proof"
           ],

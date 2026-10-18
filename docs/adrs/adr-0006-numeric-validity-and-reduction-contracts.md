@@ -4,8 +4,8 @@
 
 Accepted on 2026-10-10: the numeric, validity, reduction, typed-cell, and
 commit contracts below are Combobulate's semantic baseline, recorded as `SC-01`
-to `SC-09` in `spec/semantic-contracts.json`. Records D09, D10, and D14, and
-the numerical and array semantics subject assigned here by D07, in the
+to `SC-09` and `SC-11` in `spec/semantic-contracts.json`. Records D09, D10, and
+D14, and the numerical and array semantics subject assigned here by D07, in the
 [decision register](../decision-register.md).
 
 ## Date
@@ -57,13 +57,19 @@ backend could substitute a cheaper but different aggregation.
 - Empty lanes (`SC-02`). The registered identities are typed zero for `sum`,
   one for `product`, false for `any`, and true for `all`. `minimum`, `maximum`,
   and `mean` have none: empty input fails unless `.identity(value)` supplies a
-  result of the output dtype. An identity is used only for an empty lane and is
-  never a seed.
+  result of the output dtype (F64 for `mean`). An identity is used only for an
+  empty lane and is never a seed; its dtype is checked for nonempty lanes too.
 - F64 special values (`SC-07`, D09). Binary `min` and `max` follow IEEE
   754-2019 `minimum` and `maximum`: null takes precedence over NaN, NaN
   propagates, and `-0.0` is less than `+0.0`. An empty F64 `sum` is `+0.0`,
   while `sum([-0.0])` is `-0.0` because a singleton passes through. `mean`
   converts to F64, right-sums, and divides by a count of at most 2^53.
+- Variance and standard deviation (`SC-11`). Both use two ordered passes:
+  compute the mean by F64 right-sum and exact count conversion, then right-sum
+  squared deviations and divide by `count - ddof`; `stddev` takes the square
+  root. `ddof` is a non-negative I64 defaulting to zero. After null handling,
+  the valid count must exceed `ddof` and must not exceed 2^53. A one-pass,
+  stable, or merged algorithm needs an explicit numerical policy.
 - Cell atomicity (`SC-08`, D10). A typed cell such as `DVec3` is one logical
   element until an explicit component operation: `Batch<DVec3>` of shape
   `[2,3]` has cardinality 6, and its axes index the frame only.
@@ -72,12 +78,12 @@ backend could substitute a cheaper but different aggregation.
 
 ## Consequences
 
-- `spec/examples.json` holds tagged-scalar examples (`EX21` to `EX71`) for
+- `spec/examples.json` holds tagged-scalar examples (`EX21` to `EX81`) for
   every rule, and each contract names seeded mutations (left association, floor
   division, an erroring empty sum, an identity used as a seed, implicit
   promotion, NaN-ignoring `min`, two-valued logic, exact-quotient `div`, cell
-  flattening, partial output) that the documentation model shows change an
-  outcome.
+  flattening, partial output, ignored `ddof`, and one-pass variance) that the
+  documentation model shows change an outcome.
 - Each contract carries a proof sketch for the Verus lemmas and Kani harnesses
   that its discharging obligation component must provide; task 1.2.3 replays
   the examples as `rstest` cases.

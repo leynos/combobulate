@@ -23,27 +23,54 @@ from host Rust, such as closures, without inferring meaning from function names.
 
 ## Grammar
 
-Screen reader description: the following EBNF defines a pipeline as stages
-separated by `|>`, a stage as a Rust-precedence expression over the documented
-operators, and primaries as names, literals, calls, method calls, parenthesized
-pipelines, and `host` blocks.
+Screen reader description: the following EBNF defines `comb!`, `verb!`,
+`host { ... }`, `arr!`, and `array!`, including pipeline stages, placeholder
+bindings, literal cell boundaries, and nested array structure.
 
 ```plaintext
-pipeline  = stage , { "|>" , stage } ;              (* left-associative, lowest *)
-stage     = expr ;                                    (* precedence climbing, table below *)
-expr      = unary , { binary-op , unary } ;
-unary     = { "-" | "!" } , postfix ;
-postfix   = primary , { "." , name , arguments } ;
-primary   = path | literal | path , arguments | "(" , pipeline , ")" | host-block ;
-arguments = "(" , [ argument , { "," , argument } ] , ")" ;
-argument  = "&" , name | pipeline ;                  (* &name is a host reference *)
-host-block = "host" , "{" , rust-tokens , "}" ;      (* host Rust, evaluated once *)
+comb-macro    = "comb!" , "{" , pipeline , "}" ;
+pipeline      = stage , { "|>" , stage } ;                  (* left-associative, lowest *)
+stage         = expr ;                                       (* Rust precedence, table below *)
+expr          = comparison ;
+comparison    = bitwise-or , [ comparison-op , bitwise-or ] ; (* no ungrouped chains *)
+bitwise-or    = bitwise-xor , { "|" , bitwise-xor } ;
+bitwise-xor   = bitwise-and , { "^" , bitwise-and } ;
+bitwise-and   = shift , { "&" , shift } ;
+shift         = additive , { ( "<<" | ">>" ) , additive } ;
+additive      = multiplicative , { ( "+" | "-" ) , multiplicative } ;
+multiplicative = unary , { ( "*" | "/" | "%" ) , unary } ;
+unary         = { "-" | "!" } , postfix ;
+postfix       = primary , { "." , name , arguments } ;
+primary       = path | literal | path , arguments
+              | "(" , pipeline , ")" | host-block ;
+arguments     = "(" , [ argument , { "," , argument } ] , ")" ;
+argument      = "&" , path | pipeline ;                        (* &name is a host reference *)
+comparison-op = "==" | "!=" | "<" | ">" | "<=" | ">=" ;
+host-block    = "host" , "{" , rust-token-tree , "}" ;        (* host Rust, evaluated once *)
+verb-macro    = "verb!" , "{" , "|" , [placeholders] , "|" , {let-binding} , pipeline , "}" ;
+placeholders  = name , { "," , name } ;
+let-binding   = "let" , name , "=" , pipeline , ";" ;         (* immutable, shared graph node *)
+arr-macro     = "arr!" , "[" , [arr-row , { ";" , arr-row }] , "]" ;
+arr-row       = arr-cell , { whitespace , arr-cell } ;          (* whitespace separates cells *)
+arr-cell      = path | literal | "(" , rust-expression , ")" ;
+array-macro   = "array!" , "[" , array-literal , "]" ;
+array-literal = "[" , [array-element , { "," , array-element }] , "]" ;
+array-element = rust-expression | array-literal ;
+name          = identifier ;
+path          = Rust path tokens ;
+literal       = Rust literal token ;
+identifier    = Rust identifier token ;
+rust-token-tree = balanced Rust token tree ;
+rust-expression = Rust expression occupying one literal cell ;
+whitespace    = one or more spaces or tabs ;
 ```
 
-`verb! { |inputs| body }` binds placeholder inputs and immutable `let` bindings
-around the same expression grammar. `arr!` takes whitespace cells and semicolon
-rows, and `array!` takes nested comma-separated rows; both require rectangular
-literals.
+The EBNF names the five public forms recorded in `spec/macro-grammar.json`.
+`comb!` and `verb!` use the graph-expression subset above. In `arr!`, top-level
+whitespace separates cells and semicolons separate rows; parentheses keep a
+compound Rust expression within one cell. `array!` uses recursively nested,
+comma-separated Rust array literals. Both literal forms require rectangular
+structure.
 
 ## Operator precedence
 
@@ -87,9 +114,10 @@ _Table 1: `comb!` operator precedence, strongest first._
 
 ## Consequences
 
-- `spec/macro-grammar.json` records the corpus (`G01` to `G28`), covering
-  every level and rejection rule; a documentation-model recognizer checks it
-  until task 2.3.1 replays every entry as a `trybuild` pass or fail fixture.
+- `spec/macro-grammar.json` records all five macro forms and the corpus
+  (`G01` to `G28`), covering every precedence level and rejection rule; a
+  documentation-model recognizer checks it until task 2.3.1 replays every
+  expression entry as a `trybuild` pass or fail fixture.
 - Seeded grammar mutations (swapped `*` and `+`, right-associative `|>`,
   accepted `&&`, allowed comparison mixing) each change at least one corpus
   outcome.

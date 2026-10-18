@@ -5,6 +5,7 @@ import copy
 import math
 import struct
 import sys
+from tempfile import TemporaryDirectory
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -13,9 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from hypothesis import given, settings, strategies as st
 
-from docs_validation.context import ValidationContext
-from docs_validation.contract_examples import decode, encode, evaluate_contract, outcome
-from docs_validation.semantic_contracts import check_semantic_contracts
+from docs_validation.context import ValidationContext, same_typed_value
+from docs_validation.contract_examples import check_contract_examples, decode, encode, evaluate_contract, outcome
+from docs_validation.semantic_contracts import check_macro_grammar, check_semantic_contracts
 from docs_validation.semantics import SemanticFailure
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -102,9 +103,30 @@ class ContractRegister(unittest.TestCase):
         self.assert_rejected('spec/decisions.json', decisions, 'SC-05 cites a decision that is not accepted')
 
     def test_superseded_name_cannot_return_to_the_catalogue(self):
-        vocabulary = CONTEXT.load('spec/vocabulary.json')
-        vocabulary['entries'].append(copy.deepcopy(vocabulary['entries'][0]) | {'id': 'V999', 'name': '`cells`'})
-        self.assert_rejected('spec/vocabulary.json', vocabulary, 'Excluded name cells appears in the catalogue')
+        for name, normalized in (('cells', 'cells'), ('.pipe(f)', '.pipe')):
+            with self.subTest(name=name):
+                vocabulary = CONTEXT.load('spec/vocabulary.json')
+                vocabulary['entries'].append(copy.deepcopy(vocabulary['entries'][0]) |
+                                              {'id': 'V999', 'name': f'`{name}`'})
+                self.assert_rejected('spec/vocabulary.json', vocabulary,
+                                     f'Excluded name {normalized} appears in the catalogue')
+
+    def test_macro_grammar_covers_all_five_public_forms(self):
+        check_macro_grammar(ValidationContext(ROOT))
+
+    def test_macro_grammar_rejects_a_missing_public_form_production(self):
+        source = (ROOT / 'docs/adrs/adr-0007-comb-macro-grammar-and-staging.md').read_text(encoding='utf-8')
+        source = source.replace(
+            'host-block    = "host" , "{" , rust-token-tree , "}" ;        (* host Rust, evaluated once *)\n', '', 1)
+        with TemporaryDirectory() as temporary_directory:
+            temporary_root = Path(temporary_directory)
+            adr_path = temporary_root / 'docs/adrs/adr-0007-comb-macro-grammar-and-staging.md'
+            adr_path.parent.mkdir(parents=True)
+            adr_path.write_text(source, encoding='utf-8')
+            context = ValidationContext(temporary_root)
+            with patch.object(context, 'load', lambda name: CONTEXT.load(name)):
+                with self.assertRaisesRegex(AssertionError, 'ADR-0007 grammar misses productions: host-block'):
+                    check_macro_grammar(context)
 
 
 class TaggedScalars(unittest.TestCase):
@@ -171,7 +193,17 @@ class ContractProperties(unittest.TestCase):
             with self.subTest(case=case['id']):
                 expected = {'error': case['expected_error']} if 'expected_error' in case else encode(
                     decode(case['expected']))
-                self.assertEqual(outcome(case), expected, 'the documentation model must reproduce the example')
+                self.assertTrue(same_typed_value(outcome(case), expected),
+                                'the documentation model must reproduce the typed example')
+
+    def test_contract_example_rejects_bool_integer_expectation_coercion(self):
+        examples = copy.deepcopy(CONTEXT.load('spec/examples.json'))
+        next(case for case in examples['contract_cases'] if case['id'] == 'EX26')['expected'] = 0
+        context = ValidationContext(ROOT)
+        original = context.load
+        with patch.object(context, 'load', lambda name: examples if name == 'spec/examples.json' else original(name)):
+            with self.assertRaisesRegex(AssertionError, 'EX26 expected 0, got False'):
+                check_contract_examples(context)
 
 
 if __name__ == '__main__':

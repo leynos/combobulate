@@ -832,7 +832,7 @@
       "name": "mean",
       "signature": "numeric array -> F64 scalar",
       "shape": "[] by default.",
-      "contract": "Whole-cell aggregate; empty/all-skipped-null input fails. Cast numeric values to F64, exact right sum, then divide by valid count. Contracts: SC-02, SC-07.",
+      "contract": "Whole-cell aggregate; empty/all-skipped-null input fails without an explicit F64 identity. Cast numeric values to F64, exact right sum, then divide by valid count. Contracts: SC-02, SC-07.",
       "execution": "Explicit reducer state/finalize contract; count must fit exactly supported range.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -845,7 +845,7 @@
       "name": "variance",
       "signature": "numeric array -> F64 scalar",
       "shape": "[] by default.",
-      "contract": "Two-pass definition using mean and right-summed squared deviations; ddof=0; require count>ddof; null propagates.",
+      "contract": "Two-pass definition using mean and right-summed squared deviations; ddof=0; require count>ddof; null propagates. Contract: SC-11.",
       "execution": "Alternative stable/parallel algorithms need an explicit numerical policy, not a silent rewrite.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -858,7 +858,7 @@
       "name": "stddev",
       "signature": "numeric array -> F64 scalar",
       "shape": "[] by default.",
-      "contract": "Two-pass definition using mean and right-summed squared deviations; ddof=0; require count>ddof; null propagates.",
+      "contract": "Two-pass definition using mean and right-summed squared deviations; ddof=0; require count>ddof; null propagates. Contract: SC-11.",
       "execution": "Alternative stable/parallel algorithms need an explicit numerical policy, not a silent rewrite.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1430,7 +1430,7 @@
       "name": ".ddof(n)",
       "signature": "variance/stddev -> operation",
       "shape": "Aggregate shape.",
-      "contract": "Non-negative integer; require non-null count > n. Default 0.",
+      "contract": "Non-negative integer; require non-null count > n. Default 0. Contract: SC-11.",
       "execution": "Part of numerical definition and plan identity.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1549,7 +1549,7 @@
       "name": "arr!",
       "signature": "whitespace cells; semicolon rows",
       "shape": "Literal-derived.",
-      "contract": "Retains arr![1 2 3; 4 5 6]; require rectangularity. Parentheses delimit complex/negative cell expressions.",
+      "contract": "Retains arr![1 2 3; 4 5 6]; require rectangularity. Parentheses delimit complex/negative cell expressions. Contract: SC-10.",
       "execution": "Compile-time syntax/rectangularity diagnostics; fallible checked value construction.",
       "scope": "Core",
       "roadmap_tasks": [
@@ -1562,7 +1562,7 @@
       "name": "array!",
       "signature": "nested comma-separated rows",
       "shape": "Literal-derived.",
-      "contract": "Conventional array![[1,2],[3,4]]; nested rectangular literals. Empty typed literal needs explicit dtype.",
+      "contract": "Conventional array![[1,2],[3,4]]; nested rectangular literals. Empty typed literal needs explicit dtype. Contract: SC-10.",
       "execution": "Same runtime value contract as arr!, not a second execution model.",
       "scope": "Core",
       "roadmap_tasks": [

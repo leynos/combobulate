@@ -15,7 +15,7 @@ import struct
 from collections.abc import Callable
 from fractions import Fraction
 
-from .context import ValidationContext, require
+from .context import ValidationContext, require, same_typed_value
 from .semantics import SemanticFailure
 
 I64_MIN, I64_MAX = -(2**63), 2**63 - 1
@@ -227,10 +227,10 @@ def checked_identity(identity: object, element_dtype: str) -> object:
 
 def empty_result(name: str, case: dict, mutations: Mutations) -> object:
     """Return an aggregate's empty-lane result; identities are never seeds."""
+    if 'identity' in case:
+        return checked_identity(decode(case['identity']), 'F64' if name == 'mean' else case['dtype'])
     if name == 'mean':
         raise SemanticFailure('EmptyMean')
-    if 'identity' in case:
-        return checked_identity(decode(case['identity']), case['dtype'])
     registered = AGGREGATES[name][1]
     if registered is None or (name == 'sum' and 'empty-sum-error' in mutations):
         raise SemanticFailure('EmptyReduction')
@@ -239,6 +239,8 @@ def empty_result(name: str, case: dict, mutations: Mutations) -> object:
 
 def aggregate(name: str, case: dict, mutations: Mutations) -> object:
     """Evaluate one whole-cell aggregate (V058 to V064) over a rank-one input."""
+    if 'identity' in case:
+        checked_identity(decode(case['identity']), 'F64' if name == 'mean' else case['dtype'])
     values = null_policy(decode(case['input']), case.get('skip_nulls', False))
     if values is None:
         return None
@@ -249,6 +251,35 @@ def aggregate(name: str, case: dict, mutations: Mutations) -> object:
     if name == 'mean':
         return ieee_div(right_reduce('add', [float(value) for value in values], mutations), float(len(values)))
     return right_reduce(AGGREGATES[name][0], values, mutations)
+
+
+def variance(case: dict, mutations: Mutations) -> object:
+    """Evaluate the declared two-pass variance; e.g. [1, 2, 3] with ddof 1 gives 1.0."""
+    ddof = case.get('ddof', 0)
+    if type(ddof) is not int or not 0 <= ddof <= I64_MAX:
+        raise SemanticFailure('InvalidDegreesOfFreedom')
+    values = null_policy(decode(case['input']), case.get('skip_nulls', False))
+    if values is None:
+        return None
+    if any(type(value) not in {int, float} for value in values):
+        raise SemanticFailure('DtypeMismatch')
+    if len(values) > MEAN_COUNT_LIMIT:
+        raise SemanticFailure('CountTooLarge')
+    if len(values) <= ddof:
+        raise SemanticFailure('InsufficientCount')
+
+    f64_values = [float(value) for value in values]
+    mean = ieee_div(right_reduce('add', f64_values, mutations), float(len(values)))
+    if 'one-pass-variance' in mutations:
+        squared_total = right_reduce('add', [value * value for value in f64_values], mutations)
+        second_moment = ieee_div(squared_total, float(len(values)))
+        result = second_moment - mean * mean
+        return math.sqrt(result) if case['operation'] == 'stddev' else result
+    squared_deviations = [(value - mean) ** 2 for value in f64_values]
+    squared_total = right_reduce('add', squared_deviations, mutations)
+    denominator = float(len(values) if 'ignore-ddof' in mutations else len(values) - ddof)
+    result = ieee_div(squared_total, denominator)
+    return math.sqrt(result) if case['operation'] == 'stddev' else result
 
 
 def mean_count(case: dict, mutations: Mutations) -> object:
@@ -287,6 +318,8 @@ def evaluate_contract(case: dict, mutations: Mutations = frozenset()) -> object:
         return right_reduce(case['binary'], decode(case['input']), mutations)
     if operation == 'cast':
         return cast(decode(case['input']), case['to'])
+    if operation in {'variance', 'stddev'}:
+        return variance(case, mutations)
     if operation in AGGREGATES or operation == 'mean':
         return aggregate(operation, case, mutations)
     handlers = {'mean_count': mean_count, 'batch_axis': batch_axis, 'atomic_commit': atomic_commit}
@@ -317,6 +350,7 @@ def check_contract_examples(context: ValidationContext) -> None:
     for case in cases:
         require(('expected' in case) != ('expected_error' in case), f"{case['id']} needs one expectation")
         actual = outcome(case)
-        require(actual == expected_outcome(case), f"{case['id']} expected {expected_outcome(case)}, got {actual}")
+        require(same_typed_value(actual, expected_outcome(case)),
+                f"{case['id']} expected {expected_outcome(case)}, got {actual}")
     context.record('contract-examples', 'Tagged-scalar examples of the accepted numeric, validity, reduction, cell, and '
                                         'commit contracts evaluate as recorded in the documentation model.', len(cases))

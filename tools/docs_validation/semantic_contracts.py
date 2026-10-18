@@ -19,11 +19,19 @@ from .contract_examples import outcome
 from .grammar import parse
 
 TASK_SOURCE = re.compile(r'^task:(.+)$')
+REQUIRED_MACRO_FORMS = {
+    'comb!': ('comb-macro', 'X001'),
+    'verb!': ('verb-macro', 'X004'),
+    'host { ... }': ('host-block', 'E001'),
+    'arr!': ('arr-macro', 'X002'),
+    'array!': ('array-macro', 'X003'),
+}
 
 
 def catalogue_names(entry: dict) -> set[str]:
     """Return an entry's names without Markdown code marks; e.g. '`comb!`' gives {'comb!'}."""
-    return {name.strip(' `') for name in entry['name'].split('/')}
+    names = {name.strip(' `') for name in entry['name'].split('/')}
+    return {re.sub(r'^(\.[A-Za-z_]\w*)\s*\(.*\)$', r'\1', name) for name in names}
 
 
 def check_excluded_names(register: dict, catalogue: list[dict]) -> None:
@@ -111,6 +119,10 @@ def adr_precedence(text: str) -> list[tuple[list[str], str]]:
 def check_macro_grammar(context: ValidationContext) -> None:
     """Require the corpus to parse as recorded, cover every rule, and agree with ADR-0007 (VO-9)."""
     grammar = context.load('spec/macro-grammar.json')
+    forms = {form['name']: (form['production'], form['catalogue_id']) for form in grammar['forms']}
+    require(len(forms) == len(grammar['forms']), 'Macro grammar form names must be unique')
+    require(forms == REQUIRED_MACRO_FORMS,
+            'Macro grammar must register comb!, verb!, host, arr!, and array! with their catalogue entries')
     for entry in grammar['corpus']:
         expected = entry['tree'] if entry['expect'] == 'accept' else entry['rule']
         actual = parse(entry['source'], grammar)
@@ -120,6 +132,16 @@ def check_macro_grammar(context: ValidationContext) -> None:
     required = {level['name'] for level in grammar['precedence']} | {rule['rule'] for rule in grammar['rejections']}
     require(required <= covered, f"Grammar corpus misses {', '.join(sorted(required - covered))}")
     adr = (context.root / 'docs/adrs/adr-0007-comb-macro-grammar-and-staging.md').read_text(encoding='utf-8')
+    grammar_section = adr.split('```plaintext', 1)[1].split('```', 1)[0]
+    productions = {line.split('=', 1)[0].strip() for line in grammar_section.splitlines() if '=' in line}
+    required_forms = {form['production'] for form in grammar['forms']}
+    require(required_forms <= productions,
+            f"ADR-0007 grammar misses productions: {', '.join(sorted(required_forms - productions))}")
+    semantic_contracts = context.load('spec/semantic-contracts.json')['contracts']
+    sc10 = next(record for record in semantic_contracts if record['id'] == 'SC-10')
+    form_catalogue_ids = {catalogue_id for _, catalogue_id in forms.values()}
+    require(form_catalogue_ids <= set(sc10['catalogue_ids']),
+            'SC-10 must cite every macro-form catalogue entry')
     table = [(level['operators'], level['associativity']) for level in grammar['precedence']]
     require(adr_precedence(adr) == table, 'spec/macro-grammar.json disagrees with the ADR-0007 precedence table')
     context.record('macro-grammar', 'The comb! corpus parses as recorded in the documentation model, covers every '

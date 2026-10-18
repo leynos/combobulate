@@ -839,6 +839,125 @@
         8,
         9
       ]
+    },
+    {
+      "id": "EX72",
+      "contract": "SC-02",
+      "operation": "mean",
+      "input": [],
+      "dtype": "F64",
+      "identity": {
+        "f64": "9.0"
+      },
+      "expected": {
+        "f64": "9.0"
+      }
+    },
+    {
+      "id": "EX73",
+      "contract": "SC-02",
+      "operation": "minimum",
+      "input": [
+        5
+      ],
+      "dtype": "I64",
+      "identity": {
+        "f64": "0.0"
+      },
+      "expected_error": "IdentityDtype"
+    },
+    {
+      "id": "EX74",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        {
+          "f64": "1e+16"
+        },
+        {
+          "f64": "1.0000000000000002e+16"
+        }
+      ],
+      "expected": {
+        "f64": "2.0"
+      }
+    },
+    {
+      "id": "EX75",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        1,
+        2,
+        3
+      ],
+      "ddof": 1,
+      "expected": {
+        "f64": "1.0"
+      }
+    },
+    {
+      "id": "EX76",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [],
+      "expected_error": "InsufficientCount"
+    },
+    {
+      "id": "EX77",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        1
+      ],
+      "ddof": 1,
+      "expected_error": "InsufficientCount"
+    },
+    {
+      "id": "EX78",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        1,
+        null,
+        3
+      ],
+      "expected": null
+    },
+    {
+      "id": "EX79",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        null,
+        null
+      ],
+      "skip_nulls": true,
+      "expected_error": "InsufficientCount"
+    },
+    {
+      "id": "EX80",
+      "contract": "SC-11",
+      "operation": "stddev",
+      "input": [
+        1,
+        2,
+        3
+      ],
+      "ddof": 1,
+      "expected": {
+        "f64": "1.0"
+      }
+    },
+    {
+      "id": "EX81",
+      "contract": "SC-11",
+      "operation": "variance",
+      "input": [
+        1
+      ],
+      "ddof": -1,
+      "expected_error": "InvalidDegreesOfFreedom"
     }
   ],
   "semantic_changes_from_0_1": "none"

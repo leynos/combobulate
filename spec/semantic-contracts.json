@@ -8,8 +8,10 @@
     "EmptyMean",
     "EmptyReduction",
     "IdentityDtype",
+    "InsufficientCount",
     "IntegerOverflow",
     "InvalidCast",
+    "InvalidDegreesOfFreedom",
     "MacroSyntax",
     "NonFinite",
     "NonIntegral",
@@ -79,7 +81,7 @@
         }
       ],
       "mutation_frame": "Pure: no input, destination, or host state is modified.",
-      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
+      "termination": "Empty lanes perform no operation. For a nonempty n-element lane, reduce and fold_left apply the binary operation n-1 times, scan_left applies it n-1 times, and exact right-prefix scan applies it n(n-1)/2 times in total.",
       "empty_rule": "Empty reduce and fold_left lanes use only a registered or explicit identity, else EmptyReduction; empty scans return an empty lane without applying f.",
       "examples": [
         "EX21",
@@ -114,7 +116,7 @@
         "The aggregate null policy has already been applied.",
         "An explicit identity, when given, has the output dtype."
       ],
-      "success_relation": "For a nonempty lane the result is the exact right reduction of the aggregate operation; for an empty lane it is the registered identity (typed zero for sum, one for product, false for any, true for all) or the explicit .identity(value).",
+      "success_relation": "For a nonempty lane the result is the exact right reduction of the aggregate operation; for an empty lane it is the registered identity (typed zero for sum, one for product, false for any, true for all) or the explicit .identity(value), provided the identity has the output dtype.",
       "success_conditions": [
         "An identity is used for an empty lane only and is never a seed.",
         "Minimum, maximum, and mean have no registered identity."
@@ -125,16 +127,16 @@
           "error": "EmptyReduction"
         },
         {
-          "condition": "Empty mean.",
+          "condition": "Empty mean without .identity(value).",
           "error": "EmptyMean"
         },
         {
-          "condition": ".identity(value) whose dtype differs from the output dtype.",
+          "condition": ".identity(value) whose dtype differs from the output dtype, for any lane length.",
           "error": "IdentityDtype"
         }
       ],
       "mutation_frame": "Pure: no input, destination, or host state is modified.",
-      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
+      "termination": "A nonempty n-element reduction uses n-1 binary applications; mean then divides once. Empty identities finalize without applying the aggregate operation.",
       "empty_rule": "This contract is the empty rule for the aggregates it lists.",
       "examples": [
         "EX23",
@@ -147,7 +149,9 @@
         "EX30",
         "EX31",
         "EX32",
-        "EX33"
+        "EX33",
+        "EX72",
+        "EX73"
       ],
       "seeded_mutations": [
         {
@@ -382,8 +386,8 @@
         }
       ],
       "mutation_frame": "Pure: no input, destination, or host state is modified.",
-      "termination": "Total: one application of the binary operation per adjacent pair, so at most n-1 applications for n elements.",
-      "empty_rule": "Empty F64 sum is +0.0; empty minimum, maximum, and mean fail per SC-02.",
+      "termination": "Binary min and max use constant work. Mean uses n-1 additions followed by one division for a nonempty lane.",
+      "empty_rule": "Empty F64 sum is +0.0; empty minimum, maximum, and mean fail without an explicit identity per SC-02.",
       "examples": [
         "EX60",
         "EX61",
@@ -488,16 +492,19 @@
       "decision": "D08",
       "catalogue_ids": [
         "X001",
+        "X002",
+        "X003",
         "X004",
         "E001"
       ],
       "preconditions": [
         "Source is a token stream accepted by the macro frontend."
       ],
-      "success_relation": "The token stream is split on |> first (lowest precedence, left-associative); each stage parses with Rust expression precedence as parsed by syn, restricted to the documented DSL subset in spec/macro-grammar.json.",
+      "success_relation": "comb!, verb!, host { ... }, arr!, and array! follow the productions in ADR-0007; comb! splits the token stream on |> first (lowest precedence, left-associative), then parses each stage with Rust expression precedence as parsed by syn, restricted to the documented DSL subset in spec/macro-grammar.json.",
       "success_conditions": [
         "Comparison mixed unparenthesized with &, |, or ^ is rejected, as are comparison chains.",
-        "Closures and || are accepted only inside host { ... }."
+        "Closures and || are accepted only inside host { ... }.",
+        "verb! placeholder inputs and immutable let bindings preserve graph-node sharing; arr! and array! preserve the literal cell and nested-row boundaries and require rectangular literals."
       ],
       "error_relation": [
         {
@@ -529,6 +536,71 @@
         "task:2.3.1"
       ],
       "proof_sketch": "No proof: 2.3.1 replays every grammar corpus entry as a trybuild pass or fail fixture, with a completeness check; the recognizer in tools/docs_validation/grammar.py models the corpus, not the macro."
+    },
+    {
+      "id": "SC-11",
+      "title": "Two-pass variance and standard deviation",
+      "decision": "D07",
+      "catalogue_ids": [
+        "V065",
+        "V066",
+        "P008"
+      ],
+      "preconditions": [
+        "The input contains numeric values; the aggregate null policy is applied before counting.",
+        "ddof is a non-negative I64; it defaults to zero."
+      ],
+      "success_relation": "After null handling, convert each value to F64; compute the mean by exact right-sum/count, right-sum the squared deviations from that mean, and divide by count-ddof. stddev is the square root of variance.",
+      "success_conditions": [
+        "The valid count is at most 2^53 so count conversion is exact.",
+        "The specified order is two passes; a numerically different one-pass, stable, or merged algorithm requires an explicit numerical policy.",
+        "Validate ddof before null handling; check the 2^53 count bound before comparing the count with ddof."
+      ],
+      "error_relation": [
+        {
+          "condition": "ddof is not a non-negative I64; this is checked before null handling.",
+          "error": "InvalidDegreesOfFreedom"
+        },
+        {
+          "condition": "An input element is not numeric.",
+          "error": "DtypeMismatch"
+        },
+        {
+          "condition": "The valid count exceeds 2^53; this is checked before comparing with ddof.",
+          "error": "CountTooLarge"
+        },
+        {
+          "condition": "The valid count is not greater than ddof.",
+          "error": "InsufficientCount"
+        }
+      ],
+      "mutation_frame": "Pure: no input, destination, or host state is modified.",
+      "termination": "At most two ordered passes, each linear in the number of valid values.",
+      "empty_rule": "After skip_nulls, an empty lane or any lane with valid_count <= ddof fails with InsufficientCount; default ddof is zero.",
+      "examples": [
+        "EX74",
+        "EX75",
+        "EX76",
+        "EX77",
+        "EX78",
+        "EX79",
+        "EX80",
+        "EX81"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "ignore-ddof",
+          "description": "Divide the squared-deviation sum by count instead of count-ddof."
+        },
+        {
+          "id": "one-pass-variance",
+          "description": "Use E[x^2] - E[x]^2 instead of the declared two-pass definition."
+        }
+      ],
+      "discharged_by": [
+        "PF07.proof@2.2.4"
+      ],
+      "proof_sketch": "Verus: specify the ordered two-pass sequence function and prove the executable accumulator/finalizer refines it, including null filtering, count bounds, and count <= ddof failure. Kani: bounded symbolic lanes compare F64 result bits against the sequential oracle and exercise empty, singleton, ddof, and count-bound cases. This establishes algorithmic refinement, not real-number accuracy."
     }
   ]
 }
