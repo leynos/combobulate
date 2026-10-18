@@ -107,7 +107,7 @@
     {
       "check": "macro-grammar",
       "status": "pass",
-      "detail": "The comb! corpus parses as recorded in the documentation model, covers every precedence level and rejection rule, and agrees with ADR-0007. Task 2.3.1 replays it through trybuild.",
+      "detail": "The comb! corpus parses as recorded in the documentation model, covers every precedence level and rejection rule, and agrees with ADR-0007. The published array! literal also derives from the recorded productions. Task 2.3.1 replays the comb! corpus through trybuild.",
       "count": 28
     },
     {

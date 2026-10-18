@@ -406,7 +406,8 @@
     {
       "name": "array!",
       "production": "array-macro",
-      "catalogue_id": "X003"
+      "catalogue_id": "X003",
+      "example": "array![[1,2],[3,4]]"
     }
   ]
 }

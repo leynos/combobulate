@@ -75,6 +75,16 @@ class Corpus(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'disagrees with the ADR-0007 precedence table'):
             run_with(adr=swapped)
 
+    def test_array_macro_production_must_derive_its_published_example(self):
+        text = ADR_PATH.read_text(encoding='utf-8')
+        extra_bracket = text.replace(
+            'array-macro   = "array!" , array-literal ;',
+            'array-macro   = "array!" , "[" , array-literal , "]" ;',
+        )
+        self.assertNotEqual(extra_bracket, text, 'the control must add the invalid outer bracket layer')
+        with self.assertRaisesRegex(AssertionError, 'array productions do not derive'):
+            run_with(adr=extra_bracket)
+
 
 if __name__ == '__main__':
     unittest.main()

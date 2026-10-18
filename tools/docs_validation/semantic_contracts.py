@@ -10,6 +10,7 @@ component or task. They also keep superseded names out of the catalogue (VO-10).
 """
 from __future__ import annotations
 
+import json
 import re
 
 from jsonschema import Draft202012Validator
@@ -133,10 +134,33 @@ def check_macro_grammar(context: ValidationContext) -> None:
     require(required <= covered, f"Grammar corpus misses {', '.join(sorted(required - covered))}")
     adr = (context.root / 'docs/adrs/adr-0007-comb-macro-grammar-and-staging.md').read_text(encoding='utf-8')
     grammar_section = adr.split('```plaintext', 1)[1].split('```', 1)[0]
-    productions = {line.split('=', 1)[0].strip() for line in grammar_section.splitlines() if '=' in line}
+    productions = {}
+    for line in grammar_section.splitlines():
+        if '=' in line:
+            name, expression = line.split('=', 1)
+            productions[name.strip()] = expression.strip().removesuffix(';').strip()
     required_forms = {form['production'] for form in grammar['forms']}
-    require(required_forms <= productions,
-            f"ADR-0007 grammar misses productions: {', '.join(sorted(required_forms - productions))}")
+    missing_productions = required_forms - set(productions)
+    require(not missing_productions,
+            f"ADR-0007 grammar misses productions: {', '.join(sorted(missing_productions))}")
+    array_form = next(form for form in grammar['forms'] if form['name'] == 'array!')
+    array_example = array_form.get('example')
+    catalogue = {entry['id']: entry for entry in context.load('spec/vocabulary.json')['entries']}
+    require(isinstance(array_example, str) and array_example in catalogue['X003']['contract'],
+            'array! grammar example must appear in catalogue entry X003')
+    try:
+        array_literal = json.loads(array_example.removeprefix('array!'))
+    except json.JSONDecodeError as error:
+        raise AssertionError('array! grammar example must be a nested literal array') from error
+    require(array_literal == [[1, 2], [3, 4]],
+            'array! grammar example must be the published nested literal array')
+    expected_array_rules = {
+        'array-macro': '"array!" , array-literal',
+        'array-literal': '"[" , [array-element , { "," , array-element }] , "]"',
+        'array-element': 'rust-expression | array-literal',
+    }
+    require(all(productions.get(rule) == expected for rule, expected in expected_array_rules.items()),
+            'ADR-0007 array productions do not derive the published array! example')
     semantic_contracts = context.load('spec/semantic-contracts.json')['contracts']
     sc10 = next(record for record in semantic_contracts if record['id'] == 'SC-10')
     form_catalogue_ids = {catalogue_id for _, catalogue_id in forms.values()}
@@ -145,5 +169,6 @@ def check_macro_grammar(context: ValidationContext) -> None:
     table = [(level['operators'], level['associativity']) for level in grammar['precedence']]
     require(adr_precedence(adr) == table, 'spec/macro-grammar.json disagrees with the ADR-0007 precedence table')
     context.record('macro-grammar', 'The comb! corpus parses as recorded in the documentation model, covers every '
-                                    'precedence level and rejection rule, and agrees with ADR-0007. Task 2.3.1 '
-                                    'replays it through trybuild.', len(grammar['corpus']))
+                                    'precedence level and rejection rule, and agrees with ADR-0007. The published '
+                                    'array! literal also derives from the recorded productions. Task 2.3.1 replays '
+                                    'the comb! corpus through trybuild.', len(grammar['corpus']))

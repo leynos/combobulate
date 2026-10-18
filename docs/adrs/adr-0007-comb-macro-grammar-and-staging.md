@@ -53,7 +53,7 @@ let-binding   = "let" , name , "=" , pipeline , ";" ;         (* immutable, shar
 arr-macro     = "arr!" , "[" , [arr-row , { ";" , arr-row }] , "]" ;
 arr-row       = arr-cell , { whitespace , arr-cell } ;          (* whitespace separates cells *)
 arr-cell      = path | literal | "(" , rust-expression , ")" ;
-array-macro   = "array!" , "[" , array-literal , "]" ;
+array-macro   = "array!" , array-literal ;
 array-literal = "[" , [array-element , { "," , array-element }] , "]" ;
 array-element = rust-expression | array-literal ;
 name          = identifier ;

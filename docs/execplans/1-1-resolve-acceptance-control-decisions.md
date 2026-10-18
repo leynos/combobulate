@@ -444,6 +444,16 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   follow-up brings EP-M3 to 3,184 net added lines across 24 authored files,
   excluding the generated reference table and validation report. No Verus or
   Kani proof was run. Date/Author: 2026-10-18, implementing agent.
+- Decision: the CodeRabbit follow-up
+  ([assessment](https://github.com/leynos/combobulate/pull/15#issuecomment-6250998441))
+  found Python exponentiation raised `OverflowError` for finite F64 squared
+  deviations, and ADR-0007's `array!` production added an outer bracket pair
+  that could not derive X003's published example. Use multiplication and add
+  EX82/EX83; pass the `array!` wrapper directly to `array-literal`, link the
+  grammar example to X003, and reject the defective production in a negative
+  control. This brings EP-M3 to 3,272 net added lines across 24 authored files,
+  excluding the generated reference table and validation report. Date/Author:
+  2026-10-18, implementing agent.
 - Decision: `EP-M1b` milestone review dispositions. Fixed: completion
   artefacts must resolve inside the repository; the real-roadmap closure test
   runs the full check sequence so a tick that relies on a checker-sourced
