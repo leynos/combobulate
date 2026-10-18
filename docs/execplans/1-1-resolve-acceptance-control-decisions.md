@@ -329,7 +329,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   VO-10 negative controls, four Hypothesis properties, and the ADR-0007 table
   agreement); every seeded mutation changes at least one outcome; the
   recognizer is 198 lines; task 1.1.2 ticked and backed.
-- [ ] (2026-10-18) Current-head review follow-up: preserve the 10/11 evidence
+- [x] (2026-10-18) Current-head review follow-up: preserve the 10/11 evidence
   above as a dated historical snapshot. Reconcile contract coverage for empty
   reductions, negative axes, mixed-dtype arithmetic, and pipeline arguments;
   correct tagged wide integers and traceability; add bounded properties for
@@ -347,7 +347,21 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make install-build-tools` restored the pinned component. Design-check then
   caught a negative-control test routed to the semantic checker instead of the
   grammar checker; the test now calls `check_macro_grammar` with the mutated
-  corpus. Hosted CI and review equilibrium remain pending.
+  corpus.
+- Follow-up outcome: commit `2a17b9d` updates ADR-0007 to record `G01` to `G29`
+  and pipeline-argument coverage, and adds the dated `array!` correction
+  history tied to X003. Against PR base `main` at `e525f75b`, that candidate
+  changes 24 authored files with 4,036 additions and 131 deletions (3,905 net),
+  excluding the generated language-reference and validation-result tables. All
+  seven local gates passed; `make test` reports 329 passed, one skipped, and
+  one doctest passed. The hosted `build-test` and `design-check` workflows
+  passed on that exact head; the optional Act step was skipped. CodeRabbit
+  approved `ef6e796` with 99.05% docstring coverage (105 functions across seven
+  files; 11 skipped as unsupported), then confirmed the Developer Documentation
+  row and both ADR-0007 findings resolved at `2a17b9d`. Its confirmation is at
+  <https://github.com/leynos/combobulate/pull/15#issuecomment-6253606767>.
+  Sourcery's check was skipped because the diff exceeded its 150,000-character
+  limit. The current-head review follow-up is complete.
 - [ ] `EP-M4` Task 1.1.3: calibrated acceptance controls pre-registered.
 - [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
