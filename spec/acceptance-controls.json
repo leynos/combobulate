@@ -49,7 +49,7 @@
           "sources": [
             {
               "path": "tools/calibration/cardinality-probe/verus/cardinality.rs",
-              "sha256": "43c3786a3e22479c25b083549277f2548a822bc726135b827bf821cb2bf0c701"
+              "sha256": "5747afcc769dc72c4679a88721181dbb577a64bfed375dee6982c58f5f84d4de"
             }
           ]
         },
@@ -100,7 +100,7 @@
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
       "registered_digest": "da483a469488f9d2e5fade01a589c7143576bd47cc123b2ca2819dfa44d6a4e5",
-      "digest": "258eeda5f942089f139200734410814486d39189ebb5c4bdeafa0c9e15ff09b6",
+      "digest": "1bf0b928a9d64928584f8b299432d6a9ddfb1b060f03aeffac8cc17a89da3542",
       "amendments": [
         {
           "date": "2026-10-19",
@@ -109,6 +109,14 @@
           "replaces": "da483a469488f9d2e5fade01a589c7143576bd47cc123b2ca2819dfa44d6a4e5",
           "new_digest": "258eeda5f942089f139200734410814486d39189ebb5c4bdeafa0c9e15ff09b6",
           "reason": "Added required module-level documentation to the Verus and Kani calibration probes, changing the registered AC-01 and AC-02 workload source hashes."
+        },
+        {
+          "date": "2026-10-19",
+          "approved_by": "leynos",
+          "approval_reference": "https://lody.ai/leynos/sessions/5b59256c-7ea1-43d9-8d4b-e3a3f7c397c1",
+          "replaces": "258eeda5f942089f139200734410814486d39189ebb5c4bdeafa0c9e15ff09b6",
+          "new_digest": "1bf0b928a9d64928584f8b299432d6a9ddfb1b060f03aeffac8cc17a89da3542",
+          "reason": "Added Rustdoc examples to the Verus probe declarations and proof helpers, changing the registered AC-01 source hash."
         }
       ]
     },

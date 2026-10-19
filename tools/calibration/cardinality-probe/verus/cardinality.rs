@@ -5,12 +5,28 @@ use vstd::prelude::*;
 
 verus! {
 
+/// Return the mathematical product of a sequence, using one for the empty
+/// product.
+///
+/// # Examples
+///
+/// ```text
+/// product(seq![2u64, 3]) == 6
+/// product(seq![]) == 1
+/// ```
 pub open spec fn product(s: Seq<u64>) -> int
     decreases s.len(),
 {
     if s.len() == 0 { 1 } else { product(s.drop_last()) * s.last() }
 }
 
+/// Prove that an in-range zero extent makes the full product zero.
+///
+/// # Examples
+///
+/// ```text
+/// For s = seq![4u64, 0, 7] and i = 1, this proves product(s) == 0.
+/// ```
 proof fn lemma_zero_extent(s: Seq<u64>, i: int)
     requires 0 <= i < s.len(), s[i] == 0,
     ensures product(s) == 0,
@@ -21,6 +37,13 @@ proof fn lemma_zero_extent(s: Seq<u64>, i: int)
     }
 }
 
+/// Prove that a sequence of positive extents has a positive product.
+///
+/// # Examples
+///
+/// ```text
+/// For s = seq![2u64, 3], this proves product(s) >= 1.
+/// ```
 proof fn lemma_product_positive(s: Seq<u64>)
     requires forall|k: int| 0 <= k < s.len() ==> s[k] >= 1,
     ensures product(s) >= 1,
@@ -33,6 +56,13 @@ proof fn lemma_product_positive(s: Seq<u64>)
     }
 }
 
+/// Prove the product recurrence for a non-empty prefix.
+///
+/// # Examples
+///
+/// ```text
+/// For s = seq![2u64, 3] and i = 1, product(s) == product(seq![2]) * 3.
+/// ```
 proof fn lemma_product_step(s: Seq<u64>, i: int)
     requires 0 <= i < s.len(),
     ensures product(s.take(i + 1)) == product(s.take(i)) * s[i],
@@ -40,6 +70,13 @@ proof fn lemma_product_step(s: Seq<u64>, i: int)
     assert(s.take(i + 1).drop_last() =~= s.take(i));
 }
 
+/// Prove that a prefix product is no greater than the whole positive product.
+///
+/// # Examples
+///
+/// ```text
+/// For s = seq![2u64, 3] and i = 1, product(seq![2]) <= product(s).
+/// ```
 proof fn lemma_product_monotone(s: Seq<u64>, i: int)
     requires 0 <= i <= s.len(), forall|k: int| 0 <= k < s.len() ==> s[k] >= 1,
     ensures product(s.take(i)) <= product(s),
@@ -56,6 +93,16 @@ proof fn lemma_product_monotone(s: Seq<u64>, i: int)
     }
 }
 
+/// Return the checked product of extents, with zero taking precedence over
+/// overflow.
+///
+/// # Examples
+///
+/// ```text
+/// checked_cardinality(&vec![2u64, 3]) == Some(6)
+/// checked_cardinality(&vec![0u64, u64::MAX]) == Some(0)
+/// checked_cardinality(&vec![u64::MAX, 2]) == None
+/// ```
 pub fn checked_cardinality(extents: &Vec<u64>) -> (result: Option<u64>)
     ensures
         result == Some(product(extents@) as u64) <==> product(extents@) <= u64::MAX,
@@ -101,4 +148,10 @@ pub fn checked_cardinality(extents: &Vec<u64>) -> (result: Option<u64>)
 
 } // verus!
 
+/// Entry point used by Verus to verify the calibration probe.
+///
+/// # Example
+///
+/// Run `verus cardinality.rs` from this directory to verify the specification
+/// and loop invariants in this file.
 fn main() {}
