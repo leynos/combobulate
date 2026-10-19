@@ -133,10 +133,10 @@ def check_amendment_chain(
     ------
     AssertionError
         If an amendment changes authority, chronology, or digest ancestry.
-KeyError
-    If a control, amendment, or measurement omits a required field.
-TypeError
-    If a frozen field cannot be serialized as JSON.
+    KeyError
+        If a control, amendment, or measurement omits a required field.
+    TypeError
+        If a frozen field cannot be serialized as JSON.
     ValueError
         If a registration, amendment, or measurement date is not ISO formatted.
 
@@ -191,8 +191,8 @@ def check_sources(control: Mapping[str, object], source_digests: Mapping[str, st
     ------
     AssertionError
         If a source is missing or differs from its registered digest.
-KeyError
-    If a control or source omits a required path or digest field.
+    KeyError
+        If a control or source omits a required path or digest field.
 
     Examples
     --------

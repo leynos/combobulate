@@ -34,8 +34,8 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
     ------
     AssertionError
         If the record is unbound, predates registration, or uses another environment.
-KeyError
-    If the control or record omits a field required for binding.
+    KeyError
+        If the control or record omits a field required for binding.
 
     Examples
     --------
@@ -79,8 +79,8 @@ def check_calibration_record(name: str, record: Mapping[str, object]) -> None:
     ------
     AssertionError
         If the record claims acceptance purpose.
-KeyError
-    If the record omits its purpose field.
+    KeyError
+        If the record omits its purpose field.
 
     Examples
     --------
@@ -108,8 +108,8 @@ def check_control_bindings(controls: Mapping[str, Mapping[str, object]], record:
     ------
     AssertionError
         If the record references an unknown control identifier.
-KeyError
-    If the record omits its identifier or control list.
+    KeyError
+        If the record omits its identifier or control list.
 
     Examples
     --------
@@ -142,10 +142,10 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
     ------
     AssertionError
         If a matching acceptance record violates digest, environment, or AC-07 rules.
-KeyError
-    If a matching record omits a required field.
-ValueError
-    If an AC-07 attempt timestamp is malformed.
+    KeyError
+        If a matching record omits a required field.
+    ValueError
+        If an AC-07 attempt timestamp is malformed.
 
     Examples
     --------
@@ -215,8 +215,8 @@ def check_calibration_reference(control: Mapping[str, object], records: Mapping[
     ------
     AssertionError
         If the calibration record is absent, misbound, or a missing status reason is given.
-KeyError
-    If the control omits its calibration declaration or required field.
+    KeyError
+        If the control omits its calibration declaration or required field.
 
     Examples
     --------
