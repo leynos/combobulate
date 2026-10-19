@@ -440,6 +440,17 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make markdownlint`, `make nixie`, and
   `make design-check BASE_REV=origin/1-1-acceptance-controls` (368 unittest, 64
   pytest). Logs use suffix `-rebased.out` under `/tmp`.
+- [ ] (2026-10-19) EP-M5 follow-up assessment repair: CodeRabbit found that a
+  JSON array or `null` supplied to `--bindings` reached the pure gate and
+  raised an uncaught `AttributeError`. Both cases were reproduced, then guarded
+  at the CLI configuration boundary with a usage error and exit code 2; a
+  parameterized regression covers both inputs. The child branch was restacked
+  onto updated PR #16 head `2ff1556b95df` before this repair. Local gates
+  passed sequentially: `make check-fmt`, `make lint`, `make typecheck`,
+  `make test` (329 passed, one skipped, and doctest passed),
+  `make markdownlint`, `make nixie`, and `make design-check` (377 unittest and
+  66 pytest). CodeScene found no issues. Hosted checks and the current-head
+  completeness assessment remain pending.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
 ## Surprises & discoveries
@@ -2003,3 +2014,7 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   pytest suites in `scripts/tests/`), and the planned decision generator and
   evidence checker follow the same rule. Checker modules stay in
   `tools/docs_validation/`. Remaining milestones are unchanged.
+- 2026-10-19, EP-M5 completeness follow-up: validate that `--bindings` decodes
+  to a JSON object before constructing the admission context. The old candidate
+  assessment identified uncaught array and `null` inputs; dedicated CLI
+  regression cases now require usage exit code 2.

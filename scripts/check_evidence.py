@@ -61,6 +61,18 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def load_bindings(path: Path) -> dict:
+    """Load component profiles from a JSON object.
+
+    For example, ``{"PF01.proof@1": {"source_revision": "..."}}`` is
+    returned as a mapping; a top-level array or ``null`` raises ``ValueError``.
+    """
+    bindings = load_json(path)
+    if not isinstance(bindings, dict):
+        raise ValueError(f'{path} must contain a JSON object mapping components to profiles')
+    return bindings
+
+
 def report_line(path: Path, level: str, reasons: tuple[str, ...]) -> str:
     """Format one result; e.g. 'spec/x.json: rejected [not-run]'."""
     return f"{path}: {level} [{', '.join(reasons)}]"
@@ -126,7 +138,7 @@ def main(
         validator = Draft202012Validator(load_json(ROOT / 'spec/proof-evidence.schema.json'),
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
         parsers = frozenset(load_json(options.log_parsers)['registered_log_parsers'])
-        register, current = exception_register(options.exceptions), load_json(options.bindings)
+        register, current = exception_register(options.exceptions), load_bindings(options.bindings)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
         return 2

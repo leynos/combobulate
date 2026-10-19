@@ -83,6 +83,20 @@ def test_unreadable_configuration_exits_two(option, tmp_path, capsys):
     assert 'Traceback' not in error, 'configuration failures do not leak a traceback'
 
 
+@pytest.mark.parametrize(('document', 'kind'), [('[]', 'array'), ('null', 'null')], ids=['array', 'null'])
+def test_non_object_bindings_configuration_exits_two(document, kind, tmp_path, capsys):
+    bindings = tmp_path / 'bindings.json'
+    bindings.write_text(document, encoding='utf-8')
+
+    assert run('--as-of', '2026-10-10', '--bindings', str(bindings), '--log-parsers',
+               str(FIXTURES / 'log-parsers.json'), fixture('complete-test')) == 2, \
+        f'a JSON {kind} cannot be used as a bindings map'
+    error = capsys.readouterr().err
+    assert 'usage error: cannot load configuration' in error, 'invalid bindings have a usage diagnostic'
+    assert 'must contain a JSON object' in error, 'the diagnostic explains the bindings shape'
+    assert 'Traceback' not in error, 'invalid bindings do not leak a traceback'
+
+
 def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
     broken = tmp_path / 'broken.json'
     broken.write_text('{not json', encoding='utf-8')
