@@ -18,7 +18,7 @@ PINNED_VERSION = re.compile(r'\bnightly-\d{4}-\d{2}-\d{2}\b|\b\d+(?:\.\d+){2,}(?
 ACCEPTANCE_RUNNER_CLASS = 'GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64'
 
 def check_measurement_binding(control: Mapping[str, object], record: Mapping[str, object]) -> bool:
-    """Validate a measurement's history and report whether it uses the current digest.
+    """Validate a measurement's effective digest and report whether it is current.
 
     Parameters
     ----------
@@ -31,19 +31,21 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
     Returns
     -------
     bool
-        True for the current digest and False for a valid historical digest.
+        True for the current digest and False for a historical digest effective on the
+        measurement date.
 
     Raises
     ------
     AssertionError
-        If the record is unbound, predates registration, or differs from the registered
-        runner profile or toolchain configuration.
+        If the record is unbound, outside its digest's effective date range, or differs
+        from the registered runner profile or toolchain configuration.
     KeyError
         If the control or record omits a field required for binding.
 
     Examples
     --------
-    check_measurement_binding(control, record) returns True for a current result.
+    check_measurement_binding(control, record) returns False for a result bound to a
+    digest superseded after that result's recorded date.
     """
     require(record['purpose'] == 'acceptance' and control['id'] in record['control_ids'],
             f"{record['id']} is not acceptance evidence for {control['id']}")
@@ -57,6 +59,11 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
     recorded_on = record['recorded_on']
     require(recorded_on >= effective_date,
             f"{record['id']} predates registration of {control['id']} digest {record_digest}")
+    if index + 1 < len(bindings):
+        superseded_on = bindings[index + 1][1]
+        require(recorded_on < superseded_on,
+                f"{record['id']} cites {control['id']} digest {record_digest} superseded on "
+                f"{superseded_on}")
     environment = control['frozen']['environment']
     require(environment['runner_class'] == ACCEPTANCE_RUNNER_CLASS,
             f"{control['id']} has an unsupported frozen acceptance runner class")

@@ -68,10 +68,26 @@ class Outcomes(unittest.TestCase):
     def test_historical_digest_is_valid_but_does_not_count_for_current_digest(self):
         control = amended(CONTROL, 'seeds', [7])
         historical = record('pass', digest=CONTROL['digest'])
+        historical['recorded_on'] = control['amendments'][-2]['date']
         self.assertFalse(check_measurement_binding(control, historical),
                          'known earlier digests remain valid historical bindings')
         self.assertEqual(verdict(control, [historical]), 'not-run',
                          'a historical result cannot satisfy the amended current digest')
+
+    def test_historical_digest_is_rejected_on_or_after_its_supersession_date(self):
+        control = amended(CONTROL, 'seeds', [7])
+        superseded_on = control['amendments'][-1]['date']
+        recorded_dates = (
+            superseded_on,
+            (datetime.fromisoformat(superseded_on) + timedelta(days=1)).date().isoformat(),
+        )
+
+        for recorded_on in recorded_dates:
+            with self.subTest(recorded_on=recorded_on):
+                historical = record('pass', digest=CONTROL['digest'])
+                historical['recorded_on'] = recorded_on
+                with self.assertRaisesRegex(AssertionError, 'superseded'):
+                    check_measurement_binding(control, historical)
 
     def test_record_before_registration_is_rejected(self):
         earlier = record('pass')
