@@ -124,15 +124,18 @@ def _check_registered_toolchains(control: Mapping[str, object], record: Mapping[
     require(not missing,
             f"{record['id']} lacks measured versions for registered toolchains: {', '.join(missing)}")
 
-    observed_versions = ' '.join(value for value in observed.values() if isinstance(value, str))
     missing_versions = []
     for name, requirement in expected.items():
         if not isinstance(requirement, str):
             raise AssertionError(f"{control['id']} has a malformed requirement for toolchain {name}")
         versions = PINNED_VERSION.findall(requirement)
-        if versions and versions[0] not in measured.get(name, ''):
-            missing_versions.append(f"{name} {versions[0]}")
-        missing_versions.extend(version for version in versions[1:] if version not in observed_versions)
+        missing_versions.extend(
+            f"{name} {version}" for version in versions
+            if re.search(
+                r'(?<![A-Za-z0-9.+-])' + re.escape(version) + r'(?![A-Za-z0-9.+-])',
+                measured[name],
+            ) is None
+        )
     missing_versions.sort()
     require(not missing_versions,
             f"{record['id']} does not report frozen toolchain versions: {', '.join(missing_versions)}")
@@ -149,6 +152,7 @@ def _check_registered_toolchains(control: Mapping[str, object], record: Mapping[
     if isinstance(linker_requirement, str) and 'mold' in linker_requirement.casefold():
         require('mold' in measured.get('linker', '').casefold(),
                 f"{record['id']} uses a linker outside the frozen environment")
+
 
 def check_calibration_record(name: str, record: Mapping[str, object]) -> None:
     """Require a record loaded from calibration storage to declare calibration purpose.
