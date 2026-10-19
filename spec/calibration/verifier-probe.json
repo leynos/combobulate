@@ -24,7 +24,7 @@
     "python": "3.14.7",
     "polars": "0.55.2 (provisional; lazy feature)"
   },
-  "conditions": "Shared host; verifiers run single-threaded per harness; compile admission applies to Kani builds.",
+  "conditions": "Shared host; Verus function verification used four threads; each Kani harness was invoked separately; compile admission applies to Kani builds.",
   "workloads": [
     {
       "id": "verus-wall",
