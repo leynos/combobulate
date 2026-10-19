@@ -34,11 +34,14 @@ specification digests, source revision, target, features, semantic policy,
 backend profile, and implementation relation. A change to any field makes the
 record stale until the registered binding is updated.
 
-The schema enforces the validity predicate: an executed kind has an outcome
-other than `not-run`, `none` and trust declarations have `not-run`, and only
-bounded evidence has bounds. Fields such as `claim`, `outcome_detail`,
-`declared_assumptions`, and `result_artefacts` inform reviewers but do not
-change admission.
+The schema enforces the validity predicate: executed evidence must have an
+outcome other than `not-run`; `none` and trust declarations must have
+`not-run`, and only bounded evidence may carry bounds. Fields such as `claim`,
+`outcome_detail`, and `result_artefacts` inform reviewers but do not change
+admission. `declared_assumptions` is different: the gate uses it to resolve
+trust-audit coverage, so changing it can change the trust state and admission.
+A declared assumption supplies a coverage reference; it does not establish that
+the assumption is true.
 
 ## Admission levels and reason codes
 
