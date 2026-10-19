@@ -78,3 +78,84 @@ quantitative proof/build/performance controls, exception/release authority, and
 a publication destination. These are open ToR decisions and early roadmap
 tasks, not invented approvals. A change can narrow an optional optimization,
 but cannot turn missing evidence into a passing proof-required route.
+
+## Evidence-record schema migration
+
+### Who should read this
+
+Evidence producers and maintainers with records written against schema version
+1 must update them before using the version 2 evidence gate. Version 1 records
+are no longer accepted, and the reader does not attempt dual-version
+interpretation. See
+[ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md) for the
+admission contract and the
+[evidence and decision records guide](evidence-and-decision-records.md) for the
+complete producer workflow.
+
+### Impact at a glance
+
+| Priority | Area             | What to do                                            |
+| -------- | ---------------- | ----------------------------------------------------- |
+| Required | Record version   | Emit `schema_version: 2`; version 1 is rejected.      |
+| Required | Evidence outcome | Replace `status` with `evidence_kind` and `outcome`.  |
+| Required | Trust evidence   | Bind each audited item to an assumption or exception. |
+| Required | Witnesses        | Supply success witnesses and negative controls.       |
+| Required | Verdict source   | Identify the source of each verdict.                  |
+
+_Table 1: Required producer changes for proof-evidence schema version 2._
+
+### Emit version 2 records
+
+For the changed fields only, replace the version 1 status with the version 2
+kind and outcome:
+
+### Before
+
+<!-- tested-example: evidence-v1-fields -->
+```json
+{
+  "schema_version": 1,
+  "status": "proved"
+}
+```
+
+### After
+
+<!-- tested-example: evidence-v2-fields -->
+```json
+{
+  "schema_version": 2,
+  "evidence_kind": "deductive",
+  "outcome": "verified"
+}
+```
+
+The version 2 record also requires structured `bounds`, a trust audit,
+`success_witnesses`, `negative_controls`, a `verdict_source`, and complete
+binding and method fields. Start with the schema example, then replace its
+claim and bindings with the producer's evidence. Schema validity checks record
+shape; the evidence gate assigns an admission level.
+
+### What does not need to change
+
+The claim identifier and executable and specification binding concepts remain.
+A schema-valid record still does not prove its claim, and evidence remains
+bound to its source revision, target, features, semantic policy, backend
+profile, and implementation relation.
+
+### Migration checklist
+
+- [ ] Replace the version 1 status field with `evidence_kind` and `outcome`.
+- [ ] Add version 2 bounds, trust audit, witnesses, controls, and verdict
+      source.
+- [ ] Revalidate each record with `scripts/check_evidence.py --as-of <date>`.
+- [ ] Review the reported admission level and reason codes before relying on it.
+
+### Common errors and fixes
+
+- **Error:** `schema-invalid: 1 is not one of [2]`
+  - **Fix:** Set `schema_version` to `2` and update the remaining fields to the
+    version 2 schema.
+- **Error:** `verdict-self-reported`
+  - **Fix:** Register a log parser that derives the verdict from a committed
+    log, or treat the record as unable to satisfy `proof` or `bounded`.

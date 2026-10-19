@@ -27,18 +27,21 @@ def fixture(name: str) -> str:
 
 
 def test_planned_example_is_rejected_as_not_run(capsys):
+    """Keep planned evidence below the tested admission level with a not-run reason."""
     assert run('--as-of', '2026-10-10', str(EXAMPLE)) == 1, 'a planned record falls short of tested'
     out = capsys.readouterr().out
     assert 'rejected [' in out and 'not-run' in out, 'the planned record names why it is rejected'
 
 
 def test_complete_test_record_is_admitted_at_tested(capsys):
+    """Accept complete test evidence at the CLI's default minimum level."""
     assert run('--as-of', '2026-10-10', *WITH_PARSERS, fixture('complete-test')) == 0, 'tested meets the default'
     assert ': tested []' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(('required', 'code'), [('bounded', 0), ('proof', 1)])
 def test_partial_bounds_reach_bounded_but_never_proof(required, code, capsys):
+    """Respect the bounded level and reject partial bounds as proof."""
     assert run('--as-of', '2026-10-10', '--require', required, *WITH_PARSERS, fixture('partial-bounds-kani')) == code
     assert ': bounded []' in capsys.readouterr().out, 'partial bounds are reported as bounded'
 
@@ -46,17 +49,20 @@ def test_partial_bounds_reach_bounded_but_never_proof(required, code, capsys):
 @pytest.mark.parametrize(('name', 'reason'), [('resource-exhausted-kani', 'outcome-resource-exhausted'),
                                               ('self-reported-verus', 'verdict-self-reported')])
 def test_failing_records_are_rejected_with_their_reason(name, reason, capsys):
+    """Report the specific reason for an outcome or verdict-source failure."""
     assert run('--as-of', '2026-10-10', *WITH_PARSERS, fixture(name)) == 1, f'{name} must fall short'
     assert f'rejected [{reason}]' in capsys.readouterr().out
 
 
 def test_without_a_registered_parser_a_verifier_verdict_is_self_reported(capsys):
+    """Fail closed when a verifier has no registered result-log parser."""
     assert run('--as-of', '2026-10-10', '--bindings', str(FIXTURES / 'bindings.json'),
                fixture('partial-bounds-kani')) == 1, 'the repository registers no parser yet (C-EP-10)'
     assert 'verdict-self-reported' in capsys.readouterr().out
 
 
 def test_schema_invalid_record_exits_two(tmp_path, capsys):
+    """Return the schema-invalid exit code for a record that breaks the validity predicate."""
     record = json.loads(EXAMPLE.read_text(encoding='utf-8'))
     record['outcome'] = 'verified'
     path = tmp_path / 'invalid.json'
@@ -65,8 +71,27 @@ def test_schema_invalid_record_exits_two(tmp_path, capsys):
     assert 'schema-invalid' in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(('field', 'value'), [('schema_version', 1), ('undocumented_field', 'rejected')])
+def test_legacy_version_and_unknown_property_exit_two(field, value, tmp_path, capsys):
+    """Reject legacy schema versions and unknown fields at the command boundary."""
+    record = json.loads((FIXTURES / 'complete-test.json').read_text(encoding='utf-8'))
+    record[field] = value
+    path = tmp_path / 'invalid-schema.json'
+    path.write_text(json.dumps(record), encoding='utf-8')
+
+    assert run('--as-of', '2026-10-10', str(path)) == 2, 'invalid schema records exit two'
+    assert 'schema-invalid' in capsys.readouterr().err, 'the CLI identifies the schema failure'
+
+
+def test_no_record_arguments_exit_two(capsys):
+    """Require at least one evidence record instead of reporting an empty success."""
+    assert run('--as-of', '2026-10-10') == 2, 'an invocation without records is a usage error'
+    assert 'give at least one record' in capsys.readouterr().err, 'the usage diagnostic explains the missing input'
+
+
 @pytest.mark.parametrize('option', ['--bindings', '--log-parsers', '--exceptions'])
 def test_unreadable_configuration_exits_two(option, tmp_path, capsys):
+    """Treat missing registries as configuration errors without emitting a traceback."""
     missing = str(tmp_path / 'missing.json')
     settings = {'--bindings': str(FIXTURES / 'bindings.json'),
                 '--log-parsers': str(FIXTURES / 'log-parsers.json'),
@@ -85,6 +110,7 @@ def test_unreadable_configuration_exits_two(option, tmp_path, capsys):
 
 @pytest.mark.parametrize(('document', 'kind'), [('[]', 'array'), ('null', 'null')], ids=['array', 'null'])
 def test_non_object_bindings_configuration_exits_two(document, kind, tmp_path, capsys):
+    """Reject binding configuration documents that are not component maps."""
     bindings = tmp_path / 'bindings.json'
     bindings.write_text(document, encoding='utf-8')
 
@@ -98,6 +124,7 @@ def test_non_object_bindings_configuration_exits_two(document, kind, tmp_path, c
 
 
 def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
+    """Continue reporting later records while preserving the invalid-input exit code."""
     broken = tmp_path / 'broken.json'
     broken.write_text('{not json', encoding='utf-8')
     missing = tmp_path / 'missing.json'
@@ -111,10 +138,12 @@ def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
 @pytest.mark.parametrize('args', [('--as-of', 'yesterday', str(EXAMPLE)), ('--as-of', '2026-10-10', '--require',
                                                                              'restricted', str(EXAMPLE))])
 def test_usage_errors_exit_two(args, capsys):
+    """Report malformed dates and unsupported minimum levels as usage errors."""
     assert run(*args) == 2, 'bad dates and unsatisfiable requirements are usage errors'
     assert 'usage error' in capsys.readouterr().err
 
 
 def test_as_of_can_come_from_the_environment(monkeypatch, capsys):
+    """Accept the injected CI evaluation date without reading the wall clock."""
     monkeypatch.setenv('INPUT_AS_OF', '2026-10-10')
     assert run(*WITH_PARSERS, fixture('complete-test')) == 0, 'INPUT_AS_OF supplies the date in CI'

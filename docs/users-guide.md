@@ -37,8 +37,28 @@ from a committed log with a digest. It must include at least one success
 witness and every witness must be reached; it must include at least one
 negative control, every required control must be rejected as intended, and no
 control may be accepted or rejected for another reason. Every trusted item must
-be covered, the binding must match the current executable and specification,
-the run must use `full-profile`, and no exception may apply. Partial-bounds
+name a declared assumption or cited exception. The binding must match the
+registered executable and specification digests, source revision, target,
+features, semantic policy, backend profile, and implementation relation; the
+run must use `full-profile`, and no exception may apply. Partial-bounds
 evidence remains `bounded`, never `proof`. The initial release covers the Core
 scope class of the [language reference](language-reference.md)
 ([ADR-0003](adrs/adr-0003-initial-release-scope.md)).
+
+## Check proof-evidence records
+
+Run
+`uv run scripts/check_evidence.py --as-of YYYY-MM-DD [--require
+proof|bounded|tested] spec/evidence/record.json`
+to check one or more records. The date is required and makes exception
+evaluation reproducible. The minimum level defaults to `tested`; `proof`,
+`bounded`, and `tested` are the supported requirements. The command exits `0`
+when every record meets the requirement, `1` when a record is admitted below
+it, and `2` for unreadable input, a schema failure, or a usage error. Until a
+verifier's log parser is registered, its verdict is self-reported and cannot
+meet `proof` or `bounded`.
+
+Records use schema version 2. Version 1 records are rejected; see the
+[evidence-record migration notes](revision-0.2.md#evidence-record-schema-migration)
+and the [producer reference](evidence-and-decision-records.md) before updating
+a producer.

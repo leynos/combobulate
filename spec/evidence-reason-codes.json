@@ -31,7 +31,7 @@
     "exception-expired": "The cited exception passed its invalid_from date or release-gate task.",
     "exception-not-yet-valid": "The cited exception is not yet approved on the evaluation date.",
     "exception-malformed": "The cited exception is unknown or breaks D02.",
-    "binding-stale": "The executable, specification, or source revision differs from the current binding.",
+    "binding-stale": "A binding field (executable or specification digest, source revision, target, features, semantic policy, backend profile, or implementation relation) differs from the registered current binding.",
     "binding-incomplete": "The record lacks an executable, specification, or source identity.",
     "run-focused": "The run used a focused or partial profile.",
     "verdict-self-reported": "No registered log parser re-derived the verdict from a committed log (C-EP-10).",

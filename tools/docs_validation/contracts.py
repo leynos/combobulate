@@ -178,6 +178,8 @@ def check_proof_evidence_envelope(context: ValidationContext) -> None:
         _mutated_proof_record(
             example, lambda record: record.update(evidence_kind='bounded', outcome='verified'),
         ),
+        _mutated_proof_record(example, lambda record: record.update(schema_version=1)),
+        _mutated_proof_record(example, lambda record: record.update(undocumented_field='rejected')),
         _mutated_proof_record(
             example, lambda record: record['verdict_source'].update(kind='log-parser'),
         ),

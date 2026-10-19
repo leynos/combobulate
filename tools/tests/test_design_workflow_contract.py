@@ -148,6 +148,11 @@ class DesignWorkflowContract(unittest.TestCase):
 
         steps = workflow['jobs']['design-check']['steps']
         base_step = next(step for step in steps if step.get('id') == 'base')
+        self.assertEqual(
+            base_step['env']['BASE_SHA'],
+            '${{ github.event.pull_request.base.sha }}',
+            'pull requests must supply the event base commit to the selector',
+        )
         self.assertIn('git merge-base "$BASE_SHA" HEAD', base_step['run'],
                       'pull requests must compare frozen decisions with the event base commit')
         self.assertIn('date -u +%F', base_step['run'],

@@ -22,7 +22,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import cyclopts
 from cyclopts import App, Parameter
@@ -30,6 +30,9 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
+
+if TYPE_CHECKING:
+    from docs_validation.evidence_gate import AdmissionContext
 
 
 @dataclass(frozen=True)

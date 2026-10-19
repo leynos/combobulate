@@ -1004,13 +1004,15 @@ existing scalar reference evaluator, Miri/audit work, fault injection, and
 backend conformance remain necessary; formal verification complements rather
 than renames them.
 
-The [proof-evidence schema](../spec/proof-evidence.schema.json) separates
-planned, proved, bounded-checked, tested, trusted, failed, and inconclusive
-records. A record identifies the proposition, executable and specification
-bindings, source revision, tool/solver versions, command, target/features,
-numerical policy, backend profile, bounds, assumptions, termination scope,
-positive witness, negative control, and result artefacts. A schema-valid record
-establishes only that these fields exist. It does not establish the proposition.
+The version 2 [proof-evidence schema](../spec/proof-evidence.schema.json)
+separates the evidence kind from its outcome. A record identifies the claim,
+executable and specification bindings, source revision, tool/solver versions,
+command, run mode, target/features, semantic policy, backend profile, bounds,
+declared assumptions, trust audit, success witnesses, negative controls,
+verdict source, and result artefacts. A schema-valid record establishes only
+that these fields exist. It does not establish the proposition; the evidence
+gate in [ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md)
+decides its admission level.
 
 Current-binding comparison covers every schema-defined `binding` field:
 executable and specification digests, source revision, target, features,

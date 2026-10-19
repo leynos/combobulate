@@ -18,7 +18,6 @@ from .context import ValidationContext, require
 from .evidence_gate import Admission
 from .evidence_records import admitted_evidence
 from .markdown import headings
-from .revision_reader import git_head_revision
 
 ADMISSION_LEVELS = frozenset({'proof', 'bounded', 'tested'})
 COMPONENT_ID = re.compile(r'^(PF[0-9]{2})\.([a-z][a-z0-9-]*)@([1-9][0-9]*\.[1-9][0-9]*\.[1-9][0-9]*)$')
@@ -311,8 +310,4 @@ def check_roadmap_status(context: ValidationContext) -> None:
     """Run closure over the committed export; registered after every check whose result a component cites."""
     decisions = {record['id']: record for record in context.load('spec/decisions.json')['decisions']}
     components = index_components(context.load('spec/proof-obligations.json')['obligations'])
-    requires_current_revision = any(component['evidence_source'].startswith(CHECKER_SOURCE)
-                                    for task_components in components.values() for component in task_components)
-    if requires_current_revision and context.source_revision is None:
-        context.source_revision = git_head_revision(context.root)
     check_task_status(context, context.load('spec/roadmap.json'), decisions, components)

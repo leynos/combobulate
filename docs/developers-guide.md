@@ -538,6 +538,26 @@ fields, levels, reason codes, and log-parser obligations. Until a log parser is
 registered for a verifier, its records are self-reported and cannot satisfy a
 `proof` or `bounded` component.
 
+### Compose the evidence-admission boundary
+
+`AdmissionContext` is a frozen, call-scoped value containing the exception
+register, current binding profiles, evaluation date, and registered log
+parsers. The evidence-record and CLI adapters validate each record against the
+schema and assemble this context. `abstract_record(record, context)` maps a
+schema-valid record to the ten-field model; `admit` applies the pure MS-0 to
+MS-2 rules and returns an admission level with reason codes. Neither function
+reads files, the clock, the environment, or the network. Add producers at the
+adapter boundary and pass explicit inputs into the gate.
+
+The `tools/check_docs.py` composition root resolves the checked-out source
+revision through the Git adapter and places it in
+`ValidationContext.source_revision` before running checks. The roadmap adapter
+uses that injected value to bind earlier check results in `CheckResult` values.
+`ClosureInputs` carries those results and the current revision into the pure
+MS-3 component checks and MS-4 task-closure rules. Keep Git access in the
+composition root; roadmap closure consumes revision-shaped values and injected
+artefact readers.
+
 Accepted decisions are frozen. `make design-check BASE_REV=<revision>` compares
 `spec/decisions.json` with that revision and rejects an accepted record that
 was deleted or edited other than by becoming superseded; recomputing a stored
@@ -561,6 +581,11 @@ script by path with `ValidationContext.load_script` rather than keeping a
 second copy, so the script's dependencies are also pinned in
 `tools/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
+
+`tools/tests/markdown_examples.py` is the shared loader for marked JSON fences
+in migration documents. It requires each fence to have a unique adjacent
+`tested-example` marker and reads the example from the published Markdown. Use
+it from documentation contract tests; it is not a general Markdown parser.
 
 The `tools/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
@@ -619,10 +644,12 @@ small reader callbacks. `ClosureInputs` receives an artefact resolver that
 returns `ArtefactProblem` for path, read, or anchor failures; `check_frozen`
 receives a `RevisionJsonReader`. The roadmap check composes its filesystem
 adapter from the validation context; the command-line composition root supplies
-the Git adapter. These ports belong only to `tools/docs_validation/`: keep
-their domain rules independent of I/O, and do not reuse them as general
-repository file or Git APIs. Unit tests inject deterministic readers, while a
-temporary Git integration test covers actual revision reads.
+the current source revision and Git-backed register reader. `roadmap_status`
+uses the injected revision and does not resolve Git state itself. These ports
+belong only to `tools/docs_validation/`: keep their domain rules independent of
+I/O, and do not reuse them as general repository file or Git APIs. Unit tests
+inject deterministic readers, while a temporary Git integration test covers
+actual revision reads.
 
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their

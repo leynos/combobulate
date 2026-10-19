@@ -11,21 +11,14 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
+from docs_validation.evidence_gate import Admission, Level
+from docs_validation.revision_reader import git_head_revision
 from check_docs import collect_checks
 from docs_validation.roadmap_status import (
     ArtefactProblem, CheckResult, ClosureInputs, artefact_resolver, closure_failures, component_failure, index_completions,
     index_components, task_closure,
 )
 
-ROOT = Path(__file__).resolve().parents[2]
-ACCEPTED = {'id': 'D01', 'lifecycle': 'accepted'}
-ARTEFACT = 'docs/adrs/adr-0002-governance-authority.md'
-
-
-from docs_validation.evidence_gate import Admission, Level
-
-"""Prove roadmap ticks are backed by evidence (VO-4: MS-3, MS-4, and closure soundness)."""
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 ROOT = Path(__file__).resolve().parents[2]
 ACCEPTED = {'id': 'D01', 'lifecycle': 'accepted'}
 ARTEFACT = 'docs/adrs/adr-0002-governance-authority.md'
@@ -160,6 +153,7 @@ class TaskClosure(unittest.TestCase):
                          'a checker result cannot satisfy a proof-only component')
 
     def test_admitted_record_satisfies_and_a_counterexample_reopens(self):
+        """Close on admitted proof evidence and reopen when a current counterexample appears."""
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
         verified = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
         evidence = {'PF14.proof@1.1.1': [(Admission(Level.PROOF, ()), verified)]}
@@ -192,6 +186,7 @@ class TaskClosure(unittest.TestCase):
                          'an older revision counterexample does not invalidate the current run')
 
     def test_record_below_the_accepted_level_fails(self):
+        """Keep evidence below the component's accepted level from closing the task."""
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
         bounded = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
         evidence = {'PF14.proof@1.1.1': [(Admission(Level.BOUNDED, ()), bounded)]}
@@ -199,6 +194,7 @@ class TaskClosure(unittest.TestCase):
                              'evidence is bounded')
 
     def test_same_day_latest_records_fail_closed(self):
+        """Reject ambiguous evidence when several current records share the latest date."""
         component_id = 'PF14.proof@1.1.1'
         components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
         first = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
@@ -302,7 +298,7 @@ class RealRoadmap(unittest.TestCase):
 
     def test_committed_roadmap_precedes_package_policy_that_consumes_it(self):
         """Validate task closure before package policy consumes that result."""
-        context = ValidationContext(ROOT)
+        context = ValidationContext(ROOT, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         checks = [row['check'] for row in context.results]
         self.assertIn('roadmap-status', checks, 'the composed checker must run roadmap closure')

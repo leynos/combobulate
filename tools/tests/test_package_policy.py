@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_docs import collect_checks
 from docs_validation.context import ValidationContext
 from docs_validation.package_policy import check_manifest, check_package_policy
+from docs_validation.revision_reader import git_head_revision
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = tomllib.loads((ROOT / 'Cargo.toml').read_text(encoding='utf-8'))
@@ -27,7 +28,7 @@ class PackagePolicy(unittest.TestCase):
 
     def test_composed_checker_records_package_policy(self):
         """Run task-closure validation before package publication policy."""
-        context = ValidationContext(ROOT)
+        context = ValidationContext(ROOT, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         checks = [row['check'] for row in context.results]
         results = [row for row in context.results if row['check'] == 'package-policy']

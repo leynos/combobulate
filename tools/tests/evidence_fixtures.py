@@ -34,7 +34,8 @@ WITNESSES = {'all-satisfied': ['satisfied'], 'some-unsatisfied': ['satisfied', '
 CONTROLS = {'all-required-rejected-as-intended': [(True, 'rejected-as-intended'), (False, 'not-run')],
             'some-rejected-otherwise': [(True, 'rejected-otherwise')], 'some-accepted': [(True, 'accepted')],
             'required-missing': [(True, 'not-run')]}
-TRUST = {'audited-none': ('audited', []), 'audited-all-covered': ('audited', ['A1']),
+TRUST = {'audited-none': ('audited', []),
+         'audited-all-covered': ('audited', [TEMPLATE['declared_assumptions'][0]]),
          'audited-uncovered': ('audited', [None]), 'unaudited': ('unaudited', [])}
 
 
@@ -62,7 +63,10 @@ def concrete(state: AbstractRecord) -> tuple[dict, dict]:
     else:
         record['exception'] = 'EXC-0001'
         approved, invalid_from = EXCEPTION_DATES[state.exception]
-        exceptions['EXC-0001'] = {'approved_on': approved, 'invalid_from': invalid_from, 'problems': []}
+        exceptions['EXC-0001'] = {
+            'component': TEMPLATE['component'], 'approved_on': approved,
+            'invalid_from': invalid_from, 'problems': [],
+        }
     return record, exceptions
 
 

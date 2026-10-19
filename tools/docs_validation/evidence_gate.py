@@ -159,14 +159,14 @@ def exception_state(exception: Mapping[str, object] | None, as_of: datetime.date
     return 'active' if as_of < invalid_from else 'expired'
 
 
-def trust_state(audit: Mapping[str, object]) -> str:
-    """Abstract a trust audit; an uncovered `assume`, `external_body`, or stub is `audited-uncovered`."""
+def trust_state(audit: Mapping[str, object], covers: frozenset[str]) -> str:
+    """Abstract an audit; every covered item must name a declared assumption or exception."""
     if audit['status'] == 'unaudited':
         return 'unaudited'
     items = audit['items']
     if not items:
         return 'audited-none'
-    return 'audited-all-covered' if all(item['covered_by'] for item in items) else 'audited-uncovered'
+    return 'audited-all-covered' if all(item['covered_by'] in covers for item in items) else 'audited-uncovered'
 
 
 def witness_state(witnesses: list[Mapping[str, object]]) -> str:
@@ -215,10 +215,17 @@ def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> 
         exception = 'none'
     else:
         entry = context.exceptions.get(str(exception_id))
-        exception = 'malformed' if entry is None else exception_state(entry, context.as_of)
+        if entry is None or entry.get('component') != record['component']:
+            exception = 'malformed'
+        else:
+            exception = exception_state(entry, context.as_of)
+    trust_covers = frozenset(str(item) for item in record['declared_assumptions'])
+    if exception_id is not None:
+        trust_covers |= frozenset({str(exception_id)})
     return AbstractRecord(
         kind=str(record['evidence_kind']), outcome=str(record['outcome']), bounds=str(record['bounds']['kind']),
         witness=witness_state(record['success_witnesses']), controls=controls_state(record['negative_controls']),
-        trust=trust_state(record['trust_audit']), exception=exception, binding=binding_state(record, context.bindings),
+        trust=trust_state(record['trust_audit'], trust_covers), exception=exception,
+        binding=binding_state(record, context.bindings),
         run_mode=str(method['run_mode']), verdict_source='log-parser' if parsed else 'self-reported',
     )

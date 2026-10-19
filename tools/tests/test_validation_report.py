@@ -312,6 +312,25 @@ class ValidationReport(unittest.TestCase):
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')
 
+    def test_cli_supplies_resolved_revision_to_the_check_composition(self) -> None:
+        """Resolve Git identity in the command root before composing roadmap checks."""
+        observed: dict[str, str | None] = {}
+
+        def capture_context(context: ValidationContext) -> None:
+            """Capture the revision passed to the composed check sequence."""
+            observed['source_revision'] = context.source_revision
+
+        with (patch.object(check_docs, 'git_head_revision', return_value='fixture-revision') as resolve_revision,
+              patch.object(check_docs, 'collect_checks', side_effect=capture_context),
+              patch.object(check_docs, 'check_frozen', return_value='Freeze check fixture passed.'),
+              contextlib.redirect_stdout(io.StringIO())):
+            result = self.run_main(['--write'])
+
+        self.assertEqual(result, 0, 'composition should complete with an injected source revision')
+        self.assertEqual(observed, {'source_revision': 'fixture-revision'},
+                         'roadmap checks must receive the revision resolved by the application boundary')
+        resolve_revision.assert_called_once_with(self.root)
+
     def test_cli_rejects_an_accepted_decision_edit_against_git_base(self) -> None:
         """Surface a real base-revision freeze failure through the command-line entrypoint."""
         accepted = {
