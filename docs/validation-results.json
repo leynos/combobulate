@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 59
+      "count": 60
     },
     {
       "check": "contract-examples",

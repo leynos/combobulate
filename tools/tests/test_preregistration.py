@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from hypothesis import given, settings, strategies as st
 from jsonschema import Draft202012Validator, ValidationError
 
+from docs_validation.ci_controls import AcceptanceWorkflowSettings
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
     FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_acceptance_workflow,
@@ -194,10 +195,15 @@ class Registration(unittest.TestCase):
 
     def test_changed_source_needs_an_amendment(self):
         control = copy.deepcopy(CI_CONTROL)
-        check_sources(control, ROOT)
-        control['frozen']['workload']['sources'][0]['sha256'] = '0' * 64
-        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml changed since registration'):
-            check_sources(control, ROOT)
+        sources = {source['path']: source['sha256'] for source in control['frozen']['workload']['sources']}
+        check_sources(control, sources)
+        sources['.github/workflows/ci.yml'] = '0' * 64
+        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml changed since registration',
+                                    msg='changed source bytes must require a registered amendment'):
+            check_sources(control, sources)
+        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml is missing',
+                                    msg='every registered source must be supplied to the pure rule'):
+            check_sources(control, {})
 
     def test_every_frozen_field_changes_the_digest(self):
         exercised: set[str] = set()
@@ -293,14 +299,11 @@ class WorkflowAndCi(unittest.TestCase):
     """Pin the hosted CI control and prevent failures hiding in the p90 tail."""
 
     def test_workflow_runner_and_timeout_match_ac07(self):
-        check_acceptance_workflow({'jobs': {'build-test': {'runs-on': 'ubuntu-24.04', 'timeout-minutes': 8}}},
-                                  CI_CONTROL)
+        check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-24.04', 8), CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'runner.*does not match AC-07'):
-            check_acceptance_workflow({'jobs': {'build-test': {'runs-on': 'ubuntu-latest',
-                                                                 'timeout-minutes': 8}}}, CI_CONTROL)
+            check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-latest', 8), CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'timeout.*does not match AC-07'):
-            check_acceptance_workflow({'jobs': {'build-test': {'runs-on': 'ubuntu-24.04',
-                                                                 'timeout-minutes': 9}}}, CI_CONTROL)
+            check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-24.04', 9), CI_CONTROL)
 
     def test_two_timeouts_fail_even_when_fast_successes_keep_p90_low(self):
         attempts = [('success', 1.0)] * 18 + [('timed_out', 480.0)] * 2

@@ -13,6 +13,8 @@ from datetime import date
 from pathlib import Path
 from types import ModuleType
 
+import yaml
+
 DESIGN_DOCUMENTS = (
     'acceptance-calibration.md', 'context.md', 'decision-register.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
     'roadmap.md', 'technical-design.md', 'terms-of-reference.md',
@@ -68,6 +70,17 @@ class ValidationContext:
     def load(self, name: str) -> dict:
         """Read JSON beneath the root; e.g. context.load('spec/bets.json')."""
         return json.loads((self.root / name).read_text(encoding='utf-8'))
+
+    def load_yaml(self, name: str) -> object:
+        """Parse YAML beneath the root; e.g. load the CI workflow as source data."""
+        try:
+            return yaml.safe_load((self.root / name).read_text(encoding='utf-8'))
+        except yaml.YAMLError as error:
+            raise ValueError(f'Invalid YAML in {name}: {error}') from error
+
+    def read_bytes(self, name: str) -> bytes:
+        """Read raw source bytes; e.g. hash a registered workload file."""
+        return (self.root / name).read_bytes()
 
     def record(self, name: str, detail: str, count: int | None = None) -> None:
         """Append a check result; e.g. context.record('tasks', 'Pass', 10)."""

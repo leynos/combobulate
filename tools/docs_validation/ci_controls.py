@@ -25,6 +25,14 @@ class _CiAttemptSummary:
     has_incomplete_attempt: bool
 
 
+@dataclass(frozen=True)
+class AcceptanceWorkflowSettings:
+    """Carry the workflow values used by AC-07; e.g. `ubuntu-24.04` and eight minutes."""
+
+    runner_image: object
+    timeout_minutes: object
+
+
 def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, object]) -> None:
     """Keep failures visible; for example, two timeouts cannot hide behind fast successes."""
     if control['id'] != 'AC-07':
@@ -195,14 +203,11 @@ def _check_ci_calibration_p90(
             f"{control['id']} calibration derivation does not match its recorded attempt p90")
 
 
-def check_acceptance_workflow(workflow: Mapping[str, object], control: Mapping[str, object]) -> None:
+def check_acceptance_workflow(settings: AcceptanceWorkflowSettings, control: Mapping[str, object]) -> None:
     """Keep the runner aligned; for example, reject `ubuntu-latest` for an Ubuntu 24.04 control."""
-    jobs = workflow.get('jobs', {}) if isinstance(workflow, Mapping) else {}
-    job = jobs.get('build-test') if isinstance(jobs, Mapping) else None
-    require(isinstance(job, Mapping), 'CI workflow must define the build-test job')
     image = control['frozen']['environment']['image']
     timeout = control['frozen']['decision_rule']['thresholds']['timeout_minutes']
-    require(job.get('runs-on') == image,
-            f"build-test runner {job.get('runs-on')!r} does not match AC-07 image {image}")
-    require(job.get('timeout-minutes') == timeout,
-            f"build-test timeout {job.get('timeout-minutes')!r} does not match AC-07 budget {timeout}")
+    require(settings.runner_image == image,
+            f"build-test runner {settings.runner_image!r} does not match AC-07 image {image}")
+    require(settings.timeout_minutes == timeout,
+            f"build-test timeout {settings.timeout_minutes!r} does not match AC-07 budget {timeout}")

@@ -15,12 +15,13 @@ import json
 import re
 from collections.abc import Iterable, Mapping
 from datetime import date
-from pathlib import Path
 
-import yaml
 from jsonschema import Draft202012Validator
 
-from .ci_controls import OUTCOME_VERDICTS, check_acceptance_workflow, check_ci_calibration, check_ci_measurement
+from .ci_controls import (
+    OUTCOME_VERDICTS, AcceptanceWorkflowSettings, check_acceptance_workflow, check_ci_calibration,
+    check_ci_measurement,
+)
 from .context import ValidationContext, require
 
 FROZEN_FIELDS = (
@@ -93,14 +94,35 @@ def check_amendment_chain(
     require(control['digest'] == previous, f"{control['id']} digest is not the end of its amendment chain")
 
 
-def check_sources(control: Mapping[str, object], root: Path) -> None:
-    """Require each registered workload source to match its recorded SHA-256; an edit needs an amendment."""
+def check_sources(control: Mapping[str, object], source_digests: Mapping[str, str]) -> None:
+    """Require loaded workload digests to match registration; e.g. an edited source needs an amendment."""
     for source in control['frozen']['workload']['sources']:
-        path = root / source['path']
-        require(path.is_file(), f"{control['id']} source {source['path']} is missing")
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        digest = source_digests.get(source['path'])
+        require(digest is not None, f"{control['id']} source {source['path']} is missing")
         require(digest == source['sha256'],
                 f"{control['id']} source {source['path']} changed since registration; amend the control")
+
+
+def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
+    """Adapt parsed CI YAML into AC-07 values; e.g. extract image and job timeout."""
+    jobs = workflow.get('jobs', {}) if isinstance(workflow, Mapping) else {}
+    job = jobs.get('build-test') if isinstance(jobs, Mapping) else None
+    return AcceptanceWorkflowSettings(
+        runner_image=job.get('runs-on') if isinstance(job, Mapping) else None,
+        timeout_minutes=job.get('timeout-minutes') if isinstance(job, Mapping) else None,
+    )
+
+
+def _load_source_digests(context: ValidationContext, controls: list[dict]) -> dict[str, str]:
+    """Hash registered workload sources in the composition path; e.g. bind CI YAML to AC-07."""
+    paths = sorted({source['path'] for control in controls for source in control['frozen']['workload']['sources']})
+    digests: dict[str, str] = {}
+    for path in paths:
+        try:
+            digests[path] = hashlib.sha256(context.read_bytes(path)).hexdigest()
+        except OSError as error:
+            raise ValueError(f'Unable to read registered workload source {path}: {error}') from error
+    return digests
 
 
 def digest_dates(control: Mapping[str, object]) -> list[tuple[str, str]]:
@@ -206,11 +228,12 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     ids = [control['id'] for control in controls]
     require(len(ids) == len(set(ids)), 'Duplicate acceptance control ID')
     controls_by_id = {control['id']: control for control in controls}
-    workflow_path = context.root / '.github/workflows/ci.yml'
-    check_acceptance_workflow(yaml.safe_load(workflow_path.read_text()), controls_by_id['AC-07'])
+    workflow = context.load_yaml('.github/workflows/ci.yml')
+    check_acceptance_workflow(_workflow_settings(workflow), controls_by_id['AC-07'])
     check_ci_calibration(controls_by_id['AC-07'], records)
     _check_acceptance_measurements(controls_by_id, records, measurements)
-    _check_registered_controls(controls, context, records, measurements)
+    source_digests = _load_source_digests(context, controls)
+    _check_registered_controls(controls, context, records, measurements, source_digests)
     context.record('acceptance-controls', 'Typed frozen protocols close their approved digest chains; measurement '
                                           'records bind known controls, registered dates and the hosted image; '
                                           'calibration evidence is excluded from acceptance verdicts.', len(ids))
@@ -263,13 +286,14 @@ def _check_acceptance_measurements(
 
 def _check_registered_controls(
     controls: list[dict], context: ValidationContext, records: Mapping[str, dict], measurements: list[dict],
+    source_digests: Mapping[str, str],
 ) -> None:
     """Check every frozen control; for example, reject calibration used as acceptance evidence."""
     sponsor = context.load('spec/decisions.json')['authorities']['roles']['sponsor']
     for control in controls:
         check_completeness(control)
         check_amendment_chain(control, sponsor, measurements)
-        check_sources(control, context.root)
+        check_sources(control, source_digests)
         check_calibration_reference(control, records)
         require(verdict(control, records.values()) == 'not-run',
                 f"{control['id']} has acceptance evidence in the calibration directory")

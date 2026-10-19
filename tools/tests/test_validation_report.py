@@ -93,6 +93,26 @@ class ValidationReport(unittest.TestCase):
                 self.run_main(arguments)
             self.assertEqual(self.source_bytes(), before)
 
+    def test_invalid_workflow_yaml_is_reported_without_overwriting_evidence(self) -> None:
+        """Translate malformed workflow YAML at the checker boundary and preserve the report."""
+        (self.root / '.github/workflows/ci.yml').write_text('jobs: [\n', encoding='utf-8')
+        report_before = self.report.read_bytes()
+        with self.assertRaisesRegex(SystemExit, 'Invalid YAML in .github/workflows/ci.yml',
+                                    msg='malformed workflow YAML must fail as a validation result'):
+            self.run_main(['--write'])
+        self.assertEqual(self.report.read_bytes(), report_before,
+                         'invalid workflow YAML must not replace the committed validation report')
+
+    def test_missing_registered_workload_source_is_reported_at_command_boundary(self) -> None:
+        """Convert source-reader failures into a validation result without mutating the report."""
+        (self.root / 'tools/calibration/cardinality-probe/verus/cardinality.rs').unlink()
+        report_before = self.report.read_bytes()
+        with self.assertRaisesRegex(SystemExit, 'Unable to read registered workload source',
+                                    msg='missing source bytes must fail through the checker boundary'):
+            self.run_main(['--write'])
+        self.assertEqual(self.report.read_bytes(), report_before,
+                         'a missing registered source must not replace the committed validation report')
+
     def test_explicit_write_repairs_report_after_source_validation(self) -> None:
         """Limit a successful write request to the generated validation report."""
         self.report.write_text('{')
