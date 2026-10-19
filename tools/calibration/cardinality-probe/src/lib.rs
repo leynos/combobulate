@@ -27,6 +27,8 @@ pub fn checked_cardinality(extents: &[usize]) -> Option<usize> {
 
 #[cfg(kani)]
 mod verification {
+    //! Structural Kani harnesses for the calibration probe's cardinality function.
+
     use super::checked_cardinality;
 
     /// Any zero extent gives zero without multiplying, whatever the other extents are.

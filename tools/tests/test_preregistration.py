@@ -37,6 +37,8 @@ RECORD_VALIDATOR = Draft202012Validator(
     format_checker=Draft202012Validator.FORMAT_CHECKER,
 )
 RECORD_OUTCOMES = sorted(OUTCOME_VERDICTS)
+LATEST_CONTROL_AMENDMENT_DATE = CONTROL['amendments'][-1]['date']
+TEST_MEASUREMENT_DATE = (date.fromisoformat(LATEST_CONTROL_AMENDMENT_DATE) + timedelta(days=1)).isoformat()
 
 
 def amended(control: dict, field: str, value: object) -> dict:
@@ -57,7 +59,7 @@ def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None)
     """Build one schema-valid measurement record for the first control."""
     entry = {'id': 'fixture', 'purpose': purpose, 'control_ids': [CONTROL['id']],
              'control_digest': None if purpose == 'calibration' else (digest or CONTROL['digest']),
-             'recorded_on': '2026-10-12',
+             'recorded_on': TEST_MEASUREMENT_DATE,
              'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
                           'memory_gib': 16, 'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
              'toolchains': {}, 'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
@@ -128,7 +130,9 @@ class Registration(unittest.TestCase):
     def test_amendment_before_first_measurement_remains_authorized(self):
         control = amended(CONTROL, 'seeds', [7])
         measurement = record('pass', digest=control['digest'])
-        measurement['recorded_on'] = '2026-10-13'
+        measurement['recorded_on'] = (
+            date.fromisoformat(control['amendments'][-1]['date']) + timedelta(days=1)
+        ).isoformat()
         check_amendment_chain(control, SPONSOR, [measurement])
         self.assertTrue(check_measurement_binding(control, measurement),
                         'a measurement after an approved amendment binds the amended digest')

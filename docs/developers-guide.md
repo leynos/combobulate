@@ -545,17 +545,21 @@ validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout
 formatting can preserve the contract without creating false generator drift.
 
-Acceptance-control helpers in `tools/docs_validation/preregistration.py` and
+Acceptance-control rule checks in
+`tools/docs_validation/acceptance_registration.py`,
+`tools/docs_validation/acceptance_evidence.py`, and
 `tools/docs_validation/ci_controls.py` belong only to the documentation-pack
-checker. Keep filesystem reads and schema loading in the composition path
-rooted at `check_acceptance_controls` and its shared `ValidationContext`.
+checker. They accept parsed values and source digests, and do not read
+repository files. Keep filesystem reads and schema loading in the composition
+path rooted at `check_acceptance_controls` in
+`tools/docs_validation/preregistration.py` and its shared `ValidationContext`.
 `ValidationContext.load_yaml` converts parser failures into checker errors, and
 `ValidationContext.read_bytes` supplies source data for composition-time digest
 calculation. The composition path passes source digests and the small
-`AcceptanceWorkflowSettings` value to filesystem-independent rules.
-`_CiAttemptSummary` carries AC-07 attempt facts only between its measurement
-helpers. Tests may call named rule checks directly, but these helpers and the
-summary are not general GitHub Actions parsers or repository file APIs.
+`AcceptanceWorkflowSettings` value to the pure rules. The original named
+imports remain re-exported from preregistration for focused tests; these
+helpers are not general GitHub Actions parsers, measurement libraries, or
+repository file APIs.
 
 `check_manifest` in `tools/docs_validation/package_policy.py` is an internal
 package-policy helper. `check_package_policy` is its only production caller and

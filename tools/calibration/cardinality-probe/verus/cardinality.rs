@@ -1,6 +1,6 @@
-// Calibration probe: Verus specification and proof of checked cardinality.
-// Measured for the AC-01 budget (docs/acceptance-calibration.md); not the
-// shipped kernel, which task 1.2.4 owns.
+//! Calibration probe: Verus specification and proof of checked cardinality.
+//! Measured for the AC-01 budget (docs/acceptance-calibration.md); not the
+//! shipped kernel, which task 1.2.4 owns.
 use vstd::prelude::*;
 
 verus! {

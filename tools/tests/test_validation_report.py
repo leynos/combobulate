@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -180,8 +180,11 @@ class ValidationReport(unittest.TestCase):
         """Reject acceptance evidence that cites no digest in the registered control history."""
         register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
         control = next(item for item in register['controls'] if item['id'] == 'AC-01')
+        last_effective_date = (control['amendments'][-1]['date'] if control['amendments']
+                               else control['frozen']['registered_on'])
+        recorded_on = (date.fromisoformat(last_effective_date) + timedelta(days=1)).isoformat()
         record = self.acceptance_record(
-            'unknown-control-digest', 'AC-01', 'f' * 64, control['frozen']['registered_on'],
+            'unknown-control-digest', 'AC-01', 'f' * 64, recorded_on,
         )
         measurements = self.root / 'spec/measurements'
         measurements.mkdir()

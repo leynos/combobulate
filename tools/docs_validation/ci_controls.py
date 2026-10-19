@@ -34,7 +34,33 @@ class AcceptanceWorkflowSettings:
 
 
 def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, object]) -> None:
-    """Keep failures visible; for example, two timeouts cannot hide behind fast successes."""
+    """Validate AC-07 retry samples and apply failure-first outcome rules.
+
+    Parameters
+    ----------
+    control : Mapping[str, object]
+        Registered control; non-AC-07 controls need no CI-specific checks.
+    record : Mapping[str, object]
+        Acceptance record containing the build-test attempts and samples.
+
+    Returns
+    -------
+    None
+        Returns without a CI-specific check for any control except AC-07.
+
+    Raises
+    ------
+    AssertionError
+        If attempts, durations, sample retention, or the recorded outcome disagree.
+    KeyError
+        If a required control or record field is absent.
+    ValueError
+        If a started or completed timestamp is malformed.
+
+    Examples
+    --------
+    check_ci_measurement(control, record) rejects an AC-07 timeout marked as passing.
+    """
     if control['id'] != 'AC-07':
         return
     workload = _ci_build_test_workload(record)
@@ -124,13 +150,63 @@ def _check_ci_p90_outcome(
 
 
 def nearest_rank(values: list[float], quantile: float) -> float:
-    """Return a sample quantile by nearest rank; e.g. p90 of 20 uses rank 18."""
+    """Return a sample quantile using the nearest-rank definition.
+
+    Parameters
+    ----------
+    values : list[float]
+        Non-empty sample values.
+    quantile : float
+        Quantile fraction; for example, 0.9 selects rank 18 from 20 samples.
+
+    Returns
+    -------
+    float
+        Sample at rank ceil(quantile * len(values)) in sorted order.
+
+    Raises
+    ------
+    AssertionError
+        If values is empty.
+    IndexError
+        If the quantile selects a rank above the available sample count.
+
+    Examples
+    --------
+    nearest_rank(list(range(1, 21)), 0.9) returns 18.
+    """
     require(bool(values), 'A percentile requires at least one sample')
     return sorted(values)[ceil(quantile * len(values)) - 1]
 
 
 def check_ci_calibration(control: Mapping[str, object], records: Mapping[str, dict]) -> None:
-    """Check AC-07 calibration; for example, reject a derivation that misstates its sample p90."""
+    """Validate the AC-07 calibration history and its recorded p90 derivation.
+
+    Parameters
+    ----------
+    control : Mapping[str, object]
+        Registered AC-07 control containing calibration metadata and thresholds.
+    records : Mapping[str, dict]
+        Calibration records indexed by repository-relative path.
+
+    Returns
+    -------
+    None
+        Returns when the calibration is not required or all retained samples agree.
+
+    Raises
+    ------
+    AssertionError
+        If a required record, attempt window, median, timestamp, or p90 is inconsistent.
+    KeyError
+        If a required control, record, or workload field is absent.
+    ValueError
+        If a retained attempt timestamp is malformed.
+
+    Examples
+    --------
+    check_ci_calibration(control, records) accepts a history whose p90 matches its samples.
+    """
     calibration = control['frozen']['calibration']
     if calibration['status'] != 'calibrated':
         return
@@ -204,7 +280,31 @@ def _check_ci_calibration_p90(
 
 
 def check_acceptance_workflow(settings: AcceptanceWorkflowSettings, control: Mapping[str, object]) -> None:
-    """Keep the runner aligned; for example, reject `ubuntu-latest` for an Ubuntu 24.04 control."""
+    """Require the hosted build-test workflow to use the registered runner and timeout.
+
+    Parameters
+    ----------
+    settings : AcceptanceWorkflowSettings
+        Parsed runner image and timeout from the build-test job.
+    control : Mapping[str, object]
+        Registered AC-07 control supplying the expected image and timeout.
+
+    Returns
+    -------
+    None
+        Returns only when both workflow settings match the registration.
+
+    Raises
+    ------
+    AssertionError
+        If the workflow runner image or timeout differs from the control.
+    KeyError
+        If the control omits a required environment or threshold field.
+
+    Examples
+    --------
+    check_acceptance_workflow(settings, control) accepts ubuntu-24.04 with an eight-minute timeout.
+    """
     image = control['frozen']['environment']['image']
     timeout = control['frozen']['decision_rule']['thresholds']['timeout_minutes']
     require(settings.runner_image == image,
