@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
-# dependencies = ["cyclopts==5.2.0", "jsonschema>=4,<5"]
+# dependencies = ["cyclopts==5.2.0", "jsonschema>=4,<5", "PyYAML==6.0.3"]
 # ///
 """Admit proof-evidence records through the evidence gate and report their levels.
 

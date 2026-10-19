@@ -409,11 +409,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   2 record, and the schema agrees with the validity predicate on all 120 kind,
   outcome, and bounds combinations; VO-3 checks the exception window
   boundaries, each D02 violation, and P5; P6 and record-sourced closure pass;
-  `scripts/check_evidence.py` rejects the planned example (exit 1), admits the
-  complete test fixture at `tested`, reports partial bounds at `bounded` (never
-  `proof`), and rejects resource-exhausted and self-reported fixtures with
-  their reasons; `PF14.structural@1.1.4` is satisfied by the passing
-  `evidence-gate` check and task 1.1.4 is ticked.
+  `scripts/check_evidence.py` rejects the planned example with all four
+  blocking reasons (exit 1), admits the complete test fixture at `tested`,
+  rejects the unadapted partial-bounds Kani fixture as
+  `rejected [verdict-self-reported]`, and rejects resource-exhausted and
+  self-reported fixtures with their reasons; separately, the abstract gate
+  admits partial-bounds evidence at `bounded` when all rules hold and a
+  matching adapter result is supplied; `PF14.structural@1.1.4` is satisfied by
+  the passing `evidence-gate` check and task 1.1.4 is ticked.
 - [x] (2026-10-18) EP-M5 review repair: group the evidence gate's explicit
   caller inputs in `AdmissionContext`, retain the flat `check_evidence.py`
   option names through Cyclopts, and reduce the reported complexity hotspots.
@@ -1754,10 +1757,14 @@ and the bet register's measurement sentences.
   amendments only. Compatibility: none.
 - `EP-M5`. Outcome: ADR-0009; schema version 2; exception register; pure gate
   with exhaustive tests; task 1.1.4 ticked via `PF14.structural@1.1.4`.
-  Evidence: VO-1 to VO-4; the transcript's `kind = none`, `outcome = not-run`
-  witness has every other blocker condition satisfied and yields exactly
-  `rejected [not-run]` (exit 1); the complete test fixture is admitted at
-  `tested` (exit 0), and reports its partial-bounds variant at `bounded`.
+  Evidence: VO-1 to VO-4; the committed planned example is rejected with
+  `witness-absent`, `control-required-missing`, `binding-incomplete`, and
+  `not-run` (exit 1); VO-1 separately checks a valid abstract `kind = none`,
+  `outcome = not-run` state whose sole reason is `not-run`. The complete test
+  fixture is admitted at `tested` (exit 0). The abstract gate admits a
+  partial-bounds verifier state at `bounded` when all rules hold and a matching
+  adapter result is supplied; the current CLI rejects the unadapted fixture as
+  `rejected [verdict-self-reported]` because no parser is integrated.
   Conformance: the 1.1.4 success text is satisfied; no version-1 consumer
   remains. Compatibility: none (no deployed consumer).
 - `EP-M6`. Outcome: all four 1.1 tasks ticked; documents reconciled; plan
@@ -1812,15 +1819,16 @@ make nixie
 
 Evidence gate demonstration (after `EP-M5`):
 
-The planned example uses VO-1's `none/not-run` witness, with every other
-blocking condition satisfied.
+The committed planned example is not VO-1's sole-`not-run` abstract state. Its
+witness is unobserved, its required negative control is unrun, and its
+executable, specification, and source-revision bindings are absent.
 
 ```bash
 $PY scripts/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json; echo "exit=$?"
 ```
 
 ```plaintext
-spec/proof-evidence.example.json: rejected [not-run]
+spec/proof-evidence.example.json: rejected [witness-absent, control-required-missing, binding-incomplete, not-run]
 exit=1
 ```
 
@@ -1848,9 +1856,11 @@ Behavioural acceptance:
    remains open", makes `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
    `make design-check BASE_REV=origin/main` fail and name AC-03.
-5. `check_evidence.py` rejects a `resource-exhausted` fixture, reports a
-   partial-bounds Kani fixture at `bounded`, never `proof`, and rejects a
-   self-reported Verus record with `verdict-self-reported`.
+5. `check_evidence.py` rejects a `resource-exhausted` fixture and a
+   self-reported Verus record with `verdict-self-reported`. The abstract gate
+   reports a partial-bounds Kani state at `bounded`, never `proof`, only when a
+   matching adapter result and all other rule conditions are supplied; the
+   current CLI rejects the unadapted fixture with `verdict-self-reported`.
 6. `docs/developers-guide.md` states the ISC licence and the `publish = false`
    policy, and `cargo publish --dry-run` refuses to publish.
 

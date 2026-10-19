@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -26,11 +27,34 @@ def fixture(name: str) -> str:
     return str(FIXTURES / f'{name}.json')
 
 
-def test_planned_example_is_rejected_as_not_run(capsys):
-    """Keep planned evidence below the tested admission level with a not-run reason."""
+def test_planned_example_reports_all_blocking_reasons(capsys):
+    """Report every blocking reason for the committed planned example."""
     assert run('--as-of', '2026-10-10', str(EXAMPLE)) == 1, 'a planned record falls short of tested'
     out = capsys.readouterr().out
-    assert 'rejected [' in out and 'not-run' in out, 'the planned record names why it is rejected'
+    assert out.splitlines() == [
+        f'{EXAMPLE}: rejected [witness-absent, control-required-missing, binding-incomplete, not-run]',
+    ], 'the planned record reports all blocking reasons in rule order'
+
+
+def test_standalone_entrypoint_has_its_runtime_dependencies():
+    """Run the PEP 723 entry point with only its declared script dependencies."""
+    result = subprocess.run(
+        [
+            str(ROOT / 'scripts/check_evidence.py'),
+            '--as-of',
+            '2026-10-10',
+            *WITH_BINDINGS,
+            fixture('complete-test'),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=180,
+    )
+    assert result.returncode == 0, f'standalone CLI should admit tested evidence: {result.stderr}'
+    assert result.stdout.splitlines() == [
+        f"{fixture('complete-test')}: tested []",
+    ], 'standalone CLI reports the admitted level and reasons'
 
 
 def test_complete_test_record_is_admitted_at_tested(capsys):
