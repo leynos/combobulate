@@ -42,13 +42,18 @@ with the evidence recorded.
   time secondary. Proof and build ceilings use the same runner class. Shared
   development hosts are never acceptance environments; they serve only for
   calibration, and calibration runs never count as acceptance evidence.
+  Acceptance records validate the vCPU, memory, and architecture class, record
+  GitHub Actions `ImageOS` and `ImageVersion`, and include measured versions
+  for the frozen toolchain requirements.
 - Registration. Each control freezes its workload and control sources (with
   digests), sizes, seeds, timed region, metric, unit, estimand, statistic,
   decision rule (including inconclusive and extension policy), warm-up,
   interleaving, sample counts, outlier policy, environment, cache policy, proof
   scope, measurement tool, analysis script, and calibration reference. Its
   digest is SHA-256 over the canonical JSON of those fields. Observed runner
-  metadata is recorded per measurement, not frozen.
+  metadata is recorded per measurement, not frozen. A non-null analysis-script
+  path must also be listed among the workload sources so its bytes are covered
+  by a registered source digest; a null path records that no script is needed.
 - Amendments. A frozen field changes only through an amendment approved by
   the sponsor, whose `replaces` equals the previous digest; amendments form an
   append-only chain. The design checks compare with the pull request's merge

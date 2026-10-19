@@ -14,6 +14,8 @@ from .ci_controls import OUTCOME_VERDICTS, check_ci_measurement
 from .context import require
 
 HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
+PINNED_VERSION = re.compile(r'\bnightly-\d{4}-\d{2}-\d{2}\b|\b\d+(?:\.\d+){2,}(?:[.-][A-Za-z0-9]+)*\b')
+ACCEPTANCE_RUNNER_CLASS = 'GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64'
 
 def check_measurement_binding(control: Mapping[str, object], record: Mapping[str, object]) -> bool:
     """Validate a measurement's history and report whether it uses the current digest.
@@ -23,7 +25,8 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
     control : Mapping[str, object]
         Registered control whose digest history governs the measurement.
     record : Mapping[str, object]
-        Acceptance record naming the control, digest, date, runner, and hardware class.
+        Acceptance record naming the control, digest, date, runner metadata, hardware,
+        and measured toolchain versions.
 
     Returns
     -------
@@ -33,7 +36,8 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
     Raises
     ------
     AssertionError
-        If the record is unbound, predates registration, or uses another environment.
+        If the record is unbound, predates registration, or differs from the registered
+        runner profile or toolchain configuration.
     KeyError
         If the control or record omits a field required for binding.
 
@@ -53,12 +57,98 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
     recorded_on = record['recorded_on']
     require(recorded_on >= effective_date,
             f"{record['id']} predates registration of {control['id']} digest {record_digest}")
-    require(record['runner_image'] == control['frozen']['environment']['image'],
+    environment = control['frozen']['environment']
+    require(environment['runner_class'] == ACCEPTANCE_RUNNER_CLASS,
+            f"{control['id']} has an unsupported frozen acceptance runner class")
+    require(record['runner_image'] == environment['image'],
             f"{record['id']} does not use {control['id']}'s registered runner image")
-    require(record['hardware']['class'] == 'github-hosted-runner'
-            and record['hardware']['os_family'] == 'Ubuntu 24.04',
-            f"{record['id']} was not measured on the registered GitHub-hosted Ubuntu 24.04 runner")
+    hardware = record['hardware']
+    require(hardware['class'] == 'github-hosted-runner'
+            and hardware['os_family'] == 'Ubuntu 24.04'
+            and hardware['threads'] == 4
+            and hardware['vcpus'] == 4
+            and hardware['memory_gib'] == 16
+            and hardware['architecture'] == 'x64',
+            f"{record['id']} was not measured on the registered 4-vCPU, 16-GB, x64 "
+            'GitHub-hosted Ubuntu 24.04 runner')
+    runner_metadata = record.get('runner_metadata')
+    require(isinstance(runner_metadata, Mapping)
+            and all(isinstance(runner_metadata.get(name), str) and runner_metadata[name].strip()
+                    for name in ('image_os', 'image_version')),
+            f"{record['id']} lacks observed GitHub ImageOS or ImageVersion metadata")
+    _check_registered_toolchains(control, record)
     return record_digest == control['digest']
+
+
+def _check_registered_toolchains(control: Mapping[str, object], record: Mapping[str, object]) -> None:
+    """Require measured toolchains and pinned versions named by the frozen environment.
+
+    Parameters
+    ----------
+    control : Mapping[str, object]
+        Registered control whose environment defines required toolchains.
+    record : Mapping[str, object]
+        Acceptance measurement containing observed toolchain identifiers.
+
+    Returns
+    -------
+    None
+        Returns only when all registered tools and fixed versions are recorded.
+
+    Raises
+    ------
+    AssertionError
+        If a toolchain or a fixed version from the control is absent.
+    KeyError
+        If the control or record omits its environment or toolchain map.
+
+    Examples
+    --------
+    _check_registered_toolchains(control, record) accepts the pinned tool versions.
+    """
+    expected = control['frozen']['environment']['toolchains']
+    observed = record.get('toolchains')
+    if not isinstance(expected, Mapping):
+        raise AssertionError(f"{control['id']} has no frozen toolchain requirements")
+    if not isinstance(observed, Mapping):
+        raise AssertionError(f"{record['id']} lacks measured versions for registered toolchains")
+    measured: dict[str, str] = {}
+    missing = []
+    for name in expected:
+        value = observed.get(name)
+        if isinstance(value, str) and value.strip():
+            measured[name] = value
+        else:
+            missing.append(name)
+    missing.sort()
+    require(not missing,
+            f"{record['id']} lacks measured versions for registered toolchains: {', '.join(missing)}")
+
+    observed_versions = ' '.join(value for value in observed.values() if isinstance(value, str))
+    missing_versions = []
+    for name, requirement in expected.items():
+        if not isinstance(requirement, str):
+            raise AssertionError(f"{control['id']} has a malformed requirement for toolchain {name}")
+        versions = PINNED_VERSION.findall(requirement)
+        if versions and versions[0] not in measured.get(name, ''):
+            missing_versions.append(f"{name} {versions[0]}")
+        missing_versions.extend(version for version in versions[1:] if version not in observed_versions)
+    missing_versions.sort()
+    require(not missing_versions,
+            f"{record['id']} does not report frozen toolchain versions: {', '.join(missing_versions)}")
+
+    backend_requirement = expected.get('codegen_backend', '')
+    registered_backends = [backend for backend in ('Cranelift', 'LLVM')
+                           if isinstance(backend_requirement, str) and backend in backend_requirement]
+    if registered_backends:
+        observed_backend = measured.get('codegen_backend', '').casefold()
+        require(any(backend.casefold() in observed_backend for backend in registered_backends),
+                f"{record['id']} uses a codegen backend outside the frozen environment")
+
+    linker_requirement = expected.get('linker', '')
+    if isinstance(linker_requirement, str) and 'mold' in linker_requirement.casefold():
+        require('mold' in measured.get('linker', '').casefold(),
+                f"{record['id']} uses a linker outside the frozen environment")
 
 def check_calibration_record(name: str, record: Mapping[str, object]) -> None:
     """Require a record loaded from calibration storage to declare calibration purpose.

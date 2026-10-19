@@ -61,12 +61,17 @@ def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None)
              'control_digest': None if purpose == 'calibration' else (digest or CONTROL['digest']),
              'recorded_on': TEST_MEASUREMENT_DATE,
              'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
-                          'memory_gib': 16, 'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
-             'toolchains': {}, 'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
+                          'vcpus': 4, 'memory_gib': 16, 'architecture': 'x64',
+                          'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
+             'toolchains': {'rust': 'nightly-2026-08-27', 'codegen_backend': 'Cranelift',
+                            'linker': 'mold 2.41.0', 'verus': '0.2026.09.06.8dea4a2 with Z3 4.16.0',
+                            'kani': '0.67.0'},
+             'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
                                               'metric': 'wall time', 'unit': 's', 'samples': [1], 'median': 1}]}
     if purpose == 'acceptance':
         entry['outcome'] = outcome
         entry['runner_image'] = 'ubuntu-24.04'
+        entry['runner_metadata'] = {'image_os': 'ubuntu24', 'image_version': '20261012.1'}
     RECORD_VALIDATOR.validate(entry)
     return entry
 
@@ -296,6 +301,55 @@ class Outcomes(unittest.TestCase):
             RECORD_VALIDATOR.validate(wrong_image)
         with self.assertRaisesRegex(AssertionError, 'does not use AC-01'):
             check_measurement_binding(CONTROL, wrong_image)
+
+    def test_acceptance_runner_profile_must_match_registration(self):
+        for field, value in (('threads', 1), ('vcpus', 1), ('memory_gib', 1), ('architecture', 'arm64')):
+            with self.subTest(field=field):
+                wrong_profile = record('pass')
+                wrong_profile['hardware'][field] = value
+                with self.assertRaises(ValidationError,
+                                       msg=f'acceptance schema must reject an incorrect {field}'):
+                    RECORD_VALIDATOR.validate(wrong_profile)
+                with self.assertRaisesRegex(AssertionError, 'registered 4-vCPU'):
+                    check_measurement_binding(CONTROL, wrong_profile)
+
+        missing_vcpu_count = record('pass')
+        del missing_vcpu_count['hardware']['vcpus']
+        with self.assertRaises(ValidationError,
+                               msg='acceptance schema must require the registered virtual CPU count'):
+            RECORD_VALIDATOR.validate(missing_vcpu_count)
+
+    def test_acceptance_runner_metadata_and_toolchain_versions_are_required(self):
+        missing_metadata = record('pass')
+        del missing_metadata['runner_metadata']
+        with self.assertRaises(ValidationError, msg='acceptance records require observed runner metadata'):
+            RECORD_VALIDATOR.validate(missing_metadata)
+        with self.assertRaisesRegex(AssertionError, 'lacks observed GitHub ImageOS'):
+            check_measurement_binding(CONTROL, missing_metadata)
+
+        missing_toolchain = record('pass')
+        missing_toolchain['toolchains'] = {}
+        with self.assertRaisesRegex(AssertionError, 'lacks measured versions for registered toolchains'):
+            check_measurement_binding(CONTROL, missing_toolchain)
+
+        wrong_version = record('pass')
+        wrong_version['toolchains']['kani'] = '0.68.0'
+        with self.assertRaisesRegex(AssertionError, 'does not report frozen toolchain versions'):
+            check_measurement_binding(CONTROL, wrong_version)
+
+    def test_analysis_script_must_be_a_hashed_workload_source(self):
+        control = copy.deepcopy(CONTROL)
+        control['frozen']['analysis_script'] = {
+            'path': 'tools/analyse.py', 'requirement': 'Use the registered analysis.',
+        }
+        control['frozen']['workload']['sources'] = []
+        with self.assertRaisesRegex(AssertionError, 'analysis script .* has no matching hashed workload source',
+                                    msg='analysis script bytes must be frozen with a source digest'):
+            check_sources(control, {})
+
+        script_digest = 'a' * 64
+        control['frozen']['workload']['sources'] = [{'path': 'tools/analyse.py', 'sha256': script_digest}]
+        check_sources(control, {'tools/analyse.py': script_digest})
 
     def test_calibration_directory_rejects_acceptance_record_directly(self):
         with self.assertRaisesRegex(AssertionError, 'acceptance evidence belongs in spec/measurements'):

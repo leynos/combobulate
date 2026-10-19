@@ -173,36 +173,44 @@ def check_amendment_chain(
     require(control['digest'] == previous, f"{control['id']} digest is not the end of its amendment chain")
 
 def check_sources(control: Mapping[str, object], source_digests: Mapping[str, str]) -> None:
-    """Require supplied workload-source digests to match the registration.
+    """Require workload sources and any analysis script to have registered digests.
 
     Parameters
     ----------
     control : Mapping[str, object]
-        Control whose workload sources are registered.
+        Control whose workload and analysis-script sources are registered.
     source_digests : Mapping[str, str]
         SHA-256 values keyed by registered source path.
 
     Returns
     -------
     None
-        Returns only when every registered source digest matches.
+        Returns only when every registered source digest matches and each named
+        analysis script is among the hashed workload sources.
 
     Raises
     ------
     AssertionError
-        If a source is missing or differs from its registered digest.
+        If a source is missing or differs from its registered digest, or an
+        analysis script has no matching hashed source.
     KeyError
         If a control or source omits a required path or digest field.
 
     Examples
     --------
-    check_sources(control, digests) accepts matching source hashes.
+    check_sources(control, digests) accepts matching source hashes and script bindings.
     """
-    for source in control['frozen']['workload']['sources']:
+    sources = control['frozen']['workload']['sources']
+    for source in sources:
         digest = source_digests.get(source['path'])
         require(digest is not None, f"{control['id']} source {source['path']} is missing")
         require(digest == source['sha256'],
                 f"{control['id']} source {source['path']} changed since registration; amend the control")
+    analysis_script = control['frozen']['analysis_script']
+    if isinstance(analysis_script, Mapping) and analysis_script['path'] is not None:
+        script_path = analysis_script['path']
+        require(any(source['path'] == script_path for source in sources),
+                f"{control['id']} analysis script {script_path} has no matching hashed workload source")
 
 def digest_dates(control: Mapping[str, object]) -> list[tuple[str, str]]:
     """Pair each registered digest with the date when it became effective.

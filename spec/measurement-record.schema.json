@@ -22,6 +22,16 @@
       "description": "Acceptance measurement date, not the later date when its record is committed."
     },
     "runner_image": {"const": "ubuntu-24.04"},
+    "runner_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_os", "image_version"],
+      "properties": {
+        "image_os": {"type": "string", "minLength": 1},
+        "image_version": {"type": "string", "minLength": 1}
+      },
+      "description": "Observed GitHub Actions ImageOS and ImageVersion values."
+    },
     "outcome": {"enum": ["pass", "fail", "budget-exceeded", "resource-exhausted", "inconclusive", "missing"]},
     "hardware": {
       "type": "object",
@@ -32,7 +42,9 @@
         "cpu_model": {"type": "string", "minLength": 1},
         "cores": {"type": "integer", "minimum": 1},
         "threads": {"type": "integer", "minimum": 1},
+        "vcpus": {"type": "integer", "minimum": 1},
         "memory_gib": {"type": "integer", "minimum": 1},
+        "architecture": {"enum": ["x64", "arm64"]},
         "os_family": {"type": "string", "minLength": 1},
         "kernel_major": {"type": "integer", "minimum": 1}
       }
@@ -92,14 +104,19 @@
     {
       "if": {"properties": {"purpose": {"const": "acceptance"}}},
       "then": {
-        "required": ["outcome", "runner_image"],
+        "required": ["outcome", "runner_image", "runner_metadata"],
         "properties": {
           "control_ids": {"maxItems": 1},
           "control_digest": {"type": "string"},
           "hardware": {
+            "required": ["vcpus", "memory_gib", "architecture"],
             "properties": {
               "class": {"const": "github-hosted-runner"},
-              "os_family": {"const": "Ubuntu 24.04"}
+              "os_family": {"const": "Ubuntu 24.04"},
+              "threads": {"const": 4},
+              "vcpus": {"const": 4},
+              "memory_gib": {"const": 16},
+              "architecture": {"const": "x64"}
             }
           }
         }
