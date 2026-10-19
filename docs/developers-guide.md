@@ -36,7 +36,8 @@ discovers `.cargo/config.toml`; that check uses the development backend and
 linker defaults. The recipe sends warnings-as-errors to the repository check
 through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
 `cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
-available. `make check-fmt` verifies Rust formatting with
+available. It also runs the cardinality probe's `trybuild` UI test for its
+`#[must_use]` result contract. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and
@@ -550,18 +551,20 @@ Acceptance-control rule checks in
 `tools/docs_validation/acceptance_evidence.py`, and
 `tools/docs_validation/ci_controls.py` belong only to the documentation-pack
 checker. They accept parsed values and source digests, and do not read
-repository files. The `preregistration.py` composition path also scans
-serialized evidence for host identities before parsing it, preserving raw
-artefact text for that check. Keep filesystem reads and schema loading in the
-composition path rooted at `check_acceptance_controls` in
-`tools/docs_validation/preregistration.py` and its shared `ValidationContext`.
-`ValidationContext.load_yaml` converts parser failures into checker errors, and
-`ValidationContext.read_bytes` supplies source data for composition-time digest
-calculation. The composition path passes source digests and the small
-`AcceptanceWorkflowSettings` value to the pure rules. The original named
-imports remain re-exported from preregistration for focused tests; these
-helpers are not general GitHub Actions parsers, measurement libraries, or
-repository file APIs.
+repository files. The `preregistration.py` composition path scans serialized
+JSON evidence for host identities and then recursively scans its decoded string
+keys and values, so escaped characters cannot hide an identity from the check.
+The Markdown calibration report is scanned as raw text. Keep this recursive
+scan private to the acceptance-control composition path. Keep filesystem reads
+and schema loading in the composition path rooted at
+`check_acceptance_controls` in `tools/docs_validation/preregistration.py` and
+its shared `ValidationContext`. `ValidationContext.load_yaml` converts parser
+failures into checker errors, and `ValidationContext.read_bytes` supplies
+source data for composition-time digest calculation. The composition path
+passes source digests and the small `AcceptanceWorkflowSettings` value to the
+pure rules. The original named imports remain re-exported from preregistration
+for focused tests; these helpers are not general GitHub Actions parsers,
+measurement libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
 documentation-pack validation. The frozen register is

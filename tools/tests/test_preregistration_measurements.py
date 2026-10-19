@@ -45,11 +45,21 @@ class Outcomes(unittest.TestCase):
 
     def test_every_retry_counts(self):
         """Require every retry outcome to contribute to the aggregate verdict."""
+        failure_outcomes = {'fail', 'budget-exceeded', 'resource-exhausted', 'missing'}
         for length in range(1, 4):
             for outcomes in itertools.product(RECORD_OUTCOMES, repeat=length):
                 result = verdict(CONTROL, [record(outcome) for outcome in outcomes])
-                expected_pass = all(outcome == 'pass' for outcome in outcomes)
-                self.assertEqual(result == 'pass', expected_pass, f'{outcomes} gave {result}')
+                if any(outcome in failure_outcomes for outcome in outcomes):
+                    expected_verdict = 'fail'
+                elif any(outcome == 'inconclusive' for outcome in outcomes):
+                    expected_verdict = 'inconclusive'
+                else:
+                    expected_verdict = 'pass'
+                self.assertEqual(
+                    result,
+                    expected_verdict,
+                    f'{outcomes} gave {result}, expected {expected_verdict}',
+                )
 
     def test_calibration_records_never_count(self):
         """Keep calibration-purpose records out of acceptance verdicts."""

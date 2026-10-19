@@ -109,6 +109,41 @@ def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -
         require(not value or value not in text, f'{name} contains host identity {value!r}')
 
 
+def _iter_decoded_json_strings(value: object) -> Iterable[str]:
+    """Yield JSON object keys and string values recursively; e.g. from nested records.
+
+    Examples
+    --------
+    list(_iter_decoded_json_strings({'hardware': ['runner', {'class': 'ubuntu'}]}))
+    yields ['hardware', 'runner', 'class', 'ubuntu'].
+    """
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for key, item in value.items():
+            if isinstance(key, str):
+                yield key
+            yield from _iter_decoded_json_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_decoded_json_strings(item)
+
+
+def _load_identity_checked_json(name: str, text: str, extra_names: Iterable[str]) -> object:
+    """Reject identities in raw and decoded JSON; e.g. catch escaped home paths.
+
+    Examples
+    --------
+    _load_identity_checked_json('record.json', '{"command": "verus"}', ())
+    returns a parsed record after checking its serialized and decoded strings.
+    """
+    check_host_identity(name, text, extra_names)
+    record = json.loads(text)
+    for decoded_string in _iter_decoded_json_strings(record):
+        check_host_identity(name, decoded_string, extra_names)
+    return record
+
+
 
 
 
@@ -155,6 +190,7 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     --------
     check_acceptance_controls(context) records a passing check for a valid register.
     """
+    extra_names = tuple(extra_names)
     register = context.load('spec/acceptance-controls.json')
     Draft202012Validator(
         context.load('spec/acceptance-controls.schema.json'),
@@ -189,8 +225,7 @@ def _load_calibration_records(
     for path in sorted((context.root / 'spec/calibration').glob('*.json')):
         relative = path.relative_to(context.root).as_posix()
         text = path.read_text(encoding='utf-8')
-        check_host_identity(relative, text, extra_names)
-        records[relative] = json.loads(text)
+        records[relative] = _load_identity_checked_json(relative, text, extra_names)
         record_schema.validate(records[relative])
         check_calibration_record(relative, records[relative])
     return records
@@ -207,8 +242,7 @@ def _load_acceptance_measurements(
     for path in sorted(measurements_directory.glob('*.json')):
         relative = path.relative_to(context.root).as_posix()
         text = path.read_text(encoding='utf-8')
-        check_host_identity(relative, text, extra_names)
-        measurement = json.loads(text)
+        measurement = _load_identity_checked_json(relative, text, extra_names)
         record_schema.validate(measurement)
         require(measurement['purpose'] == 'acceptance',
                 f"{relative} must be an acceptance record; calibration evidence belongs in spec/calibration")

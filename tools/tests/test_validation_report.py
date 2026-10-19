@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from docs_validation.freeze import RevisionJsonReader
+from docs_validation.preregistration import check_acceptance_controls
 
 import check_docs
 
@@ -201,6 +202,52 @@ class ValidationReport(unittest.TestCase):
             r'unknown-control-digest cites unknown digest .* for AC-01',
             'the command path must reject acceptance evidence with an unregistered digest',
         )
+
+    def test_decoded_json_strings_cannot_hide_host_identities(self) -> None:
+        """Reject escaped host identities in calibration and acceptance JSON."""
+        calibration_path = self.root / 'spec/calibration/verifier-probe.json'
+        original_calibration = json.loads(calibration_path.read_text(encoding='utf-8'))
+        register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
+        control = next(item for item in register['controls'] if item['id'] == 'AC-01')
+        last_effective_date = (control['amendments'][-1]['date'] if control['amendments']
+                               else control['frozen']['registered_on'])
+        recorded_on = (date.fromisoformat(last_effective_date) + timedelta(days=1)).isoformat()
+        measurements = self.root / 'spec/measurements'
+        measurements.mkdir()
+        measurement_path = measurements / 'escaped-identity.json'
+        original_measurement = self.acceptance_record(
+            'escaped-identity', 'AC-01', control['digest'], recorded_on,
+        )
+        source_records = (
+            ('calibration', calibration_path, original_calibration),
+            ('measurement', measurement_path, original_measurement),
+        )
+        encoded_values = (
+            ('home path', '/home/alice/bin/verus', r'\u002fhome\u002falice\u002fbin\u002fverus', (),
+             'contains a home path'),
+            ('host name', 'measured on build-box-7', r'measured on build-\u0062ox-7', ('build-box-7',),
+             "contains host identity 'build-box-7'"),
+        )
+
+        for record_type, source, original in source_records:
+            for label, decoded, encoded, extra_names, expected_error in encoded_values:
+                with self.subTest(record_type=record_type, identity=label):
+                    record = json.loads(json.dumps(original))
+                    record['workloads'][0]['command'] = decoded
+                    serialized = json.dumps(record)
+                    escaped = serialized.replace(decoded, encoded, 1)
+                    self.assertNotIn(
+                        decoded,
+                        escaped,
+                        f'{label} regression fixture must hide the identity from the raw-text scan',
+                    )
+                    source.write_text(escaped, encoding='utf-8')
+                    with self.assertRaisesRegex(
+                        AssertionError,
+                        expected_error,
+                        msg=f'the composition path must reject a decoded {label} in {record_type} JSON',
+                    ):
+                        check_acceptance_controls(ValidationContext(self.root), extra_names)
 
     def test_acceptance_purpose_record_in_calibration_directory_is_rejected_by_command(self) -> None:
         """Keep acceptance-purpose records out of the calibration-only directory."""
