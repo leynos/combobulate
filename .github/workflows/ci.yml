@@ -8,7 +8,10 @@ name: CI
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # Pre-registered budget AC-07 (spec/acceptance-controls.json): any failed
+    # attempt fails independently of p90 over the latest 20 attempts.
+    timeout-minutes: 8
     permissions:
       contents: read
     env:

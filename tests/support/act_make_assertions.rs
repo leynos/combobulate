@@ -111,7 +111,7 @@ pub(super) fn assert_invocations_use_repository_directory(invocations: &[Invocat
 /// Checks the selected CI job and all Act arguments controlled by the Makefile.
 pub(super) fn assert_act_invocation_matches(invocation: &Invocation, common_directory: &Utf8Path) {
     let common_mount = format!("--volume {common_directory}:{common_directory}:ro");
-    let platform = format!("ubuntu-latest={RUNNER_IMAGE}");
+    let platform = format!("ubuntu-24.04={RUNNER_IMAGE}");
 
     assert_eq!(
         invocation.executable, "act",

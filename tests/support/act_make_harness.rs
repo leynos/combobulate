@@ -33,7 +33,7 @@ const ACT_SCRIPT: &str = concat!(
     "  exit 64\n",
     "fi\n",
     "case \"$4\" in \"--volume \"*:ro) ;; *) exit 64 ;; esac\n",
-    "case \"${10}\" in ubuntu-latest=*) ;; *) exit 64 ;; esac\n",
+    "case \"${10}\" in ubuntu-24.04=*) ;; *) exit 64 ;; esac\n",
     "[ \"${FAIL_ACT:-}\" != 1 ] || exit 31\n",
 );
 

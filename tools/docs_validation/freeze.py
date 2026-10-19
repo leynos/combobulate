@@ -9,8 +9,8 @@ with the head's own claims. CI passes the merge base; without a base revision
 the check does not run and says so.
 
 `FROZEN_DOCUMENTS` lists the registers compared. Each governance register
-joins it in the commit that creates the register: decisions now; acceptance
-controls (with their amendment chain) and exceptions when they are added.
+joins it in the commit that creates the register: decisions and acceptance
+controls (with their amendment chain) now; exceptions when they are added.
 """
 from __future__ import annotations
 
@@ -38,8 +38,30 @@ def check_decisions_frozen(base: dict, head: dict) -> None:
                              'supersede it instead')
 
 
+def check_controls_frozen(base: dict, head: dict) -> None:
+    """Freeze register metadata; permit control changes only through appended amendments."""
+    require(head.get('frozen_fields') == base.get('frozen_fields'),
+            'Registered frozen_fields list was edited in place')
+    require(head.get('outcome_verdicts') == base.get('outcome_verdicts'),
+            'Registered outcome_verdicts mapping was edited in place')
+    head_controls = {control['id']: control for control in head['controls']}
+    for control in base['controls']:
+        current = head_controls.get(control['id'])
+        require(current is not None, f"Registered control {control['id']} was deleted")
+        require(current['registered_digest'] == control['registered_digest'],
+                f"Registered control {control['id']} changed its registration digest")
+        prefix = current['amendments'][:len(control['amendments'])]
+        require(prefix == control['amendments'], f"Registered control {control['id']} edited or removed an amendment")
+        if current['digest'] != control['digest']:
+            added = current['amendments'][len(control['amendments']):]
+            require(bool(added) and added[0]['replaces'] == control['digest'],
+                    f"Registered control {control['id']} changed frozen fields without an amendment replacing "
+                    f"{control['digest'][:12]}")
+
+
 FROZEN_DOCUMENTS: Mapping[str, Callable[[dict, dict], None]] = {
     'spec/decisions.json': check_decisions_frozen,
+    'spec/acceptance-controls.json': check_controls_frozen,
 }
 
 

@@ -191,7 +191,7 @@ impl ActSmoke {
                 "--env",
                 "ACT=true",
                 "--platform",
-                "ubuntu-latest=catthehacker/ubuntu:act-latest",
+                "ubuntu-24.04=catthehacker/ubuntu:act-latest",
             ])
             .current_dir(&self.path);
         if let Some(target) = failed_target {

@@ -10,10 +10,12 @@ import unittest
 from functools import partial
 from pathlib import Path
 
+from hypothesis import given, settings, strategies as st
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.freeze import check_decisions_frozen, check_frozen
+from docs_validation.freeze import check_controls_frozen, check_decisions_frozen, check_frozen
 from docs_validation.revision_reader import git_json_at_revision
 
 DecisionRecord = dict[str, object]
@@ -65,6 +67,126 @@ class DecisionFreeze(unittest.TestCase):
             check_decisions_frozen(register(superseded), register(superseded | {'superseded_by': 'D17'}))
 
 
+CONTROL = {'id': 'AC-03', 'registered_digest': 'a' * 64, 'digest': 'a' * 64, 'amendments': [],
+           'frozen': {'decision_rule': {'thresholds': {'upper_bound_ratio': 1.25}}}}
+
+
+def controls(*entries: dict, outcome_verdicts: dict | None = None) -> dict:
+    """Wrap control records in a minimal register."""
+    return {
+        'frozen_fields': ['control'],
+        'outcome_verdicts': copy.deepcopy(outcome_verdicts if outcome_verdicts is not None else {'pass': 'pass'}),
+        'controls': [copy.deepcopy(entry) for entry in entries],
+    }
+
+
+def amendment(replaces: str, new_digest: str) -> dict:
+    """Build one sponsor-approved amendment."""
+    return {'date': '2026-10-12', 'approved_by': 'leynos', 'approval_reference': 'https://example.org/approval',
+            'replaces': replaces, 'new_digest': new_digest, 'reason': 'Test.'}
+
+
+class ControlFreeze(unittest.TestCase):
+    """VO-7 for controls: frozen fields change only through an appended amendment."""
+
+    def test_threshold_and_digest_edited_together_fail(self):
+        """Reject a threshold change that bypasses the amendment history."""
+        edited = copy.deepcopy(CONTROL)
+        edited['frozen']['decision_rule']['thresholds']['upper_bound_ratio'] = 1.5
+        edited['digest'] = 'b' * 64
+        with self.assertRaisesRegex(AssertionError, 'AC-03 changed frozen fields without an amendment'):
+            check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_appended_amendment_passes(self):
+        """Accept a control change recorded as an appended amendment."""
+        edited = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
+        check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_registered_digest_cannot_change_in_place(self):
+        """Keep the original control registration digest immutable."""
+        edited = copy.deepcopy(CONTROL) | {'registered_digest': 'b' * 64}
+        with self.assertRaisesRegex(AssertionError, 'AC-03 changed its registration digest',
+                                    msg='the original registration digest must remain immutable'):
+            check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_first_appended_amendment_must_replace_the_previous_digest(self):
+        """Require the first new amendment to extend the current digest."""
+        edited = copy.deepcopy(CONTROL) | {
+            'digest': 'b' * 64,
+            'amendments': [amendment('c' * 64, 'b' * 64)],
+        }
+        with self.assertRaisesRegex(AssertionError,
+                                    'AC-03 changed frozen fields without an amendment replacing a{12}',
+                                    msg='the first amendment must continue the registered digest chain'):
+            check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_edited_amendment_fails(self):
+        """Reject edits to an amendment already present at the base."""
+        base = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
+        head = copy.deepcopy(base)
+        head['amendments'][0]['reason'] = 'Rewritten.'
+        with self.assertRaisesRegex(AssertionError, 'AC-03 edited or removed an amendment'):
+            check_controls_frozen(controls(base), controls(head))
+
+    def test_deleted_control_fails(self):
+        """Reject deleting a registered control from the head register."""
+        with self.assertRaisesRegex(AssertionError, 'Registered control AC-03 was deleted'):
+            check_controls_frozen(controls(CONTROL), controls())
+
+    def test_outcome_verdict_mapping_is_frozen(self):
+        """Keep the registered outcome-to-verdict mapping unchanged."""
+        base = controls(CONTROL)
+        edited_maps = (
+            ('added key', {'pass': 'pass', 'fail': 'fail'}),
+            ('removed key', {}),
+            ('changed value', {'pass': 'fail'}),
+        )
+        for change, outcome_verdicts in edited_maps:
+            with self.subTest(change=change):
+                with self.assertRaisesRegex(AssertionError, 'Registered outcome_verdicts mapping was edited in place',
+                                            msg=f'{change} to the registered mapping must fail'):
+                    check_controls_frozen(base, controls(CONTROL, outcome_verdicts=outcome_verdicts))
+
+    def test_frozen_field_list_is_frozen(self):
+        """Keep the digest input field declaration unchanged."""
+        base = controls(CONTROL)
+        edited = controls(CONTROL)
+        edited['frozen_fields'].append('analysis')
+        with self.assertRaisesRegex(AssertionError, 'Registered frozen_fields list was edited in place',
+                                    msg='the digest input declaration must not change in place'):
+            check_controls_frozen(base, edited)
+
+    @settings(max_examples=40, derandomize=True, deadline=None)
+    @given(st.lists(st.text(alphabet='0123456789abcdef', min_size=64, max_size=64)
+                    .filter(lambda digest: digest != CONTROL['registered_digest']),
+                    min_size=2, max_size=6, unique=True))
+    def test_generated_amendment_prefix_preserves_historical_records(self, digests: list[str]) -> None:
+        """Accept generated append-only chains and reject edits or removals from their historical prefix."""
+        head_control = copy.deepcopy(CONTROL)
+        previous = head_control['registered_digest']
+        for digest in digests:
+            head_control['amendments'].append(amendment(previous, digest))
+            previous = digest
+        head_control['digest'] = previous
+
+        base_control = copy.deepcopy(head_control)
+        base_control['amendments'] = base_control['amendments'][:1]
+        base_control['digest'] = digests[0]
+        base = controls(base_control)
+        head = controls(head_control)
+        check_controls_frozen(base, head)
+
+        edited_history = copy.deepcopy(head)
+        edited_history['controls'][0]['amendments'][0]['reason'] = 'Rewritten.'
+        with self.assertRaisesRegex(AssertionError, 'edited or removed an amendment'):
+            check_controls_frozen(base, edited_history)
+
+        removed_history = copy.deepcopy(head)
+        removed_history['controls'][0]['amendments'].pop(0)
+        with self.assertRaisesRegex(AssertionError, 'edited or removed an amendment'):
+            check_controls_frozen(base, removed_history)
+
+
 class BaseRevisionChecks(unittest.TestCase):
     """Freeze rules consume an injected reader, independent of Git command details."""
 
@@ -81,7 +203,7 @@ class BaseRevisionChecks(unittest.TestCase):
     def read_base(self, revision: str, path: str) -> dict | None:
         """Return a fixed base value and record the requested repository path."""
         self.reads.append((revision, path))
-        return copy.deepcopy(self.base)
+        return copy.deepcopy(self.base) if path == 'spec/decisions.json' else None
 
     def write(self, value: DecisionRegister) -> None:
         """Write the current register read by the freeze check."""
@@ -98,7 +220,8 @@ class BaseRevisionChecks(unittest.TestCase):
         self.write(register(ACCEPTED))
         summary = check_frozen(self.context, 'base', self.read_base)
         self.assertIn('no frozen registers', summary, 'a new register freezes nothing yet')
-        self.assertEqual(self.reads, [('base', 'spec/decisions.json')],
+        self.assertEqual(self.reads, [('base', 'spec/decisions.json'),
+                                      ('base', 'spec/acceptance-controls.json')],
                          'the checker reads each frozen register from the requested base')
 
     def test_fake_reader_supplies_the_register_compared_with_the_head(self) -> None:
