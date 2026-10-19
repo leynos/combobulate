@@ -1029,6 +1029,12 @@ construct the same context to check the abstraction. Any additional producer
 must compose the context from its own explicit inputs rather than add
 environment or filesystem access to the gate.
 
+The private `_trust_coverage` projection is scoped to `evidence_gate.py` and is
+called only by `abstract_record`. It combines declared assumption identifiers
+and the cited exception identifier; `trust_state` remains responsible for
+checking each audit reference against that set. Keep this projection free of
+registry lookups and I/O, and do not reuse it as a general record adapter.
+
 Public claims distinguish successful-result correctness from success
 conditions. An implementation that always returns `Err` must fail a success
 witness. A masked-map proof with only inactive cells must also include a

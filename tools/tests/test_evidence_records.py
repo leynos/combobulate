@@ -214,6 +214,15 @@ class ConcreteMapping(unittest.TestCase):
         self.assertEqual(abstract_record(record, context).trust, 'audited-all-covered',
                          'the cited component exception may cover a trusted item')
 
+    def test_trust_coverage_projection_collects_declared_sources(self):
+        """Collect declared assumptions and the optional cited exception for trust audits."""
+        record = {'declared_assumptions': ['A-0001'], 'exception': 'EXC-0001'}
+        self.assertEqual(gate._trust_coverage(record), frozenset({'A-0001', 'EXC-0001'}),
+                         'trust coverage must include declared assumptions and the cited exception')
+        record['exception'] = None
+        self.assertEqual(gate._trust_coverage(record), frozenset({'A-0001'}),
+                         'trust coverage must omit an absent exception without dropping assumptions')
+
     def test_exception_for_another_component_is_malformed(self):
         """Reject a cited exception whose authority narrows a different component."""
         state = AbstractRecord(

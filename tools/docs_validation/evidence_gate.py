@@ -264,6 +264,15 @@ def _exception_for_record(record: Mapping[str, object], context: AdmissionContex
     return exception_state(entry, context.as_of)
 
 
+def _trust_coverage(record: Mapping[str, object]) -> frozenset[str]:
+    """Collect the assumption and exception identifiers that may cover audited items."""
+    covers = {str(item) for item in record['declared_assumptions']}
+    exception_id = record['exception']
+    if exception_id is not None:
+        covers.add(str(exception_id))
+    return frozenset(covers)
+
+
 def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord:
     """Map a schema-valid record to the abstract model; validate against the schema first.
 
@@ -274,14 +283,10 @@ def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> 
     method = record['method']
     parsed = _matching_verified_log_result(record, context) is not None
     exception = _exception_for_record(record, context)
-    exception_id = record['exception']
-    trust_covers = frozenset(str(item) for item in record['declared_assumptions'])
-    if exception_id is not None:
-        trust_covers |= frozenset({str(exception_id)})
     return AbstractRecord(
         kind=str(record['evidence_kind']), outcome=str(record['outcome']), bounds=str(record['bounds']['kind']),
         witness=witness_state(record['success_witnesses']), controls=controls_state(record['negative_controls']),
-        trust=trust_state(record['trust_audit'], trust_covers), exception=exception,
+        trust=trust_state(record['trust_audit'], _trust_coverage(record)), exception=exception,
         binding=binding_state(record, context.bindings),
         run_mode=str(method['run_mode']), verdict_source='log-parser' if parsed else 'self-reported',
     )
