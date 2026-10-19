@@ -16,6 +16,7 @@ from docs_validation.decisions import (
     normalize,
 )
 from docs_validation.ledger import check_generated_documents, generated_documents
+from docs_validation.revision_reader import git_head_revision
 from test_decision_register import REGISTER, RETIRED
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +31,7 @@ class RealRegister(unittest.TestCase):
 
     def test_composed_checker_records_the_decision_register(self) -> None:
         """Include decision-register validation in the complete check sequence."""
-        context = ValidationContext(ROOT)
+        context = ValidationContext(ROOT, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         result = next(row for row in context.results if row['check'] == 'decision-register')
         self.assertEqual(result['count'], 15,

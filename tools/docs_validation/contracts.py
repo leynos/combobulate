@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from jsonschema import Draft202012Validator, ValidationError
 from .context import ValidationContext, require, unique_ids
 from .markdown import MD
@@ -152,24 +153,42 @@ def check_revision_contracts(context: ValidationContext) -> None:
     context.record('backend-capability-plans', 'All source IDs and probe/refusal contracts resolve; no unrun backend capability is marked eligible.', len(cap_ids))
 
 
-def check_proof_evidence_envelope(context: ValidationContext) -> None:
-    """Validate planned evidence; proof claims without witnesses must fail."""
+def _mutated_proof_record(example: dict, change: Callable[[dict], object]) -> dict:
+    """Copy the fixture and apply one focused mutation for the schema contract."""
     import copy
+
+    record = copy.deepcopy(example)
+    change(record)
+    return record
+
+
+def check_proof_evidence_envelope(context: ValidationContext) -> None:
+    """Validate the planned record against schema version 2; records breaking the validity predicate fail."""
     schema = context.load('spec/proof-evidence.schema.json')
     Draft202012Validator.check_schema(schema)
-    validator = Draft202012Validator(schema)
+    validator = Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER)
     example = context.load('spec/proof-evidence.example.json')
     validator.validate(example)
-    mutations = []
-    missing = copy.deepcopy(example)
-    missing.pop('success_witness')
-    mutations.append(missing)
-    unsupported_claim = copy.deepcopy(example)
-    unsupported_claim['status'] = 'proved'
-    mutations.append(unsupported_claim)
-    missing_trust = copy.deepcopy(example)
-    missing_trust['status'] = 'trusted'
-    mutations.append(missing_trust)
-    for mutation in mutations:
-        require(not validator.is_valid(mutation), 'Invalid proof-evidence mutation accepted')
-    context.record('proof-evidence-envelope', 'The planned record validates; missing witness, proof status without actual bindings/results, and unscoped trust mutations fail. Schema validity does not establish a proposition.', len(mutations))
+
+    mutations = [
+        _mutated_proof_record(example, lambda record: record.pop('success_witnesses')),
+        _mutated_proof_record(example, lambda record: record.update(success_witnesses=[])),
+        _mutated_proof_record(example, lambda record: record.update(outcome='verified')),
+        _mutated_proof_record(example, lambda record: record.update(evidence_kind='deductive')),
+        _mutated_proof_record(
+            example, lambda record: record.update(evidence_kind='bounded', outcome='verified'),
+        ),
+        _mutated_proof_record(example, lambda record: record.update(schema_version=1)),
+        _mutated_proof_record(example, lambda record: record.update(undocumented_field='rejected')),
+        _mutated_proof_record(
+            example, lambda record: record['verdict_source'].update(kind='log-parser'),
+        ),
+        _mutated_proof_record(example, lambda record: record.update(status='proved')),
+    ]
+    require(all(not validator.is_valid(mutation) for mutation in mutations),
+            'Invalid proof-evidence mutation accepted')
+    context.record('proof-evidence-envelope', 'The planned record validates against schema version 2; a missing or empty '
+                                              'witness list, a verified outcome for nothing run, an executed kind with '
+                                              'no run, bounded evidence without bounds, a log-parser verdict without a '
+                                              'log, and the retired status field all fail. Schema validity does not '
+                                              'establish a proposition.', len(mutations))

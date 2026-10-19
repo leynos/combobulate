@@ -20,6 +20,7 @@ from docs_validation.context import ValidationContext, same_typed_value
 from docs_validation.contract_examples import check_contract_examples, decode, encode, evaluate_contract, outcome
 from docs_validation.semantic_contracts import check_macro_grammar, check_semantic_contracts
 from docs_validation.semantics import SemanticFailure
+from docs_validation.revision_reader import git_head_revision
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTEXT = ValidationContext(ROOT)
@@ -66,7 +67,7 @@ class ContractRegister(unittest.TestCase):
 
     def test_composed_checker_records_semantic_contract_checks_once(self):
         """Keep each contract checker connected to the complete validation path."""
-        context = ValidationContext(ROOT)
+        context = ValidationContext(ROOT, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         checks = [result['check'] for result in context.results]
         for check in ('contract-examples', 'semantic-contracts', 'macro-grammar'):

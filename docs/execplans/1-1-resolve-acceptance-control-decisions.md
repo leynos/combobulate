@@ -5,9 +5,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN_PROGRESS (the sponsor approved the EP-M2 scope exception on
-2026-10-18; `EP-M2` is merged, `EP-M3` and `EP-M4` are complete, and `EP-M5` is
-next)
+Status: IN PROGRESS (`EP-M0` to `EP-M5` are complete; `EP-M6` reconciliation,
+roadmap closure, and final gates are under way)
 
 Plan approval is distinct from acceptance of an individual decision;
 acceptances are recorded per decision identifier (see `Sponsor decisions`).
@@ -399,11 +398,77 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   data yield p90 220 s (rank 18 of 20); the draft registration retains that
   derivation and its matching initial digest. The eight-minute threshold is
   unchanged and the amendment chain remains empty.
-- [ ] `EP-M5` Task 1.1.4: proof-first policy and evidence gate.
+- [x] (2026-10-11) `EP-M5` Task 1.1.4: proof-first policy and evidence gate
+  (branch `1-1-evidence-gate`, stacked on `EP-M4`). Evidence: ADR-0009 accepted
+  under D02 and D06; the rule-table fixture and gate tests written first (red:
+  module missing); the gate agrees with an independent interpreter of the
+  fixture on all 345,600 states (86,400 valid), every level and reason occurs
+  alone, P1 to P4 hold over the enumeration, the upstream scenario corpus (B01,
+  B02, B08, PF14, §17) passes, and five seeded rule-table faults are each
+  caught; VO-2 round-trips every valid state through a concrete schema version
+  2 record, and the schema agrees with the validity predicate on all 120 kind,
+  outcome, and bounds combinations; VO-3 checks the exception window
+  boundaries, each D02 violation, and P5; P6 and record-sourced closure pass;
+  `scripts/check_evidence.py` rejects the planned example with all four
+  blocking reasons (exit 1), admits the complete test fixture at `tested`,
+  rejects the unadapted partial-bounds Kani fixture as
+  `rejected [verdict-self-reported]`, and rejects resource-exhausted and
+  self-reported fixtures with their reasons; separately, the abstract gate
+  admits partial-bounds evidence at `bounded` when all rules hold and a
+  matching adapter result is supplied; `PF14.structural@1.1.4` is satisfied by
+  the passing `evidence-gate` check and task 1.1.4 is ticked.
+- [x] (2026-10-18) EP-M5 review repair: group the evidence gate's explicit
+  caller inputs in `AdmissionContext`, retain the flat `check_evidence.py`
+  option names through Cyclopts, and reduce the reported complexity hotspots.
+  The CodeScene delta improves `contracts.py` mean complexity from 4.89 to
+  4.50, with no new or degraded findings. The sequential candidate gates
+  `make check-fmt`, `make lint`, `make typecheck`, `make test` (329 passed, one
+  skipped, doctest passed), `make markdownlint`, `make nixie`, and
+  `make design-check AS_OF=2026-10-18 BASE_REV=origin/1-1-acceptance-controls`
+  (341 unittest and 64 pytest) all passed on the same candidate patch. Logs use
+  suffix `-20261018-8.out` under `/tmp`.
+- [x] (2026-10-19) EP-M5 completeness-assessment repair: enforce current-run,
+  current-source checker closure with the counterexample veto; select record
+  evidence only within the registered current binding; compare every binding
+  profile field; exhaustively check schema validity and round-trips across the
+  full abstract state space; add approved-exception freeze controls. Update the
+  ADR and contributor references to match these rules. Restack the four child
+  commits from the
+  [prior PR #16 head](https://github.com/leynos/combobulate/commit/6559ba4e3cedf79b27f99885ff6c72a377d3833f)
+  onto the updated PR #16 head `fdf35b38af44`, preserving the EP-M4 review
+  history and regenerating the validation report. CodeScene reports
+  contracts.py mean complexity improving from 4.89 to 4.50, with no new or
+  degraded findings. Sequential gates passed: `make check-fmt`, `make lint`,
+  `make typecheck`, `make test` (329 passed, one skipped; doctest passed),
+  `make markdownlint`, `make nixie`, and
+  `make design-check BASE_REV=origin/1-1-acceptance-controls` (368 unittest, 64
+  pytest). Logs use suffix `-rebased.out` under `/tmp`.
+- [x] (2026-10-19) EP-M5 follow-up assessment repair: CodeRabbit found that a
+  JSON array or `null` supplied to `--bindings` reached the pure gate and
+  raised an uncaught `AttributeError`. Both cases were reproduced, then guarded
+  at the CLI configuration boundary with a usage error and exit code 2; a
+  parameterized regression covers both inputs. The child branch was restacked
+  onto updated PR #16 head `2ff1556b95df` before this repair. Local gates
+  passed sequentially: `make check-fmt`, `make lint`, `make typecheck`,
+  `make test` (329 passed, one skipped, and doctest passed),
+  `make markdownlint`, `make nixie`, and `make design-check` (377 unittest and
+  66 pytest). CodeScene found no issues. Hosted checks and the current-head
+  completeness assessment passed. CodeRabbit's
+  [assessment response](https://github.com/leynos/combobulate/pull/17#issuecomment-6257200446)
+  found no remaining in-scope implementation defect and identified the stale
+  EP-M5 state in `Plan of work` below; that state is reconciled here. The
+  doc-only follow-up confirmation is tracked in the delivery ledger.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
 ## Surprises & discoveries
 
+- Observation: a synchronize run on #16 received `github.base_ref` = `main`
+  although the pull request's base is `1-1-semantic-contracts`, so its freeze
+  check compared against `main` and found no frozen registers. Evidence: Design
+  contracts run 38098734956 ("Freeze check against 2f856b0 passed for no frozen
+  registers"); earlier runs on #13 to #16 used their stacked bases. Impact: from
+  `EP-M5` the workflow takes the merge base with the event's
+  `pull_request.base.sha` and prints the selected base.
 - Observation: the hosted design check failed on #16 because the
   host-identity test also supplied the user name, which is `runner` on GitHub
   runners and is an ordinary word in the CI calibration record. Evidence:
@@ -510,6 +575,28 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 
 ## Decision log
 
+- Decision: `EP-M5` milestone review disposition (CodeRabbit CLI):
+  `scripts/check_evidence.py` stopped at the first schema-invalid record and
+  raised on an unreadable file; it now reports every record, names unreadable
+  and invalid files, and exits 2 after the loop. Date/Author: 2026-10-11,
+  implementing agent.
+- Decision: `EP-M5` exceeded both per-milestone tolerances: 39 changed files
+  against 25, and about 1,900 net added lines against 1,500, excluding the
+  regenerated regions, the export, and the report. The evidence fixtures (six
+  JSON files under `tools/tests/fixtures/evidence/` plus the rule-table
+  fixture), the version 2 schema, and the five test suites the plan requires
+  (VO-1 to VO-4 and the command) account for most of it. Escalated to the
+  sponsor in the milestone pull request. Date/Author: 2026-10-11, implementing
+  agent.
+- Decision: in `EP-M5`, P1's order for the exception field depends on the
+  kind: for a trust declaration an active exception is better than none,
+  because a declaration exists only to carry one (the enumeration found this).
+  `outcome-not-run` is not a reason code, because an executed kind that did not
+  run fails the validity predicate first. Without an evaluation date the gate
+  treats every exception as malformed (fail closed). The parser registry under
+  `tools/tests/fixtures/evidence/` is test-only; the repository registry
+  registers no parser, so verifier evidence stays self-reported until tasks
+  1.2.1 and 1.2.4 (C-EP-10). Date/Author: 2026-10-11, implementing agent.
 - Decision: `EP-M4` milestone review dispositions (CodeRabbit CLI). Fixed in
   this layer before any merge or acceptance measurement: `verdict` read a
   `control_id` field that the measurement-record schema names `control_ids`
@@ -1348,7 +1435,7 @@ Trusted, not verified here:
 
 Milestones run in order on stacked branches. `EP-M0` was sponsor-directed and
 is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`, `EP-M1b`,
-`EP-M2`, `EP-M3`, and `EP-M4` are complete; `EP-M5` and `EP-M6` remain
+`EP-M2`, `EP-M3`, `EP-M4`, and `EP-M5` are complete; `EP-M6` remains
 outstanding. All decisions they need have been answered. Each milestone follows
 Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables, fixtures,
 and tests and observe the expected failure (Stage B); implement until the
@@ -1670,10 +1757,14 @@ and the bet register's measurement sentences.
   amendments only. Compatibility: none.
 - `EP-M5`. Outcome: ADR-0009; schema version 2; exception register; pure gate
   with exhaustive tests; task 1.1.4 ticked via `PF14.structural@1.1.4`.
-  Evidence: VO-1 to VO-4; the transcript's `kind = none`, `outcome = not-run`
-  witness has every other blocker condition satisfied and yields exactly
-  `rejected [not-run]` (exit 1); the complete test fixture is admitted at
-  `tested` (exit 0), and reports its partial-bounds variant at `bounded`.
+  Evidence: VO-1 to VO-4; the committed planned example is rejected with
+  `witness-absent`, `control-required-missing`, `binding-incomplete`, and
+  `not-run` (exit 1); VO-1 separately checks a valid abstract `kind = none`,
+  `outcome = not-run` state whose sole reason is `not-run`. The complete test
+  fixture is admitted at `tested` (exit 0). The abstract gate admits a
+  partial-bounds verifier state at `bounded` when all rules hold and a matching
+  adapter result is supplied; the current CLI rejects the unadapted fixture as
+  `rejected [verdict-self-reported]` because no parser is integrated.
   Conformance: the 1.1.4 success text is satisfied; no version-1 consumer
   remains. Compatibility: none (no deployed consumer).
 - `EP-M6`. Outcome: all four 1.1 tasks ticked; documents reconciled; plan
@@ -1728,15 +1819,16 @@ make nixie
 
 Evidence gate demonstration (after `EP-M5`):
 
-The planned example uses VO-1's `none/not-run` witness, with every other
-blocking condition satisfied.
+The committed planned example is not VO-1's sole-`not-run` abstract state. Its
+witness is unobserved, its required negative control is unrun, and its
+executable, specification, and source-revision bindings are absent.
 
 ```bash
 $PY scripts/check_evidence.py --as-of 2026-10-10 --require proof spec/proof-evidence.example.json; echo "exit=$?"
 ```
 
 ```plaintext
-spec/proof-evidence.example.json: rejected [not-run]
+spec/proof-evidence.example.json: rejected [witness-absent, control-required-missing, binding-incomplete, not-run]
 exit=1
 ```
 
@@ -1764,9 +1856,11 @@ Behavioural acceptance:
    remains open", makes `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
    `make design-check BASE_REV=origin/main` fail and name AC-03.
-5. `check_evidence.py` rejects a `resource-exhausted` fixture, reports a
-   partial-bounds Kani fixture at `bounded`, never `proof`, and rejects a
-   self-reported Verus record with `verdict-self-reported`.
+5. `check_evidence.py` rejects a `resource-exhausted` fixture and a
+   self-reported Verus record with `verdict-self-reported`. The abstract gate
+   reports a partial-bounds Kani state at `bounded`, never `proof`, only when a
+   matching adapter result and all other rule conditions are supplied; the
+   current CLI rejects the unadapted fixture with `verdict-self-reported`.
 6. `docs/developers-guide.md` states the ISC licence and the `publish = false`
    policy, and `cargo publish --dry-run` refuses to publish.
 
@@ -1842,13 +1936,21 @@ class Admission:
     level: Level
     reasons: tuple[str, ...]
 
-def abstract_record(record: Mapping[str, object], exceptions: Mapping[str, Mapping[str, object]],
-                    bindings: Mapping[str, str], as_of: datetime.date) -> AbstractRecord: ...
+@dataclasses.dataclass(frozen=True, slots=True)
+class AdmissionContext:
+    exceptions: Mapping[str, Mapping[str, object]]
+    bindings: Mapping[str, Mapping[str, str]]
+    as_of: datetime.date
+    log_parsers: frozenset[str] = frozenset()
+
+def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord: ...
 def admit(record: AbstractRecord) -> Admission: ...
 ```
 
-`admit` is pure and total over `AbstractRecord`; `abstract_record` raises
-`ValidationError` only for schema-invalid records.
+`admit` and `abstract_record` are pure. The adapters validate the concrete
+record against schema version 2 before calling `abstract_record`; the gate
+receives its exception, binding, date, and parser inputs through the
+call-scoped context.
 
 `scripts/check_evidence.py --as-of DATE [--require LEVEL] [--bindings FILE]
 RECORD…`
@@ -1926,3 +2028,7 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   pytest suites in `scripts/tests/`), and the planned decision generator and
   evidence checker follow the same rule. Checker modules stay in
   `tools/docs_validation/`. Remaining milestones are unchanged.
+- 2026-10-19, EP-M5 completeness follow-up: validate that `--bindings` decodes
+  to a JSON object before constructing the admission context. The old candidate
+  assessment identified uncaught array and `null` inputs; dedicated CLI
+  regression cases now require usage exit code 2.

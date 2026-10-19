@@ -1,0 +1,32 @@
+{
+  "PF01.proof@1.2.4": {
+    "executable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "specification_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "target": "x86_64-unknown-linux-gnu",
+    "features": [],
+    "semantic_policy": "checked shape/cost arithmetic",
+    "backend_profile": null,
+    "implementation_relation": "Must bind to the shipped analyser; no implementation exists in this pack."
+  },
+  "PF01.proof@2.1.1": {
+    "executable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "specification_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "target": "x86_64-unknown-linux-gnu",
+    "features": [],
+    "semantic_policy": "checked shape/cost arithmetic",
+    "backend_profile": null,
+    "implementation_relation": "Must bind to the shipped analyser; no implementation exists in this pack."
+  },
+  "PF07.proof@2.2.2": {
+    "executable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "specification_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "target": "x86_64-unknown-linux-gnu",
+    "features": [],
+    "semantic_policy": "checked shape/cost arithmetic",
+    "backend_profile": null,
+    "implementation_relation": "Must bind to the shipped analyser; no implementation exists in this pack."
+  }
+}

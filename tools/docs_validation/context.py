@@ -16,7 +16,7 @@ from types import ModuleType
 import yaml
 
 DESIGN_DOCUMENTS = (
-    'acceptance-calibration.md', 'context.md', 'decision-register.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
+    'acceptance-calibration.md', 'context.md', 'decision-register.md', 'evidence-and-decision-records.md', 'language-reference.md', 'references.md', 'revision-0.2.md',
     'roadmap.md', 'technical-design.md', 'terms-of-reference.md',
     'testable-bets.md', 'validation.md',
 )
@@ -61,11 +61,14 @@ class ValidationContext:
 
     ``as_of`` is injected by the caller (``make design-check`` passes the HEAD
     commit date) so date-dependent checks never read the wall clock.
+    ``source_revision`` identifies the checked-out commit for evidence bound to
+    this validation run.
     """
 
     root: Path
     results: list[dict[str, object]] = field(default_factory=list)
     as_of: date | None = None
+    source_revision: str | None = None
 
     def load(self, name: str) -> dict:
         """Read JSON beneath the root; e.g. context.load('spec/bets.json')."""

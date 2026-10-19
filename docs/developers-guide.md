@@ -510,11 +510,69 @@ be ticked, every cited decision to be accepted, every artefact to resolve, and
 every proof-obligation component linked to the task to be satisfied. Components
 live in `spec/proof-obligations.json` as `PFnn.<method>@<task>`, each listing
 the admission levels (`proof`, `bounded`, `tested`) that satisfy it. A
-component whose `evidence_source` is `checker:<check>` is satisfied when that
-check passes in the same run; a `record` component fails closed until the
-evidence gate admits a proof-evidence record for it. A task that meets every
-condition but is not ticked is reported, not failed, so ticking stays a
-deliberate act.
+component whose `evidence_source` is `checker:<check>` is satisfied when the
+latest result passes in the current validation run at the current source
+revision, the component accepts `tested`, and no evidence record for it reports
+a counterexample at that revision. Checker results are `tested` evidence and
+need no separate verifier record. A `record` component fails closed unless its
+latest record by `recorded_on` matches the current binding and reaches an
+accepted level; same-day ties fail closed. A counterexample at the selected
+source revision vetoes closure regardless of its admission level. A task that
+meets every condition but is not ticked is reported, not failed, so ticking
+stays a deliberate act.
+
+The private `record_component_failure` and `_checker_result_failure` paths are
+called only by `component_failure`; `_current_binding_records` and
+`_records_on_latest_date` are confined to record selection. Record closure
+filters to current-binding records before choosing the latest date, then
+applies the counterexample veto to every record at the selected source
+revision. The evidence CLI builds `EvidenceCliConfiguration` once and passes it
+only to the per-record evaluator, so all records share one fixed set of
+bindings and parser results. Its exception-register adapter receives the
+decisions and roadmap paths explicitly; it must not load those policy files
+through a module-level repository root.
+
+`tools/docs_validation/closure_evidence.py` owns the immutable
+`ClosureEvidence` projection used only for roadmap closure. The
+`evidence_records.admitted_evidence` adapter constructs it from schema-v2
+records and their admission. Its fields are component id, recorded date, source
+revision, outcome, binding-current state, admission level, and reasons. Only
+`ClosureInputs.evidence` and the MS-3 closure predicates consume this
+projection. It is not a general record API and does not replace the full schema
+record or `AbstractRecord`; keep projection and construction at this
+roadmap-closure boundary.
+
+Proof evidence for a record-sourced component goes in `spec/evidence/` as a
+schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
+before committing, and see
+[evidence and decision records](evidence-and-decision-records.md) for the
+fields, levels, reason codes, and log-parser obligations. Until a log parser is
+registered for a verifier, its records are self-reported and cannot satisfy a
+`proof` or `bounded` component.
+
+### Compose the evidence-admission boundary
+
+`AdmissionContext` is a frozen, call-scoped value containing the exception
+register, current binding profiles, evaluation date, registered log parsers,
+and verified adapter results. The evidence-record and CLI adapters validate
+each record against the schema and assemble this context. A parser adapter may
+provide `VerifiedLogResult` only after reading the cited log, validating its
+digest, and deriving the admission-relevant facts. Tool registration alone is
+insufficient. The CLI currently has no verifier parser adapter, so verifier
+records remain self-reported there. `abstract_record(record, context)` maps a
+schema-valid record to the ten-field model; `admit` applies the pure MS-0 to
+MS-2 rules and returns an admission level with reason codes. Neither function
+reads files, the clock, the environment, or the network. Add producers at the
+adapter boundary and pass explicit inputs into the gate.
+
+The `tools/check_docs.py` composition root resolves the checked-out source
+revision through the Git adapter and places it in
+`ValidationContext.source_revision` before running checks. The roadmap adapter
+uses that injected value to bind earlier check results in `CheckResult` values.
+`ClosureInputs` carries those results and the current revision into the pure
+MS-3 component checks and MS-4 task-closure rules. Keep Git access in the
+composition root; roadmap closure consumes revision-shaped values and injected
+artefact readers.
 
 Accepted decisions are frozen. `make design-check BASE_REV=<revision>` compares
 `spec/decisions.json` with that revision and rejects an accepted record that
@@ -539,6 +597,11 @@ script by path with `ValidationContext.load_script` rather than keeping a
 second copy, so the script's dependencies are also pinned in
 `tools/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
+
+`tools/tests/markdown_examples.py` is the shared loader for marked JSON fences
+in migration documents. It requires each fence to have a unique adjacent
+`tested-example` marker and reads the example from the published Markdown. Use
+it from documentation contract tests; it is not a general Markdown parser.
 
 The `tools/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
@@ -597,10 +660,12 @@ small reader callbacks. `ClosureInputs` receives an artefact resolver that
 returns `ArtefactProblem` for path, read, or anchor failures; `check_frozen`
 receives a `RevisionJsonReader`. The roadmap check composes its filesystem
 adapter from the validation context; the command-line composition root supplies
-the Git adapter. These ports belong only to `tools/docs_validation/`: keep
-their domain rules independent of I/O, and do not reuse them as general
-repository file or Git APIs. Unit tests inject deterministic readers, while a
-temporary Git integration test covers actual revision reads.
+the current source revision and Git-backed register reader. `roadmap_status`
+uses the injected revision and does not resolve Git state itself. These ports
+belong only to `tools/docs_validation/`: keep their domain rules independent of
+I/O, and do not reuse them as general repository file or Git APIs. Unit tests
+inject deterministic readers, while a temporary Git integration test covers
+actual revision reads.
 
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their

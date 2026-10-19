@@ -40,7 +40,18 @@ class ValidationReport(unittest.TestCase):
             if path.is_file() and path.name != '.git':
                 shutil.copy2(path, self.root / path.name)
         self.report = self.root / 'docs/validation-results.json'
+        self.initialise_repository()
         self.assertEqual(self.run_main(['--write']), 0)
+
+    def initialise_repository(self) -> None:
+        """Give the current-revision checker a committed fixture checkout."""
+        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(['git', 'add', '-A'], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(
+            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
+             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Create validation fixture'],
+            cwd=self.root, check=True, capture_output=True,
+        )
 
     def run_main(self, arguments: list[str]) -> int:
         """Execute the checker against copied inputs and capture its evidence output."""
@@ -300,6 +311,25 @@ class ValidationReport(unittest.TestCase):
         }, 'the parsed CLI values must reach the context and freeze check')
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')
+
+    def test_cli_supplies_resolved_revision_to_the_check_composition(self) -> None:
+        """Resolve Git identity in the command root before composing roadmap checks."""
+        observed: dict[str, str | None] = {}
+
+        def capture_context(context: ValidationContext) -> None:
+            """Capture the revision passed to the composed check sequence."""
+            observed['source_revision'] = context.source_revision
+
+        with (patch.object(check_docs, 'git_head_revision', return_value='fixture-revision') as resolve_revision,
+              patch.object(check_docs, 'collect_checks', side_effect=capture_context),
+              patch.object(check_docs, 'check_frozen', return_value='Freeze check fixture passed.'),
+              contextlib.redirect_stdout(io.StringIO())):
+            result = self.run_main(['--write'])
+
+        self.assertEqual(result, 0, 'composition should complete with an injected source revision')
+        self.assertEqual(observed, {'source_revision': 'fixture-revision'},
+                         'roadmap checks must receive the revision resolved by the application boundary')
+        resolve_revision.assert_called_once_with(self.root)
 
     def test_cli_rejects_an_accepted_decision_edit_against_git_base(self) -> None:
         """Surface a real base-revision freeze failure through the command-line entrypoint."""

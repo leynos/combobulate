@@ -1,0 +1,130 @@
+# Evidence and decision records
+
+This document is for anyone who produces or consumes Combobulate's governance
+records: proof-evidence records, exceptions, decisions, acceptance controls,
+and task-completion records. It states each record's schema, who writes it, and
+what the design checks do with it.
+[ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md) states the
+admission rules and their rationale.
+
+## Proof-evidence records
+
+A record lives in `spec/evidence/` and follows
+`spec/proof-evidence.schema.json`, schema version 2. Each record carries
+evidence for exactly one proof-obligation component, named in `component` as
+`PFnn.<method>@<task>`. The fields that decide admission are:
+
+| Field               | Meaning                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `evidence_kind`     | `deductive` (Verus), `bounded` (Kani), `test`, `trust-declaration`, or `none` (planned)                            |
+| `outcome`           | The verifier's or test's result; anything but `verified` blocks admission                                          |
+| `bounds.kind`       | `type-complete` or `partial` for bounded evidence; otherwise `not-applicable`                                      |
+| `success_witnesses` | At least one; each Kani `cover!` is listed; any `unsatisfied` or `not-observed` blocks admission                   |
+| `negative_controls` | At least one; every required control must be `rejected-as-intended`; any `accepted` or `rejected-otherwise` blocks |
+| `trust_audit`       | Audited trusted items, each covered by a declared assumption or exception, or else blocking                        |
+| `binding`           | Complete schema-defined verification binding, compared with `spec/evidence-bindings.json`                          |
+| `method.run_mode`   | `full-profile`; a `focused` run blocks admission                                                                   |
+| `verdict_source`    | `log-parser` (with the committed log and its digest) or `self-reported`                                            |
+| `exception`         | `null` or an identifier in `spec/exceptions.json`                                                                  |
+
+_Table 1: Fields that decide admission._
+
+Current-binding comparison covers every schema field: executable and
+specification digests, source revision, target, features, semantic policy,
+backend profile, and implementation relation. A change to any field makes the
+record stale until the registered binding is updated.
+
+The schema enforces the validity predicate: executed evidence must have an
+outcome other than `not-run`; `none` and trust declarations must have
+`not-run`, and only bounded evidence may carry bounds. Fields such as `claim`,
+`outcome_detail`, and `result_artefacts` inform reviewers but do not change
+admission. `declared_assumptions` is different: the gate uses it to resolve
+trust-audit coverage, so changing it can change the trust state and admission.
+A declared assumption supplies a coverage reference; it does not establish that
+the assumption is true.
+
+## Admission levels and reason codes
+
+The gate admits a record at `proof`, `bounded`, `tested`, `restricted`, or
+`rejected`. Only the first three can satisfy a component, and each component
+lists which of them it accepts. Every blocking condition contributes one reason
+code; the codes and their meanings are single-sourced in
+`spec/evidence-reason-codes.json`. A record that cites an active exception is
+`restricted`, with the informational code `exception-active`.
+
+## Verdict sources and log parsers
+
+A verifier verdict counts as parsed only when its registered adapter supplies a
+`VerifiedLogResult` for the record's exact tool, committed log path, and
+digest. Registration alone is insufficient. The adapter reads the log,
+validates its digest, derives the admission-relevant facts, and passes that
+result to the pure gate, which checks that those facts match the record. No
+parser is registered or integrated yet, so verifier records are
+`verdict-self-reported` and rejected. Tasks 1.2.1 and 1.2.4 own the parsers and
+the trust-audit scanner, with these obligations:
+
+- A parser re-derives the outcome, every `cover!` result, every negative
+  control's observed failure, and the run mode from the raw log, and rejects a
+  log it cannot fully parse.
+- The scanner lists every trusted item: for Verus, `assume`, `admit`,
+  `external_body`, `external`, `external_fn_specification` (or
+  `assume_specification`), and `external_type_specification`; for Kani,
+  `kani::assume`, `stub`, `stub_verified`, and `should_panic`.
+- Each parser is registered only together with tests over real logs,
+  including a timeout, an unsatisfied cover, and a skipped harness.
+
+## Command line
+
+```bash
+scripts/check_evidence.py --as-of 2026-10-11 spec/evidence/*.json
+```
+
+The command prints `path: level [reasons]` for each record. It exits 0 when
+every record reaches `--require` (default `tested`), 1 when any falls short,
+and 2 for a schema-invalid record or a usage error. Options name other binding
+or exception files. The `--bindings`, `--exceptions`, `--decisions`, and
+`--roadmap` options accept explicit paths. They default to
+`spec/evidence-bindings.json`, `spec/exceptions.json`, `spec/decisions.json`,
+and `spec/roadmap.json`, respectively. Producers can supply alternate or
+temporary policy inputs as a consistent set; the exception-register adapter
+receives the decisions and roadmap paths explicitly. The command has no parser
+adapter yet, so callers cannot make verifier evidence admissible by supplying
+their own parser registry.
+
+At least one record is required, and `--require` accepts `proof`, `bounded`, or
+`tested`. A configuration file that cannot be loaded is a usage error;
+unreadable or schema-invalid record files produce exit 2 while the command
+continues reporting the remaining inputs.
+
+## Exceptions
+
+`spec/exceptions.json` (schema `spec/exception.schema.json`) holds trusted
+boundary exceptions under decision D02. An exception names its component,
+owner, narrowed claim, reason, release gate (task 4.3.3 or 6.3.4), approval by
+the sponsor, `approved_on`, and `invalid_from`. It is valid from `approved_on`
+up to, but excluding, `invalid_from`, for at most 90 days. Renewal is a new
+exception with a new identifier. Passing its release-gate task expires it
+immediately, even when `invalid_from` is later. The expired entry remains
+history and cannot admit new evidence. An approved exception is never edited;
+the freeze check rejects an edit or deletion.
+
+## Decisions, controls, and completion records
+
+- Decisions: `spec/decisions.json`, rendered into the
+  [decision register](decision-register.md); see the developers' guide for the
+  acceptance workflow.
+- Acceptance controls: `spec/acceptance-controls.json`, registered under
+  [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md) and
+  calibrated in [acceptance calibration](acceptance-calibration.md).
+- Task completion: `spec/task-completion.json` names, for each ticked roadmap
+  task, the decisions it relies on and the artefacts that complete it.
+
+## Kernel-contract evidence status
+
+Native kernel declarations (`spec/kernel-contract.schema.json`) keep their own
+`evidence.status` vocabulary. It maps onto admission levels as follows:
+`proposed` is evidence kind `none` (rejected as `not-run`);
+`tested-with-bounds` is at most `tested` or `bounded`, depending on the record;
+and `proved-with-assumptions` is at most `proof`, and only when every
+assumption is a covered trusted item. The kernel contract's status is a
+declaration; the evidence record and the gate decide admission.

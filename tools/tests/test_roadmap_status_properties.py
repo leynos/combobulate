@@ -12,7 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from docs_validation.roadmap_status import (
-    ArtefactProblem, ClosureInputs, artefact_resolver, component_failure, index_completions, task_closure,
+    ArtefactProblem, CheckResult, ClosureInputs, artefact_resolver, component_failure, index_completions,
+    task_closure,
 )
 
 GENERATED = settings(max_examples=60, derandomize=True, deadline=None)
@@ -46,7 +47,7 @@ def closure_states(draw):
         completions=completions,
         decisions={},
         components={},
-        passed_checks=frozenset(),
+        check_results=(),
         artefact_problem=lambda artefact: None if artefact == 'docs/evidence.md' else ArtefactProblem('is missing'),
     )
 
@@ -102,18 +103,20 @@ class RoadmapClosureProperties(unittest.TestCase):
     @given(check=st.from_regex(r'[a-z][a-z0-9-]{0,12}', fullmatch=True), passed=st.booleans())
     def test_checker_component_tracks_its_named_check(self, check, passed):
         """Satisfy generated checker components exactly when their named check passes."""
-        component = {'id': 'PF01.test@1.1.1', 'evidence_source': f'checker:{check}', 'evidence': []}
-        result = component_failure(component, frozenset({check}) if passed else frozenset())
+        component = {'id': 'PF01.test@1.1.1', 'evidence_source': f'checker:{check}', 'evidence': [],
+                     'accepts': ['tested']}
+        results = (CheckResult(check, 'pass', 'current'),) if passed else ()
+        result = component_failure(component, results, {}, 'current')
         self.assertEqual(result is None, passed,
                          'checker-sourced evidence must follow the matching current-run check')
 
     @GENERATED
     @given(evidence=st.lists(st.text(max_size=20), max_size=5))
-    def test_record_component_fails_closed_for_generated_evidence(self, evidence):
-        """Keep arbitrary record payloads inadmissible until the evidence gate exists."""
+    def test_record_component_needs_an_admitted_record(self, evidence):
+        """Keep component payloads from bypassing the evidence admission gate."""
         component = {'id': 'PF01.proof@1.1.1', 'evidence_source': 'record', 'evidence': evidence}
-        result = component_failure(component, frozenset({'unrelated-check'}))
-        self.assertIsNotNone(result, 'record evidence must remain fail-closed before EP-M5')
+        result = component_failure(component, (), {}, 'current')
+        self.assertIsNotNone(result, 'record-sourced evidence must pass through admission before closure')
 
     @GENERATED
     @given(parts=st.lists(st.from_regex(r'[a-z][a-z0-9_-]{0,7}', fullmatch=True), min_size=1, max_size=4))

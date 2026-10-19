@@ -6,6 +6,27 @@ import subprocess
 from pathlib import Path
 
 
+def _git_output(root: Path, arguments: list[str], failure: str) -> bytes:
+    """Run one read-only Git command for this adapter and attach its failure context."""
+    try:
+        result = subprocess.run(['git', *arguments], cwd=root, capture_output=True, check=False)
+    except OSError as error:
+        raise AssertionError(f'Cannot run Git while {failure}: {error}') from error
+    if result.returncode != 0:
+        detail = result.stderr.decode(errors='replace').strip()
+        raise AssertionError(f'{failure}: {detail}')
+    return result.stdout
+
+
+def git_head_revision(root: Path) -> str:
+    """Return the checked-out commit used to bind current-run checker results."""
+    output = _git_output(
+        root, ['rev-parse', '--verify', '--end-of-options', 'HEAD^{commit}'],
+        'Cannot resolve the current source revision',
+    )
+    return output.decode('ascii').strip()
+
+
 def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
     """Read JSON from Git; return None only when the path is absent at the revision.
 
@@ -19,18 +40,19 @@ def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
     ``None``; a revision or command failure raises ``AssertionError``, while
     malformed JSON raises ``json.JSONDecodeError``.
     """
-    try:
-        result = subprocess.run(['git', 'show', f'{revision}:{path}'], cwd=root, capture_output=True,
-                                text=True, check=False)
-    except OSError as error:
-        message = f'Cannot run Git while reading {path} at base revision {revision}: {error}'
-        raise AssertionError(message) from error
-    if result.returncode != 0:
-        path_is_missing = (
-            'does not exist' in result.stderr or 'exists on disk, but not in' in result.stderr
-        )
-        if path_is_missing:
-            return None
-        message = f'Cannot read {path} at base revision {revision}: {result.stderr.strip()}'
-        raise AssertionError(message)
-    return json.loads(result.stdout)
+    resolved = _git_output(
+        root, ['rev-parse', '--verify', '--end-of-options', f'{revision}^{{commit}}'],
+        f'Cannot resolve base revision {revision}',
+    )
+    base_commit = resolved.decode('ascii').strip()
+    entry = _git_output(
+        root, ['ls-tree', '-z', base_commit, '--', path],
+        f'Cannot inspect {path} at base revision {revision}',
+    )
+    if not entry:
+        return None
+    record = _git_output(
+        root, ['show', f'{base_commit}:{path}'],
+        f'Cannot read {path} at base revision {revision}',
+    )
+    return json.loads(record)

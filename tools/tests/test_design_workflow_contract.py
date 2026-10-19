@@ -8,12 +8,22 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@dataclass(frozen=True)
+class WorkflowEvent:
+    """Inputs supplied by one checked GitHub workflow event in this test module."""
+
+    name: str
+    before: str
+    base_sha: str
 
 
 class DesignWorkflowContract(unittest.TestCase):
@@ -102,8 +112,7 @@ class DesignWorkflowContract(unittest.TestCase):
         self,
         repository: Path,
         date_command: Path,
-        event: str,
-        before: str,
+        event: WorkflowEvent,
     ) -> dict[str, str]:
         """Execute the checked workflow with fixture refs and capture outputs."""
         script = self._workflow_base_step()
@@ -111,9 +120,9 @@ class DesignWorkflowContract(unittest.TestCase):
         output.unlink(missing_ok=True)
         environment = os.environ.copy()
         environment.update({
-            'BASE_REF': 'main',
-            'BEFORE': before,
-            'EVENT': event,
+            'BASE_SHA': event.base_sha,
+            'BEFORE': event.before,
+            'EVENT': event.name,
             'GITHUB_OUTPUT': str(output),
             'PATH': os.pathsep.join((str(date_command.parent), environment['PATH'])),
         })
@@ -139,8 +148,13 @@ class DesignWorkflowContract(unittest.TestCase):
 
         steps = workflow['jobs']['design-check']['steps']
         base_step = next(step for step in steps if step.get('id') == 'base')
-        self.assertIn('git merge-base "origin/$BASE_REF" HEAD', base_step['run'],
-                      'pull requests must compare frozen decisions with their merge base')
+        self.assertEqual(
+            base_step['env']['BASE_SHA'],
+            '${{ github.event.pull_request.base.sha }}',
+            'pull requests must supply the event base commit to the selector',
+        )
+        self.assertIn('git merge-base "$BASE_SHA" HEAD', base_step['run'],
+                      'pull requests must compare frozen decisions with the event base commit')
         self.assertIn('date -u +%F', base_step['run'],
                       'scheduled expiry checks must use the workflow run date')
 
@@ -153,6 +167,32 @@ class DesignWorkflowContract(unittest.TestCase):
                       'the workflow must invoke the Make target with its base revision')
         self.assertIn('AS_OF="$RUN_DATE"', check_step['run'],
                       'the workflow must pass a scheduled evaluation date')
+
+    def test_workflow_installs_uv_before_running_design_check(self) -> None:
+        """Make the standalone CLI's declared runtime available in CI."""
+        workflow = yaml.load(
+            (ROOT / '.github/workflows/design.yml').read_text(encoding='utf-8'),
+            Loader=yaml.BaseLoader,
+        )
+        steps = workflow['jobs']['design-check']['steps']
+        uv_step_index = next(
+            index for index, step in enumerate(steps)
+            if step.get('name') == 'Setup uv'
+        )
+        check_step_index = next(
+            index for index, step in enumerate(steps)
+            if step.get('name') == 'Validate documentation contracts'
+        )
+        uv_step = steps[uv_step_index]
+        self.assertEqual(
+            uv_step['uses'],
+            'astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91',
+            'the workflow must use the repository-pinned uv setup action',
+        )
+        self.assertLess(
+            uv_step_index, check_step_index,
+            'the standalone evidence CLI test needs uv on PATH before design-check',
+        )
 
     def test_make_forwards_as_of_and_base_revision_to_checker(self) -> None:
         """Exercise Make expansion for empty and populated base revisions."""
@@ -212,17 +252,17 @@ class DesignWorkflowContract(unittest.TestCase):
                 date_command.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
             )
             cases = (
-                ('pull_request', '', base_revision, ''),
-                ('push', base_revision, base_revision, ''),
-                ('push', 'missing-revision', '', ''),
-                ('push', '', '', ''),
-                ('schedule', '', '', '2031-02-03'),
-                ('workflow_dispatch', '', '', ''),
+                (WorkflowEvent('pull_request', '', base_revision), base_revision, ''),
+                (WorkflowEvent('push', base_revision, ''), base_revision, ''),
+                (WorkflowEvent('push', 'missing-revision', ''), '', ''),
+                (WorkflowEvent('push', '', ''), '', ''),
+                (WorkflowEvent('schedule', '', ''), '', '2031-02-03'),
+                (WorkflowEvent('workflow_dispatch', '', ''), '', ''),
             )
-            for event, before, expected_revision, expected_date in cases:
-                with self.subTest(event=event, before=before):
+            for event, expected_revision, expected_date in cases:
+                with self.subTest(event=event.name, before=event.before):
                     outputs = self._run_workflow_base_step(
-                        repository, date_command, event, before,
+                        repository, date_command, event,
                     )
                     self.assertEqual(
                         outputs,
@@ -236,7 +276,6 @@ class DesignWorkflowContract(unittest.TestCase):
             directory = Path(directory_name)
             repository = directory / 'repository'
             self._make_git_fixture(repository)
-            self._run_git(repository, 'update-ref', '-d', 'refs/remotes/origin/main')
             date_command = directory / 'date'
             date_command.write_text(f'#!{sys.executable}\nprint("2031-02-03")\n', encoding='utf-8')
             date_command.chmod(
@@ -247,7 +286,8 @@ class DesignWorkflowContract(unittest.TestCase):
                 msg='the pull-request selector must fail when Git cannot find a merge base',
             ):
                 self._run_workflow_base_step(
-                    repository, date_command, 'pull_request', '',
+                    repository, date_command,
+                    WorkflowEvent('pull_request', '', 'missing-base-revision'),
                 )
 
             self.assertFalse(

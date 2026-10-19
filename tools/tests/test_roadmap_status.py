@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import datetime
 import sys
 import tempfile
 import unittest
@@ -11,9 +12,12 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
+from docs_validation.closure_evidence import ClosureEvidence
+from docs_validation.evidence_gate import Level
+from docs_validation.revision_reader import git_head_revision
 from check_docs import collect_checks
 from docs_validation.roadmap_status import (
-    ArtefactProblem, ClosureInputs, artefact_resolver, closure_failures, index_completions,
+    ArtefactProblem, CheckResult, ClosureInputs, artefact_resolver, closure_failures, component_failure, index_completions,
     index_components, task_closure,
 )
 
@@ -53,8 +57,9 @@ def component(component_id: str, source: str, accepts: list[str] | None = None) 
 def inputs(tasks: dict[str, dict], **overrides: object) -> ClosureInputs:
     """Build closure inputs in which every condition holds unless overridden."""
     values = {'tasks': tasks, 'completions': completions(tasks), 'decisions': {'D01': ACCEPTED},
-              'components': {}, 'passed_checks': frozenset({'evidence-gate'}),
-              'artefact_problem': lambda artefact: None if artefact == ARTEFACT else ArtefactProblem('is missing')}
+              'components': {}, 'check_results': (CheckResult('evidence-gate', 'pass', 'r1'),),
+              'artefact_problem': lambda artefact: None if artefact == ARTEFACT else ArtefactProblem('is missing'),
+              'current_source_revision': 'r1'}
     values.update(overrides)
     return ClosureInputs(**values)
 
@@ -112,15 +117,121 @@ class TaskClosure(unittest.TestCase):
         """Keep record-sourced components unsatisfied until evidence admission exists."""
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components)
-        self.assert_rejected(closure, 'component PF14.proof@1.1.1 has no admitted evidence record')
+        self.assert_rejected(closure, 'component PF14.proof@1.1.1 has no evidence record')
 
     def test_checker_component_needs_its_check_to_pass_in_this_run(self):
         """Use this run's check result to satisfy a checker-sourced component."""
         components = {'1.1.1': [component('PF14.structural@1.1.1', 'checker:evidence-gate')]}
         self.assertEqual(task_closure(inputs(ticked(chain(), '1.1.1'), components=components))[0], ['1.1.1'],
                          'a passing evidence-gate check satisfies the structural component')
-        closure = inputs(ticked(chain(), '1.1.1'), components=components, passed_checks=frozenset())
-        self.assert_rejected(closure, 'component PF14.structural@1.1.1 needs check evidence-gate to pass')
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, check_results=())
+        self.assert_rejected(closure, 'needs the latest result for check evidence-gate to pass in this run')
+
+    def test_checker_component_uses_latest_current_run_result(self):
+        """Do not let an earlier pass override a later failure for the same check."""
+        components = {'1.1.1': [component('PF14.structural@1.1.1', 'checker:evidence-gate')]}
+        results = (CheckResult('evidence-gate', 'pass', 'r1'), CheckResult('evidence-gate', 'fail', 'r1'))
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, check_results=results)
+        self.assert_rejected(closure, 'needs the latest result for check evidence-gate to pass in this run')
+
+    def test_checker_component_rejects_a_result_from_another_binding(self):
+        """Require the current-run check result to inspect the current source revision."""
+        components = {'1.1.1': [component('PF14.structural@1.1.1', 'checker:evidence-gate')]}
+        results = (CheckResult('evidence-gate', 'pass', 'older-revision'),)
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, check_results=results)
+        self.assert_rejected(closure, 'is not bound to current source revision r1')
+
+    def test_checker_component_fails_closed_without_current_source_revision(self):
+        """Do not accept checker evidence when its source binding cannot be identified."""
+        components = {'1.1.1': [component('PF14.structural@1.1.1', 'checker:evidence-gate')]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, current_source_revision=None)
+        self.assert_rejected(closure, 'cannot determine the current source revision')
+
+    def test_checker_component_requires_tested_acceptance(self):
+        """Keep checker output at tested even if a component accepts only proof."""
+        proof_only = component('PF14.structural@1.1.1', 'checker:evidence-gate', ['proof'])
+        failure = component_failure(proof_only, (CheckResult('evidence-gate', 'pass', 'r1'),), {}, 'r1')
+        self.assertEqual(failure, 'component PF14.structural@1.1.1 does not accept tested checker evidence',
+                         'a checker result cannot satisfy a proof-only component')
+
+    def test_admitted_record_satisfies_and_a_counterexample_reopens(self):
+        """Close on admitted proof evidence and reopen when a current counterexample appears."""
+        components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
+        verified = ClosureEvidence('PF14.proof@1.1.1', datetime.date(2026, 10, 10), 'r1',
+                                   'verified', True, Level.PROOF, ())
+        evidence = {'PF14.proof@1.1.1': [verified]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
+        self.assertEqual(task_closure(closure)[0], ['1.1.1'], 'an admitted proof record satisfies the component')
+        counterexample = ClosureEvidence('PF14.proof@1.1.1', datetime.date(2026, 10, 9), 'r1',
+                                         'counterexample', True, Level.REJECTED, ('outcome-counterexample',))
+        evidence['PF14.proof@1.1.1'].append(counterexample)
+        self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
+                             'has a counterexample at source revision r1')
+
+    def test_checker_counterexample_vetoes_a_passing_check(self):
+        """A current-source counterexample reopens checker-backed closure at any admission level."""
+        component_id = 'PF14.structural@1.1.1'
+        components = {'1.1.1': [component(component_id, 'checker:evidence-gate')]}
+        counterexample = ClosureEvidence(component_id, datetime.date(2026, 10, 9), 'r1',
+                                         'counterexample', True, Level.REJECTED, ('outcome-counterexample',))
+        evidence = {component_id: [counterexample]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
+        self.assert_rejected(closure, 'has a counterexample at source revision r1')
+
+    def test_checker_counterexample_for_an_older_revision_does_not_veto(self):
+        """Apply the checker veto only to the revision whose current check passed."""
+        component_id = 'PF14.structural@1.1.1'
+        components = {'1.1.1': [component(component_id, 'checker:evidence-gate')]}
+        counterexample = ClosureEvidence(component_id, datetime.date(2026, 10, 9), 'older-revision',
+                                         'counterexample', True, Level.REJECTED, ('outcome-counterexample',))
+        evidence = {component_id: [counterexample]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
+        self.assertEqual(task_closure(closure)[0], ['1.1.1'],
+                         'an older revision counterexample does not invalidate the current run')
+
+    def test_record_below_the_accepted_level_fails(self):
+        """Keep evidence below the component's accepted level from closing the task."""
+        components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
+        bounded = ClosureEvidence('PF14.proof@1.1.1', datetime.date(2026, 10, 10), 'r1',
+                                  'verified', True, Level.BOUNDED, ())
+        evidence = {'PF14.proof@1.1.1': [bounded]}
+        self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
+                             'evidence is bounded')
+
+    def test_same_day_latest_records_fail_closed(self):
+        """Reject ambiguous evidence when several current records share the latest date."""
+        component_id = 'PF14.proof@1.1.1'
+        components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
+        first = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r1', 'verified', True, Level.PROOF, ())
+        evidence = {component_id: [first, first]}
+        failures = closure_failures('1.1.1', inputs(ticked(chain(), '1.1.1'), components=components,
+                                                   evidence=evidence))
+        self.assertIn(f'component {component_id} has 2 records on latest recorded_on date 2026-10-10', failures,
+                      'same-day latest records are ambiguous and cannot close a task')
+
+    def test_later_stale_binding_record_does_not_supersede_current_evidence(self):
+        """Select the latest record only after excluding another binding's evidence."""
+        component_id = 'PF14.proof@1.1.1'
+        components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
+        current = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r1', 'verified', True, Level.PROOF, ())
+        stale = ClosureEvidence(component_id, datetime.date(2026, 10, 11), 'r2', 'verified',
+                                False, Level.REJECTED, ('binding-stale',))
+        evidence = {component_id: [current, stale]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
+        self.assertEqual(task_closure(closure)[0], ['1.1.1'],
+                         'a later record at a different binding must not supersede current evidence')
+
+    def test_same_date_stale_record_does_not_make_current_evidence_ambiguous(self):
+        """Limit latest-date ambiguity to the registered current binding."""
+        component_id = 'PF14.proof@1.1.1'
+        components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
+        current = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r1', 'verified', True, Level.PROOF, ())
+        stale = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r2', 'verified',
+                                False, Level.REJECTED, ('binding-stale',))
+        evidence = {component_id: [current, stale]}
+        closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
+        self.assertEqual(task_closure(closure)[0], ['1.1.1'],
+                         'a same-day stale record must not make the current binding ambiguous')
 
     def test_supported_but_unticked_task_is_reported_not_failed(self):
         """Report supported open work as eligible while keeping it unticked."""
@@ -187,7 +298,7 @@ class RealRoadmap(unittest.TestCase):
 
     def test_committed_roadmap_precedes_package_policy_that_consumes_it(self):
         """Validate task closure before package policy consumes that result."""
-        context = ValidationContext(ROOT)
+        context = ValidationContext(ROOT, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         checks = [row['check'] for row in context.results]
         self.assertIn('roadmap-status', checks, 'the composed checker must run roadmap closure')
