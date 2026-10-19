@@ -21,8 +21,8 @@ from .acceptance_evidence import (
     check_measurement_binding, verdict,
 )
 from .acceptance_registration import (
-    FROZEN_FIELDS, check_amendment_chain, check_completeness, check_frozen_fields, check_outcome_verdicts,
-    check_sources, digest_dates, frozen_digest,
+    FROZEN_FIELDS, check_amendment_chain, check_completeness, check_registration_declarations, check_sources,
+    digest_dates, frozen_digest,
 )
 from .ci_controls import (
     OUTCOME_VERDICTS, AcceptanceWorkflowSettings, check_acceptance_workflow, check_ci_calibration,
@@ -34,8 +34,8 @@ __all__ = [
     'AcceptanceWorkflowSettings', 'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'check_acceptance_controls',
     'check_acceptance_workflow', 'check_amendment_chain', 'check_calibration_record',
     'check_calibration_reference', 'check_ci_calibration', 'check_ci_measurement', 'check_completeness',
-    'check_control_bindings', 'check_frozen_fields', 'check_host_identity', 'check_measurement_binding',
-    'check_outcome_verdicts', 'check_sources', 'digest_dates', 'frozen_digest', 'verdict',
+    'check_control_bindings', 'check_host_identity', 'check_measurement_binding', 'check_registration_declarations',
+    'check_sources', 'digest_dates', 'frozen_digest', 'verdict',
 ]
 
 
@@ -121,8 +121,7 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
         context.load('spec/acceptance-controls.schema.json'),
         format_checker=Draft202012Validator.FORMAT_CHECKER,
     ).validate(register)
-    check_outcome_verdicts(register)
-    check_frozen_fields(register)
+    check_registration_declarations(register)
     record_schema = Draft202012Validator(context.load('spec/measurement-record.schema.json'),
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
     records = _load_calibration_records(context, record_schema, extra_names)
@@ -137,8 +136,7 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     check_acceptance_workflow(_workflow_settings(workflow), controls_by_id['AC-07'])
     check_ci_calibration(controls_by_id['AC-07'], records)
     _check_acceptance_measurements(controls_by_id, records, measurements)
-    source_digests = _load_source_digests(context, controls)
-    _check_registered_controls(controls, context, records, measurements, source_digests)
+    _check_registered_controls(controls, context, records, measurements)
     context.record('acceptance-controls', 'Typed frozen protocols close their approved digest chains; measurement '
                                           'records bind known controls, registered dates and the hosted image; '
                                           'calibration evidence is excluded from acceptance verdicts.', len(ids))
@@ -191,9 +189,9 @@ def _check_acceptance_measurements(
 
 def _check_registered_controls(
     controls: list[dict], context: ValidationContext, records: Mapping[str, dict], measurements: list[dict],
-    source_digests: Mapping[str, str],
 ) -> None:
     """Check every frozen control; for example, reject calibration used as acceptance evidence."""
+    source_digests = _load_source_digests(context, controls)
     sponsor = context.load('spec/decisions.json')['authorities']['roles']['sponsor']
     for control in controls:
         check_completeness(control)

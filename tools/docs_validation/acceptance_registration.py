@@ -79,8 +79,8 @@ def check_completeness(control: Mapping[str, object]) -> None:
     require(not missing, f"{control['id']} lacks frozen fields: {', '.join(missing)}")
     require(not extra, f"{control['id']} has unregistered frozen fields: {', '.join(extra)}")
 
-def check_outcome_verdicts(register: Mapping[str, object]) -> None:
-    """Require the register's outcome map to match executable verdict semantics.
+def check_registration_declarations(register: Mapping[str, object]) -> None:
+    """Require top-level register declarations to match executable semantics.
 
     Parameters
     ----------
@@ -90,44 +90,25 @@ def check_outcome_verdicts(register: Mapping[str, object]) -> None:
     Returns
     -------
     None
-        Returns only when the declared outcome map is exact.
+        Returns only when its outcome map and frozen-field list are exact.
 
     Raises
     ------
     AssertionError
-        If the declared map differs from the executable outcome map.
+        If either declaration differs from its executable counterpart.
 
     Examples
     --------
-    check_outcome_verdicts(register) accepts the registered verdict table.
+    check_registration_declarations(register) accepts the canonical declarations.
     """
-    require(register.get('outcome_verdicts') == OUTCOME_VERDICTS,
-            'Registered outcome_verdicts must match the executable outcome mapping')
-
-def check_frozen_fields(register: Mapping[str, object]) -> None:
-    """Require the register's frozen-field list to match the digest implementation.
-
-    Parameters
-    ----------
-    register : Mapping[str, object]
-        Parsed acceptance-control register.
-
-    Returns
-    -------
-    None
-        Returns only when the declared field list is exact.
-
-    Raises
-    ------
-    AssertionError
-        If the declared list differs from the executable digest fields.
-
-    Examples
-    --------
-    check_frozen_fields(register) accepts the canonical frozen_fields list.
-    """
-    require(register.get('frozen_fields') == list(FROZEN_FIELDS),
-            'Registered frozen_fields must match the executable digest fields')
+    declarations = (
+        ('outcome_verdicts', OUTCOME_VERDICTS,
+         'Registered outcome_verdicts must match the executable outcome mapping'),
+        ('frozen_fields', list(FROZEN_FIELDS),
+         'Registered frozen_fields must match the executable digest fields'),
+    )
+    for name, expected, message in declarations:
+        require(register.get(name) == expected, message)
 
 def check_amendment_chain(
     control: Mapping[str, object], sponsor: str, acceptance_records: Iterable[Mapping[str, object]] = (),

@@ -19,8 +19,8 @@ from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
     FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_acceptance_workflow,
     check_amendment_chain, check_calibration_record, check_ci_calibration, check_ci_measurement, check_completeness,
-    check_control_bindings, check_frozen_fields, check_host_identity, check_measurement_binding,
-    check_outcome_verdicts, check_sources, frozen_digest, verdict,
+    check_control_bindings, check_host_identity, check_measurement_binding, check_registration_declarations,
+    check_sources, frozen_digest, verdict,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -104,12 +104,12 @@ class Registration(unittest.TestCase):
         self.assertEqual(REGISTER['frozen_fields'], list(FROZEN_FIELDS), 'the register must state its frozen fields')
 
     def test_register_frozen_fields_match_digest_implementation(self):
-        check_frozen_fields(REGISTER)
+        check_registration_declarations(REGISTER)
         candidate = copy.deepcopy(REGISTER)
         candidate['frozen_fields'][-1] = 'unhashed-field'
         with self.assertRaisesRegex(AssertionError, 'must match the executable digest fields',
                                     msg='the declared frozen fields must match the digest implementation'):
-            check_frozen_fields(candidate)
+            check_registration_declarations(candidate)
 
     def test_missing_calibration_reference_fails(self):
         control = copy.deepcopy(CONTROL)
@@ -152,7 +152,7 @@ class Registration(unittest.TestCase):
             check_amendment_chain(control, SPONSOR)
 
     def test_register_outcome_map_matches_executable_verdicts(self):
-        check_outcome_verdicts(REGISTER)
+        check_registration_declarations(REGISTER)
         altered_maps = (
             dict(OUTCOME_VERDICTS) | {'new-outcome': 'fail'},
             {key: value for key, value in OUTCOME_VERDICTS.items() if key != 'missing'},
@@ -164,7 +164,7 @@ class Registration(unittest.TestCase):
                 candidate['outcome_verdicts'] = outcome_map
                 with self.assertRaisesRegex(AssertionError, 'must match the executable outcome mapping',
                                             msg='runtime semantics must reject a changed outcome map'):
-                    check_outcome_verdicts(candidate)
+                    check_registration_declarations(candidate)
                 with self.assertRaises(ValidationError, msg='the register schema must reject a changed outcome map'):
                     REGISTER_VALIDATOR.validate(candidate)
 
