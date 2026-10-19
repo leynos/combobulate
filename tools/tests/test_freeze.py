@@ -160,7 +160,7 @@ class ControlFreeze(unittest.TestCase):
     @given(st.lists(st.text(alphabet='0123456789abcdef', min_size=64, max_size=64)
                     .filter(lambda digest: digest != CONTROL['registered_digest']),
                     min_size=2, max_size=6, unique=True))
-    def test_generated_amendment_prefix_preserves_historical_records(self, digests):
+    def test_generated_amendment_prefix_preserves_historical_records(self, digests: list[str]) -> None:
         """Accept generated append-only chains and reject edits or removals from their historical prefix."""
         head_control = copy.deepcopy(CONTROL)
         previous = head_control['registered_digest']

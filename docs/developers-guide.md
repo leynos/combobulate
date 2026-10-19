@@ -550,8 +550,10 @@ Acceptance-control rule checks in
 `tools/docs_validation/acceptance_evidence.py`, and
 `tools/docs_validation/ci_controls.py` belong only to the documentation-pack
 checker. They accept parsed values and source digests, and do not read
-repository files. Keep filesystem reads and schema loading in the composition
-path rooted at `check_acceptance_controls` in
+repository files. The `preregistration.py` composition path also scans
+serialized evidence for host identities before parsing it, preserving raw
+artefact text for that check. Keep filesystem reads and schema loading in the
+composition path rooted at `check_acceptance_controls` in
 `tools/docs_validation/preregistration.py` and its shared `ValidationContext`.
 `ValidationContext.load_yaml` converts parser failures into checker errors, and
 `ValidationContext.read_bytes` supplies source data for composition-time digest

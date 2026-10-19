@@ -247,7 +247,7 @@ class Registration(unittest.TestCase):
     @given(st.lists(st.integers(min_value=-1_000_000, max_value=1_000_000)
                     .filter(lambda value: [value] != CONTROL['frozen']['seeds']),
                     min_size=2, max_size=6, unique=True))
-    def test_generated_amendment_chains_reject_invalid_mutations(self, seed_values):
+    def test_generated_amendment_chains_reject_invalid_mutations(self, seed_values: list[int]) -> None:
         """Exercise valid amendment chains and generated authority, ancestry, chronology, repetition, and cutoff failures."""
         chain = copy.deepcopy(CONTROL)
         for seed in seed_values:

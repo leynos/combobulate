@@ -13,7 +13,6 @@ from .acceptance_registration import digest_dates
 from .ci_controls import OUTCOME_VERDICTS, check_ci_measurement
 from .context import require
 
-HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
 PINNED_VERSION = re.compile(r'\bnightly-\d{4}-\d{2}-\d{2}\b|\b\d+(?:\.\d+){2,}(?:[.-][A-Za-z0-9]+)*\b')
 ACCEPTANCE_RUNNER_CLASS = 'GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64'
 
@@ -265,37 +264,6 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
     if 'fail' in outcomes:
         return 'fail'
     return 'inconclusive' if 'inconclusive' in outcomes else 'pass'
-
-def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -> None:
-    """Reject home paths and supplied host names from committed evidence.
-
-    Parameters
-    ----------
-    name : str
-        Record or document name used in any diagnostic.
-    text : str
-        Serialized content to scan.
-    extra_names : Iterable[str], optional
-        Host names supplied by the test or caller.
-
-    Returns
-    -------
-    None
-        Returns only when the content contains no prohibited identity.
-
-    Raises
-    ------
-    AssertionError
-        If the content contains a home path or supplied host name.
-
-    Examples
-    --------
-    check_host_identity(name, '{"hardware": "Ubuntu 24.04"}') accepts a host class.
-    """
-    for pattern in HOST_PATTERNS:
-        require(pattern.search(text) is None, f'{name} contains a home path')
-    for value in extra_names:
-        require(not value or value not in text, f'{name} contains host identity {value!r}')
 
 def check_calibration_reference(control: Mapping[str, object], records: Mapping[str, dict]) -> None:
     """Require a calibrated control to cite an existing record for itself.

@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable, Mapping
 
 from jsonschema import Draft202012Validator
 
 from .acceptance_evidence import (
-    check_calibration_record, check_calibration_reference, check_control_bindings, check_host_identity,
-    check_measurement_binding, verdict,
+    check_calibration_record, check_calibration_reference, check_control_bindings, check_measurement_binding,
+    verdict,
 )
 from .acceptance_registration import (
     FROZEN_FIELDS, check_amendment_chain, check_completeness, check_registration_declarations, check_sources,
@@ -37,6 +38,8 @@ __all__ = [
     'check_control_bindings', 'check_host_identity', 'check_measurement_binding', 'check_registration_declarations',
     'check_sources', 'digest_dates', 'frozen_digest', 'verdict',
 ]
+
+HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
 
 
 
@@ -72,6 +75,38 @@ def _load_source_digests(context: ValidationContext, controls: list[dict]) -> di
         except OSError as error:
             raise ValueError(f'Unable to read registered workload source {path}: {error}') from error
     return digests
+
+
+def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -> None:
+    """Reject host paths and supplied host names in serialized evidence.
+
+    Parameters
+    ----------
+    name : str
+        Artefact name used in any diagnostic.
+    text : str
+        Serialized artefact content to scan before parsing.
+    extra_names : Iterable[str], optional
+        Host names supplied by the caller.
+
+    Returns
+    -------
+    None
+        Returns only when the content contains no prohibited identity.
+
+    Raises
+    ------
+    AssertionError
+        If the content contains a home path or supplied host name.
+
+    Examples
+    --------
+    check_host_identity(name, '{"hardware": "Ubuntu 24.04"}') accepts a host class.
+    """
+    for pattern in HOST_PATTERNS:
+        require(pattern.search(text) is None, f'{name} contains a home path')
+    for value in extra_names:
+        require(not value or value not in text, f'{name} contains host identity {value!r}')
 
 
 
