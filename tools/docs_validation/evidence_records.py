@@ -16,6 +16,7 @@ from collections.abc import Mapping
 
 from jsonschema import Draft202012Validator
 
+from .closure_evidence import ClosureEvidence
 from .context import ValidationContext, require
 from .evidence_gate import Admission, AdmissionContext, Level, abstract_record, admit, all_states, is_valid
 from .exceptions import annotated_exceptions, ticked_tasks
@@ -50,12 +51,41 @@ def admit_record(record: Mapping[str, object], context: ValidationContext, input
     )))
 
 
-def admitted_evidence(context: ValidationContext) -> dict[str, list[tuple[Admission, dict]]]:
-    """Index committed records by component with their admissions."""
+def closure_evidence(record: Mapping[str, object], admission: Admission) -> ClosureEvidence:
+    """Project a schema-v2 record and its admission into roadmap closure facts.
+
+    Parameters
+    ----------
+    record
+        A record already validated against proof-evidence schema version 2.
+    admission
+        The gate result for that record and the current admission context.
+
+    Returns
+    -------
+    ClosureEvidence
+        Closure-only facts; for example, ``binding-stale`` makes
+        ``binding_is_current`` false even when the recorded date is newer.
+    """
+    return ClosureEvidence(
+        component_id=str(record['component']),
+        recorded_on=datetime.date.fromisoformat(str(record['recorded_on'])),
+        source_revision=(None if record['binding']['source_revision'] is None
+                         else str(record['binding']['source_revision'])),
+        outcome=str(record['outcome']),
+        binding_is_current=not {'binding-stale', 'binding-incomplete'}.intersection(admission.reasons),
+        admission_level=admission.level,
+        admission_reasons=admission.reasons,
+    )
+
+
+def admitted_evidence(context: ValidationContext) -> dict[str, list[ClosureEvidence]]:
+    """Index committed record admissions as domain facts for roadmap closure."""
     inputs = evidence_inputs(context)
-    evidence: dict[str, list[tuple[Admission, dict]]] = {}
+    evidence: dict[str, list[ClosureEvidence]] = {}
     for _, record in committed_records(context):
-        evidence.setdefault(str(record['component']), []).append((admit_record(record, context, inputs), record))
+        facts = closure_evidence(record, admit_record(record, context, inputs))
+        evidence.setdefault(facts.component_id, []).append(facts)
     return evidence
 
 

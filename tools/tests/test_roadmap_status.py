@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import datetime
 import sys
 import tempfile
 import unittest
@@ -11,7 +12,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.evidence_gate import Admission, Level
+from docs_validation.closure_evidence import ClosureEvidence
+from docs_validation.evidence_gate import Level
 from docs_validation.revision_reader import git_head_revision
 from check_docs import collect_checks
 from docs_validation.roadmap_status import (
@@ -155,12 +157,14 @@ class TaskClosure(unittest.TestCase):
     def test_admitted_record_satisfies_and_a_counterexample_reopens(self):
         """Close on admitted proof evidence and reopen when a current counterexample appears."""
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
-        verified = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
-        evidence = {'PF14.proof@1.1.1': [(Admission(Level.PROOF, ()), verified)]}
+        verified = ClosureEvidence('PF14.proof@1.1.1', datetime.date(2026, 10, 10), 'r1',
+                                   'verified', True, Level.PROOF, ())
+        evidence = {'PF14.proof@1.1.1': [verified]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
         self.assertEqual(task_closure(closure)[0], ['1.1.1'], 'an admitted proof record satisfies the component')
-        counterexample = {'recorded_on': '2026-10-09', 'outcome': 'counterexample', 'binding': {'source_revision': 'r1'}}
-        evidence['PF14.proof@1.1.1'].append((Admission(Level.REJECTED, ('outcome-counterexample',)), counterexample))
+        counterexample = ClosureEvidence('PF14.proof@1.1.1', datetime.date(2026, 10, 9), 'r1',
+                                         'counterexample', True, Level.REJECTED, ('outcome-counterexample',))
+        evidence['PF14.proof@1.1.1'].append(counterexample)
         self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
                              'has a counterexample at source revision r1')
 
@@ -168,9 +172,9 @@ class TaskClosure(unittest.TestCase):
         """A current-source counterexample reopens checker-backed closure at any admission level."""
         component_id = 'PF14.structural@1.1.1'
         components = {'1.1.1': [component(component_id, 'checker:evidence-gate')]}
-        counterexample = {'recorded_on': '2026-10-09', 'outcome': 'counterexample',
-                          'binding': {'source_revision': 'r1'}}
-        evidence = {component_id: [(Admission(Level.REJECTED, ('outcome-counterexample',)), counterexample)]}
+        counterexample = ClosureEvidence(component_id, datetime.date(2026, 10, 9), 'r1',
+                                         'counterexample', True, Level.REJECTED, ('outcome-counterexample',))
+        evidence = {component_id: [counterexample]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
         self.assert_rejected(closure, 'has a counterexample at source revision r1')
 
@@ -178,9 +182,9 @@ class TaskClosure(unittest.TestCase):
         """Apply the checker veto only to the revision whose current check passed."""
         component_id = 'PF14.structural@1.1.1'
         components = {'1.1.1': [component(component_id, 'checker:evidence-gate')]}
-        counterexample = {'recorded_on': '2026-10-09', 'outcome': 'counterexample',
-                          'binding': {'source_revision': 'older-revision'}}
-        evidence = {component_id: [(Admission(Level.REJECTED, ('outcome-counterexample',)), counterexample)]}
+        counterexample = ClosureEvidence(component_id, datetime.date(2026, 10, 9), 'older-revision',
+                                         'counterexample', True, Level.REJECTED, ('outcome-counterexample',))
+        evidence = {component_id: [counterexample]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
         self.assertEqual(task_closure(closure)[0], ['1.1.1'],
                          'an older revision counterexample does not invalidate the current run')
@@ -188,8 +192,9 @@ class TaskClosure(unittest.TestCase):
     def test_record_below_the_accepted_level_fails(self):
         """Keep evidence below the component's accepted level from closing the task."""
         components = {'1.1.1': [component('PF14.proof@1.1.1', 'record', ['proof'])]}
-        bounded = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
-        evidence = {'PF14.proof@1.1.1': [(Admission(Level.BOUNDED, ()), bounded)]}
+        bounded = ClosureEvidence('PF14.proof@1.1.1', datetime.date(2026, 10, 10), 'r1',
+                                  'verified', True, Level.BOUNDED, ())
+        evidence = {'PF14.proof@1.1.1': [bounded]}
         self.assert_rejected(inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence),
                              'evidence is bounded')
 
@@ -197,9 +202,8 @@ class TaskClosure(unittest.TestCase):
         """Reject ambiguous evidence when several current records share the latest date."""
         component_id = 'PF14.proof@1.1.1'
         components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
-        first = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
-        second = first | {'id': 'EV-0002'}
-        evidence = {component_id: [(Admission(Level.PROOF, ()), first), (Admission(Level.PROOF, ()), second)]}
+        first = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r1', 'verified', True, Level.PROOF, ())
+        evidence = {component_id: [first, first]}
         failures = closure_failures('1.1.1', inputs(ticked(chain(), '1.1.1'), components=components,
                                                    evidence=evidence))
         self.assertIn(f'component {component_id} has 2 records on latest recorded_on date 2026-10-10', failures,
@@ -209,12 +213,10 @@ class TaskClosure(unittest.TestCase):
         """Select the latest record only after excluding another binding's evidence."""
         component_id = 'PF14.proof@1.1.1'
         components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
-        current = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
-        stale = {'recorded_on': '2026-10-11', 'outcome': 'verified', 'binding': {'source_revision': 'r2'}}
-        evidence = {component_id: [
-            (Admission(Level.PROOF, ()), current),
-            (Admission(Level.REJECTED, ('binding-stale',)), stale),
-        ]}
+        current = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r1', 'verified', True, Level.PROOF, ())
+        stale = ClosureEvidence(component_id, datetime.date(2026, 10, 11), 'r2', 'verified',
+                                False, Level.REJECTED, ('binding-stale',))
+        evidence = {component_id: [current, stale]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
         self.assertEqual(task_closure(closure)[0], ['1.1.1'],
                          'a later record at a different binding must not supersede current evidence')
@@ -223,12 +225,10 @@ class TaskClosure(unittest.TestCase):
         """Limit latest-date ambiguity to the registered current binding."""
         component_id = 'PF14.proof@1.1.1'
         components = {'1.1.1': [component(component_id, 'record', ['proof'])]}
-        current = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r1'}}
-        stale = {'recorded_on': '2026-10-10', 'outcome': 'verified', 'binding': {'source_revision': 'r2'}}
-        evidence = {component_id: [
-            (Admission(Level.PROOF, ()), current),
-            (Admission(Level.REJECTED, ('binding-stale',)), stale),
-        ]}
+        current = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r1', 'verified', True, Level.PROOF, ())
+        stale = ClosureEvidence(component_id, datetime.date(2026, 10, 10), 'r2', 'verified',
+                                False, Level.REJECTED, ('binding-stale',))
+        evidence = {component_id: [current, stale]}
         closure = inputs(ticked(chain(), '1.1.1'), components=components, evidence=evidence)
         self.assertEqual(task_closure(closure)[0], ['1.1.1'],
                          'a same-day stale record must not make the current binding ambiguous')

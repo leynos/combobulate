@@ -82,8 +82,14 @@ scripts/check_evidence.py --as-of 2026-10-11 spec/evidence/*.json
 The command prints `path: level [reasons]` for each record. It exits 0 when
 every record reaches `--require` (default `tested`), 1 when any falls short,
 and 2 for a schema-invalid record or a usage error. Options name other binding
-or exception files. The command has no parser adapter yet, so callers cannot
-make verifier evidence admissible by supplying their own parser registry.
+or exception files. The `--bindings`, `--exceptions`, `--decisions`, and
+`--roadmap` options accept explicit paths. They default to
+`spec/evidence-bindings.json`, `spec/exceptions.json`, `spec/decisions.json`,
+and `spec/roadmap.json`, respectively. Producers can supply alternate or
+temporary policy inputs as a consistent set; the exception-register adapter
+receives the decisions and roadmap paths explicitly. The command has no parser
+adapter yet, so callers cannot make verifier evidence admissible by supplying
+their own parser registry.
 
 At least one record is required, and `--require` accepts `proof`, `bounded`, or
 `tested`. A configuration file that cannot be loaded is a usage error;

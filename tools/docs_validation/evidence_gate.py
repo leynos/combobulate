@@ -279,6 +279,20 @@ def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> 
     A verdict counts as parsed only when a registered adapter supplies a
     matching result for the named log and digest; tool registration alone is
     insufficient (C-EP-10). An unknown exception identifier is malformed.
+
+    Parameters
+    ----------
+    record
+        An evidence record already validated against proof-evidence schema
+        version 2; this function does not validate serialized inputs.
+    context
+        Explicit exception, binding, date, and verified parser-result inputs.
+
+    Returns
+    -------
+    AbstractRecord
+        The finite admission facts; for example, an unregistered parser claim
+        maps to ``verdict_source='self-reported'``.
     """
     method = record['method']
     parsed = _matching_verified_log_result(record, context) is not None

@@ -20,6 +20,25 @@ class MarkedJsonExamples(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'fenced examples must have tested-example markers'):
                 load_marked_json_examples(path)
 
+    def test_rejects_bare_fence_after_valid_example(self):
+        """Do not let a valid marked example hide a later unmarked bare fence."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'examples.md'
+            path.write_text('<!-- tested-example: sample -->\n```json\n{}\n```\n\n```\n{}\n```\n',
+                            encoding='utf-8')
+
+            with self.assertRaisesRegex(ValueError, 'fenced examples must have tested-example markers'):
+                load_marked_json_examples(path)
+
+    def test_rejects_marked_bare_or_non_json_fence(self):
+        """Require an explicit JSON language even when a marker is present."""
+        for language in ('', 'python'):
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'examples.md'
+                path.write_text(f'<!-- tested-example: sample -->\n```{language}\n{{}}\n```\n', encoding='utf-8')
+                with self.assertRaisesRegex(ValueError, 'only JSON examples are supported'):
+                    load_marked_json_examples(path)
+
     def test_rejects_unterminated_fence(self):
         """Report a marked JSON fence whose closing delimiter is missing."""
         with tempfile.TemporaryDirectory() as directory:

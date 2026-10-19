@@ -122,12 +122,13 @@ def test_no_record_arguments_exit_two(capsys):
     assert 'give at least one record' in capsys.readouterr().err, 'the usage diagnostic explains the missing input'
 
 
-@pytest.mark.parametrize('option', ['--bindings', '--exceptions'])
+@pytest.mark.parametrize('option', ['--bindings', '--exceptions', '--decisions', '--roadmap'])
 def test_unreadable_configuration_exits_two(option, tmp_path, capsys):
     """Treat missing registries as configuration errors without emitting a traceback."""
     missing = str(tmp_path / 'missing.json')
     settings = {'--bindings': str(FIXTURES / 'bindings.json'),
-                '--exceptions': str(ROOT / 'spec/exceptions.json')}
+                '--exceptions': str(ROOT / 'spec/exceptions.json'),
+                '--decisions': str(ROOT / 'spec/decisions.json'), '--roadmap': str(ROOT / 'spec/roadmap.json')}
     settings[option] = missing
     arguments = ['--as-of', '2026-10-10']
     for name, path in settings.items():
@@ -178,3 +179,33 @@ def test_as_of_can_come_from_the_environment(monkeypatch, capsys):
     """Accept the injected CI evaluation date without reading the wall clock."""
     monkeypatch.setenv('INPUT_AS_OF', '2026-10-10')
     assert run(*WITH_BINDINGS, fixture('complete-test')) == 0, 'INPUT_AS_OF supplies the date in CI'
+
+
+@pytest.mark.parametrize(('sponsor', 'status', 'expected'), [
+    ('alternate-sponsor', 'open', []),
+    ('different-sponsor', 'open', ['approver-not-sponsor']),
+    ('alternate-sponsor', 'done', ['past-release-gate']),
+])
+def test_exception_policy_uses_explicit_decision_and_roadmap_paths(sponsor, status, expected, tmp_path, capsys):
+    """Load injected sponsor authority and release-gate completion through CLI options."""
+    from check_evidence import exception_register
+
+    entry = {'id': 'EXC-0001', 'component': 'PF09.proof@2.4.1', 'owner': 'owner',
+             'approved_by': 'alternate-sponsor', 'approved_on': '2026-10-01', 'invalid_from': '2026-11-01',
+             'narrowed_claim': 'Only small inputs.', 'release_gate': '4.3.3'}
+    documents = {
+        '--exceptions': {'exceptions': [entry]},
+        '--decisions': {'authorities': {'roles': {'sponsor': sponsor}}},
+        '--roadmap': {'phases': [{'steps': [{'tasks': [{'id': '4.3.3', 'status': status}]}]}]},
+    }
+    arguments = ['--as-of', '2026-10-10', *WITH_BINDINGS]
+    paths = {}
+    for option, document in documents.items():
+        path = tmp_path / f'{option[2:]}.json'
+        path.write_text(json.dumps(document), encoding='utf-8')
+        paths[option] = path
+        arguments.extend((option, str(path)))
+    register = exception_register(paths['--exceptions'], paths['--decisions'], paths['--roadmap'])
+    assert register['EXC-0001']['problems'] == expected, 'injected authority and release gate determine D02 problems'
+    assert run(*arguments, fixture('complete-test')) == 0, 'explicit policy paths are accepted by the public CLI'
+    assert ': tested []' in capsys.readouterr().out, 'alternate policy files preserve unrelated test admission'

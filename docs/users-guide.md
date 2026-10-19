@@ -59,6 +59,21 @@ verifier's verdict remains self-reported until a registered adapter validates
 the cited log digest and supplies a matching result; registration by itself
 cannot satisfy `proof` or `bounded`.
 
+The command reads the repository policy files by default. To check records
+against alternate or temporary inputs, pass all relevant paths explicitly:
+
+```bash
+uv run scripts/check_evidence.py --as-of 2026-10-11 \
+  --bindings /tmp/evidence-bindings.json \
+  --exceptions /tmp/exceptions.json \
+  --decisions /tmp/decisions.json \
+  --roadmap /tmp/roadmap.json \
+  spec/evidence/record.json
+```
+
+The four options default to `spec/evidence-bindings.json`,
+`spec/exceptions.json`, `spec/decisions.json`, and `spec/roadmap.json`.
+
 Records use schema version 2. Version 1 records are rejected; see the
 [evidence-record migration notes](revision-0.2.md#evidence-record-schema-migration)
 and the [producer reference](evidence-and-decision-records.md) before updating

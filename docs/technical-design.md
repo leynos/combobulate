@@ -1029,6 +1029,15 @@ construct the same context to check the abstraction. Any additional producer
 must compose the context from its own explicit inputs rather than add
 environment or filesystem access to the gate.
 
+Roadmap closure uses a separate immutable `ClosureEvidence` projection owned by
+`tools/docs_validation/closure_evidence.py`. The
+`evidence_records.admitted_evidence` adapter constructs it from schema-v2
+records and their admission. Its fields are component id, recorded date, source
+revision, outcome, binding-current state, admission level, and reasons. Only
+`ClosureInputs.evidence` and the MS-3 closure predicates consume this
+projection. It is scoped to roadmap closure; it is not a general record API or
+a replacement for the full schema record or `AbstractRecord`.
+
 The private `_trust_coverage` projection is scoped to `evidence_gate.py` and is
 called only by `abstract_record`. It combines declared assumption identifiers
 and the cited exception identifier; `trust_state` remains responsible for

@@ -528,7 +528,19 @@ filters to current-binding records before choosing the latest date, then
 applies the counterexample veto to every record at the selected source
 revision. The evidence CLI builds `EvidenceCliConfiguration` once and passes it
 only to the per-record evaluator, so all records share one fixed set of
-bindings and parser results.
+bindings and parser results. Its exception-register adapter receives the
+decisions and roadmap paths explicitly; it must not load those policy files
+through a module-level repository root.
+
+`tools/docs_validation/closure_evidence.py` owns the immutable
+`ClosureEvidence` projection used only for roadmap closure. The
+`evidence_records.admitted_evidence` adapter constructs it from schema-v2
+records and their admission. Its fields are component id, recorded date, source
+revision, outcome, binding-current state, admission level, and reasons. Only
+`ClosureInputs.evidence` and the MS-3 closure predicates consume this
+projection. It is not a general record API and does not replace the full schema
+record or `AbstractRecord`; keep projection and construction at this
+roadmap-closure boundary.
 
 Proof evidence for a record-sourced component goes in `spec/evidence/` as a
 schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it

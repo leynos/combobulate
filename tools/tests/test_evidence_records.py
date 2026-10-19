@@ -1,6 +1,7 @@
 """Prove concrete evidence records map onto the abstract model and agree with the schema (VO-2)."""
 from __future__ import annotations
 
+import datetime
 import itertools
 import sys
 import unittest
@@ -15,6 +16,7 @@ from hypothesis import given, settings, strategies as st
 
 from docs_validation import evidence_gate as gate
 from docs_validation.evidence_gate import AdmissionContext, AbstractRecord, abstract_record, is_valid
+from docs_validation.evidence_records import closure_evidence
 from evidence_fixtures import (AS_OF, BINDINGS, DIGEST, PARSERS, VALID, VALIDATOR, admission_context, concrete,
                                round_trip, verified_log_results)
 from markdown_examples import load_marked_json_examples
@@ -34,6 +36,41 @@ def concrete_mapping_failure(state: AbstractRecord) -> str | None:
     context = admission_context(record, exceptions)
     actual = abstract_record(record, context)
     return f'{state}: abstraction returned {actual}' if actual != state else None
+
+
+class ClosureProjection(unittest.TestCase):
+    """Keep schema translation and current-binding interpretation in the adapter."""
+
+    def test_maps_schema_record_and_admission_to_domain_facts(self):
+        """Preserve closure facts and reject either stale-binding reason."""
+        state = next(item for item in VALID if item.kind == 'test')
+        record, _ = concrete(state)
+        record['recorded_on'] = '2026-10-10'
+        for reasons in ((), ('outcome-counterexample',), ('binding-stale',), ('binding-incomplete',)):
+            with self.subTest(reasons=reasons):
+                admission = gate.Admission(gate.Level.REJECTED, reasons)
+                facts = closure_evidence(record, admission)
+                self.assertEqual(facts.component_id, record['component'], 'component identity must survive translation')
+                self.assertEqual(facts.recorded_on, datetime.date(2026, 10, 10), 'dates must become domain date values')
+                self.assertEqual(facts.source_revision, record['binding']['source_revision'],
+                                 'source revision must survive translation')
+                self.assertEqual(facts.outcome, record['outcome'], 'outcome must survive translation')
+                self.assertEqual(facts.binding_is_current, not any(reason.startswith('binding-') for reason in reasons),
+                                 'only binding failures exclude records from current-binding selection')
+                self.assertEqual((facts.admission_level, facts.admission_reasons), (admission.level, reasons),
+                                 'admission level and ordered reasons must survive translation')
+
+    def test_preserves_null_source_revision_from_incomplete_binding(self):
+        """Keep the schema's absent source revision distinct from the string 'None'."""
+        state = next(item for item in VALID if item.kind == 'test')
+        record, _ = concrete(state)
+        record['binding']['source_revision'] = None
+        admission = gate.Admission(gate.Level.REJECTED, ('binding-incomplete',))
+
+        facts = closure_evidence(record, admission)
+
+        self.assertIsNone(facts.source_revision, 'an incomplete binding must preserve its absent revision')
+        self.assertFalse(facts.binding_is_current, 'an incomplete binding must not enter current closure selection')
 
 
 class ConcreteMapping(unittest.TestCase):

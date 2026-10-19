@@ -14,8 +14,8 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
+from .closure_evidence import ClosureEvidence
 from .context import ValidationContext, require
-from .evidence_gate import Admission
 from .evidence_records import admitted_evidence
 from .markdown import headings
 
@@ -51,7 +51,7 @@ class ClosureInputs:
     components: Mapping[str, list[dict]]
     check_results: tuple[CheckResult, ...]
     artefact_problem: Callable[[str], ArtefactProblem | None]
-    evidence: Mapping[str, list[tuple[Admission, dict]]] = field(default_factory=dict)
+    evidence: Mapping[str, list[ClosureEvidence]] = field(default_factory=dict)
     current_source_revision: str | None = None
 
 
@@ -118,10 +118,10 @@ def index_completions(completion: dict, tasks: Mapping[str, dict], decisions: Ma
     return records
 
 
-def has_counterexample_for_revision(records: list[tuple[Admission, dict]], revision: str) -> bool:
+def has_counterexample_for_revision(records: list[ClosureEvidence], revision: str) -> bool:
     """Find a counterexample at one source revision regardless of its admission level."""
-    return any(record['outcome'] == 'counterexample' and record['binding']['source_revision'] == revision
-               for _, record in records)
+    return any(record.outcome == 'counterexample' and record.source_revision == revision
+               for record in records)
 
 
 def latest_check_result(results: tuple[CheckResult, ...], check: str) -> CheckResult | None:
@@ -129,34 +129,33 @@ def latest_check_result(results: tuple[CheckResult, ...], check: str) -> CheckRe
     return next((result for result in reversed(results) if result.check == check), None)
 
 
-def _current_binding_records(records: list[tuple[Admission, dict]]) -> list[tuple[Admission, dict]]:
+def _current_binding_records(records: list[ClosureEvidence]) -> list[ClosureEvidence]:
     """Keep only records whose admission matched the component's registered current binding."""
-    stale_reasons = {'binding-stale', 'binding-incomplete'}
-    return [(admission, record) for admission, record in records
-            if not stale_reasons.intersection(admission.reasons)]
+    return [record for record in records if record.binding_is_current]
 
 
-def _records_on_latest_date(records: list[tuple[Admission, dict]]) -> list[tuple[Admission, dict]]:
+def _records_on_latest_date(records: list[ClosureEvidence]) -> list[ClosureEvidence]:
     """Select records on the newest date from a non-empty current-binding set."""
-    latest_date = max(record['recorded_on'] for _, record in records)
-    return [(admission, record) for admission, record in records if record['recorded_on'] == latest_date]
+    latest_date = max(record.recorded_on for record in records)
+    return [record for record in records if record.recorded_on == latest_date]
 
 
-def record_component_failure(component: dict, records: list[tuple[Admission, dict]]) -> str | None:
+def record_component_failure(component: dict, records: list[ClosureEvidence]) -> str | None:
     """Adjudicate record evidence for roadmap closure; only the component router calls this helper."""
     current_records = _current_binding_records(records)
     if not current_records:
         return f"component {component['id']} has no evidence record at the current binding"
     latest_records = _records_on_latest_date(current_records)
-    latest_date = latest_records[0][1]['recorded_on']
+    latest_date = latest_records[0].recorded_on
     if len(latest_records) != 1:
         return f"component {component['id']} has {len(latest_records)} records on latest recorded_on date {latest_date}"
-    admission, latest = latest_records[0]
-    revision = latest['binding']['source_revision']
+    latest = latest_records[0]
+    revision = latest.source_revision
     if has_counterexample_for_revision(records, revision):
         return f"component {component['id']} has a counterexample at source revision {revision}"
-    if admission.level.value not in component['accepts']:
-        return f"component {component['id']} evidence is {admission.level.value} ({', '.join(admission.reasons)})"
+    if latest.admission_level.value not in component['accepts']:
+        return (f"component {component['id']} evidence is {latest.admission_level.value} "
+                f"({', '.join(latest.admission_reasons)})")
     return None
 
 
@@ -178,7 +177,7 @@ def _checker_result_failure(component: dict, check_results: tuple[CheckResult, .
 
 
 def component_failure(component: dict, check_results: tuple[CheckResult, ...],
-                      evidence: Mapping[str, list[tuple[Admission, dict]]],
+                      evidence: Mapping[str, list[ClosureEvidence]],
                       current_source_revision: str | None) -> str | None:
     """Explain why a component is unsatisfied (MS-3), or return None when it is satisfied."""
     source = component['evidence_source']

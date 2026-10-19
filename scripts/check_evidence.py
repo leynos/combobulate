@@ -56,10 +56,34 @@ class EvidenceCliOptions:
         Path, Parameter(help='JSON map from component to its complete current executable and verification profile.')
     ] = ROOT / 'spec/evidence-bindings.json'
     exceptions: Annotated[Path, Parameter(help='The exception register.')] = ROOT / 'spec/exceptions.json'
+    decisions: Annotated[
+        Path, Parameter(help='The decision register supplying the sponsor authority.')
+    ] = ROOT / 'spec/decisions.json'
+    roadmap: Annotated[
+        Path, Parameter(help='The roadmap export supplying completed release gates.')
+    ] = ROOT / 'spec/roadmap.json'
 
 
 def load_json(path: Path) -> dict:
-    """Read one JSON document."""
+    """Read one JSON document; e.g. an object becomes a Python dictionary.
+
+    Parameters
+    ----------
+    path
+        UTF-8 JSON input file.
+
+    Returns
+    -------
+    dict
+        The parsed document; callers validate its required shape.
+
+    Raises
+    ------
+    OSError
+        If the file cannot be read.
+    ValueError
+        If its contents are not valid JSON or UTF-8 text.
+    """
     return json.loads(path.read_text(encoding='utf-8'))
 
 
@@ -68,6 +92,23 @@ def load_bindings(path: Path) -> dict:
 
     For example, ``{"PF01.proof@1": {"source_revision": "..."}}`` is
     returned as a mapping; a top-level array or ``null`` raises ``ValueError``.
+
+    Parameters
+    ----------
+    path
+        UTF-8 JSON map of components to their current profiles.
+
+    Returns
+    -------
+    dict
+        The component-profile mapping.
+
+    Raises
+    ------
+    OSError
+        If the file cannot be read.
+    ValueError
+        If the document is invalid JSON, invalid UTF-8, or not an object.
     """
     bindings = load_json(path)
     if not isinstance(bindings, dict):
@@ -76,20 +117,76 @@ def load_bindings(path: Path) -> dict:
 
 
 def report_line(path: Path, level: str, reasons: tuple[str, ...]) -> str:
-    """Format one result; e.g. 'spec/x.json: rejected [not-run]'."""
+    """Format one result; e.g. 'spec/x.json: rejected [not-run]'.
+
+    Parameters
+    ----------
+    path
+        Input record path displayed to the caller.
+    level
+        Admission level to report.
+    reasons
+        Ordered gate reason codes.
+
+    Returns
+    -------
+    str
+        The path, level, and bracketed reason list on one line.
+    """
     return f"{path}: {level} [{', '.join(reasons)}]"
 
 
-def exception_register(path: Path) -> dict[str, dict]:
-    """Load exceptions with their D02 problems attached, as the gate expects."""
+def exception_register(path: Path, decisions: Path, roadmap: Path) -> dict[str, dict]:
+    """Load exceptions with D02 problems from explicit policy inputs.
+
+    For example, a completed release gate in ``roadmap`` attaches the
+    ``past-release-gate`` problem even before an exception's expiry date.
+
+    Parameters
+    ----------
+    path
+        The JSON exception register.
+    decisions
+        The JSON decision register supplying the sponsor authority.
+    roadmap
+        The JSON roadmap export supplying completed release-gate tasks.
+
+    Returns
+    -------
+    dict[str, dict]
+        Exception entries indexed by identifier, with named problems attached.
+
+    Raises
+    ------
+    OSError
+        If any input cannot be read.
+    ValueError
+        If an input is invalid JSON, invalid UTF-8, or has an invalid date.
+    KeyError, TypeError
+        If policy input fields do not have the expected structure.
+    """
     from docs_validation.exceptions import annotated_exceptions, ticked_tasks
 
-    sponsor = load_json(ROOT / 'spec/decisions.json')['authorities']['roles']['sponsor']
-    return annotated_exceptions(load_json(path), sponsor, ticked_tasks(load_json(ROOT / 'spec/roadmap.json')))
+    sponsor = load_json(decisions)['authorities']['roles']['sponsor']
+    return annotated_exceptions(load_json(path), sponsor, ticked_tasks(load_json(roadmap)))
 
 
 def evaluate_record(path: Path, configuration: EvidenceCliConfiguration) -> tuple[int, bool]:
-    """Validate one input against the immutable settings for this CLI invocation."""
+    """Validate one input against immutable CLI settings; e.g. an invalid record returns ``(0, True)``.
+
+    Parameters
+    ----------
+    path
+        Evidence record to read and report.
+    configuration
+        Schema validator, admission inputs, and required admission level.
+
+    Returns
+    -------
+    tuple[int, bool]
+        The insufficient-level status and whether the record was unreadable or
+        schema-invalid. Expected input failures are reported on standard error.
+    """
     from docs_validation.evidence_gate import LEVEL_RANK, Level, abstract_record, admit
 
     try:
@@ -124,6 +221,12 @@ def main(
         Evidence record files to admit.
     options
         Flat options preserving their documented command-line names.
+
+    Returns
+    -------
+    int
+        Zero when all records reach the required level, one when any falls
+        short, or two for invalid records, configuration, or usage.
     """
     from docs_validation.evidence_gate import AdmissionContext, Level
 
@@ -139,7 +242,8 @@ def main(
     try:
         validator = Draft202012Validator(load_json(ROOT / 'spec/proof-evidence.schema.json'),
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
-        register, current = exception_register(options.exceptions), load_bindings(options.bindings)
+        register = exception_register(options.exceptions, options.decisions, options.roadmap)
+        current = load_bindings(options.bindings)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
         return 2

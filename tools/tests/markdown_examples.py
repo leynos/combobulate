@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 MARKER = re.compile(r'<!-- tested-example: ([a-z0-9-]+) -->$')
-FENCE = re.compile(r'(?P<ticks>`{3,}|~{3,})(?P<language>[a-zA-Z0-9_-]+)\s*$')
+FENCE = re.compile(r'(?P<ticks>`{3,}|~{3,})(?P<language>[a-zA-Z0-9_-]*)\s*$')
 
 
 def _is_closing_fence(line: str, fence: str) -> bool:
@@ -109,6 +109,24 @@ def load_marked_json_examples(path: Path) -> dict[str, dict[str, object]]:
 
     For example, ``load_marked_json_examples(Path('migration.md'))['evidence-v2']``
     returns the parsed object from that published example.
+
+    Parameters
+    ----------
+    path
+        UTF-8 Markdown document whose fenced examples all require markers.
+
+    Returns
+    -------
+    dict[str, dict[str, object]]
+        Parsed JSON objects indexed by their unique tested-example markers.
+
+    Raises
+    ------
+    ValueError
+        If markers or fences are missing, duplicated, non-adjacent, or
+        unterminated, or an example is not a JSON object.
+    OSError
+        If the document cannot be read.
     """
     reader = _MarkedExampleReader(path)
     for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
