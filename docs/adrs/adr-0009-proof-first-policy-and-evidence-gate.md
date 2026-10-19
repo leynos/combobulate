@@ -124,9 +124,12 @@ implementation and the rule table:
 
 ## Trust audit and verdicts
 
-A verdict counts as parsed only when a log parser is registered for the tool in
-`spec/evidence-reason-codes.json` and the record names its committed log with a
-digest. Otherwise it is self-reported (fail closed). No parser is registered
+A verdict counts as parsed only when a registered adapter supplies a verified
+result for the tool, committed log path, and digest named by the record. The
+adapter reads the log, validates its digest, and derives the outcome, bounds,
+witnesses, negative controls, and run mode. The pure gate checks that this
+result matches the record; registration alone is insufficient. Otherwise the
+verdict is self-reported (fail closed). No parser is registered or integrated
 yet; tasks 1.2.1 and 1.2.4 build the parsers and the trust-audit scanner, whose
 item vocabulary is fixed here:
 

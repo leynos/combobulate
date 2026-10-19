@@ -527,8 +527,8 @@ called only by `component_failure`; `_current_binding_records` and
 filters to current-binding records before choosing the latest date, then
 applies the counterexample veto to every record at the selected source
 revision. The evidence CLI builds `EvidenceCliConfiguration` once and passes it
-only to the per-record evaluator, so all inputs share one fixed set of bindings
-and registries.
+only to the per-record evaluator, so all records share one fixed set of
+bindings and parser results.
 
 Proof evidence for a record-sourced component goes in `spec/evidence/` as a
 schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
@@ -541,9 +541,13 @@ registered for a verifier, its records are self-reported and cannot satisfy a
 ### Compose the evidence-admission boundary
 
 `AdmissionContext` is a frozen, call-scoped value containing the exception
-register, current binding profiles, evaluation date, and registered log
-parsers. The evidence-record and CLI adapters validate each record against the
-schema and assemble this context. `abstract_record(record, context)` maps a
+register, current binding profiles, evaluation date, registered log parsers,
+and verified adapter results. The evidence-record and CLI adapters validate
+each record against the schema and assemble this context. A parser adapter may
+provide `VerifiedLogResult` only after reading the cited log, validating its
+digest, and deriving the admission-relevant facts. Tool registration alone is
+insufficient. The CLI currently has no verifier parser adapter, so verifier
+records remain self-reported there. `abstract_record(record, context)` maps a
 schema-valid record to the ten-field model; `admit` applies the pure MS-0 to
 MS-2 rules and returns an admission level with reason codes. Neither function
 reads files, the clock, the environment, or the network. Add producers at the

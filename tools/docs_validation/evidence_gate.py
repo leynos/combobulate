@@ -70,6 +70,35 @@ class AbstractRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class VerifiedLogResult:
+    """Facts re-derived by a parser from the exact log named by one record.
+
+    An adapter creates this value only after reading the log, verifying its
+    digest, and deriving every admission-relevant result from its contents.
+    The pure gate also checks that these facts match the submitted record.
+    """
+
+    tool: str
+    log_path: str
+    log_sha256: str
+    outcome: str
+    bounds: str
+    witness_statuses: tuple[str, ...]
+    negative_controls: tuple[tuple[bool, str], ...]
+    run_mode: str
+
+    def matches_record(self, record: Mapping[str, object]) -> bool:
+        """Confirm the parser-derived admission facts agree with the record."""
+        method = record['method']
+        bounds = record['bounds']
+        witnesses = tuple(str(item['status']) for item in record['success_witnesses'])
+        controls = tuple((bool(item['required']), str(item['observed'])) for item in record['negative_controls'])
+        return (self.outcome == record['outcome'] and self.bounds == bounds['kind']
+                and self.witness_statuses == witnesses and self.negative_controls == controls
+                and self.run_mode == method['run_mode'])
+
+
+@dataclass(frozen=True, slots=True)
 class AdmissionContext:
     """Carry caller-owned inputs used only while abstracting one evidence record."""
 
@@ -77,6 +106,7 @@ class AdmissionContext:
     bindings: Mapping[str, Mapping[str, object]]
     as_of: datetime.date
     log_parsers: frozenset[str] = frozenset()
+    verified_log_results: tuple[VerifiedLogResult, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -199,26 +229,52 @@ def binding_state(record: Mapping[str, object], bindings: Mapping[str, Mapping[s
     return 'current' if current == expected else 'stale'
 
 
+def _matching_verified_log_result(
+    record: Mapping[str, object], context: AdmissionContext,
+) -> VerifiedLogResult | None:
+    """Find a registered adapter result bound to this record and its derived facts."""
+    method = record['method']
+    source = record['verdict_source']
+    log = source['log']
+    tool = str(method['tool'])
+    if source['kind'] != 'log-parser':
+        return None
+    if log is None:
+        return None
+    if tool not in context.log_parsers:
+        return None
+    identity = (tool, str(log['path']), str(log['sha256']))
+    candidates = [result for result in context.verified_log_results
+                  if (result.tool, result.log_path, result.log_sha256) == identity]
+    if len(candidates) != 1:
+        return None
+    if not candidates[0].matches_record(record):
+        return None
+    return candidates[0]
+
+
+def _exception_for_record(record: Mapping[str, object], context: AdmissionContext) -> str:
+    """Resolve one exception claim, rejecting unknown or cross-component identifiers."""
+    exception_id = record['exception']
+    if exception_id is None:
+        return 'none'
+    entry = context.exceptions.get(str(exception_id))
+    if entry is None or entry.get('component') != record['component']:
+        return 'malformed'
+    return exception_state(entry, context.as_of)
+
+
 def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord:
     """Map a schema-valid record to the abstract model; validate against the schema first.
 
-    A verdict counts as parsed only when the record names a log and its tool has
-    a registered log parser; otherwise it is self-reported (C-EP-10). An unknown
-    exception identifier is malformed.
+    A verdict counts as parsed only when a registered adapter supplies a
+    matching result for the named log and digest; tool registration alone is
+    insufficient (C-EP-10). An unknown exception identifier is malformed.
     """
     method = record['method']
-    source = record['verdict_source']
-    parsed = (source['kind'] == 'log-parser' and source['log'] is not None
-              and method['tool'] in context.log_parsers)
+    parsed = _matching_verified_log_result(record, context) is not None
+    exception = _exception_for_record(record, context)
     exception_id = record['exception']
-    if exception_id is None:
-        exception = 'none'
-    else:
-        entry = context.exceptions.get(str(exception_id))
-        if entry is None or entry.get('component') != record['component']:
-            exception = 'malformed'
-        else:
-            exception = exception_state(entry, context.as_of)
     trust_covers = frozenset(str(item) for item in record['declared_assumptions'])
     if exception_id is not None:
         trust_covers |= frozenset({str(exception_id)})

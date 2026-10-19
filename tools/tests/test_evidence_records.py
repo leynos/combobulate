@@ -4,7 +4,7 @@ from __future__ import annotations
 import itertools
 import sys
 import unittest
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,7 +15,8 @@ from hypothesis import given, settings, strategies as st
 
 from docs_validation import evidence_gate as gate
 from docs_validation.evidence_gate import AdmissionContext, AbstractRecord, abstract_record, is_valid
-from evidence_fixtures import AS_OF, BINDINGS, DIGEST, PARSERS, VALID, VALIDATOR, concrete, round_trip
+from evidence_fixtures import (AS_OF, BINDINGS, DIGEST, PARSERS, VALID, VALIDATOR, admission_context, concrete,
+                               round_trip, verified_log_results)
 from markdown_examples import load_marked_json_examples
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,8 +31,7 @@ def concrete_mapping_failure(state: AbstractRecord) -> str | None:
         return f'{state}: schema validity was {schema_valid}'
     if not expected_valid:
         return None
-    context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS,
-                               as_of=AS_OF, log_parsers=PARSERS)
+    context = admission_context(record, exceptions)
     actual = abstract_record(record, context)
     return f'{state}: abstraction returned {actual}' if actual != state else None
 
@@ -81,7 +81,7 @@ class ConcreteMapping(unittest.TestCase):
         record, exceptions = concrete(state)
         record.update(claim=text, outcome_detail=text, recorded_on=date.isoformat())
         record['method'].update(version=text, command=text, solver=text)
-        context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS)
+        context = admission_context(record, exceptions)
         self.assertEqual(abstract_record(record, context), state,
                          'fields outside the admission contract must not affect the abstraction')
 
@@ -98,8 +98,7 @@ class ConcreteMapping(unittest.TestCase):
         for field, value in alternatives.items():
             record, exceptions = concrete(state)
             record['binding'][field] = value
-            context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF,
-                                       log_parsers=PARSERS)
+            context = admission_context(record, exceptions)
             with self.subTest(field=field):
                 self.assertEqual(abstract_record(record, context).binding, 'stale',
                                  f'a changed {field} must invalidate the current binding')
@@ -110,7 +109,7 @@ class ConcreteMapping(unittest.TestCase):
         record, exceptions = concrete(state)
         incomplete = {record['component']: {'executable_digest': DIGEST}}
         context = AdmissionContext(exceptions=exceptions, bindings=incomplete, as_of=AS_OF,
-                                   log_parsers=PARSERS)
+                                   log_parsers=PARSERS, verified_log_results=verified_log_results(record))
         self.assertEqual(abstract_record(record, context).binding, 'stale',
                          'a partial registration cannot match the complete schema binding')
 
@@ -121,6 +120,36 @@ class ConcreteMapping(unittest.TestCase):
         context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF)
         self.assertEqual(abstract_record(record, context).verdict_source, 'self-reported',
                          'without a registered parser a verdict is self-reported (C-EP-10)')
+
+    def test_registered_parser_without_verified_result_is_self_reported(self):
+        """Require parser output as well as tool registration before trusting a verdict."""
+        state = next(item for item in VALID if item.verdict_source == 'log-parser')
+        record, exceptions = concrete(state)
+        context = AdmissionContext(exceptions, BINDINGS, AS_OF, PARSERS)
+
+        self.assertEqual(abstract_record(record, context).verdict_source, 'self-reported',
+                         'a registered tool name cannot replace a verified adapter result')
+
+    def test_verified_parser_result_must_match_log_identity_and_claims(self):
+        """Reject a parser result bound to another log or inconsistent with the submitted record."""
+        state = next(item for item in VALID if item.verdict_source == 'log-parser')
+        record, exceptions = concrete(state)
+        result = verified_log_results(record)[0]
+        mismatches = (
+            ('tool', replace(result, tool='other-tool')),
+            ('log path', replace(result, log_path='logs/other.log')),
+            ('log digest', replace(result, log_sha256='c' * 64)),
+            ('outcome', replace(result, outcome='counterexample')),
+            ('bounds', replace(result, bounds='partial')),
+            ('witnesses', replace(result, witness_statuses=('unsatisfied',))),
+            ('negative controls', replace(result, negative_controls=((True, 'accepted'),))),
+            ('run mode', replace(result, run_mode='focused')),
+        )
+        for field, mismatch in mismatches:
+            context = AdmissionContext(exceptions, BINDINGS, AS_OF, PARSERS, (mismatch,))
+            with self.subTest(field=field):
+                self.assertEqual(abstract_record(record, context).verdict_source, 'self-reported',
+                                 f'a mismatched {field} must fail closed')
 
     def test_seeded_mapping_fault_fails_the_round_trip(self):
         """Show that the exhaustive round-trip detects a broken control abstraction."""
@@ -170,7 +199,7 @@ class ConcreteMapping(unittest.TestCase):
         state = next(item for item in VALID if item.trust == 'audited-all-covered' and item.exception == 'none')
         record, exceptions = concrete(state)
         record['trust_audit']['items'][0]['covered_by'] = 'undeclared claim'
-        context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS)
+        context = admission_context(record, exceptions)
         self.assertEqual(abstract_record(record, context).trust, 'audited-uncovered',
                          'an arbitrary record label must not stand in for a declared assumption')
 
@@ -181,7 +210,7 @@ class ConcreteMapping(unittest.TestCase):
         )
         record, exceptions = concrete(state)
         record['trust_audit']['items'][0]['covered_by'] = 'EXC-0001'
-        context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS)
+        context = admission_context(record, exceptions)
         self.assertEqual(abstract_record(record, context).trust, 'audited-all-covered',
                          'the cited component exception may cover a trusted item')
 
@@ -194,7 +223,7 @@ class ConcreteMapping(unittest.TestCase):
         )
         record, exceptions = concrete(state)
         exceptions['EXC-0001']['component'] = 'PF01.proof@1.2.4'
-        context = AdmissionContext(exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS)
+        context = admission_context(record, exceptions)
 
         admission = gate.admit(abstract_record(record, context))
 

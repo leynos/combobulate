@@ -54,9 +54,10 @@ to check one or more records. The date is required and makes exception
 evaluation reproducible. The minimum level defaults to `tested`; `proof`,
 `bounded`, and `tested` are the supported requirements. The command exits `0`
 when every record meets the requirement, `1` when a record is admitted below
-it, and `2` for unreadable input, a schema failure, or a usage error. Until a
-verifier's log parser is registered, its verdict is self-reported and cannot
-meet `proof` or `bounded`.
+it, and `2` for unreadable input, a schema failure, or a usage error. A
+verifier's verdict remains self-reported until a registered adapter validates
+the cited log digest and supplies a matching result; registration by itself
+cannot satisfy `proof` or `bounded`.
 
 Records use schema version 2. Version 1 records are rejected; see the
 [evidence-record migration notes](revision-0.2.md#evidence-record-schema-migration)

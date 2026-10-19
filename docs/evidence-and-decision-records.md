@@ -51,12 +51,14 @@ code; the codes and their meanings are single-sourced in
 
 ## Verdict sources and log parsers
 
-A verifier verdict counts as parsed only when the tool has a registered log
-parser in `spec/evidence-reason-codes.json` (`registered_log_parsers`) and the
-record names its committed log with a digest. None is registered yet, so
-deductive and bounded records are `verdict-self-reported` and rejected. Tasks
-1.2.1 and 1.2.4 own the parsers and the trust-audit scanner, with these
-obligations:
+A verifier verdict counts as parsed only when its registered adapter supplies a
+`VerifiedLogResult` for the record's exact tool, committed log path, and
+digest. Registration alone is insufficient. The adapter reads the log,
+validates its digest, derives the admission-relevant facts, and passes that
+result to the pure gate, which checks that those facts match the record. No
+parser is registered or integrated yet, so verifier records are
+`verdict-self-reported` and rejected. Tasks 1.2.1 and 1.2.4 own the parsers and
+the trust-audit scanner, with these obligations:
 
 - A parser re-derives the outcome, every `cover!` result, every negative
   control's observed failure, and the run mode from the raw log, and rejects a
@@ -76,10 +78,9 @@ scripts/check_evidence.py --as-of 2026-10-11 spec/evidence/*.json
 
 The command prints `path: level [reasons]` for each record. It exits 0 when
 every record reaches `--require` (default `tested`), 1 when any falls short,
-and 2 for a schema-invalid record or a usage error. Options name other binding,
-parser, or exception files; the test fixtures in
-`tools/tests/fixtures/evidence/` use a test-only parser registry so the
-`bounded` level is reachable.
+and 2 for a schema-invalid record or a usage error. Options name other binding
+or exception files. The command has no parser adapter yet, so callers cannot
+make verifier evidence admissible by supplying their own parser registry.
 
 At least one record is required, and `--require` accepts `proof`, `bounded`, or
 `tested`. A configuration file that cannot be loaded is a usage error;

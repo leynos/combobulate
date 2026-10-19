@@ -11,7 +11,7 @@ from check_evidence import app
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tools/tests/fixtures/evidence'
 EXAMPLE = ROOT / 'spec/proof-evidence.example.json'
-WITH_PARSERS = ('--bindings', str(FIXTURES / 'bindings.json'), '--log-parsers', str(FIXTURES / 'log-parsers.json'))
+WITH_BINDINGS = ('--bindings', str(FIXTURES / 'bindings.json'),)
 
 
 def run(*args: str) -> int:
@@ -35,30 +35,39 @@ def test_planned_example_is_rejected_as_not_run(capsys):
 
 def test_complete_test_record_is_admitted_at_tested(capsys):
     """Accept complete test evidence at the CLI's default minimum level."""
-    assert run('--as-of', '2026-10-10', *WITH_PARSERS, fixture('complete-test')) == 0, 'tested meets the default'
+    assert run('--as-of', '2026-10-10', *WITH_BINDINGS, fixture('complete-test')) == 0, 'tested meets the default'
     assert ': tested []' in capsys.readouterr().out
 
 
-@pytest.mark.parametrize(('required', 'code'), [('bounded', 0), ('proof', 1)])
-def test_partial_bounds_reach_bounded_but_never_proof(required, code, capsys):
-    """Respect the bounded level and reject partial bounds as proof."""
-    assert run('--as-of', '2026-10-10', '--require', required, *WITH_PARSERS, fixture('partial-bounds-kani')) == code
-    assert ': bounded []' in capsys.readouterr().out, 'partial bounds are reported as bounded'
+@pytest.mark.parametrize('required', ['bounded', 'proof'])
+def test_partial_bounds_stay_self_reported_without_a_parser_adapter(required, capsys):
+    """Keep verifier claims below bounded until an adapter verifies their cited log."""
+    assert run('--as-of', '2026-10-10', '--require', required, *WITH_BINDINGS,
+               fixture('partial-bounds-kani')) == 1, 'tool registration alone cannot satisfy a proof level'
+    assert ': rejected [verdict-self-reported]' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(('name', 'reason'), [('resource-exhausted-kani', 'outcome-resource-exhausted'),
                                               ('self-reported-verus', 'verdict-self-reported')])
 def test_failing_records_are_rejected_with_their_reason(name, reason, capsys):
     """Report the specific reason for an outcome or verdict-source failure."""
-    assert run('--as-of', '2026-10-10', *WITH_PARSERS, fixture(name)) == 1, f'{name} must fall short'
-    assert f'rejected [{reason}]' in capsys.readouterr().out
+    assert run('--as-of', '2026-10-10', *WITH_BINDINGS, fixture(name)) == 1, f'{name} must fall short'
+    assert reason in capsys.readouterr().out, f'{name} names {reason}'
 
 
 def test_without_a_registered_parser_a_verifier_verdict_is_self_reported(capsys):
-    """Fail closed when a verifier has no registered result-log parser."""
+    """Fail closed when the CLI has no verified adapter result for a log claim."""
     assert run('--as-of', '2026-10-10', '--bindings', str(FIXTURES / 'bindings.json'),
                fixture('partial-bounds-kani')) == 1, 'the repository registers no parser yet (C-EP-10)'
     assert 'verdict-self-reported' in capsys.readouterr().out
+
+
+def test_parser_registry_cannot_be_supplied_by_the_caller(capsys):
+    """Prevent CLI callers from turning a tool-name list into parser authority."""
+    code = run('--as-of', '2026-10-10', '--log-parsers', str(ROOT / 'spec/evidence-reason-codes.json'),
+               '--bindings', str(FIXTURES / 'bindings.json'), fixture('partial-bounds-kani'))
+    assert code == 2, 'parser registration is controlled by repository policy and adapter integration'
+    assert '--log-parsers' in capsys.readouterr().err, 'the CLI rejects a caller-supplied parser registry'
 
 
 def test_schema_invalid_record_exits_two(tmp_path, capsys):
@@ -89,12 +98,11 @@ def test_no_record_arguments_exit_two(capsys):
     assert 'give at least one record' in capsys.readouterr().err, 'the usage diagnostic explains the missing input'
 
 
-@pytest.mark.parametrize('option', ['--bindings', '--log-parsers', '--exceptions'])
+@pytest.mark.parametrize('option', ['--bindings', '--exceptions'])
 def test_unreadable_configuration_exits_two(option, tmp_path, capsys):
     """Treat missing registries as configuration errors without emitting a traceback."""
     missing = str(tmp_path / 'missing.json')
     settings = {'--bindings': str(FIXTURES / 'bindings.json'),
-                '--log-parsers': str(FIXTURES / 'log-parsers.json'),
                 '--exceptions': str(ROOT / 'spec/exceptions.json')}
     settings[option] = missing
     arguments = ['--as-of', '2026-10-10']
@@ -114,8 +122,7 @@ def test_non_object_bindings_configuration_exits_two(document, kind, tmp_path, c
     bindings = tmp_path / 'bindings.json'
     bindings.write_text(document, encoding='utf-8')
 
-    assert run('--as-of', '2026-10-10', '--bindings', str(bindings), '--log-parsers',
-               str(FIXTURES / 'log-parsers.json'), fixture('complete-test')) == 2, \
+    assert run('--as-of', '2026-10-10', '--bindings', str(bindings), fixture('complete-test')) == 2, \
         f'a JSON {kind} cannot be used as a bindings map'
     error = capsys.readouterr().err
     assert 'usage error: cannot load configuration' in error, 'invalid bindings have a usage diagnostic'
@@ -128,7 +135,7 @@ def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
     broken = tmp_path / 'broken.json'
     broken.write_text('{not json', encoding='utf-8')
     missing = tmp_path / 'missing.json'
-    code = run('--as-of', '2026-10-10', *WITH_PARSERS, str(broken), str(missing), fixture('complete-test'))
+    code = run('--as-of', '2026-10-10', *WITH_BINDINGS, str(broken), str(missing), fixture('complete-test'))
     captured = capsys.readouterr()
     assert code == 2, 'unreadable input exits 2'
     assert 'broken.json: unreadable' in captured.err and 'missing.json: unreadable' in captured.err
@@ -146,4 +153,4 @@ def test_usage_errors_exit_two(args, capsys):
 def test_as_of_can_come_from_the_environment(monkeypatch, capsys):
     """Accept the injected CI evaluation date without reading the wall clock."""
     monkeypatch.setenv('INPUT_AS_OF', '2026-10-10')
-    assert run(*WITH_PARSERS, fixture('complete-test')) == 0, 'INPUT_AS_OF supplies the date in CI'
+    assert run(*WITH_BINDINGS, fixture('complete-test')) == 0, 'INPUT_AS_OF supplies the date in CI'

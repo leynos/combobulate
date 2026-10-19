@@ -10,10 +10,12 @@ version 2) and then admitted by the gate in `tools/docs_validation/` on the
 date given by ``--as-of``; the wall clock is never read. Exit codes: 0 when every
 record reaches ``--require`` (default `tested`), 1 when any falls short, and 2
 for a schema-invalid record or a usage error. Exceptions come from
-`spec/exceptions.json`, current bindings from `spec/evidence-bindings.json`, and
-registered log parsers from `spec/evidence-reason-codes.json`; until a parser is
-registered for a verifier, its records are self-reported and cannot reach
-`proof` or `bounded` (ADR-0009).
+`spec/exceptions.json` and current bindings from
+`spec/evidence-bindings.json`. Verifier records stay self-reported until a
+registered parser adapter supplies a digest-bound result to the gate; tool
+registration alone cannot admit them (ADR-0009). No parser adapter is
+integrated into this command yet, so verifier records cannot reach `proof` or
+`bounded` through the CLI.
 """
 from __future__ import annotations
 
@@ -53,9 +55,6 @@ class EvidenceCliOptions:
     bindings: Annotated[
         Path, Parameter(help='JSON map from component to its complete current executable and verification profile.')
     ] = ROOT / 'spec/evidence-bindings.json'
-    log_parsers: Annotated[
-        Path, Parameter(help='JSON document listing tools with registered log parsers.')
-    ] = ROOT / 'spec/evidence-reason-codes.json'
     exceptions: Annotated[Path, Parameter(help='The exception register.')] = ROOT / 'spec/exceptions.json'
 
 
@@ -140,12 +139,11 @@ def main(
     try:
         validator = Draft202012Validator(load_json(ROOT / 'spec/proof-evidence.schema.json'),
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
-        parsers = frozenset(load_json(options.log_parsers)['registered_log_parsers'])
         register, current = exception_register(options.exceptions), load_bindings(options.bindings)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
         return 2
-    admission_context = AdmissionContext(register, current, date, parsers)
+    admission_context = AdmissionContext(register, current, date)
     configuration = EvidenceCliConfiguration(validator, admission_context, wanted.value)
 
     status, invalid = 0, False

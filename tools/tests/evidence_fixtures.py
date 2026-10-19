@@ -11,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from jsonschema import Draft202012Validator
 
 from docs_validation.context import ValidationContext
-from docs_validation.evidence_gate import AbstractRecord, AdmissionContext, abstract_record, all_states, is_valid
+from docs_validation.evidence_gate import (AbstractRecord, AdmissionContext, VerifiedLogResult, abstract_record,
+                                           all_states, is_valid)
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTEXT = ValidationContext(ROOT)
@@ -70,12 +71,34 @@ def concrete(state: AbstractRecord) -> tuple[dict, dict]:
     return record, exceptions
 
 
+def verified_log_results(record: dict) -> tuple[VerifiedLogResult, ...]:
+    """Build a synthetic adapter result matching one record for model round-trips."""
+    source = record['verdict_source']
+    log = source['log']
+    if source['kind'] != 'log-parser' or log is None:
+        return ()
+    method = record['method']
+    return (VerifiedLogResult(
+        tool=method['tool'], log_path=log['path'], log_sha256=log['sha256'], outcome=record['outcome'],
+        bounds=record['bounds']['kind'],
+        witness_statuses=tuple(item['status'] for item in record['success_witnesses']),
+        negative_controls=tuple((item['required'], item['observed']) for item in record['negative_controls']),
+        run_mode=method['run_mode'],
+    ),)
+
+
+def admission_context(record: dict, exceptions: dict) -> AdmissionContext:
+    """Compose default policy inputs and synthetic parser results for gate tests."""
+    return AdmissionContext(
+        exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS,
+        verified_log_results=verified_log_results(record),
+    )
+
+
 def round_trip(state: AbstractRecord) -> AbstractRecord:
     """Abstract the concrete record built for a state."""
     record, exceptions = concrete(state)
-    return abstract_record(record, AdmissionContext(
-        exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS,
-    ))
+    return abstract_record(record, admission_context(record, exceptions))
 
 
 VALID = [state for state in all_states() if is_valid(state)]
