@@ -33,9 +33,9 @@ mod verification {
 
     /// Any zero extent gives zero without multiplying, whatever the other extents are.
     ///
-    /// Harnesses that multiply symbolic extents (full width, or bounded below
-    /// 2^16) exhausted a 900 s budget during calibration; unbounded arithmetic
-    /// belongs to the Verus proof in `verus/cardinality.rs`.
+    /// The full-width multiplication harness stopped after 900 s; the bounded
+    /// harness stopped after 18 min 46 s (18 min 27 s CPU, 154.5 MiB). Neither
+    /// returned a verdict, so multiplication remains with Verus in `verus/cardinality.rs`.
     #[kani::proof]
     #[kani::unwind(4)]
     fn zero_extent_short_circuits() {

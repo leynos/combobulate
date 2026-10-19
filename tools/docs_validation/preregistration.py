@@ -109,8 +109,12 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
         If a register, source binding, calibration record, or measurement violates a rule.
     jsonschema.ValidationError
         If a control or measurement does not match its schema.
+    ValueError
+        If the workflow YAML is malformed or a registered workload source cannot
+        be read.
     OSError
-        If a required report or registered source cannot be read.
+        If a register, schema, calibration record, measurement record, or
+        calibration report cannot be read.
 
     Examples
     --------
