@@ -440,7 +440,7 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make markdownlint`, `make nixie`, and
   `make design-check BASE_REV=origin/1-1-acceptance-controls` (368 unittest, 64
   pytest). Logs use suffix `-rebased.out` under `/tmp`.
-- [ ] (2026-10-19) EP-M5 follow-up assessment repair: CodeRabbit found that a
+- [x] (2026-10-19) EP-M5 follow-up assessment repair: CodeRabbit found that a
   JSON array or `null` supplied to `--bindings` reached the pure gate and
   raised an uncaught `AttributeError`. Both cases were reproduced, then guarded
   at the CLI configuration boundary with a usage error and exit code 2; a
@@ -450,7 +450,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `make test` (329 passed, one skipped, and doctest passed),
   `make markdownlint`, `make nixie`, and `make design-check` (377 unittest and
   66 pytest). CodeScene found no issues. Hosted checks and the current-head
-  completeness assessment remain pending.
+  completeness assessment passed. CodeRabbit's
+  [assessment response](https://github.com/leynos/combobulate/pull/17#issuecomment-6257200446)
+  found no remaining in-scope implementation defect and identified the stale
+  EP-M5 state in `Plan of work` below; that state is reconciled here. The
+  doc-only follow-up confirmation is tracked in the delivery ledger.
 - [ ] `EP-M6` Reconciliation, roadmap closure, and final gates.
 
 ## Surprises & discoveries
@@ -1428,7 +1432,7 @@ Trusted, not verified here:
 
 Milestones run in order on stacked branches. `EP-M0` was sponsor-directed and
 is complete. The sponsor approved this plan on 2026-10-11. `EP-M1a`, `EP-M1b`,
-`EP-M2`, `EP-M3`, and `EP-M4` are complete; `EP-M5` and `EP-M6` remain
+`EP-M2`, `EP-M3`, `EP-M4`, and `EP-M5` are complete; `EP-M6` remains
 outstanding. All decisions they need have been answered. Each milestone follows
 Red, Green, Refactor: draft as `proposed` (Stage A); add rule tables, fixtures,
 and tests and observe the expected failure (Stage B); implement until the
