@@ -229,10 +229,20 @@ class Registration(unittest.TestCase):
 class Outcomes(unittest.TestCase):
     """VO-12: retries count, and only current-digest records decide the current verdict."""
 
-    def test_failure_like_outcomes_never_pass(self):
-        for outcome in ('budget-exceeded', 'resource-exhausted', 'missing', 'inconclusive'):
+    def test_failure_like_outcomes_have_exact_verdicts(self):
+        expected_verdicts = {
+            'budget-exceeded': 'fail',
+            'resource-exhausted': 'fail',
+            'missing': 'fail',
+            'inconclusive': 'inconclusive',
+        }
+        for outcome, expected_verdict in expected_verdicts.items():
             with self.subTest(outcome=outcome):
-                self.assertNotEqual(OUTCOME_VERDICTS[outcome], 'pass', f'{outcome} must not map to pass')
+                self.assertEqual(
+                    OUTCOME_VERDICTS[outcome],
+                    expected_verdict,
+                    f'{outcome} must map to {expected_verdict}',
+                )
 
     def test_every_retry_counts(self):
         for length in range(1, 4):
