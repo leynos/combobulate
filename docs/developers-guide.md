@@ -561,6 +561,23 @@ imports remain re-exported from preregistration for focused tests; these
 helpers are not general GitHub Actions parsers, measurement libraries, or
 repository file APIs.
 
+The `make design-check` target runs `check_acceptance_controls` as part of the
+documentation-pack validation. The frozen register is
+[`spec/acceptance-controls.json`](../spec/acceptance-controls.json), validated
+by its [schema](../spec/acceptance-controls.schema.json); measurement records
+use the [measurement-record schema](../spec/measurement-record.schema.json).
+Keep calibration records in `spec/calibration/` and acceptance measurements in
+`spec/measurements/`: calibration evidence cannot satisfy an acceptance
+control. Validation binds registered source digests, checks the frozen fields
+and digest chain, and requires sponsor-approved, append-only amendments for
+changes. The accepted environment is the hosted `ubuntu-24.04` runner, and
+`build-test` has an eight-minute timeout. The matching `make act-validation`
+target maps that job to the configured `ubuntu-24.04` Act runner image. See the
+[acceptance calibration report](acceptance-calibration.md)
+for methodology, tool versions, and reproduction commands, and the standalone
+[cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
+Kani calibration artefacts.
+
 `check_manifest` in `tools/docs_validation/package_policy.py` is an internal
 package-policy helper. `check_package_policy` is its only production caller and
 supplies the D04/D05 decision state. The checker runs after roadmap closure:

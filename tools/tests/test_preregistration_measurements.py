@@ -28,6 +28,7 @@ class Outcomes(unittest.TestCase):
     """VO-12: retries count, and only current-digest records decide the current verdict."""
 
     def test_failure_like_outcomes_have_exact_verdicts(self):
+        """Map each failure-like outcome to its registered verdict."""
         expected_verdicts = {
             'budget-exceeded': 'fail',
             'resource-exhausted': 'fail',
@@ -43,6 +44,7 @@ class Outcomes(unittest.TestCase):
                 )
 
     def test_every_retry_counts(self):
+        """Require every retry outcome to contribute to the aggregate verdict."""
         for length in range(1, 4):
             for outcomes in itertools.product(RECORD_OUTCOMES, repeat=length):
                 result = verdict(CONTROL, [record(outcome) for outcome in outcomes])
@@ -50,15 +52,18 @@ class Outcomes(unittest.TestCase):
                 self.assertEqual(result == 'pass', expected_pass, f'{outcomes} gave {result}')
 
     def test_calibration_records_never_count(self):
+        """Keep calibration-purpose records out of acceptance verdicts."""
         for outcome in RECORD_OUTCOMES:
             records = [record(outcome, purpose='calibration')]
             self.assertEqual(verdict(CONTROL, records), 'not-run', 'calibration never satisfies a control')
 
     def test_unknown_digest_is_rejected_before_aggregation(self):
+        """Reject a measurement that cites an unregistered digest."""
         with self.assertRaisesRegex(AssertionError, 'cites unknown digest'):
             verdict(CONTROL, [record('pass', digest='0' * 64)])
 
     def test_unknown_control_id_is_rejected(self):
+        """Reject a measurement that names an unregistered control."""
         unknown = record('pass')
         unknown['control_ids'] = ['AC-99']
         controls = {item['id']: item for item in REGISTER['controls']}
@@ -66,6 +71,7 @@ class Outcomes(unittest.TestCase):
             check_control_bindings(controls, unknown)
 
     def test_historical_digest_is_valid_but_does_not_count_for_current_digest(self):
+        """Retain historical bindings without counting them for the current control."""
         control = amended(CONTROL, 'seeds', [7])
         historical = record('pass', digest=CONTROL['digest'])
         historical['recorded_on'] = control['amendments'][-2]['date']
@@ -75,6 +81,7 @@ class Outcomes(unittest.TestCase):
                          'a historical result cannot satisfy the amended current digest')
 
     def test_historical_digest_is_rejected_on_or_after_its_supersession_date(self):
+        """Reject historical measurements at and after digest supersession."""
         control = amended(CONTROL, 'seeds', [7])
         superseded_on = control['amendments'][-1]['date']
         recorded_dates = (
@@ -90,12 +97,14 @@ class Outcomes(unittest.TestCase):
                     check_measurement_binding(control, historical)
 
     def test_record_before_registration_is_rejected(self):
+        """Reject acceptance evidence recorded before its control was registered."""
         earlier = record('pass')
         earlier['recorded_on'] = '2026-10-10'
         with self.assertRaisesRegex(AssertionError, 'predates registration'):
             check_measurement_binding(CONTROL, earlier)
 
     def test_shared_development_host_cannot_supply_acceptance_evidence(self):
+        """Reject acceptance evidence attributed to the shared development host."""
         shared_host = record('pass')
         shared_host['hardware']['class'] = 'shared-development-host'
         with self.assertRaises(ValidationError, msg='acceptance records must use the hosted runner class'):
@@ -104,6 +113,7 @@ class Outcomes(unittest.TestCase):
             check_measurement_binding(CONTROL, shared_host)
 
     def test_acceptance_runner_image_must_match_registration(self):
+        """Require the registered hosted runner image in acceptance records."""
         wrong_image = record('pass')
         wrong_image['runner_image'] = 'ubuntu-latest'
         with self.assertRaises(ValidationError, msg='schema must reject an unpinned acceptance image'):
@@ -112,6 +122,7 @@ class Outcomes(unittest.TestCase):
             check_measurement_binding(CONTROL, wrong_image)
 
     def test_acceptance_runner_profile_must_match_registration(self):
+        """Require acceptance hardware metadata to match the registered runner profile."""
         for field, value in (('threads', 1), ('vcpus', 1), ('memory_gib', 1), ('architecture', 'arm64')):
             with self.subTest(field=field):
                 wrong_profile = record('pass')
@@ -129,6 +140,7 @@ class Outcomes(unittest.TestCase):
             RECORD_VALIDATOR.validate(missing_vcpu_count)
 
     def test_acceptance_runner_metadata_and_toolchain_versions_are_required(self):
+        """Require observed runner metadata and exact registered tool versions."""
         missing_metadata = record('pass')
         del missing_metadata['runner_metadata']
         with self.assertRaises(ValidationError, msg='acceptance records require observed runner metadata'):
@@ -160,6 +172,7 @@ class Outcomes(unittest.TestCase):
             check_measurement_binding(CONTROL, misplaced_secondary_version)
 
     def test_analysis_script_must_be_a_hashed_workload_source(self):
+        """Require a registered analysis script to be covered by a source digest."""
         control = copy.deepcopy(CONTROL)
         control['frozen']['analysis_script'] = {
             'path': 'tools/analyse.py', 'requirement': 'Use the registered analysis.',
@@ -174,10 +187,12 @@ class Outcomes(unittest.TestCase):
         check_sources(control, {'tools/analyse.py': script_digest})
 
     def test_calibration_directory_rejects_acceptance_record_directly(self):
+        """Keep acceptance records out of the calibration evidence directory."""
         with self.assertRaisesRegex(AssertionError, 'acceptance evidence belongs in spec/measurements'):
             check_calibration_record('spec/calibration/fixture.json', record('pass'))
 
     def test_seeded_mapping_fault_is_detected(self):
+        """Show that the tests detect an unsafe pass mapping for resource exhaustion."""
         faulty = dict(OUTCOME_VERDICTS, **{'resource-exhausted': 'pass'})
         outcomes = [faulty[name] for name in ('pass', 'resource-exhausted')]
         self.assertEqual(set(outcomes), {'pass'}, 'the seeded fault would pass an exhausted run')
@@ -189,6 +204,7 @@ class WorkflowAndCi(unittest.TestCase):
     """Pin the hosted CI control and prevent failures hiding in the p90 tail."""
 
     def test_workflow_runner_and_timeout_match_ac07(self):
+        """Bind the CI workflow runner and timeout to AC-07."""
         check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-24.04', 8), CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'runner.*does not match AC-07'):
             check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-latest', 8), CI_CONTROL)
@@ -196,6 +212,7 @@ class WorkflowAndCi(unittest.TestCase):
             check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-24.04', 9), CI_CONTROL)
 
     def test_two_timeouts_fail_even_when_fast_successes_keep_p90_low(self):
+        """Fail a run when timeouts occur despite an in-budget p90."""
         attempts = [('success', 1.0)] * 18 + [('timed_out', 480.0)] * 2
         with self.assertRaisesRegex(AssertionError, 'must fail when a build-test attempt fails'):
             check_ci_measurement(CI_CONTROL, ci_record('pass', attempts))
@@ -205,6 +222,7 @@ class WorkflowAndCi(unittest.TestCase):
                          'timeouts fail AC-07 even when nearest-rank p90 is within budget')
 
     def test_untimed_failed_attempt_is_a_valid_failed_measurement(self):
+        """Preserve timeout failures when a CI attempt has no measured duration."""
         failed = record('fail', digest=CI_CONTROL['digest'])
         failed['control_ids'] = [CI_CONTROL['id']]
         workload = failed['workloads'][0]
@@ -233,6 +251,7 @@ class WorkflowAndCi(unittest.TestCase):
             check_ci_measurement(CI_CONTROL, passing)
 
     def test_other_controls_still_require_a_sample(self):
+        """Keep ordinary acceptance controls subject to the sample requirement."""
         no_samples = record('pass')
         no_samples['workloads'][0]['samples'] = []
         no_samples['workloads'][0]['median'] = 'not available'
@@ -240,6 +259,7 @@ class WorkflowAndCi(unittest.TestCase):
             RECORD_VALIDATOR.validate(no_samples)
 
     def test_calibration_p90_must_fit_registered_budget(self):
+        """Reject calibration whose recorded p90 exceeds the frozen budget."""
         calibration = ValidationContext(ROOT).load('spec/calibration/ci-history.json')
         control = copy.deepcopy(CI_CONTROL)
         workload = next(item for item in calibration['workloads'] if item['id'] == 'ci-build-test')
@@ -254,6 +274,7 @@ class WorkflowAndCi(unittest.TestCase):
             check_ci_calibration(control, {'spec/calibration/ci-history.json': calibration})
 
     def test_calibration_derivation_must_match_the_recorded_attempt_p90(self):
+        """Require the calibration explanation to match its attempt data."""
         calibration = ValidationContext(ROOT).load('spec/calibration/ci-history.json')
         control = copy.deepcopy(CI_CONTROL)
         control['frozen']['calibration']['derivation'] = (
@@ -267,14 +288,17 @@ class HostIdentity(unittest.TestCase):
     """VO-16: committed records carry hardware class only."""
 
     def test_home_path_fails(self):
+        """Reject a record containing a filesystem home path."""
         with self.assertRaisesRegex(AssertionError, 'contains a home path'):
             check_host_identity('record.json', '{"command": "/home/someone/bin/verus"}')
 
     def test_supplied_host_name_fails(self):
+        """Reject a record containing the supplied development host name."""
         with self.assertRaisesRegex(AssertionError, "contains host identity 'build-box-7'"):
             check_host_identity('record.json', '{"notes": "measured on build-box-7"}', ('build-box-7',))
 
     def test_clean_record_passes(self):
+        """Accept a record without a local host identity."""
         check_host_identity('record.json', '{"hardware": {"cpu_model": "AMD Ryzen 9 3900"}}', ('build-box-7',))
 
 

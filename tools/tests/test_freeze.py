@@ -10,6 +10,8 @@ import unittest
 from functools import partial
 from pathlib import Path
 
+from hypothesis import given, settings, strategies as st
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
@@ -88,6 +90,7 @@ class ControlFreeze(unittest.TestCase):
     """VO-7 for controls: frozen fields change only through an appended amendment."""
 
     def test_threshold_and_digest_edited_together_fail(self):
+        """Reject a threshold change that bypasses the amendment history."""
         edited = copy.deepcopy(CONTROL)
         edited['frozen']['decision_rule']['thresholds']['upper_bound_ratio'] = 1.5
         edited['digest'] = 'b' * 64
@@ -95,16 +98,19 @@ class ControlFreeze(unittest.TestCase):
             check_controls_frozen(controls(CONTROL), controls(edited))
 
     def test_appended_amendment_passes(self):
+        """Accept a control change recorded as an appended amendment."""
         edited = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
         check_controls_frozen(controls(CONTROL), controls(edited))
 
     def test_registered_digest_cannot_change_in_place(self):
+        """Keep the original control registration digest immutable."""
         edited = copy.deepcopy(CONTROL) | {'registered_digest': 'b' * 64}
         with self.assertRaisesRegex(AssertionError, 'AC-03 changed its registration digest',
                                     msg='the original registration digest must remain immutable'):
             check_controls_frozen(controls(CONTROL), controls(edited))
 
     def test_first_appended_amendment_must_replace_the_previous_digest(self):
+        """Require the first new amendment to extend the current digest."""
         edited = copy.deepcopy(CONTROL) | {
             'digest': 'b' * 64,
             'amendments': [amendment('c' * 64, 'b' * 64)],
@@ -115,6 +121,7 @@ class ControlFreeze(unittest.TestCase):
             check_controls_frozen(controls(CONTROL), controls(edited))
 
     def test_edited_amendment_fails(self):
+        """Reject edits to an amendment already present at the base."""
         base = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
         head = copy.deepcopy(base)
         head['amendments'][0]['reason'] = 'Rewritten.'
@@ -122,10 +129,12 @@ class ControlFreeze(unittest.TestCase):
             check_controls_frozen(controls(base), controls(head))
 
     def test_deleted_control_fails(self):
+        """Reject deleting a registered control from the head register."""
         with self.assertRaisesRegex(AssertionError, 'Registered control AC-03 was deleted'):
             check_controls_frozen(controls(CONTROL), controls())
 
     def test_outcome_verdict_mapping_is_frozen(self):
+        """Keep the registered outcome-to-verdict mapping unchanged."""
         base = controls(CONTROL)
         edited_maps = (
             ('added key', {'pass': 'pass', 'fail': 'fail'}),
@@ -139,12 +148,43 @@ class ControlFreeze(unittest.TestCase):
                     check_controls_frozen(base, controls(CONTROL, outcome_verdicts=outcome_verdicts))
 
     def test_frozen_field_list_is_frozen(self):
+        """Keep the digest input field declaration unchanged."""
         base = controls(CONTROL)
         edited = controls(CONTROL)
         edited['frozen_fields'].append('analysis')
         with self.assertRaisesRegex(AssertionError, 'Registered frozen_fields list was edited in place',
                                     msg='the digest input declaration must not change in place'):
             check_controls_frozen(base, edited)
+
+    @settings(max_examples=40, derandomize=True, deadline=None)
+    @given(st.lists(st.text(alphabet='0123456789abcdef', min_size=64, max_size=64)
+                    .filter(lambda digest: digest != CONTROL['registered_digest']),
+                    min_size=2, max_size=6, unique=True))
+    def test_generated_amendment_prefix_preserves_historical_records(self, digests):
+        """Accept generated append-only chains and reject edits or removals from their historical prefix."""
+        head_control = copy.deepcopy(CONTROL)
+        previous = head_control['registered_digest']
+        for digest in digests:
+            head_control['amendments'].append(amendment(previous, digest))
+            previous = digest
+        head_control['digest'] = previous
+
+        base_control = copy.deepcopy(head_control)
+        base_control['amendments'] = base_control['amendments'][:1]
+        base_control['digest'] = digests[0]
+        base = controls(base_control)
+        head = controls(head_control)
+        check_controls_frozen(base, head)
+
+        edited_history = copy.deepcopy(head)
+        edited_history['controls'][0]['amendments'][0]['reason'] = 'Rewritten.'
+        with self.assertRaisesRegex(AssertionError, 'edited or removed an amendment'):
+            check_controls_frozen(base, edited_history)
+
+        removed_history = copy.deepcopy(head)
+        removed_history['controls'][0]['amendments'].pop(0)
+        with self.assertRaisesRegex(AssertionError, 'edited or removed an amendment'):
+            check_controls_frozen(base, removed_history)
 
 
 class BaseRevisionChecks(unittest.TestCase):

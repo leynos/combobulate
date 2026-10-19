@@ -99,13 +99,16 @@ class Registration(unittest.TestCase):
     """VO-11: frozen protocols are typed, digested, and governed by an approved chain."""
 
     def test_committed_register_passes(self):
+        """Validate every registered control and source in the committed register."""
         # Home-path checks catch user names; a generic CI account name is ordinary text.
         check_acceptance_controls(ValidationContext(ROOT), (socket.gethostname(),))
 
     def test_register_lists_the_frozen_fields(self):
+        """Require the register to name the fields used by its digest."""
         self.assertEqual(REGISTER['frozen_fields'], list(FROZEN_FIELDS), 'the register must state its frozen fields')
 
     def test_register_frozen_fields_match_digest_implementation(self):
+        """Keep the declared frozen fields aligned with the digest implementation."""
         check_registration_declarations(REGISTER)
         candidate = copy.deepcopy(REGISTER)
         candidate['frozen_fields'][-1] = 'unhashed-field'
@@ -114,12 +117,14 @@ class Registration(unittest.TestCase):
             check_registration_declarations(candidate)
 
     def test_missing_calibration_reference_fails(self):
+        """Reject a control that omits its required calibration reference."""
         control = copy.deepcopy(CONTROL)
         del control['frozen']['calibration']
         with self.assertRaisesRegex(AssertionError, 'lacks frozen fields: calibration'):
             check_completeness(control)
 
     def test_threshold_and_digest_edited_together_fail(self):
+        """Reject a changed threshold even when its digest is recalculated."""
         control = copy.deepcopy(CONTROL)
         control['frozen']['decision_rule']['thresholds'] = {'anything': 1}
         control['digest'] = frozen_digest(control)
@@ -127,9 +132,11 @@ class Registration(unittest.TestCase):
             check_amendment_chain(control, SPONSOR)
 
     def test_correct_amendment_passes(self):
+        """Accept a correctly approved amendment with a matching digest chain."""
         check_amendment_chain(amended(CONTROL, 'seeds', [7]), SPONSOR)
 
     def test_amendment_before_first_measurement_remains_authorized(self):
+        """Allow an amendment made before its first acceptance measurement."""
         control = amended(CONTROL, 'seeds', [7])
         measurement = record('pass', digest=control['digest'])
         measurement['recorded_on'] = (
@@ -140,6 +147,7 @@ class Registration(unittest.TestCase):
                         'a measurement after an approved amendment binds the amended digest')
 
     def test_amendment_cannot_backdate_measurement_authority(self):
+        """Reject an amendment dated before its preceding effective date."""
         control = amended(CONTROL, 'seeds', [7])
         control['amendments'][0]['date'] = '2026-10-10'
         between_registration_and_record = record('pass', digest=control['digest'])
@@ -148,12 +156,14 @@ class Registration(unittest.TestCase):
             check_amendment_chain(control, SPONSOR, [between_registration_and_record])
 
     def test_amendment_date_must_follow_the_previous_amendment(self):
+        """Reject a chain whose amendment dates move backwards."""
         control = amended(amended(CONTROL, 'seeds', [7]), 'seeds', [8])
         control['amendments'][-1]['date'] = '2026-10-11'
         with self.assertRaisesRegex(AssertionError, 'amendment date cannot predate its previous effective date'):
             check_amendment_chain(control, SPONSOR)
 
     def test_register_outcome_map_matches_executable_verdicts(self):
+        """Keep schema and runtime outcome mappings consistent."""
         check_registration_declarations(REGISTER)
         altered_maps = (
             dict(OUTCOME_VERDICTS) | {'new-outcome': 'fail'},
@@ -171,17 +181,20 @@ class Registration(unittest.TestCase):
                     REGISTER_VALIDATOR.validate(candidate)
 
     def test_amendment_needs_the_sponsor(self):
+        """Reject an amendment approved by someone other than the sponsor."""
         control = amended(CONTROL, 'seeds', [7])
         control['amendments'][-1]['approved_by'] = 'someone-else'
         with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
             check_amendment_chain(control, SPONSOR)
 
     def test_amendment_on_measurement_date_requires_a_new_control_identifier(self):
+        """Reject an amendment made on an acceptance measurement date."""
         control = amended(CONTROL, 'seeds', [7])
         with self.assertRaisesRegex(AssertionError, 'must predate the earliest acceptance measurement'):
             check_amendment_chain(control, SPONSOR, [record('pass')])
 
     def test_protocol_content_is_typed_after_digest_recalculation(self):
+        """Validate frozen protocol types even when the digest is recomputed."""
         for field, value in (('seeds', None), ('registered_on', 'not-a-date'), ('decision_rule', 'bad threshold')):
             with self.subTest(field=field):
                 control = copy.deepcopy(CONTROL)
@@ -200,6 +213,7 @@ class Registration(unittest.TestCase):
                     REGISTER_VALIDATOR.validate(candidate)
 
     def test_changed_source_needs_an_amendment(self):
+        """Reject missing or changed bytes for a registered source."""
         control = copy.deepcopy(CI_CONTROL)
         sources = {source['path']: source['sha256'] for source in control['frozen']['workload']['sources']}
         check_sources(control, sources)
@@ -212,11 +226,13 @@ class Registration(unittest.TestCase):
             check_sources(control, {})
 
     def test_every_frozen_field_changes_the_digest(self):
+        """Exercise every frozen field against the digest and chain checks."""
         exercised: set[str] = set()
 
         @settings(max_examples=200, derandomize=True, deadline=None)
         @given(st.sampled_from(FROZEN_FIELDS), st.integers())
         def mutate(field: str, value: int) -> None:
+            """Replace one sampled frozen field and verify that it cannot bypass the digest check."""
             exercised.add(field)
             control = copy.deepcopy(CONTROL)
             control['frozen'][field] = {'mutated': value}
@@ -226,6 +242,51 @@ class Registration(unittest.TestCase):
 
         mutate()
         self.assertEqual(exercised, set(FROZEN_FIELDS), 'every frozen field must be exercised')
+
+    @settings(max_examples=40, derandomize=True, deadline=None)
+    @given(st.lists(st.integers(min_value=-1_000_000, max_value=1_000_000)
+                    .filter(lambda value: [value] != CONTROL['frozen']['seeds']),
+                    min_size=2, max_size=6, unique=True))
+    def test_generated_amendment_chains_reject_invalid_mutations(self, seed_values):
+        """Exercise valid amendment chains and generated authority, ancestry, chronology, repetition, and cutoff failures."""
+        chain = copy.deepcopy(CONTROL)
+        for seed in seed_values:
+            chain = amended(chain, 'seeds', [seed])
+
+        check_amendment_chain(chain, SPONSOR)
+        valid_measurement = record('pass', digest=chain['digest'])
+        valid_measurement['recorded_on'] = (
+            date.fromisoformat(chain['amendments'][-1]['date']) + timedelta(days=1)
+        ).isoformat()
+        check_amendment_chain(chain, SPONSOR, [valid_measurement])
+
+        broken_ancestry = copy.deepcopy(chain)
+        previous_digest = broken_ancestry['amendments'][-1]['replaces']
+        broken_ancestry['amendments'][-1]['replaces'] = 'f' * 64 if previous_digest != 'f' * 64 else 'e' * 64
+        with self.assertRaisesRegex(AssertionError, 'does not replace digest'):
+            check_amendment_chain(broken_ancestry, SPONSOR)
+
+        repeated_digest = copy.deepcopy(chain)
+        repeated_digest['amendments'][-1]['new_digest'] = repeated_digest['registered_digest']
+        with self.assertRaisesRegex(AssertionError, 'repeats a digest'):
+            check_amendment_chain(repeated_digest, SPONSOR)
+
+        non_monotonic_date = copy.deepcopy(chain)
+        previous_date = date.fromisoformat(non_monotonic_date['amendments'][-2]['date'])
+        non_monotonic_date['amendments'][-1]['date'] = (previous_date - timedelta(days=1)).isoformat()
+        with self.assertRaisesRegex(AssertionError, 'cannot predate its previous effective date'):
+            check_amendment_chain(non_monotonic_date, SPONSOR)
+
+        wrong_sponsor = copy.deepcopy(chain)
+        wrong_sponsor['amendments'][-1]['approved_by'] = 'another-sponsor'
+        with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
+            check_amendment_chain(wrong_sponsor, SPONSOR)
+
+        first_generated_amendment = chain['amendments'][len(CONTROL['amendments'])]
+        cutoff_measurement = record('pass', digest=chain['digest'])
+        cutoff_measurement['recorded_on'] = first_generated_amendment['date']
+        with self.assertRaisesRegex(AssertionError, 'must predate the earliest acceptance measurement'):
+            check_amendment_chain(chain, SPONSOR, [cutoff_measurement])
 
 
 if __name__ == '__main__':
