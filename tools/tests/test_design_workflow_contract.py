@@ -168,6 +168,32 @@ class DesignWorkflowContract(unittest.TestCase):
         self.assertIn('AS_OF="$RUN_DATE"', check_step['run'],
                       'the workflow must pass a scheduled evaluation date')
 
+    def test_workflow_installs_uv_before_running_design_check(self) -> None:
+        """Make the standalone CLI's declared runtime available in CI."""
+        workflow = yaml.load(
+            (ROOT / '.github/workflows/design.yml').read_text(encoding='utf-8'),
+            Loader=yaml.BaseLoader,
+        )
+        steps = workflow['jobs']['design-check']['steps']
+        uv_step_index = next(
+            index for index, step in enumerate(steps)
+            if step.get('name') == 'Setup uv'
+        )
+        check_step_index = next(
+            index for index, step in enumerate(steps)
+            if step.get('name') == 'Validate documentation contracts'
+        )
+        uv_step = steps[uv_step_index]
+        self.assertEqual(
+            uv_step['uses'],
+            'astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91',
+            'the workflow must use the repository-pinned uv setup action',
+        )
+        self.assertLess(
+            uv_step_index, check_step_index,
+            'the standalone evidence CLI test needs uv on PATH before design-check',
+        )
+
     def test_make_forwards_as_of_and_base_revision_to_checker(self) -> None:
         """Exercise Make expansion for empty and populated base revisions."""
         with tempfile.TemporaryDirectory(prefix='design-check-make-') as directory_name:
