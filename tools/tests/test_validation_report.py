@@ -52,6 +52,39 @@ class ValidationReport(unittest.TestCase):
                 for path in self.root.rglob('*')
                 if path.is_file() and '__pycache__' not in path.parts}
 
+    def assert_command_rejects(self, pattern: str, expectation: str) -> None:
+        """Require a command-boundary rejection without replacing committed evidence."""
+        report_before = self.report.read_bytes()
+        with self.assertRaisesRegex(SystemExit, pattern, msg=expectation):
+            self.run_main([])
+        self.assertEqual(self.report.read_bytes(), report_before,
+                         f'{expectation}; the validation report must remain untouched')
+
+    @staticmethod
+    def acceptance_record(record_id: str, control_id: str, control_digest: str,
+                          recorded_on: str) -> dict[str, object]:
+        """Create a schema-valid acceptance record for composition-path rejection cases."""
+        return {
+            'id': record_id,
+            'purpose': 'acceptance',
+            'control_ids': [control_id],
+            'control_digest': control_digest,
+            'recorded_on': recorded_on,
+            'runner_image': 'ubuntu-24.04',
+            'outcome': 'pass',
+            'hardware': {
+                'class': 'github-hosted-runner', 'cpu_model': 'fixture CPU',
+                'cores': 4, 'threads': 4, 'memory_gib': 16,
+                'os_family': 'Ubuntu 24.04', 'kernel_major': 6,
+            },
+            'toolchains': {'rust': 'fixture'},
+            'workloads': [{
+                'id': 'cardinality', 'description': 'Fixture workload',
+                'command': 'fixture command', 'metric': 'wall time', 'unit': 's',
+                'samples': [1.0], 'median': 1.0,
+            }],
+        }
+
     def test_successful_default_check_does_not_mutate_inputs_or_report(self) -> None:
         """Keep the default validation path read-only after confirming a valid report."""
         before = self.source_bytes()
@@ -112,6 +145,68 @@ class ValidationReport(unittest.TestCase):
             self.run_main(['--write'])
         self.assertEqual(self.report.read_bytes(), report_before,
                          'a missing registered source must not replace the committed validation report')
+
+    def test_modified_registered_source_digest_is_rejected_by_command(self) -> None:
+        """Reject changed bytes at the real checker entrypoint against registered source digests."""
+        source = self.root / 'tools/calibration/cardinality-probe/verus/cardinality.rs'
+        source.write_bytes(source.read_bytes() + b'\n')
+        self.assert_command_rejects(
+            r'AC-01 source .* changed since registration',
+            'the command path must reject bytes that no longer match AC-01 registration',
+        )
+
+    def test_missing_ac07_calibration_reference_is_rejected_by_command(self) -> None:
+        """Require the command path to resolve AC-07's registered CI history record."""
+        (self.root / 'spec/calibration/ci-history.json').unlink()
+        self.assert_command_rejects(
+            r'AC-07 cites missing calibration record spec/calibration/ci-history\.json',
+            'AC-07 must not pass when its referenced calibration record is missing',
+        )
+
+    def test_ci_runner_image_mismatch_is_rejected_by_command(self) -> None:
+        """Bind the workflow runner to AC-07 through the composition path."""
+        workflow = self.root / '.github/workflows/ci.yml'
+        contents = workflow.read_text(encoding='utf-8')
+        self.assertIn('runs-on: ubuntu-24.04', contents,
+                      'the fixture workflow must contain the registered runner image')
+        workflow.write_text(contents.replace('runs-on: ubuntu-24.04', 'runs-on: ubuntu-latest', 1),
+                             encoding='utf-8')
+        self.assert_command_rejects(
+            r"build-test runner 'ubuntu-latest' does not match AC-07 image ubuntu-24\.04",
+            'the command path must reject a workflow runner that differs from AC-07',
+        )
+
+    def test_acceptance_measurement_with_unknown_control_digest_is_rejected_by_command(self) -> None:
+        """Reject acceptance evidence that cites no digest in the registered control history."""
+        register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
+        control = next(item for item in register['controls'] if item['id'] == 'AC-01')
+        record = self.acceptance_record(
+            'unknown-control-digest', 'AC-01', 'f' * 64, control['frozen']['registered_on'],
+        )
+        measurements = self.root / 'spec/measurements'
+        measurements.mkdir()
+        (measurements / 'unknown-control-digest.json').write_text(
+            json.dumps(record), encoding='utf-8',
+        )
+        self.assert_command_rejects(
+            r'unknown-control-digest cites unknown digest .* for AC-01',
+            'the command path must reject acceptance evidence with an unregistered digest',
+        )
+
+    def test_acceptance_purpose_record_in_calibration_directory_is_rejected_by_command(self) -> None:
+        """Keep acceptance-purpose records out of the calibration-only directory."""
+        register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
+        control = next(item for item in register['controls'] if item['id'] == 'AC-01')
+        record = self.acceptance_record(
+            'misplaced-acceptance-record', 'AC-01', control['digest'], control['frozen']['registered_on'],
+        )
+        (self.root / 'spec/calibration/misplaced-acceptance-record.json').write_text(
+            json.dumps(record), encoding='utf-8',
+        )
+        self.assert_command_rejects(
+            r'spec/calibration/misplaced-acceptance-record\.json must be a calibration record',
+            'an acceptance-purpose record must fail when loaded from the calibration directory',
+        )
 
     def test_explicit_write_repairs_report_after_source_validation(self) -> None:
         """Limit a successful write request to the generated validation report."""

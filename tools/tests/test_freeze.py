@@ -98,6 +98,22 @@ class ControlFreeze(unittest.TestCase):
         edited = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
         check_controls_frozen(controls(CONTROL), controls(edited))
 
+    def test_registered_digest_cannot_change_in_place(self):
+        edited = copy.deepcopy(CONTROL) | {'registered_digest': 'b' * 64}
+        with self.assertRaisesRegex(AssertionError, 'AC-03 changed its registration digest',
+                                    msg='the original registration digest must remain immutable'):
+            check_controls_frozen(controls(CONTROL), controls(edited))
+
+    def test_first_appended_amendment_must_replace_the_previous_digest(self):
+        edited = copy.deepcopy(CONTROL) | {
+            'digest': 'b' * 64,
+            'amendments': [amendment('c' * 64, 'b' * 64)],
+        }
+        with self.assertRaisesRegex(AssertionError,
+                                    'AC-03 changed frozen fields without an amendment replacing a{12}',
+                                    msg='the first amendment must continue the registered digest chain'):
+            check_controls_frozen(controls(CONTROL), controls(edited))
+
     def test_edited_amendment_fails(self):
         base = copy.deepcopy(CONTROL) | {'digest': 'b' * 64, 'amendments': [amendment('a' * 64, 'b' * 64)]}
         head = copy.deepcopy(base)
