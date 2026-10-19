@@ -20,30 +20,51 @@ CI_CONTROL = next(control for control in REGISTER['controls'] if control['id'] =
 P90_BUDGET_SECONDS = CI_CONTROL['frozen']['decision_rule']['thresholds']['p90_minutes'] * 60
 
 
-def measurement(outcome: str, durations: list[float], failed_at: int | None = None) -> dict:
+def measurement(
+    outcome: str, durations: list[float], failed_at: int | None = None,
+    incomplete_at: int | None = None,
+) -> dict:
     """Build a newest-first CI window; e.g. twenty completed attempts bind p90 samples."""
     newest_start = datetime(2026, 10, 12, 12, tzinfo=UTC)
     attempts = []
+    samples = []
     for index, duration in enumerate(durations):
         start = newest_start - timedelta(minutes=index)
         finish = start + timedelta(seconds=duration)
+        is_incomplete = index == incomplete_at
         attempts.append({
             'run_id': str(index + 1),
             'attempt': 1,
             'conclusion': 'timed_out' if index == failed_at else 'success',
-            'wall_seconds': duration,
+            'wall_seconds': None if is_incomplete else duration,
             'started_at': start.isoformat().replace('+00:00', 'Z'),
-            'completed_at': finish.isoformat().replace('+00:00', 'Z'),
+            'completed_at': None if is_incomplete else finish.isoformat().replace('+00:00', 'Z'),
         })
+        if not is_incomplete:
+            samples.append(duration)
     return {
         'id': 'AC-07-fixture',
         'outcome': outcome,
         'workloads': [{
             'id': 'ci-build-test',
-            'samples': list(durations),
+            'samples': samples,
             'attempts': attempts,
         }],
     }
+
+
+@st.composite
+def generated_windows(draw: st.DrawFn) -> tuple[list[float], int | None, int | None, int | None, list[int]]:
+    """Generate attempt windows and malformed variants; e.g. a duplicate retry ID."""
+    durations = draw(st.lists(st.integers(min_value=0, max_value=600_000).map(lambda value: value / 1000),
+                              min_size=0, max_size=20))
+    last_index = len(durations) - 1
+    failed_at = draw(st.one_of(st.none(), st.integers(min_value=0, max_value=last_index))) if durations else None
+    incomplete_at = draw(st.one_of(st.none(), st.integers(min_value=0, max_value=last_index))) if durations else None
+    duplicate_at = (draw(st.one_of(st.none(), st.integers(min_value=1, max_value=last_index)))
+                    if len(durations) > 1 else None)
+    order = draw(st.permutations(tuple(range(len(durations)))))
+    return durations, failed_at, incomplete_at, duplicate_at, order
 
 
 class CiMeasurement(unittest.TestCase):
@@ -103,17 +124,13 @@ class CiMeasurement(unittest.TestCase):
             check_ci_measurement(CI_CONTROL, wrong_duration)
 
     @settings(max_examples=100, derandomize=True, deadline=None)
-    @given(
-        durations=st.lists(st.integers(min_value=0, max_value=600_000).map(lambda value: value / 1000),
-                           min_size=0, max_size=20),
-        failed_at=st.one_of(st.none(), st.integers(min_value=0, max_value=19)),
-    )
+    @given(window=generated_windows())
     def test_generated_windows_follow_independent_outcome_oracle(
-        self, durations: list[float], failed_at: int | None,
+        self, window: tuple[list[float], int | None, int | None, int | None, list[int]],
     ) -> None:
-        """Check windows of zero to twenty attempts against failure and p90 rules."""
-        failed_index = failed_at if failed_at is not None and failed_at < len(durations) else None
-        if failed_index is not None:
+        """Check outcome, incomplete timing, duplicate IDs, and ordering against an oracle."""
+        durations, failed_index, incomplete_index, duplicate_index, order = window
+        if failed_index is not None or incomplete_index is not None:
             expected = 'fail'
         elif len(durations) < 20:
             expected = 'inconclusive'
@@ -121,11 +138,27 @@ class CiMeasurement(unittest.TestCase):
             p90 = sorted(durations)[math.ceil(0.9 * len(durations)) - 1]
             expected = 'pass' if p90 <= P90_BUDGET_SECONDS else 'fail'
 
-        check_ci_measurement(CI_CONTROL, measurement(expected, durations, failed_index))
+        check_ci_measurement(CI_CONTROL, measurement(expected, durations, failed_index, incomplete_index))
         incorrect = 'pass' if expected != 'pass' else 'fail'
         with self.assertRaises(AssertionError,
                                msg=f'AC-07 must reject outcome {incorrect!r} for generated window'):
-            check_ci_measurement(CI_CONTROL, measurement(incorrect, durations, failed_index))
+            check_ci_measurement(CI_CONTROL, measurement(incorrect, durations, failed_index, incomplete_index))
+
+        if duplicate_index is not None:
+            duplicate_record = measurement(expected, durations, failed_index, incomplete_index)
+            attempts = duplicate_record['workloads'][0]['attempts']
+            attempts[duplicate_index]['run_id'] = attempts[duplicate_index - 1]['run_id']
+            with self.assertRaisesRegex(AssertionError, 'repeats a build-test attempt',
+                                        msg='generated duplicate attempt IDs must be rejected'):
+                check_ci_measurement(CI_CONTROL, duplicate_record)
+
+        if order != list(range(len(durations))):
+            reordered_record = measurement(expected, durations, failed_index, incomplete_index)
+            attempts = reordered_record['workloads'][0]['attempts']
+            reordered_record['workloads'][0]['attempts'] = [attempts[index] for index in order]
+            with self.assertRaisesRegex(AssertionError, 'not newest first',
+                                        msg='generated attempt permutations must preserve newest-first order'):
+                check_ci_measurement(CI_CONTROL, reordered_record)
 
 
 if __name__ == '__main__':
