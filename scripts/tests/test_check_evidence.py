@@ -181,13 +181,14 @@ def test_as_of_can_come_from_the_environment(monkeypatch, capsys):
     assert run(*WITH_BINDINGS, fixture('complete-test')) == 0, 'INPUT_AS_OF supplies the date in CI'
 
 
-@pytest.mark.parametrize(('sponsor', 'status', 'expected'), [
-    ('alternate-sponsor', 'open', []),
-    ('different-sponsor', 'open', ['approver-not-sponsor']),
-    ('alternate-sponsor', 'done', ['past-release-gate']),
+@pytest.mark.parametrize('policy', [
+    pytest.param(('alternate-sponsor', 'open', []), id='alternate-sponsor-open'),
+    pytest.param(('different-sponsor', 'open', ['approver-not-sponsor']), id='different-sponsor-open'),
+    pytest.param(('alternate-sponsor', 'done', ['past-release-gate']), id='alternate-sponsor-done'),
 ])
-def test_exception_policy_uses_explicit_decision_and_roadmap_paths(sponsor, status, expected, tmp_path, capsys):
+def test_exception_policy_uses_explicit_decision_and_roadmap_paths(policy, tmp_path, capsys):
     """Load injected sponsor authority and release-gate completion through CLI options."""
+    sponsor, status, expected = policy
     from check_evidence import exception_register
 
     entry = {'id': 'EXC-0001', 'component': 'PF09.proof@2.4.1', 'owner': 'owner',
