@@ -1220,9 +1220,9 @@ Outcome against `Purpose / big picture`, item by item:
    session answer, and ADR, plus the eight candidate ADR subjects with their
    dispositions. Reinserting a retired sentence, writing "Q4 remains open", or
    deleting a ToR §9 anchor fails `make design-check` and names the decision.
-2. `spec/semantic-contracts.json` holds `SC-01` to `SC-10` with
+2. `spec/semantic-contracts.json` holds `SC-01` to `SC-11` with
    preconditions, success and error relations, empty rules, 51 executable
-   examples, a 28-entry grammar corpus, seeded mutations that each change an
+   examples, a 29-entry grammar corpus, seeded mutations that each change an
    outcome, and proof sketches.
 3. `spec/acceptance-controls.json` registers `AC-01` to `AC-07`, four
    calibrated from recorded measurements extrapolated to the hosted runner
