@@ -35,11 +35,11 @@ implemented API or completed verification.
 - [ADR-0002: governance authority and exceptions](adrs/adr-0002-governance-authority.md).
 - [ADR-0003: initial release scope](adrs/adr-0003-initial-release-scope.md).
 - [ADR-0004: licence and publication](adrs/adr-0004-licence-and-publication.md).
-- [ADR-0005: pre-1.0 API and proof-interface policy](adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md).
-- [ADR-0006: numeric, validity, and reduction contracts](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
-- [ADR-0007: `comb!` macro grammar and staging](adrs/adr-0007-comb-macro-grammar-and-staging.md).
-- [ADR-0008: acceptance-control pre-registration](adrs/adr-0008-acceptance-control-pre-registration.md).
-- [ADR-0009: proof-first policy and evidence gate](adrs/adr-0009-proof-first-policy-and-evidence-gate.md).
+- [ADR-0005: pre-1.0 API and proof-interface policy][adr-0005].
+- [ADR-0006: numeric, validity, and reduction contracts][adr-0006].
+- [ADR-0007: `comb!` macro grammar and staging][adr-0007].
+- [ADR-0008: acceptance-control pre-registration][adr-0008].
+- [ADR-0009: proof-first policy and evidence gate][adr-0009].
 
 ## Execution plans
 
@@ -47,6 +47,11 @@ implemented API or completed verification.
   ExecPlan for roadmap step 1.1, implemented in stacked pull requests.
 
 [roadmap-1-1]: execplans/1-1-resolve-acceptance-control-decisions.md
+[adr-0005]: adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md
+[adr-0006]: adrs/adr-0006-numeric-validity-and-reduction-contracts.md
+[adr-0007]: adrs/adr-0007-comb-macro-grammar-and-staging.md
+[adr-0008]: adrs/adr-0008-acceptance-control-pre-registration.md
+[adr-0009]: adrs/adr-0009-proof-first-policy-and-evidence-gate.md
 
 ## Project guides
 

@@ -1300,7 +1300,7 @@ The checker is `scripts/check_docs.py`. It runs the checks in
 `scripts/docs_validation/` and requires `docs/validation-results.json` to equal
 the freshly computed report; after a deliberate change, run
 `check_docs.py --write` and commit the report. `make design-check` runs the
-checker and `python3 -m unittest discover -s tools/tests`;
+checker and `python3 -m unittest discover -s scripts/tests`;
 `.github/workflows/design.yml` runs it on every pull request. Markdown checks
 cover the files listed in `DESIGN_DOCUMENTS` in
 `scripts/docs_validation/context.py`.
@@ -2119,13 +2119,13 @@ FAILED (errors=1)
 Green and refactor, then regenerate and check idempotence:
 
 ```bash
-$PY -m unittest discover -s tools/tests
+$PY -m unittest discover -s scripts/tests
 $PY scripts/export_roadmap.py
-for g in reference bets; do $PY tools/generate_$g.py; done
+for g in reference bets; do $PY scripts/generate_$g.py; done
 $PY scripts/generate_decisions.py
 $PY scripts/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
 $PY scripts/export_roadmap.py --check
-for g in reference bets; do $PY tools/generate_$g.py; done
+for g in reference bets; do $PY scripts/generate_$g.py; done
 $PY scripts/generate_decisions.py
 git diff --exit-code -- docs/ spec/ && echo idempotent
 ```
@@ -2161,7 +2161,7 @@ exit=1
 ## Validation and acceptance
 
 Quality criteria: `make test` passes unchanged;
-`$PY -m unittest discover -s tools/tests` passes, including every new module,
+`$PY -m unittest discover -s scripts/tests` passes, including every new module,
 each observed failing for the expected reason first; VO-0 to VO-16 discharged
 with non-vacuity checks passing; `make check-fmt`, `make lint`,
 `make markdownlint` (with spelling), and `make nixie` pass; `make design-check`
@@ -2393,7 +2393,12 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   with comparison base `b4e2c14`. Refreshed PR #18 metadata confirms the
   existing draft and stack base. Final documentation checks, publication,
   hosted assessment, and formal review remain pending.
-- 2026-10-14, published `1f48268` and observed hosted CI run 38486818299 fail
+- 2026-10-14, published `1f48268`; hosted CI run 38486818299 failed its
+  coverage-backend preflight assertion; Design contracts run 38486818460
+  passed. Reopened implementation status for the in-scope pipeline repair. Both
+  long-list regression cases failed before repair (Make exit 2, Nextest exit
+  100), with no compilation error. Focused green validation and all code gates
+  remained pending; earlier gates retained their original candidate scope.
 - 2026-10-14, recorded the completed formal-repair gates and fresh committed
   CLI inspection at `0656e00`. Corrected the document-pack check date and
   distinguished the confirmed `804a38f` assessment from pending affected hosted
@@ -2417,12 +2422,7 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   code gates passed for `2bf668f`; fresh CodeRabbit CLI review reported zero
   findings across 92 paths. Restored implementation-complete status; the final
   documentation receipt is validated separately, and hosted CI, assessments,
-  formal review, and sponsor-owned stack merges remain delivery work. its
-  coverage-backend preflight assertion; Design contracts run 38486818460
-  passed. Reopened implementation status for the in-scope pipeline repair. Both
-  long-list regression cases failed before repair (Make exit 2, Nextest exit
-  100), with no compilation error. Focused green validation and all code gates
-  remain pending; the earlier gates retain their original candidate scope.
+  formal review, and sponsor-owned stack merges remain delivery work.
 - 2026-10-19, EP-M5 completeness follow-up: validate that `--bindings` decodes
   to a JSON object before constructing the admission context. The old candidate
   assessment identified uncaught array and `null` inputs; dedicated CLI

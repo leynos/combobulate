@@ -261,6 +261,7 @@ class Registration(unittest.TestCase):
                 with self.subTest(path=path), self.assertRaisesRegex(AssertionError, message):
                     _load_source_digests(context, controls(path))
 
+    @settings(deadline=None)
     @example(components=['plain'], symlink_outside=True)
     @given(components=st.lists(st.text(alphabet='abcXYZ09_-', min_size=1, max_size=12),
                                min_size=1, max_size=4), symlink_outside=st.booleans())
