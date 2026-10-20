@@ -169,25 +169,53 @@ class DesignWorkflowContract(unittest.TestCase):
                       'the workflow must pass a scheduled evaluation date')
 
     def test_workflow_installs_uv_before_running_design_check(self) -> None:
-        """Make the standalone CLI's declared runtime available in CI."""
+        """Verify CI installs and caches the design-check dependencies."""
         workflow = yaml.load(
             (ROOT / '.github/workflows/design.yml').read_text(encoding='utf-8'),
             Loader=yaml.BaseLoader,
         )
         steps = workflow['jobs']['design-check']['steps']
+        python_step_index = next(
+            index for index, step in enumerate(steps)
+            if step.get('uses', '').startswith('actions/setup-python@')
+        )
         uv_step_index = next(
             index for index, step in enumerate(steps)
             if step.get('name') == 'Setup uv'
+        )
+        dependencies_step_index = next(
+            index for index, step in enumerate(steps)
+            if step.get('name') == 'Install documentation dependencies'
         )
         check_step_index = next(
             index for index, step in enumerate(steps)
             if step.get('name') == 'Validate documentation contracts'
         )
+        python_step = steps[python_step_index]
         uv_step = steps[uv_step_index]
+        dependencies_step = steps[dependencies_step_index]
+        self.assertEqual(
+            python_step['with']['cache-dependency-path'],
+            'scripts/requirements.txt',
+            'Python setup must cache against the relocated requirements file',
+        )
+        self.assertEqual(
+            dependencies_step['run'],
+            'python3 -m pip install -r scripts/requirements.txt',
+            'CI must install the relocated documentation requirements file',
+        )
         self.assertEqual(
             uv_step['uses'],
             'astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91',
             'the workflow must use the repository-pinned uv setup action',
+        )
+        self.assertLess(
+            python_step_index, dependencies_step_index,
+            'Python setup must precede installation of documentation dependencies',
+        )
+        self.assertLess(
+            dependencies_step_index, check_step_index,
+            'documentation dependencies must be installed before design-check',
         )
         self.assertLess(
             uv_step_index, check_step_index,
