@@ -34,8 +34,39 @@ class DocumentRenderer:
 class LedgerDependencies:
     """Hold narrow collaborators supplied by the checker composition root.
 
-    For example, wrap a generator as ``DocumentRenderer(module.render,
-    module.START, module.END)``; the ledger never imports or loads that module.
+    For example, wrap a generator as ``DocumentRenderer(render, start, end)``;
+    the ledger never imports or loads that module.
+
+    Parameters
+    ----------
+    reference_generator : DocumentRenderer
+        Renders the generated reference document and supplies its markers.
+    bet_generator : DocumentRenderer
+        Renders the generated bet document and supplies its markers.
+    decision_generator : DocumentRenderer
+        Renders the generated decision register and supplies its markers.
+    parse_roadmap : Callable[[str], dict]
+        Parses the canonical roadmap text into its structured representation.
+    export_roadmap : Callable[[str], str]
+        Serializes canonical roadmap text to the committed JSON representation.
+    roadmap_structure_error : type[ValueError]
+        Exception type raised when the canonical roadmap structure is invalid.
+
+    Examples
+    --------
+    >>> def render() -> str:
+    ...     return "generated"
+    >>> renderer = DocumentRenderer(render, "<!-- start -->", "<!-- end -->")
+    >>> dependencies = LedgerDependencies(
+    ...     reference_generator=renderer,
+    ...     bet_generator=renderer,
+    ...     decision_generator=renderer,
+    ...     parse_roadmap=lambda text: {"source": text},
+    ...     export_roadmap=lambda text: text,
+    ...     roadmap_structure_error=ValueError,
+    ... )
+    >>> dependencies.parse_roadmap("roadmap")
+    {'source': 'roadmap'}
     """
 
     reference_generator: DocumentRenderer
