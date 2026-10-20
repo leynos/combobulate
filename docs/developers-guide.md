@@ -448,8 +448,8 @@ procedure above; after an acceptance measurement, register a new control.
 
 When `docs/validation-results.json` conflicts between stacked branches, take
 either side, rerun the generators and `scripts/export_roadmap.py`, then run
-`python3 scripts/check_docs.py --write --as-of <HEAD commit date>` and commit the
-result.
+`python3 scripts/check_docs.py --write --as-of <HEAD commit date>` and commit
+the result.
 
 ## Licence and publication
 
@@ -555,24 +555,24 @@ a missing citation, an unregistered error code, an example no record owns, or a
 seeded mutation that changes no outcome.
 
 A ticked roadmap checkbox is a claim, and
-`scripts/docs_validation/roadmap_status.py` is the single owner of what backs it.
-Before ticking a task, add its entry to `spec/task-completion.json`, naming the
-decisions it relies on and the artefacts that complete it (a path, optionally
-with a `#heading` anchor). The design checks then require every prerequisite to
-be ticked, every cited decision to be accepted, every artefact to resolve, and
-every proof-obligation component linked to the task to be satisfied. Components
-live in `spec/proof-obligations.json` as `PFnn.<method>@<task>`, each listing
-the admission levels (`proof`, `bounded`, `tested`) that satisfy it. A
-component whose `evidence_source` is `checker:<check>` is satisfied when the
-latest result passes in the current validation run at the current source
-revision, the component accepts `tested`, and no evidence record for it reports
-a counterexample at that revision. Checker results are `tested` evidence and
-need no separate verifier record. A `record` component fails closed unless its
-latest record by `recorded_on` matches the current binding and reaches an
-accepted level; same-day ties fail closed. A counterexample at the selected
-source revision vetoes closure regardless of its admission level. A task that
-meets every condition but is not ticked is reported, not failed, so ticking
-stays a deliberate act.
+`scripts/docs_validation/roadmap_status.py` is the single owner of what backs
+it. Before ticking a task, add its entry to `spec/task-completion.json`, naming
+the decisions it relies on and the artefacts that complete it (a path,
+optionally with a `#heading` anchor). The design checks then require every
+prerequisite to be ticked, every cited decision to be accepted, every artefact
+to resolve, and every proof-obligation component linked to the task to be
+satisfied. Components live in `spec/proof-obligations.json` as
+`PFnn.<method>@<task>`, each listing the admission levels (`proof`, `bounded`,
+`tested`) that satisfy it. A component whose `evidence_source` is
+`checker:<check>` is satisfied when the latest result passes in the current
+validation run at the current source revision, the component accepts `tested`,
+and no evidence record for it reports a counterexample at that revision.
+Checker results are `tested` evidence and need no separate verifier record. A
+`record` component fails closed unless its latest record by `recorded_on`
+matches the current binding and reaches an accepted level; same-day ties fail
+closed. A counterexample at the selected source revision vetoes closure
+regardless of its admission level. A task that meets every condition but is not
+ticked is reported, not failed, so ticking stays a deliberate act.
 
 The private `record_component_failure` and `_checker_result_failure` paths are
 called only by `component_failure`; `_current_binding_records` and
@@ -655,8 +655,8 @@ process-wide module state. Script dependencies remain pinned in
 `scripts/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
 
-`scripts/tests/markdown_examples.py` is the shared loader for marked JSON fences
-in migration documents. It requires each fence to have a unique adjacent
+`scripts/tests/markdown_examples.py` is the shared loader for marked JSON
+fences in migration documents. It requires each fence to have a unique adjacent
 `tested-example` marker and reads the example from the published Markdown. Use
 it from documentation contract tests; it is not a general Markdown parser.
 
@@ -719,10 +719,10 @@ receives a `RevisionJsonReader`. The roadmap check composes its filesystem
 adapter from the validation context; the command-line composition root supplies
 the current source revision and Git-backed register reader. `roadmap_status`
 uses the injected revision and does not resolve Git state itself. These ports
-belong only to `scripts/docs_validation/`: keep their domain rules independent of
-I/O, and do not reuse them as general repository file or Git APIs. Unit tests
-inject deterministic readers, while a temporary Git integration test covers
-actual revision reads.
+belong only to `scripts/docs_validation/`: keep their domain rules independent
+of I/O, and do not reuse them as general repository file or Git APIs. Unit
+tests inject deterministic readers, while a temporary Git integration test
+covers actual revision reads.
 
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their

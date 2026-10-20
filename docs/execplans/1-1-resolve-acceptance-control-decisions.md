@@ -83,8 +83,8 @@ Term definitions used throughout:
   `PFnn.<method>@<task>` (for example `PF14.structural@1.1.4`). A component
   states which admission levels satisfy it.
 - Evidence gate: the pure admission function in
-  `scripts/docs_validation/evidence_gate.py` that maps one evidence record to an
-  admission level and a set of reason codes.
+  `scripts/docs_validation/evidence_gate.py` that maps one evidence record to
+  an admission level and a set of reason codes.
 - Negative control: a deliberately broken input that a check must reject for
   the intended reason. A check with no failing negative control is vacuous.
 
@@ -380,8 +380,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   `tools/calibration/cardinality-probe/` verifies in Verus (8 functions, a
   seeded mutant rejected) and its structural Kani harnesses satisfy every
   `cover!`; 29 cases in `scripts/tests/test_preregistration.py` and
-  `scripts/tests/test_freeze.py` pass, including the exhaustive outcome mapping,
-  a Hypothesis property that exercised every frozen field, a
+  `scripts/tests/test_freeze.py` pass, including the exhaustive outcome
+  mapping, a Hypothesis property that exercised every frozen field, a
   threshold-plus-digest edit rejected without an amendment, and host-identity
   scans with the local host name supplied at test time; the CI `build-test` job
   has `timeout-minutes: 8` (`AC-07`); task 1.1.3 ticked and backed.
@@ -401,8 +401,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   checks attempt timestamps, medians, and the registered p90 budget. This
   follow-up remains under review until its candidate gates and sponsor
   assessment pass. CodeScene complexity findings moved AC-07 attempt checks to
-  `scripts/docs_validation/ci_controls.py`; `_CiAttemptSummary` carries only the
-  facts those checks compose, and the developer guide records the boundary.
+  `scripts/docs_validation/ci_controls.py`; `_CiAttemptSummary` carries only
+  the facts those checks compose, and the developer guide records the boundary.
   `cs delta origin/main` reports no issues after that refactor. The attempt
   data yield p90 220 s (rank 18 of 20); the draft registration retains that
   derivation and its matching initial digest. The eight-minute threshold is
@@ -475,7 +475,6 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   check and negative controls (VO-15); repository layout, contents, validation,
   and developers' guide updated (module ownership, exception renewal, control
   amendment, report conflicts); full gates pass.
-
 
 - [x] (2026-10-13) Reconciled the current implementation on PR #18 and kept
   its `1-1-reconciliation` branch stacked on #17. All six behavioural
@@ -571,8 +570,8 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   production code is unchanged. Focused tests and the isolated two-test
   baseline passed; five mutants failed at their intended assertions (word loss,
   collapsed paragraphs, and removal of each absolute, parent, or containment
-  guard). Logs: `/tmp/pytest-combobulate-1-1-reconciliation-properties.out`
-  and `/tmp/mutation-combobulate-1-1-reconciliation-properties.out`.
+  guard). Logs: `/tmp/pytest-combobulate-1-1-reconciliation-properties.out` and
+  `/tmp/mutation-combobulate-1-1-reconciliation-properties.out`.
 - [x] (2026-10-14) Property follow-up `3ed0593` passed all seven gates: 331
   Rust tests, one skipped, one doctest, 270 unittest tests, 315 pytest tests,
   and 589 subtests. The fresh committed CLI review inspected all 93 paths and
@@ -625,20 +624,21 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   infer a refreshed checker result from chat analysis.
 
 - Observation: a successful CodeRabbit status can coexist with a
-  `CHANGES_REQUESTED` review and failed pre-merge rows. Formal review 5511956210
-  on `804a38f` has an inline finding, two testing errors, and two documentation
-  warnings. Impact: inspect the review, threads, and full walkthrough instead
-  of treating wrapper status as approval.
+  `CHANGES_REQUESTED` review and failed pre-merge rows. Formal review
+  5511956210 on `804a38f` has an inline finding, two testing errors, and two
+  documentation warnings. Impact: inspect the review, threads, and full
+  walkthrough instead of treating wrapper status as approval.
 - Observation: the 48.89% docstring report does not expose its 45-function
   inventory. Clarification 6158784579 verified a separate changed-line Python
   inventory with 15 missing test docstrings; its 23 unsupported skips are not
-  missing documentation. Impact: document verified changed functions and do
-  not invent the original denominator.
+  missing documentation. Impact: document verified changed functions and do not
+  invent the original denominator.
 - Observation: CLI review startup failed despite passing readiness and usage
-  diagnostics. The helper-doc, helper-doc-retry, and helper-doc-full logs report
-  a non-recoverable start error without findings or completion. Impact: preserve
-  the missing review, avoid unsupported retries, and continue independent
-  publication and hosted evidence without substituting them for reassessment.
+  diagnostics. The helper-doc, helper-doc-retry, and helper-doc-full logs
+  report a non-recoverable start error without findings or completion. Impact:
+  preserve the missing review, avoid unsupported retries, and continue
+  independent publication and hosted evidence without substituting them for
+  reassessment.
 - Observation: the earlier AC-01 module-comment change targeted a registered
   calibration source. The merged parent now contains a later version of that
   source and an approved amendment chain binding its current digest. Impact:
@@ -648,7 +648,6 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   branch base. The follow-up's expanded Kani module comment changes the current
   source hash; its new amendment follows the parent's latest digest and leaves
   calibration and measurement fields unchanged.
-
 
 - Observation: the hand-edit drift controls edited "Decision: pending.",
   which vanished once every decision was accepted, so the edit became a no-op
@@ -786,10 +785,10 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   semantic equality and exact serialized-export comparison.
 
 - Decision: preserve the earlier CLI startup failure as missing review evidence
-  after two focused attempts, healthy read-only diagnostics, and one actual-base
-  attempt. Do not rotate credentials, alter service configuration, infer a
-  cooldown, or claim a clean reassessment. Reassess the published replayed
-  candidate before treating the review gate as satisfied.
+  after two focused attempts, healthy read-only diagnostics, and one
+  actual-base attempt. Do not rotate credentials, alter service configuration,
+  infer a cooldown, or claim a clean reassessment. Reassess the published
+  replayed candidate before treating the review gate as satisfied.
 
 - Decision: clarify only the two helper docstrings identified by CLI review.
   Repository instructions require usage and outcome examples, but the review's
@@ -809,7 +808,6 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   with output redirected to `/dev/null`; validate both build routes and the
   existing genuine missing-component cases. This is a shell command-contract
   correction, with no change to the pinned toolchain or acceptance controls.
-
 
 - Decision: re-reviews of the review fixes (CodeRabbit CLI) found three minor
   items, fixed in `EP-M6`: registered workload sources must resolve inside the
@@ -957,14 +955,14 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Date/Author: 2026-10-15, implementing agent.
 - EP-M1b review conformance repair: the [CodeRabbit completeness
   assessment](https://github.com/leynos/combobulate/pull/13#issuecomment-6182674988)
-  found `scripts/tests/test_decision_register.py` over the 400-line limit. Move
-  supersession lifecycle cases to `scripts/tests/test_supersession_lifecycle.py`.
-  Rebasing onto the updated parent added generator-catalogue coverage and
-  raised the invariant module above the limit again, so move composed-checker
-  and generated-document tests to
-  `scripts/tests/test_decision_register_integration.py`. Preserve all regression
-  cases and update the generated Python-source count. Date/Author: 2026-10-15,
-  implementing agent.
+  found `scripts/tests/test_decision_register.py` over the 400-line limit.
+  Move supersession lifecycle cases to
+  `scripts/tests/test_supersession_lifecycle.py`. Rebasing onto the updated
+  parent added generator-catalogue coverage and raised the invariant module
+  above the limit again, so move composed-checker and generated-document tests
+  to `scripts/tests/test_decision_register_integration.py`. Preserve all
+  regression cases and update the generated Python-source count. Date/Author:
+  2026-10-15, implementing agent.
 - EP-M1b follow-up review: add a composed test for a ticked roadmap with valid
   and invalid evidence, CLI success and failure coverage for `--as-of` and
   `--base-rev`, workflow and Make argument-propagation checks, and generated
@@ -1239,9 +1237,10 @@ Outcome against `Purpose / big picture`, item by item:
    decisions, and satisfied obligation components.
 
 Acceptance criteria (`Validation and acceptance`): 1 to 6 are met; criterion 4
-is demonstrated by `scripts/tests/test_freeze.py` (control and decision freezes,
-including a temporary Git repository) and by the hosted `Design contracts`
-runs; criterion 6 by `cargo publish --dry-run` refusing to publish.
+is demonstrated by `scripts/tests/test_freeze.py` (control and decision
+freezes, including a temporary Git repository) and by the hosted
+`Design contracts` runs; criterion 6 by `cargo publish --dry-run` refusing to
+publish.
 
 Deviations and lessons:
 
@@ -1261,10 +1260,11 @@ Deviations and lessons:
   which led to choosing the freeze base by commit.
 - Historical delivery evidence at `5bf739a`: that candidate was published,
   with successful hosted CI and Design contracts runs recorded above. The
-  hosted assessment found no blocking code defect; its documentation corrections
-  were confirmed on `804a38f`. Formal review remains candidate-bound. Leave the
-  sponsor's review and merge of #9 to #18 in stack order. Earlier milestone CLI
-  review rounds retain their original candidate scope in `Decision log`.
+  hosted assessment found no blocking code defect; its documentation
+  corrections were confirmed on `804a38f`. Formal review remains
+  candidate-bound. Leave the sponsor's review and merge of #9 to #18 in stack
+  order. Earlier milestone CLI review rounds retain their original candidate
+  scope in `Decision log`.
 - Delivery follow-up (2026-10-14): assessment confirmation completed for
   `804a38f`. Its subsequent formal review exposed the source-path and coverage
   gaps now repaired in `0656e00`, with all seven local gates and five mutation
@@ -1272,7 +1272,6 @@ Deviations and lessons:
   this documentation follow-up addresses both minor findings. Affected hosted
   assessment, formal finding/row reconciliation, and sponsor merges remain
   delivery work; no historical assessment is relabelled for the new candidate.
-
 
 ## Context and orientation
 
@@ -1637,11 +1636,11 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   document matches `(pending|open|unresolved|remains? proposed)` within 60
   characters of an accepted question's identifier. Artefact:
   `scripts/tests/test_decision_register.py` and
-  `scripts/tests/test_decision_register_integration.py`. Non-vacuity: after D03's
-  acceptance, reinserting "The classes remain proposed pending ToR Q4." (also
-  rewrapped across two lines), restoring "All work remains proposed and open."
-  while task 1.1.1 stays checked, writing "Q4 remains open", or deleting the
-  ToR §9 anchor each fails.
+  `scripts/tests/test_decision_register_integration.py`. Non-vacuity: after
+  D03's acceptance, reinserting "The classes remain proposed pending ToR Q4."
+  (also rewrapped across two lines), restoring "All work remains proposed and
+  open." while task 1.1.1 stays checked, writing "Q4 remains open", or deleting
+  the ToR §9 anchor each fails.
 - VO-7 (base-revision freeze). Invariant: compared with `--base-rev`, the
   check rejects a frozen-field change to a registered control without a new
   amendment whose `replaces` equals the previous digest; an edited or removed
@@ -1704,15 +1703,16 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   current digest equals the last `new_digest`); a measurement record cites a
   current or historical digest. Method: a Hypothesis property mutating each
   frozen field in turn; parameterized completeness controls. Artefact:
-  `scripts/tests/test_preregistration.py`. Non-vacuity: fails unless every frozen
-  field was exercised; a correct amendment passes.
+  `scripts/tests/test_preregistration.py`. Non-vacuity: fails unless every
+  frozen field was exercised; a correct amendment passes.
 - VO-12 (measurement outcomes cannot be relabelled). Invariant:
   `resource-exhausted`, `budget-exceeded`, `inconclusive`, and a missing record
   from a killed job map to fail or inconclusive, never pass; retries are all
   recorded and all count; calibration records can never satisfy an acceptance
   control. Method: exhaustive enumeration of the outcome mapping. Artefact:
-  `scripts/tests/test_preregistration.py`. Non-vacuity: a seeded mapping treating
-  `resource-exhausted` as pass, or admitting a calibration record, must fail.
+  `scripts/tests/test_preregistration.py`. Non-vacuity: a seeded mapping
+  treating `resource-exhausted` as pass, or admitting a calibration record,
+  must fail.
 - VO-13 (package policy). Invariant: `Cargo.toml` `license` is `ISC` and
   `publish` is `false`, per accepted D04 and D05. Artefact:
   `scripts/tests/test_package_policy.py`. Non-vacuity: an in-memory manifest
@@ -1720,8 +1720,8 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
 - VO-14 (drift and idempotence for every generator and export). Invariant:
   every generator and the roadmap exporter are covered by the checker; rerun on
   a clean tree, they yield no diff. Artefact:
-  `scripts/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity: a
-  hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails. The
+  `scripts/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity:
+  a hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails. The
   generator CLI rejects a word-preserving loss of a decision heading while
   permitting ordinary paragraph rewrapping.
 - VO-15 (bet and task links are two-way). Artefact:
@@ -1830,10 +1830,10 @@ full gates (Stage D).
 ### EP-M1b. Roadmap status, obligation components, and freeze check
 
 - Add `spec/task-completion.json` (task identifier to completion artefact
-  references) and `scripts/docs_validation/roadmap_status.py` as the single owner
-  of MS-3 and MS-4, reading tick state from the roadmap export. Replace the
-  blanket ban in `ledger.py` with a call to it. Compute the export's `status`
-  string and the checker's roadmap detail from tick state.
+  references) and `scripts/docs_validation/roadmap_status.py` as the single
+  owner of MS-3 and MS-4, reading tick state from the roadmap export. Replace
+  the blanket ban in `ledger.py` with a call to it. Compute the export's
+  `status` string and the checker's roadmap detail from tick state.
 - In `spec/proof-obligations.json`, add `components` to every obligation (for
   PF14, `PF14.structural@1.1.4` accepts `tested`, evidence source
   `checker:evidence-gate`). Relax `check_obligations` so components may cite
@@ -1898,8 +1898,8 @@ full gates (Stage D).
 - Make affected `spec/vocabulary.json` contracts cite their identifiers;
   regenerate the reference; add the `excluded_names` register.
 - Add tagged-scalar examples to `spec/examples.json`; extend the
-  documentation model in a new `scripts/docs_validation/contract_examples.py`. Add
-  `spec/macro-grammar.json` and `scripts/docs_validation/grammar.py`.
+  documentation model in a new `scripts/docs_validation/contract_examples.py`.
+  Add `spec/macro-grammar.json` and `scripts/docs_validation/grammar.py`.
 - Tests: VO-8, VO-9, VO-10. Update technical design §§6-7 and §17.3 to cite
   the ADRs and record the proof-influenced choices; reconcile accepted rows of
   `docs/context.md` §6. Tick task 1.1.2.
@@ -2181,9 +2181,9 @@ Behavioural acceptance:
    in the roadmap preamble while task 1.1.1 remains checked, or writing "Q4
    remains open", makes `make design-check` fail and name D03.
 4. Changing AC-03's threshold and its digest in one commit makes
-   `make design-check BASE_REV=a246aac8abf252bd7ad3cf2d1c16e06ebd5fb10c` fail and name AC-03. This base
-   contains the frozen control register; a base predating AC-03 cannot establish
-   its freeze.
+   `make design-check BASE_REV=a246aac8abf252bd7ad3cf2d1c16e06ebd5fb10c` fail
+   and name AC-03. This base contains the frozen control register; a base
+   predating AC-03 cannot establish its freeze.
 5. `check_evidence.py` rejects a `resource-exhausted` fixture and a
    self-reported Verus record with `verdict-self-reported`. The abstract gate
    reports a partial-bounds Kani state at `bounded`, never `proof`, only when a
@@ -2417,8 +2417,8 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   code gates passed for `2bf668f`; fresh CodeRabbit CLI review reported zero
   findings across 92 paths. Restored implementation-complete status; the final
   documentation receipt is validated separately, and hosted CI, assessments,
-  formal review, and sponsor-owned stack merges remain delivery work.
-  its coverage-backend preflight assertion; Design contracts run 38486818460
+  formal review, and sponsor-owned stack merges remain delivery work. its
+  coverage-backend preflight assertion; Design contracts run 38486818460
   passed. Reopened implementation status for the in-scope pipeline repair. Both
   long-list regression cases failed before repair (Make exit 2, Nextest exit
   100), with no compilation error. Focused green validation and all code gates

@@ -38,8 +38,8 @@ authority, initial release scope, licence/publication policy, and pre-1.0 API
 policy. Roadmap step 1.1 has a dedicated
 [EP-M6 ExecPlan](execplans/1-1-resolve-acceptance-control-decisions.md).
 Remaining design decisions and experiments stay proposed. Core scope ends at
-4.3.3, including public consumer and staged-cost gates. Integration scope has
-a separate gate at 6.3.4; its real-client experiments require source access,
+4.3.3, including public consumer and staged-cost gates. Integration scope has a
+separate gate at 6.3.4; its real-client experiments require source access,
 while synthetic extensions do not. The final phase contains bounded
 evaluations, not promised features.
 
