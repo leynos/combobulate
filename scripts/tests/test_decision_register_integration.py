@@ -44,7 +44,7 @@ class RealRegister(unittest.TestCase):
         context = ValidationContext(ROOT)
         catalogue = context.load('spec/vocabulary.json')['entries']
         register_entries = [
-            (Path(generator.__file__).resolve(), source, path)
+            (generator.render, source, path)
             for generator, source, path in generated_documents(context, catalogue, LEDGER_DEPENDENCIES)
             if path == 'docs/decision-register.md'
         ]

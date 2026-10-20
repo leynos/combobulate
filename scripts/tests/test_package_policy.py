@@ -196,12 +196,12 @@ class PackagePolicy(unittest.TestCase):
             check_manifest(manifest)
 
     def test_lifecycle_selects_enforced_rules_and_report(self):
-        """Enforce and report exactly the accepted decisions across all four activation states."""
+        """Report accepted licence policy and the fail-closed publication guard."""
         cases = (
             ('both', ('D04', 'D05'), 'the ISC licence (D04); publish = false (D05)', 2),
-            ('licence-only', ('D04',), 'the ISC licence (D04)', 1),
+            ('licence-only', ('D04',), 'the ISC licence (D04); publish = false (D05)', 2),
             ('publication-only', ('D05',), 'publish = false (D05)', 1),
-            ('neither', (), 'no package rule', 0),
+            ('neither', (), 'publish = false (D05)', 1),
         )
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -221,7 +221,7 @@ class PackagePolicy(unittest.TestCase):
                         context = ValidationContext(root)
                         if 'D04' in accepted and licence != 'ISC':
                             diagnostic = 'license = "ISC"'
-                        elif 'D05' in accepted and publish:
+                        elif publish:
                             diagnostic = 'publish = false'
                         else:
                             diagnostic = None
@@ -233,7 +233,7 @@ class PackagePolicy(unittest.TestCase):
                             check_package_policy(context)
                             self.assertEqual(context.results, [{
                                 'check': 'package-policy', 'status': 'pass', 'count': count,
-                                'detail': f'Cargo.toml satisfies the accepted package decisions: {detail}.',
+                                'detail': f'Cargo.toml satisfies the enforced package rules: {detail}.',
                             }], 'the report must identify exactly the enforced rules and their count')
 
 

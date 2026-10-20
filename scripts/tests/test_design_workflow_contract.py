@@ -205,7 +205,7 @@ class DesignWorkflowContract(unittest.TestCase):
                         recorder, directory / 'arguments.jsonl',
                         base_revision, '2026-10-15',
                     )
-                    expected = ['tools/check_docs.py', '--as-of', '2026-10-15']
+                    expected = ['scripts/check_docs.py', '--as-of', '2026-10-15']
                     if base_revision:
                         expected.extend(('--base-rev', base_revision))
                     self.assertEqual(
@@ -214,7 +214,7 @@ class DesignWorkflowContract(unittest.TestCase):
                     )
                     self.assertEqual(
                         calls[1:], [
-                            ['-m', 'unittest', 'discover', '-s', 'tools/tests'],
+                            ['-m', 'unittest', 'discover', '-s', 'scripts/tests'],
                             ['-m', 'pytest', '-q', 'scripts/tests'],
                         ],
                         'Make must continue to run both design-check test suites',
@@ -233,7 +233,7 @@ class DesignWorkflowContract(unittest.TestCase):
                 directory / 'arguments.jsonl', '', None,
             )
         self.assertEqual(
-            calls[0], ['tools/check_docs.py', '--as-of', head_date],
+            calls[0], ['scripts/check_docs.py', '--as-of', head_date],
             'Make must derive its default evaluation date from HEAD',
         )
 
