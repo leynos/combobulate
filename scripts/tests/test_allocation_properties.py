@@ -78,6 +78,7 @@ class GeneratedAllocationAccounting(unittest.TestCase):
     @example(case={'capacities': {'a': 80, 'b': 40}, 'stages': [
         {'live': ['a', 'a'], 'scratch': 8}, {'live': ['a', 'b'], 'scratch': 16}]})
     def test_stage_and_peak_totals_match_capacity_membership_oracle(self, case: Case) -> None:
+        """Compare stage and peak accounting with the independent membership oracle."""
         for stage in case['stages']:
             self.assertEqual(tracked_stage_bytes(stage, case['capacities']),
                              stage_oracle(stage, case['capacities']))
@@ -87,6 +88,7 @@ class GeneratedAllocationAccounting(unittest.TestCase):
     @given(case=allocation_cases())
     @example(case={'capacities': {'a': 80}, 'stages': [{'live': ['a'], 'scratch': 8}]})
     def test_repeating_live_allocation_ids_preserves_stage_and_peak_totals(self, case: Case) -> None:
+        """Check that duplicate live identifiers do not increase accounted capacity."""
         repeated = copy.deepcopy(case)
         for original, stage in zip(case['stages'], repeated['stages']):
             stage['live'] *= 2
@@ -99,6 +101,7 @@ class GeneratedAllocationAccounting(unittest.TestCase):
     def test_reordering_live_ids_and_stages_preserves_accounting(
         self, case: Case, data: st.DataObject,
     ) -> None:
+        """Check that permuting live identifiers or stages preserves accounting."""
         reordered = copy.deepcopy(case)
         for stage in reordered['stages']:
             expected = stage_oracle(stage, case['capacities'])
@@ -112,6 +115,7 @@ class GeneratedAllocationAccounting(unittest.TestCase):
     def test_increasing_stage_scratch_cannot_reduce_peak(
         self, case: Case, increase: int, data: st.DataObject,
     ) -> None:
+        """Check that adding scratch bytes cannot lower the tracked peak."""
         expanded = copy.deepcopy(case)
         index = data.draw(st.integers(min_value=0, max_value=len(case['stages']) - 1))
         stage = expanded['stages'][index]
@@ -126,6 +130,7 @@ class GeneratedAllocationAccounting(unittest.TestCase):
     def test_adding_distinct_live_allocation_cannot_reduce_peak(
         self, case: Case, capacity: int, identifier: str, data: st.DataObject,
     ) -> None:
+        """Check that a new live allocation cannot lower the tracked peak."""
         expanded = copy.deepcopy(case)
         allocation_id = 'new:' + identifier
         self.assertNotIn(allocation_id, expanded['capacities'])

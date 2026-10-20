@@ -242,6 +242,7 @@ class Registration(unittest.TestCase):
             context = ValidationContext(root)
 
             def controls(path: str) -> list[dict]:
+                """Build one frozen-control source record for the supplied path."""
                 return [{'id': 'AC-07', 'frozen': {'workload': {'sources': [{'path': path}]}}}]
 
             digests = _load_source_digests(context, controls('internal-link.yml'))
@@ -281,6 +282,7 @@ class Registration(unittest.TestCase):
             context = ValidationContext(root)
 
             def validate_binding() -> None:
+                """Recompute the registered source digest and validate its binding."""
                 digests = _load_source_digests(context, [control])
                 check_sources(control, digests)
 

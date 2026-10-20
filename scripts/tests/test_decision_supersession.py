@@ -16,6 +16,7 @@ def acyclic_supersession_graphs():
     """Generate ordered forests of valid supersession links for property checks."""
     @st.composite
     def graphs(draw):
+        """Build a Hypothesis strategy for ordered acyclic supersession forests."""
         size = draw(st.integers(min_value=1, max_value=10))
         topology = draw(st.sampled_from(('chain', 'merge', 'forest')))
         if topology == 'chain':
@@ -51,6 +52,7 @@ def supersession_cycles():
     """Generate reciprocal cycles of three or more decisions in varied record order."""
     @st.composite
     def cycles(draw):
+        """Build a Hypothesis strategy for reciprocal supersession cycles."""
         size = draw(st.integers(min_value=3, max_value=8))
         order = draw(st.permutations(tuple(range(size))))
         return {
@@ -72,17 +74,20 @@ class SupersessionProperties(unittest.TestCase):
     @settings(max_examples=100, derandomize=True, deadline=None)
     @given(records=acyclic_supersession_graphs())
     def test_acyclic_chains_and_merges_pass_in_any_record_order(self, records):
+        """Accept generated chains and merges regardless of record ordering."""
         check_supersession(records)
 
     @settings(max_examples=50, derandomize=True, deadline=None)
     @given(records=supersession_cycles())
     def test_reciprocal_cycles_fail_regardless_of_record_order(self, records):
+        """Reject generated cycles regardless of record ordering."""
         with self.assertRaisesRegex(AssertionError, 'Supersession cycle'):
             check_supersession(records)
 
     @settings(max_examples=100, derandomize=True, deadline=None)
     @given(records=acyclic_supersession_graphs())
     def test_one_way_links_fail_for_generated_acyclic_graphs(self, records):
+        """Reject a generated graph after one supersession link is removed."""
         edges = [(record['id'], older) for record in records.values() for older in record['supersedes']]
         assume(bool(edges))
         newer, older = edges[0]
@@ -93,6 +98,7 @@ class SupersessionProperties(unittest.TestCase):
     @settings(max_examples=100, derandomize=True, deadline=None)
     @given(records=acyclic_supersession_graphs())
     def test_unknown_links_fail_for_generated_acyclic_graphs(self, records):
+        """Reject generated records that refer to an unknown decision."""
         next(iter(records.values()))['supersedes'].append('D99')
         with self.assertRaisesRegex(AssertionError, 'supersedes unknown D99'):
             check_supersession(records)
@@ -100,6 +106,7 @@ class SupersessionProperties(unittest.TestCase):
     @settings(max_examples=100, derandomize=True, deadline=None)
     @given(records=acyclic_supersession_graphs())
     def test_proposed_replacements_fail_for_generated_acyclic_graphs(self, records):
+        """Reject generated replacements that remain proposed."""
         edges = [(record['id'], older) for record in records.values() for older in record['supersedes']]
         assume(bool(edges))
         replacement, _older = edges[0]

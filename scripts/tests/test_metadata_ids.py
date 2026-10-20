@@ -110,6 +110,7 @@ class MetadataIds(unittest.TestCase):
     """Exercise complete trace metadata and registered Markdown identity boundaries."""
 
     def test_complete_trace_rejects_duplicate_requirements_and_verifications(self):
+        """Reject duplicate IDs in either trace registry while accepting the committed trace."""
         original = ValidationContext(ROOT).load('spec/traceability.json')
         for group, label in (('requirements', 'requirement'), ('verification', 'verification')):
             mutated = copy.deepcopy(original)
@@ -126,6 +127,7 @@ class MetadataIds(unittest.TestCase):
         self.assertTrue(all(row['status'] == 'pass' for row in context.results))
 
     def test_duplicate_goal_declarations_do_not_collapse_into_valid_trace(self):
+        """Reject a repeated terms-of-reference goal before trace matching."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'docs').mkdir()
@@ -139,6 +141,7 @@ class MetadataIds(unittest.TestCase):
                                    source.load('spec/traceability.json'))
 
     def test_duplicate_source_headings_do_not_collapse_into_valid_registry(self):
+        """Reject duplicate registered source headings rather than collapsing them."""
         with tempfile.TemporaryDirectory() as directory:
             context = ValidationContext(Path(directory))
             for path in context.markdown_paths():
@@ -153,6 +156,7 @@ class MetadataIds(unittest.TestCase):
 
 
     def test_source_citations_reject_lowercase_and_mixed_case_with_canonical_controls(self):
+        """Reject noncanonical citation casing while preserving unrelated hyphenated prose."""
         with tempfile.TemporaryDirectory() as directory:
             context = ValidationContext(Path(directory))
             for path in context.markdown_paths():
@@ -172,6 +176,7 @@ class MetadataIds(unittest.TestCase):
                 self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
 
     def test_source_register_rejects_noncanonical_heading_even_without_citations(self):
+        """Require canonical source IDs in registry headings even when uncited."""
         with tempfile.TemporaryDirectory() as directory:
             context = ValidationContext(Path(directory))
             for path in context.markdown_paths():
@@ -184,6 +189,7 @@ class MetadataIds(unittest.TestCase):
                         check_backend_capabilities(context)
 
     def test_capability_source_lists_require_exact_registered_case(self):
+        """Reject capability references that differ in case from registered source IDs."""
         source = ValidationContext(ROOT)
         capabilities = source.load('spec/backend-capabilities.json')
         for replacement in ('e-polars2-release', 'E-Polars2-Release'):
@@ -196,6 +202,7 @@ class MetadataIds(unittest.TestCase):
 
 
     def test_ordinary_hyphenated_prose_links_code_and_tables_are_not_citations(self):
+        """Ignore lookalike source IDs in prose, word links, code, and tables."""
         text = (
             'The e-commerce and d-service terms are ordinary prose (e-commerce).\n\n'
             '[e-commerce](https://example.test/shop) and [d-service](https://example.test/service).\n\n'
@@ -206,6 +213,7 @@ class MetadataIds(unittest.TestCase):
         self.assertEqual(source_citations('D-Day and identifier abc-d-service are ordinary.', {'D-TOR'}), set())
 
     def test_explicit_citation_forms_keep_lowercase_and_mixed_case_detection(self):
+        """Recognize citation syntax and report every noncanonical source spelling."""
         source_ids = {'E-POLARS-NULL', 'D-TOR'}
         forms = (
             '[e-polars-null]', '[E-Polars-Null,\nd-tor]',
@@ -223,6 +231,7 @@ class MetadataIds(unittest.TestCase):
         self.assertEqual(source_citations('[E-POLARS-NULL, D-TOR]', source_ids), source_ids)
 
     def test_complete_source_check_accepts_ordinary_prose_and_word_links(self):
+        """Allow ordinary hyphenated prose and word links beside a canonical citation."""
         with tempfile.TemporaryDirectory() as directory:
             context = ValidationContext(Path(directory))
             for path in context.markdown_paths():
@@ -238,6 +247,7 @@ class MetadataIds(unittest.TestCase):
                 self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
 
     def test_unknown_word_links_need_explicit_source_intent(self):
+        """Treat unknown word links as citations only when their text is explicit."""
         source_ids = {'E-POLARS-NULL', 'D-TOR'}
         for label in ('e-commerce', 'e-missing', 'd-service', 'd-missing'):
             with self.subTest(label=label):

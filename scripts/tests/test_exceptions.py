@@ -37,12 +37,14 @@ class ValidityWindow(unittest.TestCase):
     """The window is [approved_on, invalid_from): boundaries on both sides."""
 
     def test_boundaries(self):
+        """Check the approval date is inclusive and the expiry date exclusive."""
         for day, expected in ((APPROVED - DAY, 'not-yet-valid'), (APPROVED, 'active'),
                               (INVALID_FROM - DAY, 'active'), (INVALID_FROM, 'expired')):
             with self.subTest(day=day):
                 self.assertEqual(state_on(day), expected, f'{day} must be {expected}')
 
     def test_complete_active_exception_restricts(self):
+        """An active exception must restrict an otherwise verified abstract record."""
         state = AbstractRecord(
             kind='deductive', outcome='verified', bounds='not-applicable', witness='all-satisfied',
             controls='all-required-rejected-as-intended', trust='audited-none', exception='active',
@@ -51,11 +53,13 @@ class ValidityWindow(unittest.TestCase):
         self.assertEqual(admit(state).level, Level.RESTRICTED, 'an active exception yields restricted, never proof')
 
     def test_release_gate_expires_an_exception_before_its_date(self):
+        """A completed release gate expires an exception immediately."""
         exception = ENTRY | {'problems': ['past-release-gate']}
         self.assertEqual(exception_state(exception, APPROVED), 'expired',
                          'a completed release gate ends an exception immediately')
 
     def test_other_d02_problems_remain_malformed_after_release_gate(self):
+        """Release-gate expiry does not excuse another malformed exception field."""
         exception = ENTRY | {'problems': ['past-release-gate', 'approver-not-sponsor']}
         self.assertEqual(exception_state(exception, APPROVED), 'malformed',
                          'release-gate expiry does not excuse another D02 violation')
@@ -65,12 +69,15 @@ class Malformed(unittest.TestCase):
     """Each D02 violation has its own reason."""
 
     def problems(self, **changes: str) -> list[str]:
+        """Return D02 violations after applying fields to the valid fixture."""
         return exception_problems(ENTRY | changes, 'leynos', frozenset())
 
     def test_well_formed_exception_has_no_problems(self):
+        """A complete reference exception satisfies every D02 check."""
         self.assertEqual(self.problems(), [], 'the reference exception satisfies D02')
 
     def test_each_violation_is_named(self):
+        """Report each tested lifetime, authority, claim, and owner defect alone."""
         cases = {
             'lifetime-over-90-days': {'invalid_from': (APPROVED + datetime.timedelta(days=91)).isoformat()},
             'empty-lifetime': {'invalid_from': APPROVED.isoformat()},
@@ -83,10 +90,12 @@ class Malformed(unittest.TestCase):
                 self.assertEqual(self.problems(**changes), [problem], f'{problem} must be reported alone')
 
     def test_passed_release_gate_is_named(self):
+        """Identify a passed release gate as an exception violation."""
         self.assertEqual(exception_problems(ENTRY, 'leynos', frozenset({'4.3.3'})), ['past-release-gate'],
                          'an exception cannot outlive its release gate')
 
     def test_ninety_days_is_allowed(self):
+        """Allow an exception whose lifetime reaches the 90-day limit."""
         self.assertEqual(self.problems(invalid_from=(APPROVED + datetime.timedelta(days=90)).isoformat()), [],
                          'exactly 90 days is within D02')
 
@@ -95,6 +104,7 @@ class RegisterCheck(unittest.TestCase):
     """A released exception remains valid history and cannot be used again."""
 
     def test_passed_release_gate_is_valid_expired_history(self):
+        """Keep a D02-compliant exception as expired history after its release gate."""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             spec = root / 'spec'
@@ -125,6 +135,7 @@ class DateSensitivity(unittest.TestCase):
     @settings(max_examples=200, derandomize=True, deadline=None)
     @given(st.sampled_from(VALID), st.dates(datetime.date(2026, 1, 1), datetime.date(2027, 12, 31)))
     def test_as_of_changes_only_the_exception_state(self, state, day):
+        """Changing the evaluation date alters only the abstract exception status."""
         record, exceptions = concrete(state)
         baseline_context = AdmissionContext(exceptions, BINDINGS, AS_OF, PARSERS)
         moved_context = AdmissionContext(exceptions, BINDINGS, day, PARSERS)

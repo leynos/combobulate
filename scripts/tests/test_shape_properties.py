@@ -73,6 +73,7 @@ class GeneratedShapeAgreement(unittest.TestCase):
     @example(left=[0], right=[2])
     @example(left=[2, 1, 4], right=[3, 4])
     def test_arbitrary_broadcast_shapes_match_constraints_and_symmetry(self, left, right):
+        """Match generated broadcast shapes to the symmetric axis-constraint oracle."""
         self.assert_agreement_matches_oracle(left, right, True)
 
     @GENERATED
@@ -80,6 +81,7 @@ class GeneratedShapeAgreement(unittest.TestCase):
     @example(shapes=([0, 1], [1, 3]))
     @example(shapes=([], []))
     def test_compatible_broadcast_pairs_produce_right_aligned_results(self, shapes):
+        """Confirm compatible generated pairs yield the oracle's right-aligned shape."""
         left, right = shapes
         self.assertIsNotNone(shape_oracle(left, right, True))
         self.assert_agreement_matches_oracle(left, right, True)
@@ -89,6 +91,7 @@ class GeneratedShapeAgreement(unittest.TestCase):
     @example(shapes=([0], [2]))
     @example(shapes=([2, 3], [4, 2]))
     def test_incompatible_broadcast_pairs_raise_shape_agreement(self, shapes):
+        """Confirm generated incompatible pairs raise the shape-agreement failure."""
         left, right = shapes
         self.assertIsNone(shape_oracle(left, right, True))
         self.assert_agreement_matches_oracle(left, right, True)
@@ -100,9 +103,11 @@ class GeneratedShapeAgreement(unittest.TestCase):
     @example(left=[1], right=[0])
     @example(left=[2], right=[1, 2])
     def test_disabled_broadcast_requires_equal_arrays_but_accepts_scalars(self, left, right):
+        """Check equality-only shape agreement while allowing scalar broadcasting rules."""
         self.assert_agreement_matches_oracle(left, right, False)
 
     def test_zero_unit_and_scalar_boundaries_remain_distinct(self):
+        """Keep zero extents, unit extents, and scalar shapes behaviorally distinct."""
         self.assertEqual(agreement([0], [1], True), [0])
         self.assertEqual(agreement([0, 1], [1, 3], True), [0, 3])
         for broadcasting in (False, True):

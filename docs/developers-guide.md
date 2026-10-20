@@ -28,16 +28,21 @@ rules.
 
 Use `make all` as the public entrypoint for formatting, linting, tests, and
 spelling. It runs these gates one at a time even when invoked with `make -j`.
-`make lint` runs `lint-clippy` (rustdoc, then Clippy) before `lint-whitaker`,
-also under `make -j`. Whitaker's temporary Dylint driver is built outside the
-repository, so the recipe removes inherited compiler and linker overrides
-before starting it. Dylint then checks the repository from its root and
-discovers `.cargo/config.toml`; that check uses the development backend and
-linker defaults. The recipe sends warnings-as-errors to the repository check
-through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
-`cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
-available. It also runs the cardinality probe's `trybuild` UI test for its
-`#[must_use]` result contract. `make check-fmt` verifies Rust formatting with
+`make lint` runs `lint-clippy` (rustdoc, then Clippy), `lint-whitaker`, and
+`lint-python` in sequence, also under `make -j`. The Python stage runs
+Interrogate 1.7.0 with a 100% threshold. It discovers tracked and non-ignored
+untracked `.py` and `.pyi` files through Git, including hidden paths under
+`.github/` and any scripts, tests, tools, or benchmarks. A failed source-list
+command stops the gate rather than silently checking an incomplete set.
+Whitaker's temporary Dylint driver is built outside the repository, so the
+recipe removes inherited compiler and linker overrides before starting it.
+Dylint then checks the repository from its root and discovers
+`.cargo/config.toml`; that check uses the development backend and linker
+defaults. The recipe sends warnings-as-errors to the repository check through
+Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers `cargo nextest run` and
+falls back to `cargo test` when cargo-nextest is not available. It also runs
+the cardinality probe's `trybuild` UI test for its `#[must_use]` result
+contract. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and

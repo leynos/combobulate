@@ -90,6 +90,11 @@ class Parser:
     """Precedence climbing over one token list, configured by the corpus precedence table."""
 
     def __init__(self, tokens: list[str], table: dict[str, tuple[int, str]], mutations: frozenset[str]) -> None:
+        """Initialize token position and retain the parser tables.
+
+        For example, ``Parser(['name'], {}, frozenset()).peek()`` returns
+        ``'name'`` without consuming the input.
+        """
         self.tokens, self.table, self.mutations, self.position = tokens, table, mutations, 0
 
     def peek(self) -> str | None:

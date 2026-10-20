@@ -19,6 +19,7 @@ class CostContainers(unittest.TestCase):
     """Keep scalar shapes and scratch-only stages valid without accepting strings or objects."""
 
     def test_full_ledger_rejects_empty_string_and_object_shapes(self):
+        """Reject string and object values where cost shapes must be dimension lists."""
         ledger = ValidationContext(ROOT).load('spec/cost-cases.json')
         for invalid in ('', {}):
             mutated = copy.deepcopy(ledger)
@@ -29,6 +30,7 @@ class CostContainers(unittest.TestCase):
                     check_cost_examples(context)
 
     def test_full_ledger_rejects_string_and_object_live_allocations(self):
+        """Reject strings and mappings where live allocations must be identifier lists."""
         ledger = ValidationContext(ROOT).load('spec/cost-cases.json')
         updates = (
             {'capacities': {'a': 80, 'b': 40},
@@ -45,6 +47,7 @@ class CostContainers(unittest.TestCase):
                     check_cost_examples(context)
 
     def test_dimension_list_and_live_id_element_boundaries(self):
+        """Reject malformed dimensions, allocation identifiers, and stage containers."""
         for invalid in ('', {}, None, False):
             with self.subTest(shape=invalid), self.assertRaisesRegex(AssertionError, 'Malformed cost shape'):
                 shape_product({'shape': invalid, 'target_bits': 64})
@@ -59,6 +62,7 @@ class CostContainers(unittest.TestCase):
                 tracked_peak({'capacities': {}, 'stages': invalid})
 
     def test_valid_scalar_zero_shapes_empty_stages_and_aliases_preserve_results(self):
+        """Keep scalar, zero-sized, empty-stage, and repeated-allocation cases valid."""
         self.assertEqual(shape_product({'shape': [], 'target_bits': 64}), 1)
         self.assertEqual(shape_product({'shape': [0, 2**64], 'target_bits': 64}), 0)
         for live, scratch, expected in (([], 0, 0), ([], 8, 8), (['source', 'source'], 8, 88)):

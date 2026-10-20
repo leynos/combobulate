@@ -21,6 +21,10 @@ GROUPS = [
 ]
 
 def escape(value: str) -> str:
+    """Escape Markdown table separators and replace newlines with spaces.
+
+    For example, ``escape('left|right')`` returns ``'left\\|right'``.
+    """
     return value.replace('|', r'\|').replace('\n', ' ')
 
 def group_chunks(group: str, entries: list[dict[str, object]]) -> list[tuple[str | None, list[dict[str, object]]]]:
@@ -72,6 +76,11 @@ def render(entries: list[dict[str, object]]) -> str:
     return ''.join(output).rstrip()
 
 def main() -> int:
+    """Check or update the generated language-reference catalogue.
+
+    For example, ``python scripts/generate_reference.py --check`` reports
+    whether generated tables match and returns zero when they do.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()

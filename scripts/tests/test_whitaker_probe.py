@@ -36,6 +36,7 @@ class SourceBindingTests(unittest.TestCase):
         seen = []
         for reference in candidates:
             def acquire(current, path):
+                """Return the approved source fixture for the requested candidate ref."""
                 seen.append((current, path))
                 return {**APPROVED, 'action.yml': candidates[current]}[path]
             evidence = verify_workflow(caller(reference), acquire)
@@ -77,6 +78,7 @@ class SourceBindingTests(unittest.TestCase):
         for altered in APPROVED:
             with self.subTest(path=altered), patch('whitaker_probe.probe_manifest') as probe:
                 def acquire(_, path):
+                    """Change one source fixture to test full-content pinning."""
                     return APPROVED[path] + ('\n# changed\n' if path == altered else '')
                 with self.assertRaisesRegex(ValueError, f'unapproved execution content: {altered}'):
                     verify_workflow(caller('a' * 40), acquire)
@@ -86,6 +88,7 @@ class SourceBindingTests(unittest.TestCase):
         """Every source path must exist at the actual ref; no vendored fallback is used."""
         with patch('whitaker_probe.probe_manifest') as probe:
             def acquire(_, path):
+                """Return approved sources, or fail when the helper is unavailable."""
                 if path == 'scripts/extract-zip.py':
                     raise OSError('helper unavailable')
                 return APPROVED[path]
@@ -96,9 +99,17 @@ class SourceBindingTests(unittest.TestCase):
     def test_fetch_uses_exact_pinned_url_and_timeout(self):
         """A fake response tests acquisition arguments without performing a request."""
         class Response:
-            def __enter__(self): return self
-            def __exit__(self, *_): return False
+            """Return one fixture payload through the response context-manager interface."""
+
+            def __enter__(self):
+                """Return the fixture response itself for a with statement."""
+                return self
+
+            def __exit__(self, *_):
+                """Leave response exceptions visible to the caller."""
+                return False
             def read(self, _):
+                """Yield the configured fixture bytes once, then return EOF."""
                 value = getattr(self, 'source', CAPABLE.encode())
                 self.source = b''
                 return value
@@ -142,6 +153,7 @@ class SourceBindingTests(unittest.TestCase):
         prefix = ('https://raw.githubusercontent.com/leynos/shared-actions/' +
                   'b' * 40 + '/.github/actions/install-whitaker/')
         def response(url, timeout):
+            """Map a requested approved-path URL to its in-memory fixture response."""
             self.assertTrue(url.startswith(prefix))
             self.assertEqual(timeout, 10)
             path = url.removeprefix(prefix)

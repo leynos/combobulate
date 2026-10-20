@@ -56,6 +56,7 @@ class GeneratedIntegerModels(unittest.TestCase):
     @GENERATED
     @given(left=I64, right=I64, operation=st.sampled_from(('add', 'sub')))
     def test_checked_binary_matches_unbounded_integer_oracle(self, left, right, operation):
+        """Match checked addition and subtraction to the unbounded integer oracle."""
         model = checked_add if operation == 'add' else checked_subtract
         self.assertEqual(model_outcome(lambda: model(left, right)),
                          integer_oracle(left, right, operation))
@@ -65,12 +66,14 @@ class GeneratedIntegerModels(unittest.TestCase):
            operation=st.sampled_from(('add', 'sub')),
            association=st.sampled_from(('left', 'right')))
     def test_reductions_match_each_ordered_intermediate_operation(self, values, operation, association):
+        """Compare reduction results and every checked intermediate operation to the oracle."""
         expected, expected_trace = sequence_oracle(values, operation, association)
         reducer = left_reduce if association == 'left' else right_reduce
         model = checked_add if operation == 'add' else checked_subtract
         actual_trace = []
 
         def traced_operation(left, right):
+            """Record one model operation and propagate its named overflow."""
             outcome = model_outcome(lambda: model(left, right))
             actual_trace.append((left, right, outcome))
             if outcome[0] == 'error':
@@ -87,6 +90,7 @@ class GeneratedIntegerModels(unittest.TestCase):
     @GENERATED
     @given(values=st.lists(I64, max_size=8), association=st.sampled_from(('left', 'right')))
     def test_scans_match_ordered_prefix_oracles(self, values, association):
+        """Match scan outputs to the ordered reduction of each input prefix."""
         expected_values = []
         expected = ('value', expected_values)
         for length in range(1, len(values) + 1):
@@ -102,6 +106,7 @@ class GeneratedIntegerModels(unittest.TestCase):
     @GENERATED
     @given(values=st.lists(st.one_of(I64, st.none()), max_size=8), skip_nulls=st.booleans())
     def test_nullable_sum_matches_right_associated_integer_oracle(self, values, skip_nulls):
+        """Check right-associated sum results under both null policies."""
         valid = [value for value in values if value is not None]
         if not skip_nulls and None in values:
             expected = ('value', None)

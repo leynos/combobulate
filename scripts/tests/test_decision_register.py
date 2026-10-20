@@ -77,14 +77,17 @@ class RegisterInvariants(unittest.TestCase):
     """VO-5: each in-register invariant has a negative control with its own message."""
 
     def assert_rejected(self, register: dict, message: str) -> None:
+        """Assert that register-record validation rejects the supplied invariant."""
         with self.assertRaisesRegex(AssertionError, message):
             check_register_records(register)
 
     def test_committed_register_passes(self):
+        """Accept the committed register after schema and record checks."""
         validate_register(REGISTER, SCHEMA)
         check_register_records(REGISTER)
 
     def test_accepted_register_passes(self):
+        """Accept a fully approved register after schema and record checks."""
         register = accepted_register()
         validate_register(register, SCHEMA)
         check_register_records(register)
@@ -102,27 +105,32 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'Unknown recommended option in D03')
 
     def test_unknown_decided_option_fails(self):
+        """Reject a decided option absent from the decision record."""
         register = accepted_register()
         record(register, 'D03')['decided_option'] = 'Z'
         self.assert_rejected(register, 'Unknown decided option in D03')
 
     def test_approval_must_name_the_record(self):
+        """Reject approval metadata that names a different decision."""
         register = accepted_register()
         record(register, 'D03')['approval_reference']['names_decisions'] = ['D04']
         self.assert_rejected(register, 'Approval does not name D03')
 
     def test_approval_author_must_be_the_accepting_login(self):
+        """Reject approval metadata authored by a different login."""
         register = accepted_register()
         record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
         self.assert_rejected(register, 'Approval author differs from accepting login in D03')
 
     def test_acceptance_outside_the_authority_fails(self):
+        """Reject an acceptance outside the authority recorded for the register."""
         register = accepted_register()
         record(register, 'D03')['accepted_by'] = 'someone-else'
         record(register, 'D03')['approval_reference']['author_login'] = 'someone-else'
         self.assert_rejected(register, 'D03 accepted by a login outside its authority')
 
     def test_authority_and_approvals_cannot_be_changed_together(self):
+        """Reject changing authorities and approvals together to bypass the original authority."""
         register = accepted_register()
         register['authorities']['roles'] = {'sponsor': 'someone-else', 'technical-owner': 'someone-else'}
         for decision_id in ('D01', 'D03'):
@@ -132,6 +140,7 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'D01 must be accepted by leynos')
 
     def test_acceptance_without_authorities_fails(self):
+        """Reject accepted decisions when the register has no authority map."""
         register = accepted_register()
         del register['authorities']
         self.assert_rejected(register, 'D01 is accepted but the register names no authorities')
@@ -143,11 +152,13 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'Authorities cite D01, which is not an accepted decision')
 
     def test_authorities_must_cite_d01_not_another_accepted_decision(self):
+        """Reject an authority map that cites an accepted decision other than D01."""
         register = accepted_register()
         register['authorities']['decision'] = 'D03'
         self.assert_rejected(register, 'Authorities must cite D01, not D03')
 
     def test_two_accepted_records_cannot_share_a_subject(self):
+        """Reject accepted decisions that reuse the same subject."""
         register = accepted_register()
         accept(register, 'D04')
         record(register, 'D04')['subject'] = 'Initial  release scope'
@@ -183,6 +194,7 @@ class RegisterInvariants(unittest.TestCase):
         self.assert_rejected(register, 'Supersession cycle through D03')
 
     def test_proposed_replacement_cannot_supersede_an_accepted_record(self):
+        """Reject a proposed replacement that claims to supersede an accepted record."""
         register = accepted_register()
         older = record(register, 'D03')
         older.update(lifecycle='superseded', superseded_by='D16')
@@ -207,18 +219,21 @@ class RegisterSchema(unittest.TestCase):
     """The schema enforces lifecycle-dependent fields and real calendar dates."""
 
     def test_proposed_record_cannot_carry_an_approval(self):
+        """Reject an approval attached to a proposed decision."""
         register = accepted_register()
         record(register, 'D03')['lifecycle'] = 'proposed'
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
 
     def test_accepted_record_needs_an_approval(self):
+        """Require approval metadata on an accepted decision."""
         register = accepted_register()
         record(register, 'D03')['approval_reference'] = None
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
 
     def test_session_approval_needs_the_verbatim_answer(self):
+        """Require the exact session answer in session-backed approval metadata."""
         register = accepted_register()
         del record(register, 'D03')['approval_reference']['answer']
         with self.assertRaises(ValidationError):
@@ -239,12 +254,14 @@ class RegisterSchema(unittest.TestCase):
             validate_register(register, SCHEMA)
 
     def test_authority_source_must_be_d01(self):
+        """Require the authority map to cite D01."""
         register = accepted_register()
         register['authorities']['decision'] = 'D03'
         with self.assertRaises(ValidationError):
             validate_register(register, SCHEMA)
 
     def test_impossible_date_fails(self):
+        """Reject dates that are not real calendar dates."""
         register = accepted_register()
         record(register, 'D03')['accepted_on'] = '2026-02-30'
         with self.assertRaises(ValidationError):
@@ -255,25 +272,31 @@ class AdrAgreement(unittest.TestCase):
     """Cited ADRs exist, follow the naming convention, and agree on status."""
 
     def setUp(self):
+        """Load the accepted register records used by the cited-ADR checks."""
         self.records = check_register_records(accepted_register())
 
     def test_cited_adr_with_agreeing_status_passes(self):
+        """Require cited ADR files to exist and agree with the accepted status."""
         check_adr_files({ADR_PATH: ACCEPTED_ADR})
         check_adr_links(self.records, {ADR_PATH: ACCEPTED_ADR})
 
     def test_missing_adr_fails(self):
+        """Reject links to ADR files that are missing."""
         with self.assertRaisesRegex(AssertionError, f'D03 cites missing ADR {ADR_PATH}'):
             check_adr_links(self.records, {})
 
     def test_status_disagreement_fails(self):
+        """Reject ADR status that disagrees with the decision register."""
         with self.assertRaisesRegex(AssertionError, 'D03 is accepted but .* says Proposed'):
             check_adr_links(self.records, {ADR_PATH: ACCEPTED_ADR.replace('Accepted.', 'Proposed.')})
 
     def test_old_naming_convention_fails(self):
+        """Reject ADR filenames that use the retired naming convention."""
         with self.assertRaisesRegex(AssertionError, 'adr-nnnn-title-slug.md convention'):
             check_adr_files({'docs/adrs/adr-003-initial-release-scope.md': ACCEPTED_ADR})
 
     def test_title_number_must_match_the_file_name(self):
+        """Reject an ADR title whose number differs from its filename."""
         with self.assertRaisesRegex(AssertionError, 'ADR title must start with'):
             check_adr_files({'docs/adrs/adr-0004-initial-release-scope.md': ACCEPTED_ADR})
 
@@ -282,38 +305,47 @@ class GoverningDocuments(unittest.TestCase):
     """VO-6: governing documents link the register and cannot contradict an accepted decision."""
 
     def setUp(self):
+        """Load accepted decision records and the governing-document contents."""
         self.records = check_register_records(accepted_register())
         self.documents = governing_documents()
 
     def assert_rejected(self, message: str) -> None:
+        """Assert that governing-document validation rejects the supplied invariant."""
         with self.assertRaisesRegex(AssertionError, message):
             check_governing_documents(self.records, self.documents)
 
     def test_consistent_documents_pass(self):
+        """Accept governing documents that agree with the decision register."""
         check_governing_documents(self.records, self.documents)
 
     def test_missing_register_link_fails(self):
+        """Require governing documents to link to the decision register."""
         self.documents['docs/context.md'] = '# Context\n'
         self.assert_rejected('docs/context.md must link the decision register')
 
     def test_reinserted_retired_statement_fails(self):
+        """Reject a statement retired by an accepted decision."""
         self.documents['docs/technical-design.md'] += f'\n{RETIRED}\n'
         self.assert_rejected('still states text retired by D03')
 
     def test_rewrapped_retired_statement_fails(self):
+        """Reject a retired statement even when Markdown wrapping changes."""
         self.documents['docs/technical-design.md'] += '\nThe classes remain *proposed*\npending ToR Q4.\n'
         self.assert_rejected('still states text retired by D03')
 
     def test_open_status_wording_fails(self):
+        """Reject governing text that still describes a decided question as open."""
         self.documents['docs/roadmap.md'] += '\nScope question Q4 remains open.\n'
         self.assert_rejected(r"docs/roadmap.md describes Q4 \(D03\) as 'remains open'|as 'open'")
 
     def test_missing_terms_of_reference_anchor_fails(self):
+        """Require the terms-of-reference row to link to the decision anchor."""
         terms = self.documents['docs/terms-of-reference.md']
         self.documents['docs/terms-of-reference.md'] = terms.replace('decision-register.md#d03', 'decision-register.md')
         self.assert_rejected('ToR §9 row Q4 must link decision-register.md#d03')
 
     def test_normalization_strips_inline_markdown(self):
+        """Normalize emphasis, code spans, links, and wrapping before comparison."""
         self.assertEqual(normalize('*Q4* `remains`\n [open](x.md)'), 'Q4 remains open',
                          'normalization must strip emphasis, code, links, and wrapping')
 

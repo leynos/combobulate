@@ -105,19 +105,23 @@ class RuleTable(unittest.TestCase):
     """MS-0 to MS-2: the implementation equals the fixture on all 345,600 states."""
 
     def test_domain_and_valid_state_counts(self):
+        """Check the enumerated domain sizes and number of valid evidence states."""
         self.assertEqual(len(STATES), 345_600, 'the product domain has 345,600 states')
         self.assertEqual(len(VALID), VALID_STATES, 'the validity predicate admits 86,400 states')
 
     def test_fixture_domains_match_the_gate(self):
+        """Require fixture domains to match the gate field names and value order."""
         self.assertEqual(tuple(RULES['domains']), gate.field_names(), 'the fixture names every field in order')
         for name, domain in zip(gate.field_names(), gate.DOMAINS):
             self.assertEqual(tuple(RULES['domains'][name]), domain, f'{name} values must agree')
 
     def test_gate_agrees_with_the_rule_table_everywhere(self):
+        """Compare the evidence gate with its rule table across every state."""
         disagreements = [state for state in STATES if as_pair(ADMISSIONS[state]) != interpret(state)]
         self.assertEqual(disagreements[:3], [], f'{len(disagreements)} states disagree with the rule table')
 
     def test_every_level_and_reason_occurs_and_each_reason_can_stand_alone(self):
+        """Require every admission level and reason to occur, including alone."""
         levels = collections.Counter(ADMISSIONS[state].level for state in VALID)
         self.assertEqual(set(levels), set(Level), f'every level must occur: {levels}')
         sole = {admission.reasons[0] for admission in ADMISSIONS.values() if len(admission.reasons) == 1}
@@ -140,6 +144,7 @@ class AdmissionProperties(unittest.TestCase):
                                      f'{state} -> {field}={value}')
 
     def test_p1_degradation_never_raises_the_level(self):
+        """Check that degrading a valid field never raises its admission level."""
         valid = set(VALID)
         for state in VALID:
             level = RANK[ADMISSIONS[state].level.value]
@@ -166,17 +171,20 @@ class AdmissionProperties(unittest.TestCase):
             self.assert_reason_remedy(state, admission, reason, field_of)
 
     def test_p2_rejection_exactly_when_blocked_and_each_remedy_removes_one_reason(self):
+        """Check that rejection matches blocking reasons and each remedy removes one."""
         field_of = {reason: rule['field'] for rule in RULES['blocking'] for reason in rule['bad'].values()}
         for state in VALID:
             self.assert_rejection_and_remedies(state, field_of)
 
     def test_p3_exceptions_never_satisfy_a_component(self):
+        """Ensure exceptions never satisfy proof, bounded, or tested evidence."""
         satisfying = {Level.PROOF, Level.BOUNDED, Level.TESTED}
         for state in VALID:
             if state.exception != 'none':
                 self.assertNotIn(ADMISSIONS[state].level, satisfying, f'{state}')
 
     def test_p4_partial_bounds_never_reach_proof(self):
+        """Ensure partial bounds never qualify as proof evidence."""
         for state in VALID:
             if state.bounds == 'partial':
                 self.assertNotEqual(ADMISSIONS[state].level, Level.PROOF, f'{state}')
@@ -218,6 +226,7 @@ class Scenarios(unittest.TestCase):
     """The upstream scenario corpus is decided the same way by the gate and the rule table."""
 
     def test_scenarios(self):
+        """Compare each named scenario result with the rule-table interpretation."""
         for name, state, level, reason in SCENARIOS:
             with self.subTest(scenario=name):
                 admission = admit(state)
@@ -227,6 +236,7 @@ class Scenarios(unittest.TestCase):
                 self.assertEqual(as_pair(admission), interpret(state), f'{name} must match the rule table')
 
     def test_bounded_kani_never_satisfies_a_proof_only_component(self):
+        """Ensure partial Kani bounds cannot satisfy a proof-only requirement."""
         state = scenario(kind='bounded', bounds='partial')
         self.assertNotIn(admit(state).level.value, {'proof'}, 'partial bounds cannot satisfy a proof-only component')
 
@@ -261,6 +271,7 @@ class SeededFaults(unittest.TestCase):
     """Each seeded rule-table fault would be caught by the exhaustive agreement test."""
 
     def test_each_fault_disagrees_with_the_gate_somewhere(self):
+        """Check that each seeded rule-table fault changes at least one admission."""
         for name, edit in SEEDED_FAULTS.items():
             with self.subTest(fault=name):
                 rules = mutated(edit)

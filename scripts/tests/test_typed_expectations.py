@@ -20,6 +20,7 @@ class TypedExpectations(unittest.TestCase):
     """Distinguish domain-valid arithmetic results from malformed expected witnesses."""
 
     def test_scalar_values_require_the_same_concrete_json_type(self):
+        """Reject Python equality coercions between distinct JSON scalar types."""
         for actual, expected in ((0, False), (1, True), (1, 1.0), (False, 0), (0.0, 0)):
             with self.subTest(actual=actual, expected=expected):
                 self.assertFalse(same_typed_value(actual, expected))
@@ -28,6 +29,7 @@ class TypedExpectations(unittest.TestCase):
                 self.assertTrue(same_typed_value(value, value))
 
     def test_nested_values_reject_coercion_and_preserve_container_contracts(self):
+        """Compare nested values recursively while preserving container and key types."""
         cases = (
             ([0, [1]], [False, [1]]),
             ([0, [1]], [0, [1.0]]),
@@ -45,6 +47,7 @@ class TypedExpectations(unittest.TestCase):
         self.assertTrue(same_typed_value({'x': 1, 'y': 2}, {'y': 2, 'x': 1}))
 
     def test_full_semantic_ledger_rejects_scalar_and_nested_wrong_types(self):
+        """Reject wrongly typed scalar and nested semantic witnesses in the full ledger."""
         ledger = ValidationContext(ROOT).load('spec/examples.json')
         mutations = (('EX13', False), ('EX01', 9.0), ('EX03', [10, 7, 9.0]))
         for case_id, expected in mutations:
@@ -59,6 +62,7 @@ class TypedExpectations(unittest.TestCase):
         self.assertEqual(context.results[-1]['status'], 'pass')
 
     def test_full_cost_ledger_rejects_boolean_and_floating_expected_counts(self):
+        """Reject Boolean and floating-point expected counts in the full cost ledger."""
         ledger = ValidationContext(ROOT).load('spec/cost-cases.json')
         mutations = (('K07', True), ('K06', 0.0), ('K10', 8386560.0))
         for case_id, expected in mutations:
@@ -74,6 +78,7 @@ class TypedExpectations(unittest.TestCase):
 
 
     def test_semantic_ledger_requires_an_explicit_single_outcome(self):
+        """Require exactly one semantic outcome field for every ledger example."""
         ledger = ValidationContext(ROOT).load('spec/examples.json')
         mutations = (
             ('EX11', 'expected', None, True),
@@ -98,6 +103,7 @@ class TypedExpectations(unittest.TestCase):
         self.assertEqual(context.results[-1]['status'], 'pass')
 
     def test_expected_errors_must_match_actual_semantic_failures(self):
+        """Reject expected error names that do not match the model's actual failure."""
         ledger = ValidationContext(ROOT).load('spec/examples.json')
         for case_id, replacement in (('EX07', 'Contraction'), ('EX11', 'EmptyMean')):
             mutated = copy.deepcopy(ledger)
@@ -111,6 +117,7 @@ class TypedExpectations(unittest.TestCase):
 
 
     def test_success_outcome_field_matches_the_model_output_kind(self):
+        """Require success witnesses to use the field matching the model output kind."""
         ledger = ValidationContext(ROOT).load('spec/examples.json')
         swaps = (('EX03', 'expected', 'expected_shape'), ('EX05', 'expected_shape', 'expected'))
         for case_id, original, replacement in swaps:

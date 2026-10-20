@@ -84,6 +84,11 @@ def check_markdown(context: ValidationContext) -> None:
 def semantic_tokens(text: str) -> tuple:
     """Normalize formatting only; e.g. wrapped prose equals its single-line form."""
     def normalize(token):
+        """Normalize parser tokens so formatting-only edits compare equally.
+
+        For example, a ``softbreak`` token becomes text containing one space,
+        so wrapped prose matches its single-line form.
+        """
         if token.type == 'inline':
             content = ''
         elif token.type == 'softbreak':

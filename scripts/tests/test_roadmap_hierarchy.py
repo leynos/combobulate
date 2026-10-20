@@ -22,6 +22,7 @@ class RoadmapHierarchy(unittest.TestCase):
     """Exercise hierarchy integrity before generated Markdown can legitimize bad ledgers."""
 
     def test_dependencies_follow_emitted_order_and_declare_lists_of_string_ids(self):
+        """Require typed dependency lists and place each prerequisite before its consumer."""
         tasks = {'1.1.2': {'requires': ['1.1.1']}, '1.1.1': {'requires': []}}
         with self.assertRaisesRegex(AssertionError, 'emitted task order'):
             check_dependencies(tasks)
@@ -34,6 +35,7 @@ class RoadmapHierarchy(unittest.TestCase):
         check_dependencies({'1.1.2': {'requires': []}, '1.1.1': {'requires': []}})
 
     def test_full_ledger_rejects_prerequisite_reordered_after_its_consumer(self):
+        """Reject a complete roadmap whose same-step prerequisite follows its consumer."""
         phases = ValidationContext(ROOT).load('spec/roadmap.json')['phases']
         for phase in phases:
             for step in phase['steps']:
@@ -52,6 +54,7 @@ class RoadmapHierarchy(unittest.TestCase):
         self.fail('Expected a real same-step dependency in the complete roadmap ledger')
 
     def test_phase_numbers_are_positive_unique_ascending_integers(self):
+        """Reject malformed, repeated, or descending phase numbers in the roadmap."""
         original = ValidationContext(ROOT).load('spec/roadmap.json')['phases']
         for invalid in (True, 1.0, '1', 0, -1):
             mutated = copy.deepcopy(original)
@@ -68,6 +71,7 @@ class RoadmapHierarchy(unittest.TestCase):
                     collect_tasks(mutated)
 
     def test_step_identity_matches_parent_and_is_canonical_unique_and_ascending(self):
+        """Require canonical step identities under their parent phase in ascending order."""
         original = ValidationContext(ROOT).load('spec/roadmap.json')['phases']
         for invalid in ('2.1', '1.0', '1.01', '1.1.1', True):
             mutated = copy.deepcopy(original)
@@ -83,6 +87,7 @@ class RoadmapHierarchy(unittest.TestCase):
                 collect_tasks(mutated)
 
     def test_tasks_have_canonical_identities_in_their_containing_step(self):
+        """Require unique canonical task IDs that match their containing step."""
         original = ValidationContext(ROOT).load('spec/roadmap.json')['phases']
         for invalid in ('2.1.1', '1.2.1', '1.1.0', '1.1.01', '1.1.1.1', True):
             mutated = copy.deepcopy(original)
@@ -96,6 +101,7 @@ class RoadmapHierarchy(unittest.TestCase):
             collect_tasks(mutated)
 
     def test_complete_ledger_hierarchy_rejection_precedes_generator_drift_checks(self):
+        """Reject malformed hierarchy before drift checks without changing loaded modules."""
         original = ValidationContext(ROOT).load('spec/roadmap.json')
         mutated = copy.deepcopy(original)
         mutated['phases'][0]['number'] = 2

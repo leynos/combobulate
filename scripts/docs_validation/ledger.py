@@ -13,6 +13,11 @@ class MalformedCanonicalRoadmapError(AssertionError):
     """Expose parser diagnostics through the design-check failure surface."""
 
     def __init__(self, parser_error: Exception) -> None:
+        """Convert parser failures into the public validation diagnostic.
+
+        For example, wrapping ``ValueError('bad heading')`` yields the message
+        ``Malformed canonical roadmap: bad heading``.
+        """
         super().__init__(f'Malformed canonical roadmap: {parser_error}')
 
 

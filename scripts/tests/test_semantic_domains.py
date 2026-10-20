@@ -15,6 +15,7 @@ class SemanticDomains(unittest.TestCase):
     """Check each shape/policy boundary before Python can coerce malformed inputs."""
 
     def test_subtraction_models_require_the_declared_operation(self):
+        """Require an explicit subtraction operation and preserve empty-model behavior."""
         for kind in ('reduce', 'fold_left', 'scan', 'scan_left'):
             for operation in ('suub', 'add', None, True):
                 with self.subTest(kind=kind, operation=operation):
@@ -28,6 +29,7 @@ class SemanticDomains(unittest.TestCase):
                 self.assertEqual(evaluate({'kind': kind, 'operation': 'sub', 'input': []}), [])
 
     def test_policy_flags_require_booleans_even_on_shortcuts(self):
+        """Validate broadcast and null policy types even when inputs would shortcut."""
         for invalid in ('false', 'true', 0, 1, None):
             with self.subTest(value=invalid):
                 with self.assertRaisesRegex(AssertionError, 'Malformed broadcast policy'):
@@ -40,6 +42,7 @@ class SemanticDomains(unittest.TestCase):
         self.assertEqual(evaluate({'kind': 'sum', 'input': [], 'skip_nulls': False}), 0)
 
     def test_every_shape_operand_rejects_invalid_dimensions(self):
+        """Reject malformed dimensions in every shape-bearing semantic operand."""
         operands = (
             ({'kind': 'rank_transpose_shape', 'input_shape': [2, 3], 'cell_rank': 1}, 'input_shape'),
             ({'kind': 'rows_mean_shape', 'input_shape': [2, 3]}, 'input_shape'),
@@ -59,6 +62,7 @@ class SemanticDomains(unittest.TestCase):
                         evaluate(case)
 
     def test_scalar_and_zero_shapes_remain_valid(self):
+        """Keep scalar and zero-extent shapes valid while rejecting empty means."""
         cases = (
             ({'kind': 'rank_transpose_shape', 'input_shape': [], 'cell_rank': 0}, []),
             ({'kind': 'rank_transpose_shape', 'input_shape': [0, 3, 4], 'cell_rank': 2}, [0, 4, 3]),
@@ -75,6 +79,7 @@ class SemanticDomains(unittest.TestCase):
             evaluate({'kind': 'rows_mean_shape', 'input_shape': [3, 0]})
 
     def test_axis_consuming_operations_reject_scalar_inputs(self):
+        """Reject scalar inputs for operations that consume an axis."""
         cases = (
             {'kind': 'rows_mean_shape', 'input_shape': []},
             {'kind': 'inner_shape', 'left': [], 'right': [3]},
@@ -85,6 +90,7 @@ class SemanticDomains(unittest.TestCase):
                 evaluate(case)
 
     def test_stencil_rejects_ragged_boards_and_accepts_empty_frames(self):
+        """Reject malformed boards while accepting empty and single-cell frames."""
         for board in ([[1, 0, 0], [0, 0, 1, 0]], [[1], []], [1], None):
             with self.subTest(board=board), self.assertRaisesRegex(AssertionError, 'Malformed board'):
                 evaluate({'kind': 'neighbour_sum', 'input': board})
@@ -93,6 +99,7 @@ class SemanticDomains(unittest.TestCase):
                 self.assertEqual(evaluate({'kind': 'neighbour_sum', 'input': board}), expected)
 
     def test_checked_add_rejects_invalid_operands_before_cancellation(self):
+        """Validate I64 operands before cancellation and distinguish overflow from emptiness."""
         for invalid in (True, 1.0, -2**63 - 1, 2**63):
             for left, right in ((invalid, -1), (-1, invalid)):
                 with self.subTest(left=left, right=right):
@@ -108,6 +115,7 @@ class SemanticDomains(unittest.TestCase):
             evaluate({'kind': 'checked_add_grouping', 'input': [], 'association': 'right'})
 
     def test_integer_models_reject_coercion_even_before_null_propagation(self):
+        """Reject coerced integer operands before null propagation or singleton shortcuts."""
         for invalid in (True, 1.0, '1'):
             cases = (
                 {'kind': 'reduce', 'operation': 'sub', 'input': [invalid]},

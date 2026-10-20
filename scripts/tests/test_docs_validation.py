@@ -27,6 +27,7 @@ class MarkdownBoundaries(unittest.TestCase):
     """Check explicit inputs, local-link confinement, and generated-content drift."""
 
     def setUp(self):
+        """Create an isolated repository fixture with valid Markdown inputs."""
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
@@ -36,6 +37,7 @@ class MarkdownBoundaries(unittest.TestCase):
             path.write_text('# Title\n', encoding='utf-8')
 
     def test_excludes_inherited_guides_and_build_outputs(self):
+        """Exclude inherited guidance and build output from repository validation."""
         for relative in ('docs/developers-guide.md', 'target/generated.md', '.git/notes.md'):
             path = self.root / relative
             path.parent.mkdir(exist_ok=True)
@@ -45,6 +47,7 @@ class MarkdownBoundaries(unittest.TestCase):
                          'only README and the listed design documents are checked')
 
     def test_discovers_relocated_adrs(self):
+        """Discover relocated ADR files beneath the repository documentation tree."""
         adr = self.root / 'docs/adrs/adr-0001-repository-bootstrap.md'
         adr.parent.mkdir(parents=True)
         adr.write_text('# Architectural decision record\n', encoding='utf-8')
@@ -52,6 +55,7 @@ class MarkdownBoundaries(unittest.TestCase):
                       'Markdown validation includes ADRs in their relocated directory')
 
     def test_json_inputs_exclude_repository_and_build_metadata(self):
+        """Ignore JSON files under repository metadata and build directories."""
         (self.root / 'spec').mkdir()
         (self.root / 'spec/cases.json').write_text('{}')
         (self.root / 'target').mkdir()
@@ -61,17 +65,20 @@ class MarkdownBoundaries(unittest.TestCase):
         self.assertEqual(paths, ['spec/cases.json', 'docs/revision-comparison.json'])
 
     def test_rejects_broken_anchor_and_parent_escape(self):
+        """Reject broken anchors and links that escape the repository root."""
         for href, message in (('#missing', 'Broken anchor'), ('../outside.md', 'Out-of-pack')):
             with self.subTest(href=href), self.assertRaisesRegex(AssertionError, message):
                 check_local_link(self.context, self.root / 'README.md', href)
 
     def test_resolves_encoded_heading_and_repeated_heading(self):
+        """Resolve encoded headings and disambiguate repeated heading anchors."""
         path = self.root / 'README.md'
         path.write_text('# Title\n\n## A heading\n\n## A heading\n')
         self.assertEqual(headings(path.read_text()), {'title', 'a-heading', 'a-heading-1'})
         self.assertTrue(check_local_link(self.context, path, '#a%2Dheading-1'))
 
     def test_rejects_missing_title_and_unclosed_fence(self):
+        """Reject Markdown without a title or with an unclosed code fence."""
         for text, message in (('No heading\n', 'Expected one title'),
                               ('# Title\n\n```python\nx = 1\n', 'Unclosed fence')):
             with self.subTest(message=message), self.assertRaisesRegex(AssertionError, message):
@@ -79,6 +86,7 @@ class MarkdownBoundaries(unittest.TestCase):
                 check_markdown(self.context)
 
     def test_formatting_does_not_change_generation_contract(self):
+        """Treat formatting-only edits as equivalent for generated-content checks."""
         variants = [
             ('Shape [..., n].\n', 'Shape […, n].\n'),
             ('A sentence wraps\nacross lines.\n', 'A sentence wraps across lines.\n'),
@@ -90,6 +98,7 @@ class MarkdownBoundaries(unittest.TestCase):
                 self.assertEqual(semantic_tokens(left), semantic_tokens(right))
 
     def test_content_and_code_language_changes_are_drift(self):
+        """Detect content changes and code-language changes as generated drift."""
         variants = [
             ('- [ ] Task\n', '- [x] Task\n'),
             ('[Spec](spec.json)\n', '[Spec](other.json)\n'),
@@ -102,6 +111,7 @@ class MarkdownBoundaries(unittest.TestCase):
                 self.assertNotEqual(semantic_tokens(left), semantic_tokens(right))
 
     def test_generated_markers_must_be_unique_and_ordered(self):
+        """Require generated markers to occur exactly once and in order."""
         for text in ('END START body', 'START body END START'):
             with self.subTest(text=text), self.assertRaises(AssertionError):
                 generated_matches(text, 'body', 'START', 'END')
@@ -110,6 +120,7 @@ class MarkdownBoundaries(unittest.TestCase):
 
 
     def test_source_scan_resolves_both_namespaces_without_partial_identifier_matches(self):
+        """Resolve source references in both namespaces without partial matches."""
         (self.root / 'spec').mkdir()
         (self.root / 'spec/backend-capabilities.json').write_text(
             '{"selected_rust_revision": null, "capabilities": []}')
@@ -119,6 +130,7 @@ class MarkdownBoundaries(unittest.TestCase):
         self.assertEqual(check_backend_capabilities(self.context), set())
 
     def test_source_scan_rejects_typo_and_deleted_internal_reference(self):
+        """Reject misspelled source names and deleted internal references."""
         (self.root / 'spec').mkdir()
         (self.root / 'spec/backend-capabilities.json').write_text(
             '{"selected_rust_revision": null, "capabilities": []}')
@@ -135,6 +147,7 @@ class ContractBoundaries(unittest.TestCase):
     """Reject unresolved plans and preserve semantic negative-control distinctions."""
 
     def test_dependency_order_rejects_cycles_self_links_and_missing_tasks(self):
+        """Reject dependency cycles, self-links, and references to missing tasks."""
         invalid = [
             {'1.1.1': {'requires': ['1.1.2']}, '1.1.2': {'requires': ['1.1.1']}},
             {'1.1.1': {'requires': ['1.1.1']}},
@@ -146,6 +159,7 @@ class ContractBoundaries(unittest.TestCase):
         check_dependencies({'1.1.1': {'requires': []}, '1.1.2': {'requires': ['1.1.1']}})
 
     def test_duplicate_task_ids_are_not_hidden_by_indexing(self):
+        """Reject duplicate task identifiers before index construction can hide them."""
         task = {'id': '1.1.1', 'success': 'witness', 'sections': '1-19'}
         phases = [{'number': 1, 'idea': 'hypothesis', 'gate': 'witness', 'steps': [
             {'number': '1.1', 'question': 'why?', 'tasks': [task, task]}]}]
@@ -153,16 +167,19 @@ class ContractBoundaries(unittest.TestCase):
             collect_tasks(phases)
 
     def test_right_and_left_association_are_observably_distinct(self):
+        """Confirm left and right reduction association produce distinct results."""
         self.assertEqual(right_reduce([10, 3, 2], operator.sub), 9)
         self.assertEqual(left_reduce([10, 3, 2], operator.sub), 5)
         with self.assertRaisesRegex(SemanticFailure, 'EmptyReduction'):
             right_reduce([], operator.sub)
 
     def test_stencil_does_not_leak_between_flattened_rows(self):
+        """Keep neighbour calculations within their original flattened rows."""
         self.assertEqual(evaluate({'kind': 'neighbour_sum', 'input': [[1, 0, 0], [0, 0, 1]]}),
                          [[0, 2, 1], [1, 2, 0]])
 
     def test_broadcast_and_empty_dimension_boundaries(self):
+        """Check broadcast and empty-dimension shape boundaries."""
         self.assertEqual(agreement([2, 1], [3], True), [2, 3])
         self.assertEqual(agreement([0], [1], True), [0])
         with self.assertRaisesRegex(SemanticFailure, 'ShapeAgreement'):
@@ -171,12 +188,14 @@ class ContractBoundaries(unittest.TestCase):
             agreement([2, 1], [3], False)
 
     def test_checked_add_uses_i64_bounds(self):
+        """Check checked addition at signed 64-bit limits and overflow."""
         self.assertEqual(checked_add(2**63 - 1, -1), 2**63 - 2)
         for values in ((2**63 - 1, 1), (-2**63, -1)):
             with self.subTest(values=values), self.assertRaisesRegex(SemanticFailure, 'IntegerOverflow'):
                 checked_add(*values)
 
     def test_cost_interval_distinguishes_safe_excess_and_uncertifiable(self):
+        """Distinguish safe, excessive, and uncertifiable cost intervals."""
         expected = ((0, 5, 'certified-within-model'), (6, 7, 'certain-excess'),
                     (0, 6, 'uncertifiable-domain'))
         for lower, upper, result in expected:
@@ -189,6 +208,7 @@ class ContractBoundaries(unittest.TestCase):
             classify_admission({'classification': 'bound', 'lower': 5, 'upper': 4, 'budget': 6})
 
     def test_cost_admission_rejects_unknown_classifications(self):
+        """Reject cost classifications that the admission policy does not define."""
         for classification in ('bounded', 'unrecognised', ''):
             with self.subTest(classification=classification):
                 with self.assertRaisesRegex(AssertionError, 'Unknown cost classification'):
@@ -196,6 +216,7 @@ class ContractBoundaries(unittest.TestCase):
                                         'lower': 0, 'upper': 0, 'budget': 5})
 
     def test_exact_cost_requires_equal_bounds(self):
+        """Require equal lower and upper bounds for exact cost records."""
         self.assertEqual(classify_admission({'classification': 'exact',
                          'lower': 5, 'upper': 5, 'budget': 5}), 'certified-within-model')
         with self.assertRaisesRegex(AssertionError, 'Exact cost must have equal'):
@@ -203,6 +224,7 @@ class ContractBoundaries(unittest.TestCase):
                                 'lower': 0, 'upper': 5, 'budget': 5})
 
     def test_cost_admission_rejects_malformed_intervals_and_budgets(self):
+        """Reject malformed cost intervals and budgets."""
         for field, value in (('lower', True), ('upper', 5.0),
                              ('budget', True), ('budget', -1), ('budget', '5')):
             case = {'classification': 'bound', 'lower': 0, 'upper': 5, 'budget': 5}
@@ -213,6 +235,7 @@ class ContractBoundaries(unittest.TestCase):
 
 
     def test_shape_counts_and_target_width_reject_malformed_numbers(self):
+        """Reject non-integer dimensions and invalid target widths."""
         for value in (True, 1.0, -1):
             with self.subTest(field='dimension', value=value):
                 with self.assertRaisesRegex(AssertionError, 'Malformed shape dimension'):
@@ -223,6 +246,7 @@ class ContractBoundaries(unittest.TestCase):
                     shape_product({'shape': [1], 'target_bits': value})
 
     def test_shape_product_accepts_zero_and_valid_target_widths(self):
+        """Preserve zero-sized and scalar shape-product behavior."""
         for width in (32, 64):
             with self.subTest(width=width):
                 self.assertEqual(shape_product({'shape': [0, 2**64], 'target_bits': width}), 0)
@@ -232,6 +256,7 @@ class ContractBoundaries(unittest.TestCase):
                 self.assertEqual(shape_product({'shape': [2**width], 'target_bits': width}), 'overflow')
 
     def test_prefix_length_requires_nonnegative_integer(self):
+        """Require prefix lengths to be non-negative integers."""
         for value in (True, 4096.0, -1):
             with self.subTest(value=value), self.assertRaisesRegex(AssertionError, 'Malformed prefix length'):
                 right_prefix_work({'length': value})
@@ -240,6 +265,7 @@ class ContractBoundaries(unittest.TestCase):
                 self.assertEqual(right_prefix_work({'length': length}), expected)
 
     def test_allocation_capacities_and_scratch_require_nonnegative_integers(self):
+        """Require allocation capacities and scratch sizes to be non-negative integers."""
         for field in ('capacity', 'scratch'):
             for value in (True, 80.0, -1):
                 case = {'capacities': {'source': 80},
@@ -257,6 +283,7 @@ class ContractBoundaries(unittest.TestCase):
 
 
     def test_unknown_and_estimate_require_valid_budgets_without_known_bounds(self):
+        """Validate budgets for unknown and estimated costs without known bounds."""
         for classification in ('unknown', 'estimate'):
             for budget in (True, 1.5, -1, '5', None):
                 case = {'classification': classification, 'lower': None,
@@ -272,6 +299,7 @@ class ContractBoundaries(unittest.TestCase):
 
 
     def test_transpose_rank_requires_integer_in_the_input_rank(self):
+        """Require transpose cell rank to be an integer within the input rank."""
         for rank in (-1, 4, True, 1.5):
             with self.subTest(rank=rank), self.assertRaisesRegex(AssertionError, 'Malformed cell rank'):
                 evaluate({'kind': 'rank_transpose_shape', 'input_shape': [0, 3, 4], 'cell_rank': rank})
@@ -282,6 +310,7 @@ class ContractBoundaries(unittest.TestCase):
         self.assertEqual(evaluate({'kind': 'rank_transpose_shape', 'input_shape': [], 'cell_rank': 0}), [])
 
     def test_checked_add_grouping_rejects_unrecognised_association(self):
+        """Reject checked-add associations outside the left and right choices."""
         for association in ('lef', '', None, True):
             with self.subTest(association=association):
                 with self.assertRaisesRegex(AssertionError, 'Unknown checked-add association'):

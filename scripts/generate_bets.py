@@ -12,9 +12,18 @@ START = '<!-- bets:start -->'
 END = '<!-- bets:end -->'
 
 def paragraph(text: str) -> str:
+    """Wrap a bet field as an 80-column Markdown paragraph.
+
+    For example, ``paragraph('short field')`` returns ``'short field\\n\\n'``.
+    """
     return textwrap.fill(text, 80, break_long_words=False, break_on_hyphens=False) + '\n\n'
 
 def render(bets: list[dict]) -> str:
+    """Render bet records as the generated section body, preserving field order.
+
+    For example, passing a valid record with ID ``B01`` and title
+    ``Bounded cost`` yields output beginning ``## B01. Bounded cost``.
+    """
     output = []
     for bet in bets:
         output.append(f"## {bet['id']}. {bet['title']}\n\n")
@@ -28,6 +37,11 @@ def render(bets: list[dict]) -> str:
     return ''.join(output).rstrip()
 
 def main() -> int:
+    """Check or update the generated bet section from the JSON register.
+
+    For example, ``python scripts/generate_bets.py --check`` reports whether
+    the generated section matches and returns zero when it does.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()

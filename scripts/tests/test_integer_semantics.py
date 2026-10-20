@@ -18,6 +18,7 @@ class CheckedIntegerModels(unittest.TestCase):
     """Check association, overflow, null policy, and stencil order against the design."""
 
     def test_subtraction_reductions_and_scans_report_i64_overflow(self):
+        """Reject subtraction overflow in both reduction and scan associations."""
         for kind in ('reduce', 'fold_left', 'scan', 'scan_left'):
             for values in ([I64_MIN, 1], [I64_MAX, -1]):
                 with self.subTest(kind=kind, values=values):
@@ -25,6 +26,7 @@ class CheckedIntegerModels(unittest.TestCase):
                         evaluate({'kind': kind, 'operation': 'sub', 'input': values})
 
     def test_right_subtraction_rejects_overflow_hidden_by_final_cancellation(self):
+        """Detect an overflowing right-associated intermediate despite later cancellation."""
         values = [I64_MIN, I64_MIN, 1]
         for kind in ('reduce', 'scan'):
             with self.subTest(kind=kind), self.assertRaisesRegex(SemanticFailure, 'IntegerOverflow'):
@@ -34,6 +36,7 @@ class CheckedIntegerModels(unittest.TestCase):
                          [I64_MIN, 0, -1])
 
     def test_sum_uses_exact_right_association_and_checked_addition(self):
+        """Apply checked additions from the right while preserving boundary values."""
         with self.assertRaisesRegex(SemanticFailure, 'IntegerOverflow'):
             evaluate({'kind': 'sum', 'input': [-1, I64_MAX, 1], 'skip_nulls': False})
         self.assertEqual(evaluate({'kind': 'sum', 'input': [I64_MAX, 1, -1], 'skip_nulls': False}),
@@ -43,6 +46,7 @@ class CheckedIntegerModels(unittest.TestCase):
                 self.assertEqual(evaluate({'kind': 'sum', 'input': values, 'skip_nulls': False}), expected)
 
     def test_null_policy_precedes_arithmetic_without_reordering_valid_values(self):
+        """Apply null handling before the checked sum of the remaining values."""
         values = [None, -1, I64_MAX, 1]
         self.assertIsNone(evaluate({'kind': 'sum', 'input': values, 'skip_nulls': False}))
         with self.assertRaisesRegex(SemanticFailure, 'IntegerOverflow'):
@@ -51,6 +55,7 @@ class CheckedIntegerModels(unittest.TestCase):
         self.assertIsNone(evaluate({'kind': 'sum', 'input': [None, None], 'skip_nulls': False}))
 
     def test_stencil_sums_preserve_order_and_overflow_checks(self):
+        """Keep neighbour accumulation ordered and reject overflowing stencil cells."""
         with self.assertRaisesRegex(SemanticFailure, 'IntegerOverflow'):
             evaluate({'kind': 'neighbour_sum', 'input': [[0, -1], [I64_MAX, 1]]})
         self.assertEqual(evaluate({'kind': 'neighbour_sum', 'input': [[0, I64_MAX], [0, 0]]}),
@@ -58,6 +63,7 @@ class CheckedIntegerModels(unittest.TestCase):
         self.assertEqual(evaluate({'kind': 'neighbour_sum', 'input': [[I64_MIN]]}), [[0]])
 
     def test_all_integer_models_reject_out_of_range_singletons(self):
+        """Reject out-of-range singleton operands before each model's special handling."""
         for invalid in (I64_MIN - 1, I64_MAX + 1):
             cases = (
                 {'kind': 'reduce', 'operation': 'sub', 'input': [invalid]},
@@ -73,6 +79,7 @@ class CheckedIntegerModels(unittest.TestCase):
                         evaluate(case)
 
     def test_optional_cost_intervals_reject_malformed_present_bounds(self):
+        """Reject malformed present interval bounds while accepting absent or valid bounds."""
         invalid_pairs = ((True, 5), (0, 5.0), ('0', '5'), (-1, 5), (5, 4),
                          (None, 5), (0, None))
         for classification in ('estimate', 'unknown'):

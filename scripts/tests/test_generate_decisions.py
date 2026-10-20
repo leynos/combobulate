@@ -48,6 +48,7 @@ def workspace(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_every_decision_and_candidate_is_rendered():
+    """Render an anchored section for every decision and candidate ADR."""
     text = render(REGISTER)
     for record in REGISTER['decisions']:
         assert f"### {record['id']}\n" in text, f"{record['id']} must have its own anchored heading"
@@ -56,12 +57,14 @@ def test_every_decision_and_candidate_is_rendered():
 
 
 def test_deferred_dispositions_name_steps_and_tasks():
+    """Preserve the distinction between deferred roadmap steps and tasks."""
     text = ' '.join(render(REGISTER).split())
     assert 'Resource certification (technical-design.md §15): deferred to step 2.4 (B03)' in text, 'CA7 is a step'
     assert 'deferred to task 1.2.1' in text, 'three-part identifiers are tasks'
 
 
 def test_rendering_is_deterministic():
+    """Render equivalent register data identically, regardless of object identity."""
     assert render(REGISTER) == render(copy.deepcopy(REGISTER)), 'rendering must not depend on identity'
 
 
@@ -78,6 +81,7 @@ def test_proposed_decision_renders_as_pending_with_its_recommendation():
 
 
 def test_accepted_decision_renders_its_approval():
+    """Render the accepted option together with its approval and ADR links."""
     section = render(accepted(REGISTER, 'D03'))
     section = ' '.join(section[section.index('### D03\n'):section.index('### D04\n')].split())
     assert 'Decision: option A, accepted on 2026-10-10 by `leynos`' in section, 'the outcome names its authority'
@@ -130,6 +134,7 @@ def test_quoted_answer_preserves_generated_words_and_paragraphs(paragraphs, sepa
 
 
 def test_splice_rejects_missing_or_repeated_markers():
+    """Reject generated regions without exactly one marker pair."""
     with pytest.raises(MarkerError, match='exactly one'):
         splice('# Register\n', 'body')
     with pytest.raises(MarkerError, match='exactly one'):
@@ -137,11 +142,13 @@ def test_splice_rejects_missing_or_repeated_markers():
 
 
 def test_committed_document_matches_the_register(workspace):
+    """The checked-in decision register matches the rendered source register."""
     register, document = workspace
     assert run_cli('--check', '--register', str(register), '--document', str(document)) == 0, 'no drift'
 
 
 def test_check_tolerates_rewrapping(workspace):
+    """Allow harmless Markdown line wrapping in the generated decision region."""
     register, document = workspace
     text = document.read_text(encoding='utf-8')
     document.write_text(text.replace('Lifecycle: proposed.', 'Lifecycle:\nproposed.', 1), encoding='utf-8')
@@ -149,6 +156,7 @@ def test_check_tolerates_rewrapping(workspace):
 
 
 def test_check_rejects_a_heading_absorbed_into_paragraph_text(workspace):
+    """Detect a lost section anchor even when the generated words are unchanged."""
     register, document = workspace
     original = document.read_text(encoding='utf-8')
     edited = original.replace('\n\n### D03\n\n', ' ### D03\n\n', 1)
@@ -170,6 +178,7 @@ def test_check_reports_a_hand_edit(workspace, capsys):
 
 
 def test_missing_markers_exit_two(workspace, capsys):
+    """Report malformed marker structure with the CLI's usage-error status."""
     register, document = workspace
     document.write_text('# Decision register\n', encoding='utf-8')
     assert run_cli('--register', str(register), '--document', str(document)) == 2, 'malformed documents exit 2'
@@ -177,6 +186,7 @@ def test_missing_markers_exit_two(workspace, capsys):
 
 
 def test_write_mode_regenerates_the_region(workspace):
+    """Replace stale generated content and leave a stable checkable document."""
     register, document = workspace
     document.write_text(f'# Decision register\n\n{START}\n\nstale\n\n{END}\n', encoding='utf-8')
     assert run_cli('--register', str(register), '--document', str(document)) == 0, 'writing succeeds'
@@ -185,6 +195,7 @@ def test_write_mode_regenerates_the_region(workspace):
 
 
 def test_check_reads_the_flag_from_the_environment(workspace, monkeypatch):
+    """Honor the action input that enables check mode without a CLI flag."""
     register, document = workspace
     document.write_text(f'# Decision register\n\n{START}\n\nstale\n\n{END}\n', encoding='utf-8')
     monkeypatch.setenv('INPUT_CHECK', 'true')
