@@ -538,8 +538,9 @@ open or pending within 60 characters of its identifier. Never edit an accepted
 record in place. A replacement must have its own valid D01-authorized
 acceptance before it can retire the accepted decision. Link both directions with
 `supersedes` and `superseded_by`; supersession chains must be acyclic and
-terminate at an accepted replacement. ADRs live in `docs/adrs/` as
-`adr-nnnn-title-slug.md`, per the
+terminate at an accepted replacement. ADRs and RFCs use four-digit,
+zero-padded numbers and lowercase ASCII title slugs in `docs/adrs/` and
+`docs/rfcs/`, respectively, as specified by the
 [documentation style guide](documentation-style-guide.md).
 
 The generated quote preserves the answer's words and blank-line paragraph

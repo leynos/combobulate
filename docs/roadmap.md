@@ -4,7 +4,9 @@ Revision 0.2, 6 October 2026. Step 1.1 (tasks 1.1.1 to 1.1.4) is complete; all
 other work remains proposed and open.
 
 Decisions that control acceptance, with their authority, options, and status,
-are recorded in the [decision register](decision-register.md).
+are recorded in the [decision register](decision-register.md). ADR and RFC
+filenames follow the conventions in the
+[documentation style guide](documentation-style-guide.md).
 
 This roadmap translates `terms-of-reference.md`, `technical-design.md`,
 `context.md`, and `language-reference.md` into proposed delivery work. It makes

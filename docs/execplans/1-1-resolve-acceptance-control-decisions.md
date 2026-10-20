@@ -285,9 +285,11 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
 - [x] (2026-10-11) Sponsor approval of this revision.
 - [x] (2026-10-11) `EP-M1a` ADR relocation, decision register, generator, and
   anchors (branch `1-1-decision-register`, stacked on `EP-M0`). Evidence: ADR
-  001 moved to `docs/adrs/adr-0001-repository-bootstrap.md` with every link
-  updated and the style guide amended (D07); `spec/decisions.json` holds D01 to
-  D15 (all `proposed`) and the eight candidate ADR subjects; 11 pytest cases in
+  001 moved to
+  `docs/adrs/adr-0001-bootstrap-the-repository-from-the-rust-build-baseline.md`
+  with every link updated and the style guide amended (D07);
+  `spec/decisions.json` holds D01 to D15 (all `proposed`) and the eight
+  candidate ADR subjects; 11 pytest cases in
   `scripts/tests/test_generate_decisions.py` (red first: module missing) and 33
   `unittest` cases in `scripts/tests/test_decision_register.py` pass; seeded
   mutations (open-status pattern disabled, supersession check removed) each
@@ -1069,11 +1071,12 @@ conflict in `Decision log`, set the status to `BLOCKED`, and escalate.
   Date/Author: 2026-10-10, sponsor.
 - Decision: ADRs live in `docs/adrs/` as `adr-nnnn-title-slug.md` (four-digit
   index) and RFCs in `docs/rfcs/` as `rfc-nnnn-title-slug.md` (D07, sponsor).
-  This deliberately diverges from the current df12 central style guide; if it
-  works well, the sponsor will update the central guide in
-  `agent-helper-scripts`. The existing ADR 001 moves to
-  `docs/adrs/adr-0001-repository-bootstrap.md` with every link updated in the
-  same commit. Date/Author: 2026-10-10, sponsor.
+  At the time, this deliberately diverged from the then-current shared style
+  guide; the sponsor planned to update the central guide in
+  `agent-helper-scripts`. The central guide now specifies this same naming
+  convention, and this repository imports it. The existing ADR 001 moves to
+  `docs/adrs/adr-0001-bootstrap-the-repository-from-the-rust-build-baseline.md`
+  with every link updated in the same commit. Date/Author: 2026-10-10, sponsor.
 - Decision: the sponsor delegated threshold selection (D12) to the agent, on
   condition that thresholds rest on recorded local measurements extrapolated to
   the pinned runner class. AC-05 remains uncalibrated until an executor exists.
@@ -1334,9 +1337,10 @@ ADR format (after `EP-M1a`): `docs/adrs/adr-nnnn-title-slug.md`, title
 - ADRs: ADR 001 (accepted, scaffold only; relocated in `EP-M1a`).
 - Sponsor decisions: D01 to D15 (2026-10-10, Lody session
   `99861d46-f6f5-48d6-acfb-658bee9364bf`).
-- Governing standards: `AGENTS.md`, `docs/documentation-style-guide.md` (as
-  amended by D07), `docs/developers-guide.md`, and D-CONTRACT in
-  `docs/references.md` (draft status retained).
+- Governing standards: `AGENTS.md`, the shared
+  `docs/documentation-style-guide.md` (including the naming convention approved
+  by D07), `docs/developers-guide.md`, and D-CONTRACT in `docs/references.md`
+  (draft status retained).
 
 Trace chains:
 
@@ -1814,11 +1818,11 @@ full gates (Stage D).
 
 - Amend `docs/documentation-style-guide.md`: ADRs in `docs/adrs/` named
   `adr-nnnn-title-slug.md`; RFCs in `docs/rfcs/` named
-  `rfc-nnnn-title-slug.md`; four-digit indices; note the deliberate divergence
-  from the central df12 guide. Move ADR 001 to
-  `docs/adrs/adr-0001-repository-bootstrap.md` and update every link,
-  `DESIGN_DOCUMENTS`, `docs/contents.md`, and `docs/repository-layout.md` in
-  the same commit.
+  `rfc-nnnn-title-slug.md`; four-digit indices. At the time, record the
+  deliberate divergence from the then-current central guide. Move ADR 001 to
+  `docs/adrs/adr-0001-bootstrap-the-repository-from-the-rust-build-baseline.md`
+  and update every link, `DESIGN_DOCUMENTS`, `docs/contents.md`, and
+  `docs/repository-layout.md` in the same commit.
 - Add `spec/decision-register.schema.json` and `spec/decisions.json` with D01
   to D15 (still `proposed` in this milestone; acceptance is recorded in `EP-M2`
   onward). Each decision carries `subject`, `questions`, `authority_roles`,
@@ -1858,8 +1862,8 @@ full gates (Stage D).
 
 ### EP-M2. Task 1.1.1: authority, scope, licence, and API policy
 
-- Write `docs/adrs/adr-0002-governance-authority.md` (D01, D02, D13, axiom
-  A4), `docs/adrs/adr-0003-initial-release-scope.md` (D03),
+- Write `docs/adrs/adr-0002-governance-authority-and-exceptions.md` (D01, D02,
+  D13, axiom A4), `docs/adrs/adr-0003-initial-release-scope.md` (D03),
   `docs/adrs/adr-0004-licence-and-publication.md` (D04, D05), and
   `docs/adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md` (D06), each
   `Accepted` on 2026-10-10 citing the session answer.
@@ -2221,14 +2225,14 @@ taking either side and rerunning the generators, exporter, and
 
 New documents: `docs/decision-register.md` (generated),
 `docs/evidence-and-decision-records.md`, `docs/acceptance-calibration.md`, and
-`docs/adrs/adr-0002-governance-authority.md`,
+`docs/adrs/adr-0002-governance-authority-and-exceptions.md`,
 `adr-0003-initial-release-scope.md`, `adr-0004-licence-and-publication.md`,
 `adr-0005-pre-1-0-api-and-proof-interface-policy.md`,
 `adr-0006-numeric-validity-and-reduction-contracts.md`,
 `adr-0007-comb-macro-grammar-and-staging.md`,
 `adr-0008-acceptance-control-pre-registration.md`,
 `adr-0009-proof-first-policy-and-evidence-gate.md`. Moved:
-`docs/adrs/adr-0001-repository-bootstrap.md`.
+`docs/adrs/adr-0001-bootstrap-the-repository-from-the-rust-build-baseline.md`.
 
 New specification files: `spec/decision-register.schema.json`,
 `spec/decisions.json`, `spec/task-completion.json`,

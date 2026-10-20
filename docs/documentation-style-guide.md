@@ -351,15 +351,22 @@ binding. Store them under `docs/rfcs/`.
 
 #### RFC naming convention
 
-Name RFC files using the pattern `rfc-nnnn-title-slug.md`, where `nnnn` is a
-four-digit, zero-padded sequence number and `title-slug` is the RFC title in
-lower-case words joined by hyphens (e.g.
-`rfc-0001-streaming-batch-readers.md`). Place RFCs in the `docs/rfcs/`
-directory.
+Name RFC files using the pattern `rfcs/rfc-nnnn-title-slug.md`, relative to the
+`docs/` directory, for example `docs/rfcs/rfc-0007-streaming-step-results.md`.
 
+- `nnnn` is a four-digit, zero-padded serial number, unique among the RFCs in
+  the repository. RFC and ADR numbers are allocated independently, so
+  `rfc-0003` and `adr-0003` may both exist.
+- `title-slug` is a kebab-case American Standard Code for Information
+  Interchange (ASCII) rendering of the RFC title, without the `RFC nnnn:`
+  prefix: lowercase letters, digits, and single hyphens only, with no leading
+  or trailing hyphen. Transliterate accented letters to their ASCII base
+  letters, and drop other punctuation and symbols.
 - Number RFCs sequentially in allocation order rather than by date.
 - Do not renumber existing RFCs after publication. Gaps are acceptable when
   numbers are reserved, drafted on another branch, or intentionally skipped.
+- Keep the slug stable once the RFC is published. If the title changes
+  materially, rename the file, keep the number, and update every inbound link.
 
 #### RFC required sections
 
@@ -501,23 +508,16 @@ providing a historical record for future maintainers.
 
 ### Naming convention
 
-Name ADR files using the pattern `adr-nnnn-title-slug.md`, where `nnnn` is a
-four-digit, zero-padded sequence number and `title-slug` is the ADR title in
-lower-case words joined by hyphens (e.g. `adr-0001-repository-bootstrap.md`).
-Place ADRs in the `docs/adrs/` directory.
+Name ADR files using the pattern `adrs/adr-nnnn-title-slug.md`, relative to the
+`docs/` directory, for example `docs/adrs/adr-0001-async-fixtures-and-tests.md`.
 
-- Number ADRs sequentially in allocation order and never renumber them.
-- Refer to an ADR in prose as `ADR-nnnn` (e.g. ADR-0002).
-
-This repository deliberately diverges from the shared df12 documentation style
-guide, which places ADRs directly under `docs/` with a three-digit index and
-names RFCs without a prefix. The sponsor directed the `docs/adrs/` and
-`docs/rfcs/` layout on 2026-10-10, as recorded in the
-[decision log][roadmap-1-1-decision-log]; if it works well, the shared guide
-will be updated to match.
-
-[roadmap-1-1-decision-log]:
-  execplans/1-1-resolve-acceptance-control-decisions.md#decision-log
+- `nnnn` is a four-digit, zero-padded serial number, unique among the ADRs in
+  the repository and allocated independently of RFC numbers.
+- `title-slug` is a kebab-case ASCII rendering of the ADR title, without the
+  `Architectural decision record (ADR) nnnn:` prefix, following the same slug
+  rules as RFC filenames.
+- Number ADRs sequentially in allocation order rather than by date, and do not
+  renumber an ADR after publication.
 
 ### Required sections
 
@@ -791,7 +791,7 @@ This hierarchy should align with the GIST framework:
   - Phases: 1, 2, 3, …
   - Steps: 1.1, 1.2, 1.3, …
   - Headline tasks: 1.1.1, 1.1.2, 1.1.3, …
-- **Checkboxes:** Precede task and sub-task items with a GitHub Flavoured
+- **Checkboxes:** Precede task and sub-task items with a GitHub Flavored
   Markdown (GFM) checkbox (`[ ]`) to track completion status.
 - **Dependencies:** Note non-linear dependencies explicitly. Where a task
   depends on another task outside its immediate sequence, cite the dependency
