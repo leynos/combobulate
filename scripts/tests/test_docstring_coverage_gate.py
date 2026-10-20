@@ -85,6 +85,21 @@ class DocstringCoverageGateTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_gate_fails_when_source_selection_is_empty(self) -> None:
+        """Reject empty Git discovery and an explicitly empty source override."""
+        scenarios = (
+            ('empty Git discovery', None),
+            ('empty explicit override', 'PYTHON_TARGETS='),
+        )
+        for scenario, override in scenarios:
+            with self.subTest(scenario=scenario):
+                with tempfile.TemporaryDirectory() as temporary_directory:
+                    root = Path(temporary_directory)
+                    if override is None:
+                        subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
+
+                    self._assert_empty_source_selection_fails(root, override)
+
     def _initialize_repository(self, root: Path) -> None:
         """Create a temporary repository with tracked and untracked sources."""
         subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
@@ -105,6 +120,49 @@ class DocstringCoverageGateTests(unittest.TestCase):
         )
         executable.chmod(0o755)
         return executable
+
+    def _assert_empty_source_selection_fails(
+        self,
+        root: Path,
+        override: str | None,
+    ) -> None:
+        """Assert that Make rejects empty sources before invoking Interrogate."""
+        invocation_log = root / 'uv-arguments.txt'
+        uv = self._write_uv_stub(root)
+        command = [
+            'make',
+            '-f',
+            str(MAKEFILE),
+            'docstring-coverage',
+            f'UV={uv}',
+        ]
+        if override is not None:
+            command.append(override)
+
+        result = subprocess.run(
+            command,
+            cwd=root,
+            env=os.environ | {'UV_INVOCATION_LOG': str(invocation_log)},
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        output = result.stdout + result.stderr
+        self.assertNotEqual(
+            result.returncode,
+            0,
+            'an empty Python source selection must fail before Interrogate runs',
+        )
+        self.assertIn(
+            'PYTHON_TARGETS is empty after source selection',
+            output,
+            'empty source selection should report the fail-closed guard',
+        )
+        self.assertFalse(
+            invocation_log.exists(),
+            'the Interrogate command must not run with an empty source list',
+        )
 
 
 if __name__ == '__main__':

@@ -138,9 +138,11 @@ ifeq ($(PYTHON_TARGETS_FROM_GIT),1)
 check-python-sources:
 	$(eval PYTHON_TARGETS := $(shell git ls-files --cached --others --exclude-standard '*.py' '*.pyi'))
 	$(if $(filter 0,$(.SHELLSTATUS)),,$(error Error: git ls-files failed while discovering Python sources for PYTHON_TARGETS))
+	$(if $(strip $(PYTHON_TARGETS)),,$(error Error: PYTHON_TARGETS is empty after source selection))
 	@:
 else
 check-python-sources:
+	$(if $(strip $(PYTHON_TARGETS)),,$(error Error: PYTHON_TARGETS is empty after source selection))
 	@:
 endif
 

@@ -33,7 +33,8 @@ spelling. It runs these gates one at a time even when invoked with `make -j`.
 Interrogate 1.7.0 with a 100% threshold. It discovers tracked and non-ignored
 untracked `.py` and `.pyi` files through Git, including hidden paths under
 `.github/` and any scripts, tests, tools, or benchmarks. A failed source-list
-command stops the gate rather than silently checking an incomplete set.
+command or empty source selection stops the gate rather than silently checking
+an incomplete set or falling back to Interrogate's working-directory scan.
 Whitaker's temporary Dylint driver is built outside the repository, so the
 recipe removes inherited compiler and linker overrides before starting it.
 Dylint then checks the repository from its root and discovers
