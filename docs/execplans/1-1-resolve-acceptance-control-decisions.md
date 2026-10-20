@@ -5,14 +5,22 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (review follow-ups replayed onto merged `EP-M5`). Prior
-receipts record the generated properties and helper documentation passing
-against former base `b4e2c14`; they do not cover this replay. The replay also
-adds AC-02 module documentation with a sponsor-approved digest amendment; the
-older AC-01 source amendment was superseded by the merged parent's later chain.
-The merged base is `a246aac`; current-candidate gates, hosted checks, review,
-and merge remain pending. Historical receipts below retain their original
-candidate scope. Current delivery state is recorded on
+Status: IN PROGRESS. The implementation and `VO-14` idempotence check are
+complete. Local candidate gates passed on the final documentation correction.
+Current hosted checks and formal review remain pending; sponsor merge follows
+review. Prior receipts record the generated properties and helper documentation
+passing against former base `b4e2c14`; they do not cover this replay. The
+replay also adds AC-02 module documentation with a sponsor-approved digest
+amendment; the older AC-01 source amendment was superseded by the merged
+parent's later chain. The merged base is `a246aac`. The earlier published
+candidate `8be35c95c04728c05a671a444922b4d59b3af11d` passed local gates and
+hosted CI
+[run 39445625489](https://github.com/leynos/combobulate/actions/runs/39445625489)
+and Design contracts
+[run 39445625290](https://github.com/leynos/combobulate/actions/runs/39445625290);
+those hosted runs do not cover the correction tree. The `VO-14`
+generation-and-format sequence passed on the current correction tree. Current
+delivery state is recorded on
 [PR #18](https://github.com/leynos/combobulate/pull/18).
 
 Plan approval is distinct from acceptance of an individual decision;
@@ -1718,12 +1726,12 @@ failed unwinding assertion to `outcome-counterexample`; empty generator to
   `scripts/tests/test_package_policy.py`. Non-vacuity: an in-memory manifest
   without `publish = false` fails.
 - VO-14 (drift and idempotence for every generator and export). Invariant:
-  every generator and the roadmap exporter are covered by the checker; rerun on
-  a clean tree, they yield no diff. Artefact:
-  `scripts/tests/test_roadmap_status.py` and the idempotence step. Non-vacuity:
-  a hand edit to `docs/decision-register.md` or `spec/roadmap.json` fails. The
-  generator CLI rejects a word-preserving loss of a decision heading while
-  permitting ordinary paragraph rewrapping.
+  every generator and the roadmap exporter are covered by the checker; rerun
+  the complete generation-and-format sequence on a clean tree, and it yields no
+  diff. Artefact: `scripts/tests/test_roadmap_status.py` and the idempotence
+  step. Non-vacuity: a hand edit to `docs/decision-register.md` or
+  `spec/roadmap.json` fails. The generator CLI rejects a word-preserving loss
+  of a decision heading while permitting ordinary paragraph rewrapping.
 - VO-15 (bet and task links are two-way). Artefact:
   `scripts/tests/test_metadata_ids.py`. Non-vacuity: removing 1.1.4 from B08 in
   memory fails.
@@ -2116,7 +2124,8 @@ ModuleNotFoundError: No module named 'docs_validation.evidence_gate'
 FAILED (errors=1)
 ```
 
-Green and refactor, then regenerate and check idempotence:
+Green and refactor, then regenerate, apply canonical Markdown formatting, and
+check idempotence:
 
 ```bash
 $PY -m unittest discover -s scripts/tests
@@ -2127,6 +2136,7 @@ $PY scripts/check_docs.py --write --as-of "$(git log -1 --format=%cs)"
 $PY scripts/export_roadmap.py --check
 for g in reference bets; do $PY scripts/generate_$g.py; done
 $PY scripts/generate_decisions.py
+make fmt
 git diff --exit-code -- docs/ spec/ && echo idempotent
 ```
 
@@ -2331,8 +2341,10 @@ mechanical documentation edits; `wyvern` does read-only reconnaissance.
   chain in place of the superseded branch amendment, and appended the approved
   AC-02 documentation amendment after the current chain. Injected ledger
   collaborators from the composition root while retaining exact export
-  serialization checks. Current-candidate validation and delivery remain
-  pending.
+  serialization checks. The `VO-14` generation-and-format idempotence sequence
+  and local candidate gates passed on the final documentation correction.
+  Current hosted checks and formal review remain pending delivery. This does
+  not mark EP-M6 complete.
 - 2026-10-14, recorded the missing CLI reassessment after three non-recoverable
   startup failures with readiness diagnostics passing. Preserved the old
   property and helper-documentation receipts at their original scope; the
