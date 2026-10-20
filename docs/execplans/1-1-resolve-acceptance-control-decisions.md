@@ -1229,7 +1229,7 @@ Outcome against `Purpose / big picture`, item by item:
    dispositions. Reinserting a retired sentence, writing "Q4 remains open", or
    deleting a ToR §9 anchor fails `make design-check` and names the decision.
 2. `spec/semantic-contracts.json` holds `SC-01` to `SC-11` with
-   preconditions, success and error relations, empty rules, 51 executable
+   preconditions, success and error relations, empty rules, 68 executable
    examples, a 29-entry grammar corpus, seeded mutations that each change an
    outcome, and proof sketches.
 3. `spec/acceptance-controls.json` registers `AC-01` to `AC-07`, four
@@ -2116,7 +2116,7 @@ make design-check PYTHON="$PY" 2>&1 | tee /tmp/design-check-combobulate-1-1-reso
 Red step, for example in `EP-M5`:
 
 ```bash
-$PY -m unittest discover -s tools/tests -p 'test_evidence_gate.py' 2>&1 | tail -n 3
+$PY -m unittest discover -s scripts/tests -p 'test_evidence_gate.py' 2>&1 | tail -n 3
 ```
 
 ```plaintext
