@@ -425,6 +425,13 @@ column says when each is meant to shrink or go.
 
 *Table 1: Governance modules, ownership, and retirement.*
 
+Bet/task traceability is an internal documentation-pack validation rule.
+`check_bets_and_tasks` calls `check_bet_links` in
+`scripts/docs_validation/contracts.py`: every task listed by a bet must cite
+that bet, and every bet cited by a task must list that task. Its regression
+tests reject a missing reverse link in either direction. Update both sides of
+the mapping together.
+
 To renew an exception before it expires, add a new exception with a new
 identifier, a fresh `approved_on`, an `invalid_from` at most 90 days later, and
 the sponsor's approval reference; point the affected evidence record at it.
