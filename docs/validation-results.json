@@ -12,7 +12,7 @@
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 103
+      "count": 106
     },
     {
       "check": "catalogue",
@@ -35,7 +35,7 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 14 of 15 decisions are accepted. Acceptance is not verification.",
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 15 of 15 decisions are accepted. Acceptance is not verification.",
       "count": 15
     },
     {
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 75
+      "count": 76
     },
     {
       "check": "contract-examples",
@@ -137,8 +137,8 @@
     {
       "check": "package-policy",
       "status": "pass",
-      "detail": "Cargo.toml meets the D04 licence policy and keeps publication disabled until an accepted D05 supersession and validated task 4.3.3 closure.",
-      "count": 1
+      "detail": "Cargo.toml satisfies the enforced package rules: the ISC licence (D04); publish = false (D05).",
+      "count": 2
     }
   ],
   "not_run": [

@@ -28,16 +28,22 @@ rules.
 
 Use `make all` as the public entrypoint for formatting, linting, tests, and
 spelling. It runs these gates one at a time even when invoked with `make -j`.
-`make lint` runs `lint-clippy` (rustdoc, then Clippy) before `lint-whitaker`,
-also under `make -j`. Whitaker's temporary Dylint driver is built outside the
-repository, so the recipe removes inherited compiler and linker overrides
-before starting it. Dylint then checks the repository from its root and
-discovers `.cargo/config.toml`; that check uses the development backend and
-linker defaults. The recipe sends warnings-as-errors to the repository check
-through Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers
-`cargo nextest run` and falls back to `cargo test` when cargo-nextest is not
-available. It also runs the cardinality probe's `trybuild` UI test for its
-`#[must_use]` result contract. `make check-fmt` verifies Rust formatting with
+`make lint` runs `lint-clippy` (rustdoc, then Clippy), `lint-whitaker`, and
+`lint-python` in sequence, also under `make -j`. The Python stage runs
+Interrogate 1.7.0 with a 100% threshold. It discovers tracked and non-ignored
+untracked `.py` and `.pyi` files through Git, including hidden paths under
+`.github/` and any scripts, tests, tools, or benchmarks. A failed source-list
+command or empty source selection stops the gate rather than silently checking
+an incomplete set or falling back to Interrogate's working-directory scan.
+Whitaker's temporary Dylint driver is built outside the repository, so the
+recipe removes inherited compiler and linker overrides before starting it.
+Dylint then checks the repository from its root and discovers
+`.cargo/config.toml`; that check uses the development backend and linker
+defaults. The recipe sends warnings-as-errors to the repository check through
+Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers `cargo nextest run` and
+falls back to `cargo test` when cargo-nextest is not available. It also runs
+the cardinality probe's `trybuild` UI test for its `#[must_use]` result
+contract. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and
@@ -233,9 +239,11 @@ with its required components, including rust-analyzer. On x86_64 GNU Linux,
 `make check-build-tools` asks Clang which `ld.mold` it will execute, checks its
 link plan and version against `tools/mold/VERSION`, and fails if Clang selects
 a different executable. It also checks that the nightly and every pinned
-component are installed. It checks clang for native Linux builds, and
-`make coverage` also checks clang and lld. Development Make targets run this
-check before Cargo. The Makefile exports `BUILD_TOOLS_PREFIX` (default
+component are installed. Component checks consume the full installed-component
+listing so an early reader exit cannot falsely report a missing component when
+the shell checks every pipeline exit status. It checks clang for native Linux
+builds, and `make coverage` also checks clang and lld. Development Make targets
+run this check before Cargo. The Makefile exports `BUILD_TOOLS_PREFIX` (default
 `~/.local`) for the native Clang wrapper and prepends its `bin` directory to
 `PATH` for direct tools. The installer and checker belong to the root build
 workflow. Callers may use them directly or through Make targets. CI, Act,
@@ -330,7 +338,7 @@ capable revision. Remove that literal revision assertion once the probe exists.
 Before installing Whitaker, CI runs:
 
 ```sh
-uv run --with PyYAML==6.0.3 python tools/whitaker_probe.py \
+uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py \
   --workflow .github/workflows/ci.yml
 ```
 
@@ -402,6 +410,60 @@ also describe the Node.js or Bun route with the official Mermaid CLI. Set
 `--no-sandbox`: this disables the Chromium sandbox when using that renderer and
 is inert with `merman-cli`.
 
+## Governance maintenance
+
+The sponsor, `leynos`, owns every governance module below; the right-hand
+column says when each is meant to shrink or go.
+
+| Module                                         | Role                                             | Retirement or hand-over                                  |
+| ---------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| `scripts/export_roadmap.py`                    | Canonical roadmap to JSON export and drift check | Replaced when leynos/mapsplice#144 ships a native export |
+| `scripts/generate_decisions.py`                | Decision register rendering                      | Stays                                                    |
+| `scripts/check_evidence.py`                    | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
+| `scripts/docs_validation/contracts.py`         | Semantic contract and bet/task validation        | Stays                                                    |
+| `scripts/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
+| `scripts/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
+| `scripts/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
+| `scripts/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
+| `scripts/docs_validation/contract_examples.py` | Documentation model of the semantic contracts    | Superseded by `rstest` replay in task 1.2.3              |
+| `scripts/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
+| `scripts/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
+
+*Table 1: Governance modules, ownership, and retirement.*
+
+Bet/task traceability is an internal documentation-pack validation rule.
+`check_bets_and_tasks` calls `check_bet_links` in
+`scripts/docs_validation/contracts.py`: every task listed by a bet must cite
+that bet, and every bet cited by a task must list that task. Its regression
+tests reject a missing reverse link in either direction. Update both sides of
+the mapping together.
+
+To renew an exception before it expires, add a new exception with a new
+identifier, a fresh `approved_on`, an `invalid_from` at most 90 days later, and
+the sponsor's approval reference; point the affected evidence record at it.
+Never edit or delete an approved exception: the freeze check rejects it, and an
+expired one stays as history. The weekly `Design contracts` run surfaces expiry
+on `main` before it reaches an unrelated pull request.
+
+To amend a registered acceptance control, change its frozen fields, compute the
+new digest with `preregistration.frozen_digest`, append an amendment whose
+`replaces` is the previous digest and whose `new_digest` is the new one, with
+the sponsor as `approved_by` and an approval reference, and set `digest` to the
+new value. If any acceptance measurement already exists for the control,
+register a new control identifier instead and keep the original result.
+
+Registered workload sources use repository-relative paths, such as
+`.github/workflows/ci.yml`, with no `..` components. Absolute paths are
+rejected. Each source file, including any resolved symlink target, must remain
+inside the repository and match its recorded SHA-256 digest. When source
+content changes, update its source digest and follow the control amendment
+procedure above; after an acceptance measurement, register a new control.
+
+When `docs/validation-results.json` conflicts between stacked branches, take
+either side, rerun the generators and `scripts/export_roadmap.py`, then run
+`python3 scripts/check_docs.py --write --as-of <HEAD commit date>` and commit
+the result.
+
 ## Licence and publication
 
 Combobulate is ISC-licensed (decision D04). `Cargo.toml` sets `publish = false`
@@ -419,7 +481,7 @@ the crate.
 
 ## Design contract checks
 
-Install `tools/requirements.txt`, then run `make design-check`. The dedicated
+Install `scripts/requirements.txt`, then run `make design-check`. The dedicated
 `Design contracts` workflow runs the same target for pull requests and main.
 These checks cover specification links, generated reference, bet, and
 decision-register drift, roadmap export drift, decision-register integrity,
@@ -427,14 +489,14 @@ example semantics, schemas, proof-evidence envelopes, and cost-model negative
 controls. They do not execute Kani, Verus, proposed Rust macros, or Polars
 probes. The default checker also verifies the committed validation report
 without changing it. After deliberate design or validator changes, run
-`python3 tools/check_docs.py --write`, review the report diff, then run
+`python3 scripts/check_docs.py --write`, review the report diff, then run
 `make design-check`. Failed source checks leave the existing report untouched.
 
 The system Python may lack the pinned dependencies. A disposable environment
 works without installing anything globally:
 
 ```bash
-make design-check PYTHON="uv run --python 3.14 --with-requirements tools/requirements.txt python3"
+make design-check PYTHON="uv run --python 3.14 --with-requirements scripts/requirements.txt python3"
 ```
 
 `docs/roadmap.md` is the canonical roadmap. Edit it directly, preferably with
@@ -480,6 +542,10 @@ terminate at an accepted replacement. ADRs live in `docs/adrs/` as
 `adr-nnnn-title-slug.md`, per the
 [documentation style guide](documentation-style-guide.md).
 
+The generated quote preserves the answer's words and blank-line paragraph
+boundaries; Markdown soft line breaks may be rewrapped to meet the prose
+formatting policy. The original approval answer in the register stays intact.
+
 Semantic contracts live in `spec/semantic-contracts.json`
 (`spec/semantic-contract.schema.json`): one record per public primitive's
 logical contract, independent of any implementation, with preconditions,
@@ -487,8 +553,8 @@ success and error relations, the empty rule, examples, seeded mutations, the
 obligation component that discharges it, and a proof sketch. Its examples are
 the tagged-scalar `contract_cases` in `spec/examples.json` (`{"f64": "-0.0"}`,
 `{"f64_bits": "0x..."}`, `{"i64": "..."}`), evaluated by
-`tools/docs_validation/contract_examples.py`, and the `comb!` corpus in
-`spec/macro-grammar.json`, recognized by `tools/docs_validation/grammar.py`.
+`scripts/docs_validation/contract_examples.py`, and the `comb!` corpus in
+`spec/macro-grammar.json`, recognized by `scripts/docs_validation/grammar.py`.
 Both models describe the contracts, not the Rust code; tasks 1.2.3 and 2.3.1
 replay them as `rstest` cases and `trybuild` fixtures, after which the grammar
 recognizer is deleted. `spec/kernel-contract.schema.json` does not fit
@@ -502,24 +568,24 @@ a missing citation, an unregistered error code, an example no record owns, or a
 seeded mutation that changes no outcome.
 
 A ticked roadmap checkbox is a claim, and
-`tools/docs_validation/roadmap_status.py` is the single owner of what backs it.
-Before ticking a task, add its entry to `spec/task-completion.json`, naming the
-decisions it relies on and the artefacts that complete it (a path, optionally
-with a `#heading` anchor). The design checks then require every prerequisite to
-be ticked, every cited decision to be accepted, every artefact to resolve, and
-every proof-obligation component linked to the task to be satisfied. Components
-live in `spec/proof-obligations.json` as `PFnn.<method>@<task>`, each listing
-the admission levels (`proof`, `bounded`, `tested`) that satisfy it. A
-component whose `evidence_source` is `checker:<check>` is satisfied when the
-latest result passes in the current validation run at the current source
-revision, the component accepts `tested`, and no evidence record for it reports
-a counterexample at that revision. Checker results are `tested` evidence and
-need no separate verifier record. A `record` component fails closed unless its
-latest record by `recorded_on` matches the current binding and reaches an
-accepted level; same-day ties fail closed. A counterexample at the selected
-source revision vetoes closure regardless of its admission level. A task that
-meets every condition but is not ticked is reported, not failed, so ticking
-stays a deliberate act.
+`scripts/docs_validation/roadmap_status.py` is the single owner of what backs
+it. Before ticking a task, add its entry to `spec/task-completion.json`, naming
+the decisions it relies on and the artefacts that complete it (a path,
+optionally with a `#heading` anchor). The design checks then require every
+prerequisite to be ticked, every cited decision to be accepted, every artefact
+to resolve, and every proof-obligation component linked to the task to be
+satisfied. Components live in `spec/proof-obligations.json` as
+`PFnn.<method>@<task>`, each listing the admission levels (`proof`, `bounded`,
+`tested`) that satisfy it. A component whose `evidence_source` is
+`checker:<check>` is satisfied when the latest result passes in the current
+validation run at the current source revision, the component accepts `tested`,
+and no evidence record for it reports a counterexample at that revision.
+Checker results are `tested` evidence and need no separate verifier record. A
+`record` component fails closed unless its latest record by `recorded_on`
+matches the current binding and reaches an accepted level; same-day ties fail
+closed. A counterexample at the selected source revision vetoes closure
+regardless of its admission level. A task that meets every condition but is not
+ticked is reported, not failed, so ticking stays a deliberate act.
 
 The private `record_component_failure` and `_checker_result_failure` paths are
 called only by `component_failure`; `_current_binding_records` and
@@ -532,7 +598,7 @@ bindings and parser results. Its exception-register adapter receives the
 decisions and roadmap paths explicitly; it must not load those policy files
 through a module-level repository root.
 
-`tools/docs_validation/closure_evidence.py` owns the immutable
+`scripts/docs_validation/closure_evidence.py` owns the immutable
 `ClosureEvidence` projection used only for roadmap closure. The
 `evidence_records.admitted_evidence` adapter constructs it from schema-v2
 records and their admission. Its fields are component id, recorded date, source
@@ -565,7 +631,7 @@ MS-2 rules and returns an admission level with reason codes. Neither function
 reads files, the clock, the environment, or the network. Add producers at the
 adapter boundary and pass explicit inputs into the gate.
 
-The `tools/check_docs.py` composition root resolves the checked-out source
+The `scripts/check_docs.py` composition root resolves the checked-out source
 revision through the Git adapter and places it in
 `ValidationContext.source_revision` before running checks. The roadmap adapter
 uses that injected value to bind earlier check results in `CheckResult` values.
@@ -592,27 +658,31 @@ Python helper scripts live in `scripts/` and follow
 723 dependency block, Cyclopts for the command line (so `INPUT_*` environment
 variables work in CI), and pytest suites in `scripts/tests/` named after the
 script, such as `scripts/tests/test_export_roadmap.py`. `make design-check`
-runs those suites. When the design checker needs a helper's logic, it loads the
-script by path with `ValidationContext.load_script` rather than keeping a
-second copy, so the script's dependencies are also pinned in
-`tools/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
+runs those suites. The checker composition root imports the roadmap exporter
+and document generators, wraps their renderers and markers in
+`DocumentRenderer`, and passes them through `LedgerDependencies`. The ledger
+checker receives these collaborators directly; it does not load scripts or
+create a general plugin interface. Focused tests pass the same collaborators
+explicitly, so they can exercise isolated repository roots without mutating
+process-wide module state. Script dependencies remain pinned in
+`scripts/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
 
-`tools/tests/markdown_examples.py` is the shared loader for marked JSON fences
-in migration documents. It requires each fence to have a unique adjacent
+`scripts/tests/markdown_examples.py` is the shared loader for marked JSON
+fences in migration documents. It requires each fence to have a unique adjacent
 `tested-example` marker and reads the example from the published Markdown. Use
 it from documentation contract tests; it is not a general Markdown parser.
 
-The `tools/docs_validation/` modules belong only to the documentation-pack
+The `scripts/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
 validation context. They do not replace repository Markdown lint or Rust
 verification. Generated-document comparisons use Markdown semantics so layout
 formatting can preserve the contract without creating false generator drift.
 
 Acceptance-control rule checks in
-`tools/docs_validation/acceptance_registration.py`,
-`tools/docs_validation/acceptance_evidence.py`, and
-`tools/docs_validation/ci_controls.py` belong only to the documentation-pack
+`scripts/docs_validation/acceptance_registration.py`,
+`scripts/docs_validation/acceptance_evidence.py`, and
+`scripts/docs_validation/ci_controls.py` belong only to the documentation-pack
 checker. They accept parsed values and source digests, and do not read
 repository files. The `preregistration.py` composition path scans serialized
 JSON evidence for host identities and then recursively scans its decoded string
@@ -620,7 +690,7 @@ keys and values, so escaped characters cannot hide an identity from the check.
 The Markdown calibration report is scanned as raw text. Keep this recursive
 scan private to the acceptance-control composition path. Keep filesystem reads
 and schema loading in the composition path rooted at
-`check_acceptance_controls` in `tools/docs_validation/preregistration.py` and
+`check_acceptance_controls` in `scripts/docs_validation/preregistration.py` and
 its shared `ValidationContext`. `ValidationContext.load_yaml` converts parser
 failures into checker errors, and `ValidationContext.read_bytes` supplies
 source data for composition-time digest calculation. The composition path
@@ -646,7 +716,7 @@ for methodology, tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
 Kani calibration artefacts.
 
-`check_manifest` in `tools/docs_validation/package_policy.py` is an internal
+`check_manifest` in `scripts/docs_validation/package_policy.py` is an internal
 package-policy helper. `check_package_policy` is its only production caller and
 supplies the D04/D05 decision state. The checker runs after roadmap closure:
 publication remains disabled until an accepted D05 supersession and a
@@ -662,10 +732,10 @@ receives a `RevisionJsonReader`. The roadmap check composes its filesystem
 adapter from the validation context; the command-line composition root supplies
 the current source revision and Git-backed register reader. `roadmap_status`
 uses the injected revision and does not resolve Git state itself. These ports
-belong only to `tools/docs_validation/`: keep their domain rules independent of
-I/O, and do not reuse them as general repository file or Git APIs. Unit tests
-inject deterministic readers, while a temporary Git integration test covers
-actual revision reads.
+belong only to `scripts/docs_validation/`: keep their domain rules independent
+of I/O, and do not reuse them as general repository file or Git APIs. Unit
+tests inject deterministic readers, while a temporary Git integration test
+covers actual revision reads.
 
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their

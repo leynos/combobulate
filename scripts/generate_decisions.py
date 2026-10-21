@@ -81,9 +81,40 @@ def outcome(record: dict) -> str:
     approval = f"[{APPROVAL_NAMES[reference['kind']]}]({reference['url']})"
     text = (f"Decision: option {record['decided_option']}, accepted on {record['accepted_on']} by "
             f"`{record['accepted_by']}` ({approval}).")
-    if 'answer' in reference:
-        text += f" Answer: \"{reference['answer']}\""
     return text
+
+
+def quoted_answer(record: dict) -> str:
+    """Quote answer words and paragraph breaks, rewrapping Markdown soft breaks.
+
+    Parameters
+    ----------
+    record : dict
+        A decision with an 'approval_reference' entry. That entry may be
+        None or a mapping whose optional 'answer' is the original string.
+
+    Returns
+    -------
+    str
+        An empty string when no answer is recorded; otherwise a labelled
+        Markdown block quote with a trailing blank line. Words and paragraph
+        boundaries are preserved, soft line breaks may reflow, and the input
+        record stays unchanged.
+
+    Examples
+    --------
+    >>> quoted_answer({'approval_reference': None})
+    ''
+    >>> quoted_answer({'approval_reference': {'answer': 'First line.\\nSecond line.'}})
+    'Answer, quoted verbatim:\\n\\n> First line. Second line.\\n\\n'
+    """
+    reference = record['approval_reference']
+    if reference is None or 'answer' not in reference:
+        return ''
+    answer = reference['answer'].replace('\r\n', '\n').replace('\r', '\n')
+    paragraphs = [textwrap.fill(part, 78, initial_indent='> ', subsequent_indent='> ', break_long_words=False,
+                                break_on_hyphens=False) for part in answer.split('\n\n')]
+    return 'Answer, quoted verbatim:\n\n' + '\n>\n'.join(paragraphs) + '\n\n'
 
 
 def lineage(record: dict) -> str:
@@ -133,6 +164,7 @@ def render_decision(record: dict) -> str:
         'Options:\n\n', options, '\n',
         paragraph(f"Recommendation rationale: {record['rationale']}"),
         paragraph(outcome(record)),
+        quoted_answer(record),
         lineage(record),
         paragraph(f'ADR: {adr}.'),
     ])

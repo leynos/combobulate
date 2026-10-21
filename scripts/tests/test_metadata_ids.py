@@ -1,0 +1,263 @@
+"""Reject duplicate declared identities before set-based reference resolution."""
+from __future__ import annotations
+
+import copy
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from hypothesis import given, settings, strategies as st
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from docs_validation.context import ValidationContext
+from docs_validation.contracts import (
+    check_backend_capabilities, check_bet_links, check_design_trace, check_revision_contracts, source_citations,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+@st.composite
+def bipartite_link_graphs(draw):
+    """Generate a small graph with at least one present and one absent link."""
+    bet_count = draw(st.integers(min_value=2, max_value=5))
+    task_count = draw(st.integers(min_value=2, max_value=5))
+    bet_ids = [f'B{index}' for index in range(bet_count)]
+    task_ids = [f'T{index}' for index in range(task_count)]
+    all_edges = [(bet_id, task_id) for bet_id in bet_ids for task_id in task_ids]
+    edges = draw(st.sets(st.sampled_from(all_edges), min_size=1, max_size=len(all_edges) - 1))
+    present = draw(st.sampled_from(sorted(edges)))
+    absent = draw(st.sampled_from(sorted(set(all_edges) - edges)))
+    return bet_ids, task_ids, edges, present, absent
+
+
+def link_records(bet_ids, task_ids, edges):
+    """Build both sides of a generated task/bet link graph."""
+    bets = [
+        {'id': bet_id, 'tasks': [task_id for task_id in task_ids if (bet_id, task_id) in edges]}
+        for bet_id in bet_ids
+    ]
+    tasks = {
+        task_id: {'id': task_id, 'bets': [bet_id for bet_id in bet_ids if (bet_id, task_id) in edges]}
+        for task_id in task_ids
+    }
+    return bets, tasks
+
+
+class BetLinks(unittest.TestCase):
+    """VO-15: bet and task links agree in both directions."""
+
+    def setUp(self):
+        """Load independent roadmap and bet records for each traceability test."""
+        context = ValidationContext(ROOT)
+        self.bets = context.load('spec/bets.json')['bets']
+        roadmap = context.load('spec/roadmap.json')
+        self.tasks = {task['id']: task for phase in roadmap['phases'] for step in phase['steps']
+                      for task in step['tasks']}
+
+    def test_committed_links_agree(self):
+        """Require committed task-to-bet links to agree in both directions."""
+        check_bet_links(self.bets, self.tasks)
+
+    def test_bet_dropping_a_citing_task_fails(self):
+        """Reject a bet that omits a task citing it."""
+        b08 = next(bet for bet in self.bets if bet['id'] == 'B08')
+        b08['tasks'].remove('1.1.4')
+        with self.assertRaisesRegex(AssertionError, 'Task 1.1.4 cites bet B08, which does not list it'):
+            check_bet_links(self.bets, self.tasks)
+
+    def test_task_dropping_a_listed_bet_fails(self):
+        """Reject a task that omits a bet listing it."""
+        self.tasks['1.1.4']['bets'].remove('B08')
+        with self.assertRaisesRegex(AssertionError, 'Bet B08 lists task 1.1.4, which does not cite it'):
+            check_bet_links(self.bets, self.tasks)
+
+    @settings(max_examples=100, deadline=None)
+    @given(graph=bipartite_link_graphs())
+    def test_generated_links_reject_one_sided_edge_changes(self, graph):
+        """Accept matching graphs and reject a missing or extra one-sided edge."""
+        bet_ids, task_ids, edges, present, absent = graph
+        bets, tasks = link_records(bet_ids, task_ids, edges)
+        check_bet_links(bets, tasks)
+
+        bet_id, task_id = present
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        next(bet for bet in mutated_bets if bet['id'] == bet_id)['tasks'].remove(task_id)
+        with self.assertRaisesRegex(AssertionError, 'does not list it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        mutated_tasks[task_id]['bets'].remove(bet_id)
+        with self.assertRaisesRegex(AssertionError, 'does not cite it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+        bet_id, task_id = absent
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        next(bet for bet in mutated_bets if bet['id'] == bet_id)['tasks'].append(task_id)
+        with self.assertRaisesRegex(AssertionError, 'does not cite it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+        mutated_bets, mutated_tasks = link_records(bet_ids, task_ids, edges)
+        mutated_tasks[task_id]['bets'].append(bet_id)
+        with self.assertRaisesRegex(AssertionError, 'does not list it'):
+            check_bet_links(mutated_bets, mutated_tasks)
+
+
+class MetadataIds(unittest.TestCase):
+    """Exercise complete trace metadata and registered Markdown identity boundaries."""
+
+    def test_complete_trace_rejects_duplicate_requirements_and_verifications(self):
+        """Reject duplicate IDs in either trace registry while accepting the committed trace."""
+        original = ValidationContext(ROOT).load('spec/traceability.json')
+        for group, label in (('requirements', 'requirement'), ('verification', 'verification')):
+            mutated = copy.deepcopy(original)
+            mutated[group].append(copy.deepcopy(mutated[group][0]))
+            context = ValidationContext(ROOT)
+            original_load = context.load
+            with self.subTest(group=group):
+                with patch.object(context, 'load', side_effect=lambda name:
+                                  mutated if name == 'spec/traceability.json' else original_load(name)):
+                    with self.assertRaisesRegex(AssertionError, 'Duplicate ' + label + ' ID'):
+                        check_revision_contracts(context)
+        context = ValidationContext(ROOT)
+        check_revision_contracts(context)
+        self.assertTrue(all(row['status'] == 'pass' for row in context.results))
+
+    def test_duplicate_goal_declarations_do_not_collapse_into_valid_trace(self):
+        """Reject a repeated terms-of-reference goal before trace matching."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'docs').mkdir()
+            (root / 'docs/technical-design.md').write_text((ROOT / 'docs/technical-design.md').read_text())
+            tor = (ROOT / 'docs/terms-of-reference.md').read_text()
+            goal = next(line for line in tor.splitlines() if line.startswith('| G1 '))
+            (root / 'docs/terms-of-reference.md').write_text(tor.replace(goal + '\n', goal + '\n' + goal + '\n', 1))
+            source = ValidationContext(ROOT)
+            with self.assertRaisesRegex(AssertionError, 'Duplicate goal ID'):
+                check_design_trace(ValidationContext(root), source.load('spec/roadmap.json')['phases'],
+                                   source.load('spec/traceability.json'))
+
+    def test_duplicate_source_headings_do_not_collapse_into_valid_registry(self):
+        """Reject duplicate registered source headings rather than collapsing them."""
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            refs = (ROOT / 'docs/references.md').read_text()
+            (context.root / 'docs/references.md').write_text(refs + '\n### D-TOR\n')
+            capabilities = ValidationContext(ROOT).load('spec/backend-capabilities.json')
+            with patch.object(context, 'load', return_value=capabilities):
+                with self.assertRaisesRegex(AssertionError, 'Duplicate source ID'):
+                    check_backend_capabilities(context)
+
+
+    def test_source_citations_reject_lowercase_and_mixed_case_with_canonical_controls(self):
+        """Reject noncanonical citation casing while preserving unrelated hyphenated prose."""
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            (context.root / 'docs/references.md').write_text((ROOT / 'docs/references.md').read_text())
+            capabilities = ValidationContext(ROOT).load('spec/backend-capabilities.json')
+            variants = ('e-polars-null', 'E-Polars-Null', 'e-POLARS-NULL', 'd-tor', 'D-Tor')
+            for source_id in variants:
+                (context.root / 'README.md').write_text('# Title\n\n[' + source_id + ']\n')
+                with self.subTest(source_id=source_id), patch.object(context, 'load', return_value=capabilities):
+                    with self.assertRaisesRegex(AssertionError, 'Noncanonical source ID ' + source_id):
+                        check_backend_capabilities(context)
+            (context.root / 'README.md').write_text(
+                '# Title\n\n[E-POLARS-NULL, D-TOR]. Identifier abc-d-other is unrelated.\n')
+            with patch.object(context, 'load', return_value=capabilities):
+                self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
+
+    def test_source_register_rejects_noncanonical_heading_even_without_citations(self):
+        """Require canonical source IDs in registry headings even when uncited."""
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            for source_id in ('e-unused', 'E-Unused', 'd-unused', 'D-Unused'):
+                (context.root / 'docs/references.md').write_text('# References\n\n### ' + source_id + '\n')
+                with self.subTest(source_id=source_id):
+                    with self.assertRaisesRegex(AssertionError, 'Noncanonical source ID ' + source_id):
+                        check_backend_capabilities(context)
+
+    def test_capability_source_lists_require_exact_registered_case(self):
+        """Reject capability references that differ in case from registered source IDs."""
+        source = ValidationContext(ROOT)
+        capabilities = source.load('spec/backend-capabilities.json')
+        for replacement in ('e-polars2-release', 'E-Polars2-Release'):
+            mutated = copy.deepcopy(capabilities)
+            mutated['capabilities'][0]['sources'][0] = replacement
+            context = ValidationContext(ROOT)
+            with self.subTest(source_id=replacement), patch.object(context, 'load', return_value=mutated):
+                with self.assertRaisesRegex(AssertionError, 'Unresolved capability source'):
+                    check_backend_capabilities(context)
+
+
+    def test_ordinary_hyphenated_prose_links_code_and_tables_are_not_citations(self):
+        """Ignore lookalike source IDs in prose, word links, code, and tables."""
+        text = (
+            'The e-commerce and d-service terms are ordinary prose (e-commerce).\n\n'
+            '[e-commerce](https://example.test/shop) and [d-service](https://example.test/service).\n\n'
+            '`e-commerce` and `d-service` are literal labels.\n\n'
+            '| Description |\n| --- |\n| e-commerce and d-service |\n'
+        )
+        self.assertEqual(source_citations(text, {'E-POLARS-NULL', 'D-TOR'}), set())
+        self.assertEqual(source_citations('D-Day and identifier abc-d-service are ordinary.', {'D-TOR'}), set())
+
+    def test_explicit_citation_forms_keep_lowercase_and_mixed_case_detection(self):
+        """Recognize citation syntax and report every noncanonical source spelling."""
+        source_ids = {'E-POLARS-NULL', 'D-TOR'}
+        forms = (
+            '[e-polars-null]', '[E-Polars-Null,\nd-tor]',
+            '(e-polars-null)', '`e-polars-null`',
+            '[e-polars-null](https://example.test/source)',
+            '| Source |\n| --- |\n| e-polars-null |\n',
+        )
+        for text in forms:
+            with self.subTest(text=text):
+                citations = source_citations(text, source_ids)
+                self.assertTrue(citations)
+                self.assertTrue(any(value != value.upper() for value in citations))
+        self.assertEqual(source_citations('[e-missing, D-TOR]', source_ids), {'e-missing', 'D-TOR'})
+        self.assertEqual(source_citations('E-MISSING explains a problem.', source_ids), {'E-MISSING'})
+        self.assertEqual(source_citations('[E-POLARS-NULL, D-TOR]', source_ids), source_ids)
+
+    def test_complete_source_check_accepts_ordinary_prose_and_word_links(self):
+        """Allow ordinary hyphenated prose and word links beside a canonical citation."""
+        with tempfile.TemporaryDirectory() as directory:
+            context = ValidationContext(Path(directory))
+            for path in context.markdown_paths():
+                path.parent.mkdir(exist_ok=True)
+                path.write_text('# Title\n')
+            (context.root / 'docs/references.md').write_text((ROOT / 'docs/references.md').read_text())
+            (context.root / 'README.md').write_text(
+                '# Title\n\nThe e-commerce/d-service markets have (e-commerce) labels.\n\n'
+                '[e-commerce](https://example.test) is a word link.\n\n'
+                'Source [E-POLARS-NULL] remains canonical.\n')
+            capabilities = ValidationContext(ROOT).load('spec/backend-capabilities.json')
+            with patch.object(context, 'load', return_value=capabilities):
+                self.assertEqual(len(check_backend_capabilities(context)), len(capabilities['capabilities']))
+
+    def test_unknown_word_links_need_explicit_source_intent(self):
+        """Treat unknown word links as citations only when their text is explicit."""
+        source_ids = {'E-POLARS-NULL', 'D-TOR'}
+        for label in ('e-commerce', 'e-missing', 'd-service', 'd-missing'):
+            with self.subTest(label=label):
+                self.assertEqual(source_citations(
+                    '[' + label + '](https://example.test/source)', source_ids), set())
+                self.assertEqual(source_citations('[' + label + ']', source_ids), {label})
+                self.assertEqual(source_citations(
+                    '[' + label.upper() + '](https://example.test/source)', source_ids),
+                    {label.upper()})
+
+
+if __name__ == '__main__':
+    unittest.main()

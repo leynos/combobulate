@@ -47,6 +47,11 @@ class RoadmapStructureError(ValueError):
     """Report unrecognized roadmap structure; e.g. a level-four heading at line 12."""
 
     def __init__(self, message: str, line: int | None = None) -> None:
+        """Store the optional source line in the roadmap diagnostic.
+
+        For example, ``RoadmapStructureError('bad heading', 12)`` renders
+        ``docs/roadmap.md:12: bad heading``.
+        """
         self.line = line
         super().__init__(f'docs/roadmap.md:{line}: {message}' if line else message)
 

@@ -8,7 +8,7 @@ MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
 .PHONY: help all clean test act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
-  lint lint-clippy lint-whitaker fmt check-fmt markdownlint spelling nixie \
+  lint lint-clippy lint-whitaker lint-python docstring-coverage check-python-sources fmt check-fmt markdownlint spelling nixie \
   audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
 SHELL := bash
@@ -123,9 +123,34 @@ coverage: check-coverage-tools ## Generate lcov coverage with lld for llvm-tools
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(TEST_FLAGS)
 
-lint: ## Run rustdoc, Clippy, then Whitaker sequentially
+lint: ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
 	+$(MAKE) lint-clippy
 	+$(MAKE) lint-whitaker
+	+$(MAKE) lint-python
+
+# Discover Python sources from Git so hidden workflow/action paths and new
+# repository areas are included without maintaining a second source manifest.
+PYTHON_TARGETS_FROM_GIT := $(if $(filter undefined,$(origin PYTHON_TARGETS)),1,0)
+PYTHON_TARGETS ?=
+INTERROGATE_VERSION ?= 1.7.0
+UV ?= uv
+ifeq ($(PYTHON_TARGETS_FROM_GIT),1)
+check-python-sources:
+	$(eval PYTHON_TARGETS := $(shell git ls-files --cached --others --exclude-standard '*.py' '*.pyi'))
+	$(if $(filter 0,$(.SHELLSTATUS)),,$(error Error: git ls-files failed while discovering Python sources for PYTHON_TARGETS))
+	$(if $(strip $(PYTHON_TARGETS)),,$(error Error: PYTHON_TARGETS is empty after source selection))
+	@:
+else
+check-python-sources:
+	$(if $(strip $(PYTHON_TARGETS)),,$(error Error: PYTHON_TARGETS is empty after source selection))
+	@:
+endif
+
+lint-python: ## Require complete Interrogate coverage for all Python sources
+	+$(MAKE) docstring-coverage
+
+docstring-coverage: check-python-sources ## Check docstrings in tracked and untracked Python files
+	$(UV) tool run --python 3.14 --from interrogate==$(INTERROGATE_VERSION) interrogate --fail-under 100 $(PYTHON_TARGETS)
 
 lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
@@ -220,6 +245,6 @@ BASE_REV ?=
 .PHONY: design-check
 
 design-check: ## Validate design documents, fixtures, and generator contracts
-	$(PYTHON) tools/check_docs.py --as-of $(AS_OF) $(if $(BASE_REV),--base-rev $(BASE_REV))
-	$(PYTHON) -m unittest discover -s tools/tests
+	$(PYTHON) scripts/check_docs.py --as-of $(AS_OF) $(if $(BASE_REV),--base-rev $(BASE_REV))
+	$(PYTHON) -m unittest discover -s scripts/tests
 	$(PYTHON) -m pytest -q scripts/tests

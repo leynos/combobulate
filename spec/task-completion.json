@@ -72,8 +72,8 @@
         "spec/exceptions.json",
         "spec/exception.schema.json",
         "spec/evidence-reason-codes.json",
-        "tools/docs_validation/evidence_gate.py",
-        "tools/tests/fixtures/evidence_gate_rules.json",
+        "scripts/docs_validation/evidence_gate.py",
+        "scripts/tests/fixtures/evidence_gate_rules.json",
         "scripts/check_evidence.py"
       ]
     }

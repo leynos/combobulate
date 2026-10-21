@@ -55,7 +55,10 @@ would require amending that column.
 
 Decision: option B, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Sponsor and technical owner @leynos"
+
+Answer, quoted verbatim:
+
+> Sponsor and technical owner @leynos
 
 ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
 
@@ -80,7 +83,10 @@ revisited, and a narrowed claim keeps an exception from being read as proof
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
 
@@ -103,7 +109,10 @@ phase and keeps integration work out of the Core acceptance dossier.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0003](adrs/adr-0003-initial-release-scope.md).
 
@@ -125,7 +134,10 @@ ADR-0001; ratification removes the open question without changing any file.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0004](adrs/adr-0004-licence-and-publication.md).
 
@@ -147,7 +159,10 @@ distribution terms for an unproven library.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted. Ensure this is clearly documented in the developer's guide."
+
+Answer, quoted verbatim:
+
+> Accepted. Ensure this is clearly documented in the developer's guide.
 
 ADR: [ADR-0004](adrs/adr-0004-licence-and-publication.md).
 
@@ -174,7 +189,10 @@ depend on.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0005](adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md).
 
@@ -200,14 +218,18 @@ subjects that depend on unrun bets are deferred to the tasks that run them.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted. Please update the documentation style guide to place ADRs in
-`docs/adrs/` with naming pattern `adr-nnnn-foo-bar-qux.md` where `nnnn` is a
-four digit index and `foo-bar-qux` is the title slug. Similarly, RFCs in
-`docs/rfcs/` with naming pattern `rfc-nnnn-foo-bar-qux.md`  This breaks from
-current DF12 standards, but the current practice is really starting to bug me
-and I want to take this opportunity to revise it. If it goes well, we will
-update the centralized documentation style guide in `agent-helper-scripts`
-documentation library."
+
+Answer, quoted verbatim:
+
+> Accepted. Please update the documentation style guide to place ADRs in
+> `docs/adrs/` with naming pattern `adr-nnnn-foo-bar-qux.md` where `nnnn` is a
+> four digit index and `foo-bar-qux` is the title slug. Similarly, RFCs in
+> `docs/rfcs/` with naming pattern `rfc-nnnn-foo-bar-qux.md`
+>
+> This breaks from current DF12 standards, but the current practice is really
+> starting to bug me and I want to take this opportunity to revise it. If it
+> goes well, we will update the centralized documentation style guide in
+> `agent-helper-scripts` documentation library.
 
 ADR: none yet.
 
@@ -233,7 +255,10 @@ the one precedence trap Rust users commonly misread.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0007](adrs/adr-0007-comb-macro-grammar-and-staging.md).
 
@@ -258,7 +283,10 @@ deterministic, unlike the NaN-ignoring `minNum` and `maxNum` operations.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
 
@@ -283,7 +311,10 @@ used for two unrelated guarantees.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
 
@@ -309,8 +340,11 @@ and controls drift by interleaving.
 
 Decision: option B, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted, although for local development boxes you'll have to take
-what you're given. Don't leak hostnames into the source documentation."
+
+Answer, quoted verbatim:
+
+> Accepted, although for local development boxes you'll have to take what
+> you're given. Don't leak hostnames into the source documentation.
 
 ADR: [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md).
 
@@ -335,9 +369,12 @@ did not choose them itself.
 
 Decision: option B, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Make realistic measurements on the current machine and extrapolate to
-a GitHub runner specced above. I'll trust your judgement here, just bring
-reasonable evidence."
+
+Answer, quoted verbatim:
+
+> Make realistic measurements on the current machine and extrapolate to a
+> GitHub runner specced above. I'll trust your judgement here, just bring
+> reasonable evidence.
 
 ADR: [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md).
 
@@ -364,8 +401,11 @@ edit a blocked merge rather than a reviewer catch.
 
 Decision: option B, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "No, we don't do `.github/CODEOWNERS`. If we magically acquire another
-dev, we can change this."
+
+Answer, quoted verbatim:
+
+> No, we don't do `.github/CODEOWNERS`. If we magically acquire another dev,
+> we can change this.
 
 ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
 
@@ -388,7 +428,10 @@ F64"; converting operands first matches what every candidate backend computes.
 
 Decision: option A, accepted on 2026-10-10 by `leynos`
 ([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
-Answer: "Accepted"
+
+Answer, quoted verbatim:
+
+> Accepted
 
 ADR: [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md).
 
@@ -398,7 +441,7 @@ Subject: Prospective details for later roadmap tasks.
 
 Terms-of-reference questions: none. Authority: sponsor, technical owner.
 
-Lifecycle: proposed.
+Lifecycle: accepted.
 
 Options:
 
@@ -411,7 +454,15 @@ Options:
 Recommendation rationale: Fixing the replay obligations before those tasks
 start prevents their success criteria from being chosen after the fact.
 
-Decision: pending.
+Decision: option A, accepted on 2026-10-10 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/99861d46-f6f5-48d6-acfb-658bee9364bf)).
+
+Answer, quoted verbatim:
+
+> Accepted. Note that `docs/roadmap.md` is canonical. If you really want a
+> JSON roadmap representation, submit a GitHub issue to `leynos/mapsplice` for
+> a JSON export and an export validator to detect drift. For now, add Python
+> scripts to do this using Wenmode in a separate stacked PR.
 
 ADR: none yet.
 

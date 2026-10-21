@@ -1030,7 +1030,7 @@ must compose the context from its own explicit inputs rather than add
 environment or filesystem access to the gate.
 
 Roadmap closure uses a separate immutable `ClosureEvidence` projection owned by
-`tools/docs_validation/closure_evidence.py`. The
+`scripts/docs_validation/closure_evidence.py`. The
 `evidence_records.admitted_evidence` adapter constructs it from schema-v2
 records and their admission. Its fields are component id, recorded date, source
 revision, outcome, binding-current state, admission level, and reasons. Only

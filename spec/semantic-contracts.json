@@ -548,7 +548,7 @@
       "discharged_by": [
         "task:2.3.1"
       ],
-      "proof_sketch": "No proof: 2.3.1 replays every grammar corpus entry as a trybuild pass or fail fixture, with a completeness check; the recognizer in tools/docs_validation/grammar.py models the corpus, not the macro."
+      "proof_sketch": "No proof: 2.3.1 replays every grammar corpus entry as a trybuild pass or fail fixture, with a completeness check; the recognizer in scripts/docs_validation/grammar.py models the corpus, not the macro."
     },
     {
       "id": "SC-11",

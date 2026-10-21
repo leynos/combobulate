@@ -133,6 +133,7 @@ impl GateProbe {
     fn configure_executors(&self, command: &mut Command) {
         for (variable, executable) in [
             ("CARGO", "probe-cargo"),
+            ("UV", "probe-uv"),
             ("CHECK_BUILD_TOOLS", "probe-check"),
             ("WHITAKER", "probe-whitaker"),
             ("MDTABLEFIX", "probe-mdtablefix"),
@@ -284,6 +285,7 @@ impl GateProbe {
     /// Writes every controlled executable through the same NUL recorder.
     fn write_executors(&self) -> Read<()> {
         self.write_executor("probe-cargo", scripts::CARGO_SCRIPT)?;
+        self.write_executor("probe-uv", scripts::INTERROGATE_SCRIPT)?;
         self.write_executor("probe-check", scripts::PREFLIGHT_SCRIPT)?;
         self.write_executor("probe-whitaker", scripts::WHITAKER_SCRIPT)?;
         self.write_executor("probe-mdtablefix", scripts::MDTABLEFIX_SCRIPT)?;

@@ -769,7 +769,7 @@ Rustdoc, Clippy, Whitaker, test, and spelling gates. Run `make markdownlint` and
 `make nixie` for Markdown and Mermaid checks.
 
 Install the documentation check dependencies with
-`python3 -m pip install -r tools/requirements.txt`, then run
+`python3 -m pip install -r scripts/requirements.txt`, then run
 `make design-check`. This validates the design fixtures, the generated
 reference and bet documents, and the roadmap's derived JSON export. It does not
 compile the proposed APIs or discharge proof obligations.

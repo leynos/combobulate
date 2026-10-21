@@ -7,6 +7,7 @@ mod support;
 
 use std::{env, process::Command};
 
+use rstest::rstest;
 use support::ToolFixture;
 
 #[test]
@@ -59,6 +60,32 @@ fn preflight_accepts_the_selected_toolchain_and_linkers() {
             String::from_utf8_lossy(&output.stderr)
         );
     }
+}
+
+#[rstest]
+#[case::development(false)]
+#[case::coverage(true)]
+fn preflight_consumes_the_complete_installed_component_list(#[case] coverage: bool) {
+    let fixture = ToolFixture::new().expect("create fake build tools");
+    let mut components = fixture
+        .directory
+        .read_to_string("components")
+        .expect("read the complete installed component list");
+    // Exceed the pipe buffer so an early reader exit deterministically breaks
+    // the producer, rather than relying on the hosted runner's scheduling.
+    components.push_str(&"other-component-x86_64-unknown-linux-gnu\n".repeat(4096));
+    fixture
+        .directory
+        .write("components", components)
+        .expect("write a long complete installed component list");
+    let output = fixture
+        .check(coverage, None, None)
+        .expect("check the complete installed component list");
+    assert!(
+        output.status.success(),
+        "a complete long listing must satisfy coverage={coverage}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
