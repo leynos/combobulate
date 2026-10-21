@@ -19,6 +19,11 @@ request comment, or a commit. An ambiguous approval accepts nothing. The
 sponsor's merge of the pull request that records an acceptance is its durable
 confirmation.
 
+The original D07 answer below is preserved verbatim. Its naming convention now
+matches the shared documentation style guide: ADRs use
+`docs/adrs/adr-nnnn-title-slug.md`, and RFCs use
+`docs/rfcs/rfc-nnnn-title-slug.md`.
+
 Accepting a decision is not verification. No accepted decision changes a proof
 obligation's status, marks a bet as run, or makes a capability eligible. A
 substantive decision is explained in an ADR under `docs/adrs/`; the record
@@ -60,7 +65,7 @@ Answer, quoted verbatim:
 
 > Sponsor and technical owner @leynos
 
-ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
+ADR: [ADR-0002](adrs/adr-0002-governance-authority-and-exceptions.md).
 
 ### D02
 
@@ -88,7 +93,7 @@ Answer, quoted verbatim:
 
 > Accepted
 
-ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
+ADR: [ADR-0002](adrs/adr-0002-governance-authority-and-exceptions.md).
 
 ### D03
 
@@ -407,7 +412,7 @@ Answer, quoted verbatim:
 > No, we don't do `.github/CODEOWNERS`. If we magically acquire another dev,
 > we can change this.
 
-ADR: [ADR-0002](adrs/adr-0002-governance-authority.md).
+ADR: [ADR-0002](adrs/adr-0002-governance-authority-and-exceptions.md).
 
 ### D14
 

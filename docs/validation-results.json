@@ -12,7 +12,7 @@
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 106
+      "count": 107
     },
     {
       "check": "catalogue",
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 76
+      "count": 79
     },
     {
       "check": "contract-examples",

@@ -50,7 +50,7 @@
         ],
         "answer": "Sponsor and technical owner @leynos"
       },
-      "adr": "docs/adrs/adr-0002-governance-authority.md",
+      "adr": "docs/adrs/adr-0002-governance-authority-and-exceptions.md",
       "supersedes": [],
       "superseded_by": null,
       "retired_statements": [
@@ -98,7 +98,7 @@
         ],
         "answer": "Accepted"
       },
-      "adr": "docs/adrs/adr-0002-governance-authority.md",
+      "adr": "docs/adrs/adr-0002-governance-authority-and-exceptions.md",
       "supersedes": [],
       "superseded_by": null,
       "retired_statements": [
@@ -571,7 +571,7 @@
         ],
         "answer": "No, we don't do `.github/CODEOWNERS`. If we magically acquire another dev, we can change this."
       },
-      "adr": "docs/adrs/adr-0002-governance-authority.md",
+      "adr": "docs/adrs/adr-0002-governance-authority-and-exceptions.md",
       "supersedes": [],
       "superseded_by": null,
       "retired_statements": []

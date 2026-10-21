@@ -23,7 +23,7 @@ from docs_validation.roadmap_status import (
 
 ROOT = Path(__file__).resolve().parents[2]
 ACCEPTED = {'id': 'D01', 'lifecycle': 'accepted'}
-ARTEFACT = 'docs/adrs/adr-0002-governance-authority.md'
+ARTEFACT = 'docs/adrs/adr-0002-governance-authority-and-exceptions.md'
 
 
 def task(task_id: str, requires: list[str], status: str = 'open') -> dict:

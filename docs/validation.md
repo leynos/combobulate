@@ -120,7 +120,7 @@ checker does not validate remote URLs. Exact implementation-time
 dependency/profile selection and capability probes remain mandatory.
 
 The repository bootstrap imports this pack and records its provenance in the
-[bootstrap decision](adrs/adr-0001-repository-bootstrap.md). Its design check
-also runs focused validator regressions through `make design-check`. Repository
-integration does not change the planned status of product tasks, proofs, or
-backend probes.
+[bootstrap decision](adrs/adr-0001-bootstrap-the-repository-from-the-rust-build-baseline.md).
+Its design check also runs focused validator regressions through
+`make design-check`. Repository integration does not change the planned status
+of product tasks, proofs, or backend probes.

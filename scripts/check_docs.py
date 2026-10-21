@@ -36,7 +36,9 @@ from docs_validation.ledger import DocumentRenderer, LedgerDependencies, check_c
 from docs_validation.markdown import check_markdown
 from docs_validation.package_policy import check_package_policy
 from docs_validation.preregistration import check_acceptance_controls
-from docs_validation.revision_reader import git_head_revision, git_json_at_revision
+from docs_validation.revision_reader import (
+    git_bytes_at_revision, git_head_revision, git_json_at_revision, working_tree_bytes,
+)
 from docs_validation.roadmap_status import check_roadmap_status
 from docs_validation.semantic_contracts import check_macro_grammar, check_semantic_contracts
 from docs_validation.semantics import check_examples
@@ -125,7 +127,9 @@ def main(argv: list[str] | None = None) -> int:
         context = ValidationContext(ROOT, as_of=args.as_of, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         freeze_summary = check_frozen(
-            context, args.base_rev, partial(git_json_at_revision, context.root)
+            context, args.base_rev, partial(git_json_at_revision, context.root),
+            partial(git_bytes_at_revision, context.root),
+            partial(working_tree_bytes, context.root),
         )
         report = report_data(context, 'pass')
         if args.write:

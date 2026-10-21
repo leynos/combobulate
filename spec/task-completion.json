@@ -14,7 +14,7 @@
         "D13"
       ],
       "artefacts": [
-        "docs/adrs/adr-0002-governance-authority.md",
+        "docs/adrs/adr-0002-governance-authority-and-exceptions.md",
         "docs/adrs/adr-0003-initial-release-scope.md",
         "docs/adrs/adr-0004-licence-and-publication.md",
         "docs/adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md",

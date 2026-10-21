@@ -5,7 +5,6 @@ import contextlib
 import io
 import json
 import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,8 +15,9 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.freeze import RevisionJsonReader
+from docs_validation.freeze import CurrentBytesReader, RevisionBytesReader, RevisionJsonReader
 from docs_validation.preregistration import check_acceptance_controls
+from git_fixtures import run_git
 
 import check_docs
 
@@ -45,13 +45,9 @@ class ValidationReport(unittest.TestCase):
 
     def initialise_repository(self) -> None:
         """Give the current-revision checker a committed fixture checkout."""
-        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(['git', 'add', '-A'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(
-            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
-             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Create validation fixture'],
-            cwd=self.root, check=True, capture_output=True,
-        )
+        run_git(self.root, 'init', '-q')
+        run_git(self.root, 'add', '-A')
+        run_git(self.root, 'commit', '-q', '-m', 'Create validation fixture')
 
     def run_main(self, arguments: list[str]) -> int:
         """Execute the checker against copied inputs and capture its evidence output."""
@@ -291,11 +287,15 @@ class ValidationReport(unittest.TestCase):
         observed: dict[str, object] = {}
 
         def freeze(context: ValidationContext, base_revision: str | None,
-                   read_json_at_revision: RevisionJsonReader) -> str:
+                   read_json_at_revision: RevisionJsonReader,
+                   read_bytes_at_revision: RevisionBytesReader,
+                   read_current_bytes: CurrentBytesReader) -> str:
             """Capture command-line values and the composition-root reader."""
             observed['as_of'] = context.as_of
             observed['base_revision'] = base_revision
             observed['reader_is_callable'] = callable(read_json_at_revision)
+            observed['revision_bytes_reader_is_callable'] = callable(read_bytes_at_revision)
+            observed['current_bytes_reader_is_callable'] = callable(read_current_bytes)
             return 'Freeze check fixture passed.'
 
         stderr = io.StringIO()
@@ -308,6 +308,8 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(observed, {
             'as_of': date(2026, 10, 15), 'base_revision': 'fixture-base',
             'reader_is_callable': True,
+            'revision_bytes_reader_is_callable': True,
+            'current_bytes_reader_is_callable': True,
         }, 'the parsed CLI values must reach the context and freeze check')
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')
@@ -339,13 +341,9 @@ class ValidationReport(unittest.TestCase):
         }
         decisions = self.root / 'spec/decisions.json'
         decisions.write_text(json.dumps({'decisions': [accepted]}), encoding='utf-8')
-        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(['git', 'add', 'spec/decisions.json'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(
-            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
-             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Accept D04'],
-            cwd=self.root, check=True, capture_output=True,
-        )
+        run_git(self.root, 'init', '-q')
+        run_git(self.root, 'add', 'spec/decisions.json')
+        run_git(self.root, 'commit', '-q', '-m', 'Accept D04')
         decisions.write_text(json.dumps({'decisions': [accepted | {'subject': 'Different licence'}]}),
                              encoding='utf-8')
 

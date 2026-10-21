@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import stat
 import subprocess
 from pathlib import Path
 
@@ -27,18 +28,17 @@ def git_head_revision(root: Path) -> str:
     return output.decode('ascii').strip()
 
 
-def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
-    """Read JSON from Git; return None only when the path is absent at the revision.
+def git_bytes_at_revision(root: Path, revision: str, path: str) -> bytes | None:
+    """Read a committed file; return None only when its path is absent.
 
     Bind the repository root once before injecting the adapter into
-    ``check_frozen``::
+    a check::
 
-        reader = partial(git_json_at_revision, repository_root)
-        register = reader(base_revision, 'spec/decisions.json')
+        reader = partial(git_bytes_at_revision, repository_root)
+        source = reader(base_revision, 'docs/adrs/adr-0002-governance.md')
 
-    A present register returns its parsed JSON value. A missing register returns
-    ``None``; a revision or command failure raises ``AssertionError``, while
-    malformed JSON raises ``json.JSONDecodeError``.
+    A present path returns its raw bytes. A missing path returns ``None``; a
+    revision or command failure raises ``AssertionError``.
     """
     resolved = _git_output(
         root, ['rev-parse', '--verify', '--end-of-options', f'{revision}^{{commit}}'],
@@ -51,8 +51,36 @@ def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
     )
     if not entry:
         return None
-    record = _git_output(
+    return _git_output(
         root, ['show', f'{base_commit}:{path}'],
         f'Cannot read {path} at base revision {revision}',
     )
-    return json.loads(record)
+
+
+def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
+    """Read JSON from Git; return None only when the path is absent at the revision.
+
+    A present register returns its parsed JSON value; revision and command
+    failures raise ``AssertionError``, while malformed JSON raises
+    ``json.JSONDecodeError``.
+    """
+    record = git_bytes_at_revision(root, revision, path)
+    return json.loads(record) if record is not None else None
+
+
+def working_tree_bytes(root: Path, path: str) -> bytes | None:
+    """Read a current regular file, returning None when the path is absent.
+
+    Callers validate repository-relative paths before using this adapter. A
+    symbolic link reports ``None`` like an absent path: a link is not a file
+    that can vouch for its own content at the canonical location, and
+    following it would let a link outside the repository satisfy a check
+    about the repository's own file.
+    """
+    try:
+        candidate = (root / path).lstat()
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(candidate.st_mode):
+        return None
+    return (root / path).read_bytes()

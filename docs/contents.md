@@ -30,9 +30,9 @@ implemented API or completed verification.
   records.
 - [Decision register](decision-register.md): decisions that control
   acceptance, their authority, options, approval references, and ADRs.
-- [ADR-0001: repository bootstrap](adrs/adr-0001-repository-bootstrap.md):
+- [ADR-0001: bootstrap the repository from the Rust build baseline](adrs/adr-0001-bootstrap-the-repository-from-the-rust-build-baseline.md):
   scaffold provenance, repository integration, and complexity repair boundaries.
-- [ADR-0002: governance authority and exceptions](adrs/adr-0002-governance-authority.md).
+- [ADR-0002: governance authority and exceptions](adrs/adr-0002-governance-authority-and-exceptions.md).
 - [ADR-0003: initial release scope](adrs/adr-0003-initial-release-scope.md).
 - [ADR-0004: licence and publication](adrs/adr-0004-licence-and-publication.md).
 - [ADR-0005: pre-1.0 API and proof-interface policy][adr-0005].

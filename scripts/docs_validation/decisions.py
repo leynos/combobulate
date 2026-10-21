@@ -15,6 +15,7 @@ from collections.abc import Mapping
 
 from jsonschema import Draft202012Validator
 
+from .adr_naming import ADR_NAME, canonical_adr_path
 from .context import ValidationContext, require
 
 GOVERNING_DOCUMENTS = (
@@ -24,7 +25,6 @@ GOVERNING_DOCUMENTS = (
 REGISTER_LINK = re.compile(r'\]\((?:\.\./docs/|\./)?decision-register\.md(?:#[^)]*)?\)')
 OPEN_STATUS = re.compile(r'\b(?:pending|open|unresolved|remains? proposed)\b', re.IGNORECASE)
 OPEN_STATUS_WINDOW = 60
-ADR_NAME = re.compile(r'^docs/adrs/adr-(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$')
 ADR_STATUS = {'proposed': 'Proposed', 'accepted': 'Accepted', 'superseded': 'Superseded'}
 KNOWN_ADR_STATUSES = frozenset(ADR_STATUS.values()) | {'Deprecated'}
 LIVE = {'proposed', 'accepted'}
@@ -244,19 +244,24 @@ def adr_status(text: str) -> str:
 
 
 def check_adr_files(adrs: Mapping[str, str]) -> None:
-    """Require ADR names and titles to follow the docs/adrs convention with matching numbers.
+    """Require each ADR filename to be the canonical name its own title implies.
 
     For example, a numbered ADR with a known status passes::
 
         >>> check_adr_files({'docs/adrs/adr-0001-repository-bootstrap.md':
         ...     '# Architectural decision record (ADR) 0001: Repository bootstrap\\n\\n'
         ...     '## Status\\n\\nProposed.\\n'})
+
+    The number and the slug must both come from that title, so a file whose
+    name disagrees with the document it contains is rejected even when only
+    the slug differs.
     """
     for path, text in adrs.items():
-        match = ADR_NAME.match(path)
-        require(match is not None, f'ADR name breaks the adr-nnnn-title-slug.md convention: {path}')
-        title = f'# Architectural decision record (ADR) {match.group(1)}: '
-        require(text.startswith(title), f'ADR title must start with {title!r}: {path}')
+        require(ADR_NAME.match(path) is not None, f'ADR name breaks the adr-nnnn-title-slug.md convention: {path}')
+        expected = canonical_adr_path(text)
+        require(expected is not None,
+                f'ADR title must start with a numbered "# Architectural decision record (ADR) nnnn: " heading: {path}')
+        require(path == expected, f'ADR {path} must be named {expected} to match its title')
         require(adr_status(text) in KNOWN_ADR_STATUSES, f'ADR lacks a known Status: {path}')
 
 
