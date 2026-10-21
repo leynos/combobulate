@@ -201,6 +201,35 @@ fn inherited_with_act_does_not_reach_nested_make_all() {
     );
 }
 
+/// Proves a failing Python docstring gate stops `make lint` at that stage.
+///
+/// The `all` composite covers the same claim through its own test. This one
+/// targets the `lint` target CI actually runs, so dropping `lint-python` from
+/// it or swallowing its exit status fails here rather than passing silently.
+#[test]
+fn parallel_lint_stops_after_a_failing_interrogate_gate() {
+    let probe = GateProbe::new().expect("create private gate probes");
+    let output = probe
+        .run("lint", Some("interrogate"))
+        .expect("execute a failing parallel Make lint");
+    assert!(
+        !output.status.success(),
+        "a failing Interrogate gate must fail make lint"
+    );
+    assert_eq!(
+        probe.stages().expect("read lint order"),
+        [
+            "preflight",
+            "doc",
+            "clippy",
+            "preflight",
+            "whitaker",
+            "interrogate"
+        ],
+        "nothing may run after a failing Interrogate gate"
+    );
+}
+
 /// Checks Make stops at each representative failing stage without hiding errors.
 #[test]
 fn parallel_all_stops_after_the_first_failing_gate() {
