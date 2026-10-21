@@ -27,6 +27,7 @@ const ALL_STAGES: &[&str] = &[
     "clippy",
     "preflight",
     "whitaker",
+    "interrogate",
     "preflight",
     "nextest",
     "doctest",
@@ -48,7 +49,8 @@ fn parallel_all_runs_each_gate_in_order() {
             .collect::<Vec<_>>(),
         "make -j all must finish each gate before starting the next"
     );
-    assert_all_commands(&probe.invocations().expect("parse complete gate records"));
+    assert_all_commands(&probe.invocations().expect("parse complete gate records"))
+        .expect("assert every expected Make gate command");
     assert!(
         output.status.success(),
         "all gates must pass: {}",
@@ -57,7 +59,7 @@ fn parallel_all_runs_each_gate_in_order() {
 }
 
 /// Checks the real Make target and confirms every selected executor call.
-fn assert_all_commands(invocations: &[Invocation]) {
+fn assert_all_commands(invocations: &[Invocation]) -> Result<(), Box<dyn std::error::Error>> {
     for (stage, executable, arguments) in [
         ("fmt", "probe-cargo", &["fmt", "--all", "--", "--check"][..]),
         (
@@ -112,6 +114,70 @@ fn assert_all_commands(invocations: &[Invocation]) {
     ] {
         GateProbe::assert_command(invocations, stage, executable, arguments);
     }
+    assert_interrogate_command(invocations, 1)
+}
+
+/// Confirms Interrogate receives its pinned command and Git's complete Python inventory.
+fn assert_interrogate_command(
+    invocations: &[Invocation],
+    expected_count: usize,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let interrogate_invocations = invocations
+        .iter()
+        .filter(|invocation| invocation.stage == "interrogate")
+        .collect::<Vec<_>>();
+    if interrogate_invocations.len() != expected_count {
+        return Err(format!(
+            "each lint run must record {expected_count} Interrogate invocation(s); found {}",
+            interrogate_invocations.len()
+        )
+        .into());
+    }
+
+    let python_sources = python_sources_from_git()?;
+    let expected_arguments = [
+        "tool",
+        "run",
+        "--python",
+        "3.14",
+        "--from",
+        "interrogate==1.7.0",
+        "interrogate",
+        "--fail-under",
+        "100",
+    ]
+    .into_iter()
+    .chain(python_sources.iter().map(String::as_str))
+    .collect::<Vec<_>>();
+    GateProbe::assert_command(invocations, "interrogate", "probe-uv", &expected_arguments);
+    Ok(())
+}
+
+/// Reads the tracked and non-ignored untracked Python paths selected by Make.
+fn python_sources_from_git() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let output = Command::new("git")
+        .args([
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "*.py",
+            "*.pyi",
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "Git must enumerate the Python sources used by the Make contract; exited with {}",
+            output.status
+        )
+        .into());
+    }
+    Ok(String::from_utf8(output.stdout)?
+        .lines()
+        .map(str::to_owned)
+        .collect())
 }
 
 /// Confirms nested Make clears inherited Act mode before running the composite.
@@ -144,6 +210,7 @@ fn parallel_all_stops_after_the_first_failing_gate() {
         "preflight",
         "clippy",
         "whitaker",
+        "interrogate",
         "nextest",
         "doctest",
         "spelling",
@@ -188,10 +255,19 @@ fn parallel_lint_preserves_repository_route_for_clean_and_coverage_callers() {
     );
     assert_eq!(
         probe.stages().expect("read lint order"),
-        ["preflight", "doc", "clippy", "preflight", "whitaker"],
-        "make -j lint must finish Clippy before Whitaker"
+        [
+            "preflight",
+            "doc",
+            "clippy",
+            "preflight",
+            "whitaker",
+            "interrogate"
+        ],
+        "make -j lint must finish Whitaker before Interrogate"
     );
     let first_invocations = probe.invocations().expect("parse coverage caller records");
+    assert_interrogate_command(&first_invocations, 1)
+        .expect("assert Interrogate invocation and Python source inventory");
     assert_coverage_contamination(&first_invocations);
     let cold_config_invocations = records::parse_invocations(
         &probe
@@ -217,6 +293,8 @@ fn parallel_lint_preserves_repository_route_for_clean_and_coverage_callers() {
     let all_invocations = probe
         .invocations()
         .expect("parse clean and coverage records");
+    assert_interrogate_command(&all_invocations, 2)
+        .expect("assert both Interrogate invocations and Python source inventories");
     let all_config_invocations = records::parse_invocations(
         &probe
             .whitaker_records()

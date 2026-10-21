@@ -38,6 +38,20 @@ if [ "${GATE_FAIL_AT-}" = "$stage" ]; then exit 1; fi
 if [ "$stage" = nextest-version-probe ]; then printf '%s\n' 'cargo-nextest 0.9.0'; fi
 "#;
 
+/// Interrogate fixture validates the pinned tool invocation and injects failure.
+pub(super) const INTERROGATE_SCRIPT: &str = r#"
+stage=interrogate
+if [ "$#" -lt 10 ] || [ "$1" != tool ] || [ "$2" != run ] ||
+   [ "$3" != --python ] || [ "$4" != 3.14 ] || [ "$5" != --from ] ||
+   [ "$6" != interrogate==1.7.0 ] || [ "$7" != interrogate ] ||
+   [ "$8" != --fail-under ] || [ "$9" != 100 ]; then
+  stage=unexpected-interrogate
+fi
+record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
+[ "$stage" = interrogate ] || exit 64
+[ "${GATE_FAIL_AT-}" != interrogate ]
+"#;
+
 /// Preflight fixture rejects arguments and supports controlled failure.
 pub(super) const PREFLIGHT_SCRIPT: &str = r#"
 stage=preflight
