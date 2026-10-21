@@ -45,8 +45,11 @@ implemented API or completed verification.
 
 - [Roadmap 1.1: resolve the decisions that control acceptance][roadmap-1-1]:
   ExecPlan for roadmap step 1.1, implemented in stacked pull requests.
+- [Roadmap 1.2.1: establish the workspace and pinned profiles][roadmap-1-2-1]:
+  ExecPlan for the facade, macro, and semantic-kernel workspace (draft).
 
 [roadmap-1-1]: execplans/1-1-resolve-acceptance-control-decisions.md
+[roadmap-1-2-1]: execplans/1-2-1-establish-workspace-and-profiles.md
 [adr-0005]: adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md
 [adr-0006]: adrs/adr-0006-numeric-validity-and-reduction-contracts.md
 [adr-0007]: adrs/adr-0007-comb-macro-grammar-and-staging.md
