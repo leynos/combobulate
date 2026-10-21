@@ -333,7 +333,7 @@ implementation begins. Each has a recommended option; the full trade-offs are in
   cross-checks the log's unwinding-assertion results; a harness whose unwinding
   checks are absent or failed is never type-complete. Rationale: a Kani log
   does not state whether a harness's inputs span the whole type, so that
-  declaration is a reviewed repository fact, recorded as axiom AX-06.
+  declaration is a reviewed repository fact, recorded as axiom AXIOM-06.
   Date/Author: 2026-10-22, planning agent.
 - DL-11. Decision: no glam feature is declared in this task. Rationale: glam is
   opt-in (technical design §3) and has no consumer until task 5.2.1; an
@@ -571,7 +571,7 @@ properties.
   - Method: Hypothesis properties over generated token streams (insertion of
     an item in code position adds exactly that item; insertion inside a comment
     or literal adds nothing; arbitrary text never raises an unhandled
-    exception), plus a hand-written corpus with one fixture per vocabulary
+    exception), plus a handwritten corpus with one fixture per vocabulary
     item and per lexical trap (nested block comments, `r#"..."#`, lifetimes
     such as `'a` versus character literals).
   - Artefacts: `scripts/docs_validation/trust_audit.py`,
@@ -628,19 +628,19 @@ properties.
 
 ### Axioms
 
-- AX-01: rustc, Cargo, and the pinned Cranelift and LLVM backends compile what
-  they accept faithfully; Cargo's dependency resolution reported by
+- AXIOM-01: rustc, Cargo, and the pinned Cranelift and LLVM backends compile
+  what they accept faithfully; Cargo's dependency resolution reported by
   `cargo tree` and `cargo metadata` is the graph that is built.
-- AX-02: Kani 0.67.0 with its bundled CBMC and CaDiCaL reports harness results
-  faithfully in its regular output format.
-- AX-03: Verus 0.2026.09.06.8dea4a2 with Z3 4.16.0 and the matching `vstd`
+- AXIOM-02: Kani 0.67.0 with its bundled CBMC and CaDiCaL reports harness
+  results faithfully in its regular output format.
+- AXIOM-03: Verus 0.2026.09.06.8dea4a2 with Z3 4.16.0 and the matching `vstd`
   reports verification results faithfully; Verus's trusted basis includes
   `vstd`'s specifications and any `external` items it uses.
-- AX-04: GitHub-hosted `ubuntu-24.04` runners match the AC environment
+- AXIOM-04: GitHub-hosted `ubuntu-24.04` runners match the AC environment
   description closely enough for the registered thresholds to apply.
-- AX-05: Polars 0.55.2's public API behaves as documented for the small calls
+- AXIOM-05: Polars 0.55.2's public API behaves as documented for the small calls
   made in this task; no Polars capability is claimed.
-- AX-06: the harness manifest's type-complete or partial declaration for each
+- AXIOM-06: the harness manifest's type-complete or partial declaration for each
   corpus harness is a reviewed repository fact (DL-10).
 
 ## Plan of work
@@ -827,12 +827,12 @@ Feature: Build profiles report what was compiled
   contract tests in `tests/` updated in the same commit. Before pushing, show
   from EP-M1 measurements that each required job is predicted within 6 minutes
   cold.
-- Add `.github/workflows/profile-builds.yml` (manual dispatch and a
-  `pull_request` `labeled` trigger for `measure-profiles`) that runs the AC-04
-  protocol: five cold and five incremental builds per profile, profiles
-  alternating run by run, one discarded incremental warm-up. Commit the
-  resulting acceptance record to `spec/measurements/` and report its verdict
-  honestly.
+- Add `.github/workflows/profile-builds.yml` (manual dispatch, plus a
+  `pull_request` trigger when the `measure-profiles` label is applied) that
+  runs the AC-04 protocol: five cold and five incremental builds per profile,
+  profiles alternating run by run, one discarded incremental warm-up. Commit
+  the resulting acceptance record to `spec/measurements/` and report its
+  verdict honestly.
 - Documentation: ADR-0010; the decision register; technical design §3 (crate
   names, dependency direction, profile names), §15 (GAP4), §17.7 (profile
   wiring), and §19.1 (selected Polars release); `docs/users-guide.md`
