@@ -23,6 +23,16 @@ def render(bets: list[dict]) -> str:
 
     For example, passing a valid record with ID ``B01`` and title
     ``Bounded cost`` yields output beginning ``## B01. Bounded cost``.
+
+    Parameters
+    ----------
+    bets : list[dict]
+        Bet records to render in their input order.
+
+    Returns
+    -------
+    str
+        The generated Markdown section body.
     """
     output = []
     for bet in bets:

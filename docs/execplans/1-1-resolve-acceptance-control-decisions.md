@@ -122,14 +122,16 @@ Term definitions used throughout:
   must not claim Rust compilation, Kani, Verus, or Polars results; the
   `NOT_RUN` list in `scripts/check_docs.py` stays truthful.
 - C-EP-7. Checker logic lives in `scripts/docs_validation/` and follows the
-  existing `tools/` conventions (`unittest` plus pinned Hypothesis with
+  repository's Python test conventions (`unittest` plus pinned Hypothesis with
   `derandomize=True`, dependencies pinned in `scripts/requirements.txt`).
   Runnable helper scripts live in `scripts/` and follow
   `docs/scripting-standards.md` (`uv` shebang, PEP 723 block, Python 3.14,
   Cyclopts with `INPUT_*` environment support, pytest suites in
-  `scripts/tests/` named after the script); when the checker needs a helper's
-  logic it loads the script by path rather than duplicating it. No Python file
-  exceeds 400 lines. Checks perform no network access.
+  `scripts/tests/` named after the script). The checker composition root
+  imports the generators and injects their renderers and markers through
+  `DocumentRenderer` and `LedgerDependencies`; checker modules do not load
+  scripts by path or duplicate their logic. No Python file exceeds 400 lines.
+  Checks perform no network access.
 - C-EP-8. No Rust library behaviour, public API, or Rust dependency changes.
   Rust-adjacent edits are `publish = false` in `Cargo.toml` (D05) and the
   narrowly scoped test-harness exception in

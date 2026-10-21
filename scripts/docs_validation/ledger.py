@@ -23,7 +23,23 @@ class MalformedCanonicalRoadmapError(AssertionError):
 
 @dataclass(frozen=True)
 class DocumentRenderer:
-    """Expose the renderer and markers needed to check one generated document."""
+    """Expose a renderer and markers needed to check one generated document.
+
+    Parameters
+    ----------
+    render : Callable[..., str]
+        Renders the generated document body.
+    start : str
+        Marks the start of the generated region.
+    end : str
+        Marks the end of the generated region.
+
+    Examples
+    --------
+    >>> renderer = DocumentRenderer(lambda: 'generated', '<start>', '<end>')
+    >>> renderer.render()
+    'generated'
+    """
 
     render: Callable[..., str]
     start: str

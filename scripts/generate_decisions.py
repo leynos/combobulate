@@ -111,8 +111,9 @@ def quoted_answer(record: dict) -> str:
     reference = record['approval_reference']
     if reference is None or 'answer' not in reference:
         return ''
+    answer = reference['answer'].replace('\r\n', '\n').replace('\r', '\n')
     paragraphs = [textwrap.fill(part, 78, initial_indent='> ', subsequent_indent='> ', break_long_words=False,
-                                break_on_hyphens=False) for part in reference['answer'].split('\n\n')]
+                                break_on_hyphens=False) for part in answer.split('\n\n')]
     return 'Answer, quoted verbatim:\n\n' + '\n>\n'.join(paragraphs) + '\n\n'
 
 

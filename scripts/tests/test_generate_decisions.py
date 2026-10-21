@@ -97,6 +97,17 @@ def test_multi_paragraph_answer_keeps_its_paragraph_break():
     assert '\n>\n> This breaks from current DF12 standards' in section, 'the blank line in the answer is kept'
 
 
+def test_quoted_answer_preserves_crlf_paragraph_boundaries():
+    """Normalize CRLF for rendering while preserving each quoted paragraph."""
+    answer = 'First paragraph.\r\n\r\nSecond paragraph.'
+    record = {'approval_reference': {'answer': answer}}
+
+    assert '> First paragraph.\n>\n> Second paragraph.\n' in quoted_answer(record), (
+        'CRLF blank lines must remain paragraph boundaries in the rendered quote'
+    )
+    assert record['approval_reference']['answer'] == answer, 'rendering must not normalize the stored answer'
+
+
 def test_answer_soft_line_break_keeps_words_in_one_paragraph():
     """Preserve all answer words while reflowing a soft line break."""
     register = accepted(REGISTER, 'D03')
@@ -151,7 +162,9 @@ def test_check_tolerates_rewrapping(workspace):
     """Allow harmless Markdown line wrapping in the generated decision region."""
     register, document = workspace
     text = document.read_text(encoding='utf-8')
-    document.write_text(text.replace('Lifecycle: proposed.', 'Lifecycle:\nproposed.', 1), encoding='utf-8')
+    edited = text.replace('Lifecycle: accepted.', 'Lifecycle:\naccepted.', 1)
+    assert edited != text, 'the fixture must contain the lifecycle text selected for rewrapping'
+    document.write_text(edited, encoding='utf-8')
     assert run_cli('--check', '--register', str(register), '--document', str(document)) == 0, 'wrapping is free'
 
 
