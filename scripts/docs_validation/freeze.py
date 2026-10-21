@@ -14,17 +14,16 @@ controls (with their amendment chain), and exceptions.
 """
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Mapping
 from typing import TypeAlias
 
+from .adr_naming import ADR_NAME, canonical_adr_path
 from .context import ValidationContext, require
 
 SUPERSESSION_FIELDS = frozenset({'lifecycle', 'superseded_by'})
 RevisionJsonReader: TypeAlias = Callable[[str, str], dict | None]
 RevisionBytesReader: TypeAlias = Callable[[str, str], bytes | None]
 CurrentBytesReader: TypeAlias = Callable[[str], bytes | None]
-ADR_PATH = re.compile(r'docs/adrs/adr-[0-9]{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md', re.ASCII)
 
 
 def check_decisions_frozen(base: dict, head: dict,
@@ -48,7 +47,12 @@ def check_decisions_frozen(base: dict, head: dict,
 def unchanged_adr_relocations(base: dict, head: dict, base_rev: str,
                               read_bytes_at_revision: RevisionBytesReader,
                               read_current_bytes: CurrentBytesReader) -> frozenset[str]:
-    """Identify accepted ADR links whose files moved without any content change."""
+    """Identify accepted ADR links whose files moved without any content change.
+
+    The move qualifies only when the destination name is the canonical name
+    its own title implies. A byte-identical copy parked at an unrelated slug
+    therefore stays a frozen-record edit.
+    """
     head_records = {record['id']: record for record in head['decisions']}
     relocated = set()
     for record in base['decisions']:
@@ -65,7 +69,7 @@ def unchanged_adr_relocations(base: dict, head: dict, base_rev: str,
         old_path, new_path = record.get('adr'), current.get('adr')
         if not isinstance(old_path, str) or not isinstance(new_path, str):
             continue
-        if ADR_PATH.fullmatch(old_path) is None or ADR_PATH.fullmatch(new_path) is None:
+        if ADR_NAME.fullmatch(old_path) is None or ADR_NAME.fullmatch(new_path) is None:
             continue
         if old_path == new_path:
             continue
@@ -75,6 +79,10 @@ def unchanged_adr_relocations(base: dict, head: dict, base_rev: str,
         if read_current_bytes(old_path) is not None:
             continue
         replacement = read_current_bytes(new_path)
+        if replacement is None:
+            continue
+        if canonical_adr_path(replacement.decode('utf-8', errors='replace')) != new_path:
+            continue
         if replacement == original:
             relocated.add(record['id'])
     return frozenset(relocated)

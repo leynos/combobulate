@@ -422,6 +422,7 @@ column says when each is meant to shrink or go.
 | `scripts/check_evidence.py`                    | Command-line evidence admission                  | Stays; Rust replay of its rules in task 1.2.4            |
 | `scripts/docs_validation/contracts.py`         | Semantic contract and bet/task validation        | Stays                                                    |
 | `scripts/docs_validation/decisions.py`         | Register integrity and document consistency      | Stays                                                    |
+| `scripts/docs_validation/adr_naming.py`        | Canonical ADR filename and title-slug rule       | Stays                                                    |
 | `scripts/docs_validation/roadmap_status.py`    | Component satisfaction and task closure          | Stays                                                    |
 | `scripts/docs_validation/freeze.py`            | Base-revision freeze of accepted records         | Stays                                                    |
 | `scripts/docs_validation/evidence_gate.py`     | The pure admission gate                          | Reference model until the Rust replay in task 1.2.4      |
@@ -741,6 +742,19 @@ only to `scripts/docs_validation/`: keep their domain rules independent of I/O,
 and do not reuse them as general repository file or Git APIs. Unit tests inject
 deterministic readers, while temporary Git integration tests cover actual
 revision reads and byte-identical ADR moves.
+
+`scripts/docs_validation/adr_naming.py` owns the ADR filename rule for both
+callers that enforce it: `check_adr_files` rejects a register ADR whose name is
+not the canonical name its own H1 title implies, and the relocation check
+requires a moved ADR to land at that same title-derived name. The rule is pure
+text handling with no filesystem access, so a byte-identical move between ADR
+paths still needs the destination to be the name the style guide demands. Do
+not reuse it as a general slugifier: it encodes the ADR title form and the
+`docs/adrs/` layout, not arbitrary heading anchors. A symbolic link at a
+relocation destination is reported as absent by the current-file reader: a link
+is not a regular file that can vouch for the canonical path, and following it
+would let a target outside the repository satisfy a check about the
+repository's own document.
 
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their

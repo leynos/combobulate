@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import copy
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from docs_validation.context import ValidationContext
 from docs_validation.freeze import check_controls_frozen, check_decisions_frozen, check_exceptions_frozen, check_frozen
 from docs_validation.revision_reader import git_head_revision, git_json_at_revision
+from git_fixtures import run_git
 
 DecisionRecord = dict[str, object]
 DecisionRegister = dict[str, list[DecisionRecord]]
@@ -288,21 +288,15 @@ class GitRevisionReaderIntegration(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        self.git('init', '-q')
+        run_git(self.root, 'init', '-q')
         (self.root / 'spec').mkdir()
         (self.root / 'README.md').write_text('# Fixture\n', encoding='utf-8')
-        self.git('add', 'README.md')
-        self.git('commit', '-q', '-m', 'Start')
-
-    def git(self, *args: str) -> None:
-        """Run a fixture Git command with local identity and signing disabled."""
-        subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
-                        '-c', 'commit.gpgsign=false', *args], cwd=self.root, check=True, capture_output=True)
+        run_git(self.root, 'add', 'README.md')
+        run_git(self.root, 'commit', '-q', '-m', 'Start')
 
     def test_head_revision_reads_the_current_commit(self) -> None:
         """Bind checker evidence to the repository's checked-out commit."""
-        expected = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=self.root, check=True,
-                                  capture_output=True, text=True).stdout.strip()
+        expected = run_git(self.root, 'rev-parse', 'HEAD')
         self.assertEqual(git_head_revision(self.root), expected,
                          'the revision adapter must return the checked-out commit')
 
@@ -310,8 +304,8 @@ class GitRevisionReaderIntegration(unittest.TestCase):
         """Run the registered exception freeze check against a real Git base revision."""
         register_path = self.root / 'spec/exceptions.json'
         register_path.write_text(json.dumps(exceptions(EXCEPTION)), encoding='utf-8')
-        self.git('add', 'spec/exceptions.json')
-        self.git('commit', '-q', '-m', 'Add approved exception')
+        run_git(self.root, 'add', 'spec/exceptions.json')
+        run_git(self.root, 'commit', '-q', '-m', 'Add approved exception')
         base_revision = git_head_revision(self.root)
         register_path.write_text(
             json.dumps(exceptions(EXCEPTION | {'reason': 'Edited in place.'})), encoding='utf-8'
@@ -329,8 +323,8 @@ class GitRevisionReaderIntegration(unittest.TestCase):
 
         decisions = self.root / 'spec/decisions.json'
         decisions.write_text(json.dumps(register(ACCEPTED)), encoding='utf-8')
-        self.git('add', 'spec/decisions.json')
-        self.git('commit', '-q', '-m', 'Accept D04')
+        run_git(self.root, 'add', 'spec/decisions.json')
+        run_git(self.root, 'commit', '-q', '-m', 'Accept D04')
         decisions.write_text(json.dumps(register(ACCEPTED | {'decided_option': 'B'})), encoding='utf-8')
 
         with self.assertRaisesRegex(AssertionError, 'Accepted decision D04 was edited'):

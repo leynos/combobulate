@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import stat
 import subprocess
 from pathlib import Path
 
@@ -68,11 +69,18 @@ def git_json_at_revision(root: Path, revision: str, path: str) -> dict | None:
 
 
 def working_tree_bytes(root: Path, path: str) -> bytes | None:
-    """Read a current file, returning None when the path is absent.
+    """Read a current regular file, returning None when the path is absent.
 
-    Callers validate repository-relative paths before using this adapter.
+    Callers validate repository-relative paths before using this adapter. A
+    symbolic link reports ``None`` like an absent path: a link is not a file
+    that can vouch for its own content at the canonical location, and
+    following it would let a link outside the repository satisfy a check
+    about the repository's own file.
     """
     try:
-        return (root / path).read_bytes()
+        candidate = (root / path).lstat()
     except FileNotFoundError:
         return None
+    if not stat.S_ISREG(candidate.st_mode):
+        return None
+    return (root / path).read_bytes()

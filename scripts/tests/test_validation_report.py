@@ -5,7 +5,6 @@ import contextlib
 import io
 import json
 import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from docs_validation.context import ValidationContext
 from docs_validation.freeze import CurrentBytesReader, RevisionBytesReader, RevisionJsonReader
 from docs_validation.preregistration import check_acceptance_controls
+from git_fixtures import run_git
 
 import check_docs
 
@@ -45,13 +45,9 @@ class ValidationReport(unittest.TestCase):
 
     def initialise_repository(self) -> None:
         """Give the current-revision checker a committed fixture checkout."""
-        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(['git', 'add', '-A'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(
-            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
-             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Create validation fixture'],
-            cwd=self.root, check=True, capture_output=True,
-        )
+        run_git(self.root, 'init', '-q')
+        run_git(self.root, 'add', '-A')
+        run_git(self.root, 'commit', '-q', '-m', 'Create validation fixture')
 
     def run_main(self, arguments: list[str]) -> int:
         """Execute the checker against copied inputs and capture its evidence output."""
@@ -345,13 +341,9 @@ class ValidationReport(unittest.TestCase):
         }
         decisions = self.root / 'spec/decisions.json'
         decisions.write_text(json.dumps({'decisions': [accepted]}), encoding='utf-8')
-        subprocess.run(['git', 'init', '-q'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(['git', 'add', 'spec/decisions.json'], cwd=self.root, check=True, capture_output=True)
-        subprocess.run(
-            ['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.org',
-             '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'Accept D04'],
-            cwd=self.root, check=True, capture_output=True,
-        )
+        run_git(self.root, 'init', '-q')
+        run_git(self.root, 'add', 'spec/decisions.json')
+        run_git(self.root, 'commit', '-q', '-m', 'Accept D04')
         decisions.write_text(json.dumps({'decisions': [accepted | {'subject': 'Different licence'}]}),
                              encoding='utf-8')
 

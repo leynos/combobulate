@@ -297,8 +297,18 @@ class AdrAgreement(unittest.TestCase):
 
     def test_title_number_must_match_the_file_name(self):
         """Reject an ADR title whose number differs from its filename."""
-        with self.assertRaisesRegex(AssertionError, 'ADR title must start with'):
+        with self.assertRaisesRegex(AssertionError, 'adr-0004-initial-release-scope.md must be named'):
             check_adr_files({'docs/adrs/adr-0004-initial-release-scope.md': ACCEPTED_ADR})
+
+    def test_title_slug_must_match_the_file_name(self):
+        """Reject an ADR filename whose slug the title does not imply."""
+        with self.assertRaisesRegex(AssertionError, 'must be named docs/adrs/adr-0003-initial-release-scope.md'):
+            check_adr_files({'docs/adrs/adr-0003-release-scope.md': ACCEPTED_ADR})
+
+    def test_untitled_adr_fails(self):
+        """Reject an ADR without the numbered H1 the naming rule derives from."""
+        with self.assertRaisesRegex(AssertionError, 'ADR title must start with a numbered'):
+            check_adr_files({ADR_PATH: '# Initial release scope\n'})
 
 
 class GoverningDocuments(unittest.TestCase):
