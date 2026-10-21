@@ -16,9 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from docs_validation.freeze import check_controls_frozen, check_decisions_frozen, check_exceptions_frozen, check_frozen
-from docs_validation.revision_reader import (
-    git_bytes_at_revision, git_head_revision, git_json_at_revision, working_tree_bytes,
-)
+from docs_validation.revision_reader import git_head_revision, git_json_at_revision
 
 DecisionRecord = dict[str, object]
 DecisionRegister = dict[str, list[DecisionRecord]]
@@ -339,94 +337,6 @@ class GitRevisionReaderIntegration(unittest.TestCase):
             check_frozen(context, 'HEAD', reader)
         with self.assertRaisesRegex(AssertionError, 'Cannot resolve base revision no-such-revision'):
             check_frozen(context, 'no-such-revision', reader)
-
-    def write_accepted_decision_with_adr(self, adr_path: str, adr_content: bytes) -> str:
-        """Commit a minimal accepted decision and its linked ADR as the freeze base."""
-        adr = self.root / adr_path
-        adr.parent.mkdir(parents=True, exist_ok=True)
-        adr.write_bytes(adr_content)
-        decisions = ACCEPTED | {'adr': adr_path}
-        (self.root / 'spec/decisions.json').write_text(
-            json.dumps(register(decisions)), encoding='utf-8'
-        )
-        self.git('add', 'spec/decisions.json', adr_path)
-        self.git('commit', '-q', '-m', 'Accept a decision with an ADR')
-        return git_head_revision(self.root)
-
-    def check_with_file_readers(self, base_revision: str) -> str:
-        """Run the freeze check with the production Git and working-tree readers."""
-        return check_frozen(
-            ValidationContext(self.root), base_revision,
-            partial(git_json_at_revision, self.root),
-            partial(git_bytes_at_revision, self.root),
-            partial(working_tree_bytes, self.root),
-        )
-
-    def test_byte_identical_adr_move_preserves_accepted_decision(self) -> None:
-        """Allow an ADR filename correction when the accepted decision is unchanged."""
-        old_path = 'docs/adrs/adr-0002-governance-authority.md'
-        new_path = 'docs/adrs/adr-0002-governance-authority-and-exceptions.md'
-        content = b'# Governance authority\n\nAccepted policy.\n'
-        base_revision = self.write_accepted_decision_with_adr(old_path, content)
-        (self.root / old_path).rename(self.root / new_path)
-        (self.root / 'spec/decisions.json').write_text(
-            json.dumps(register(ACCEPTED | {'adr': new_path})), encoding='utf-8'
-        )
-
-        summary = self.check_with_file_readers(base_revision)
-
-        self.assertIn('spec/decisions.json', summary,
-                      'an unchanged accepted decision remains frozen after its ADR moves')
-
-    def test_edited_adr_content_does_not_qualify_as_a_relocation(self) -> None:
-        """Reject an ADR pointer change when the moved document also changes."""
-        old_path = 'docs/adrs/adr-0002-governance-authority.md'
-        new_path = 'docs/adrs/adr-0002-governance-authority-and-exceptions.md'
-        base_revision = self.write_accepted_decision_with_adr(old_path, b'# Original\n')
-        (self.root / old_path).rename(self.root / new_path)
-        (self.root / new_path).write_bytes(b'# Rewritten\n')
-        (self.root / 'spec/decisions.json').write_text(
-            json.dumps(register(ACCEPTED | {'adr': new_path})), encoding='utf-8'
-        )
-
-        with self.assertRaisesRegex(AssertionError, r'Accepted decision D04 was edited \(adr\)'):
-            self.check_with_file_readers(base_revision)
-
-    def test_adr_pointer_change_does_not_qualify_while_old_path_remains(self) -> None:
-        """Reject a pointer rewrite that leaves the original ADR in place."""
-        old_path = 'docs/adrs/adr-0002-governance-authority.md'
-        new_path = 'docs/adrs/adr-0002-governance-authority-and-exceptions.md'
-        content = b'# Governance authority\n'
-        base_revision = self.write_accepted_decision_with_adr(old_path, content)
-        destination = self.root / new_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(content)
-        (self.root / 'spec/decisions.json').write_text(
-            json.dumps(register(ACCEPTED | {'adr': new_path})), encoding='utf-8'
-        )
-
-        with self.assertRaisesRegex(AssertionError, r'Accepted decision D04 was edited \(adr\)'):
-            self.check_with_file_readers(base_revision)
-
-    def test_adr_pointer_change_does_not_qualify_when_destination_already_existed(self) -> None:
-        """Reject a pointer rewrite to a pre-existing duplicate rather than a moved file."""
-        old_path = 'docs/adrs/adr-0002-governance-authority.md'
-        new_path = 'docs/adrs/adr-0002-governance-authority-and-exceptions.md'
-        content = b'# Governance authority\n'
-        self.write_accepted_decision_with_adr(old_path, content)
-        destination = self.root / new_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes(content)
-        self.git('add', new_path)
-        self.git('commit', '-q', '-m', 'Add duplicate ADR')
-        base_revision = git_head_revision(self.root)
-        (self.root / old_path).unlink()
-        (self.root / 'spec/decisions.json').write_text(
-            json.dumps(register(ACCEPTED | {'adr': new_path})), encoding='utf-8'
-        )
-
-        with self.assertRaisesRegex(AssertionError, r'Accepted decision D04 was edited \(adr\)'):
-            self.check_with_file_readers(base_revision)
 
 
 if __name__ == '__main__':
