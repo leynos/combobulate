@@ -538,9 +538,9 @@ open or pending within 60 characters of its identifier. Never edit an accepted
 record in place. A replacement must have its own valid D01-authorized
 acceptance before it can retire the accepted decision. Link both directions with
 `supersedes` and `superseded_by`; supersession chains must be acyclic and
-terminate at an accepted replacement. ADRs and RFCs use four-digit,
-zero-padded numbers and lowercase ASCII title slugs in `docs/adrs/` and
-`docs/rfcs/`, respectively, as specified by the
+terminate at an accepted replacement. ADRs and RFCs use four-digit, zero-padded
+numbers and lowercase ASCII title slugs in `docs/adrs/` and `docs/rfcs/`,
+respectively, as specified by the
 [documentation style guide](documentation-style-guide.md).
 
 The generated quote preserves the answer's words and blank-line paragraph
@@ -643,16 +643,19 @@ artefact readers.
 
 Accepted decisions are frozen. `make design-check BASE_REV=<revision>` compares
 `spec/decisions.json` with that revision and rejects an accepted record that
-was deleted or edited other than by becoming superseded; recomputing a stored
-digest cannot hide the edit, because the comparison reads the base revision
-from Git. The `Design contracts` workflow fetches full history and passes the
-pull request's merge base, or the previous head on a push to `main`. It also
-runs weekly, so date-dependent checks fail on `main` first. `make design-check`
-passes the HEAD commit date as `--as-of`, and the scheduled workflow run passes
-its own run date as `AS_OF`, so expiry surfaces even when `main` is idle; the
-checks themselves never read the wall clock. The freeze result is printed
-rather than recorded in `docs/validation-results.json`, so the committed report
-does not depend on which base revision was supplied.
+was deleted or edited other than by becoming superseded. An ADR pointer may
+change only for a canonical ADR file move: the destination must be new at the
+base revision, the old path must be absent from the working tree, and the moved
+file must be byte-identical. Recomputing a stored digest cannot hide an edit,
+because the comparison reads the base revision from Git. The `Design contracts`
+workflow fetches full history and passes the pull request's merge base, or the
+previous head on a push to `main`. It also runs weekly, so date-dependent
+checks fail on `main` first. `make design-check` passes the HEAD commit date as
+`--as-of`, and the scheduled workflow run passes its own run date as `AS_OF`,
+so expiry surfaces even when `main` is idle; the checks themselves never read
+the wall clock. The freeze result is printed rather than recorded in
+`docs/validation-results.json`, so the committed report does not depend on
+which base revision was supplied.
 
 Python helper scripts live in `scripts/` and follow
 [the scripting standards](scripting-standards.md): a `uv` shebang with a PEP
@@ -729,14 +732,15 @@ through `collect_checks`.
 Roadmap closure and frozen-register comparison keep repository access behind
 small reader callbacks. `ClosureInputs` receives an artefact resolver that
 returns `ArtefactProblem` for path, read, or anchor failures; `check_frozen`
-receives a `RevisionJsonReader`. The roadmap check composes its filesystem
+receives readers for JSON and bytes at a revision, plus current file bytes for
+the narrow ADR relocation check. The roadmap check composes its filesystem
 adapter from the validation context; the command-line composition root supplies
-the current source revision and Git-backed register reader. `roadmap_status`
-uses the injected revision and does not resolve Git state itself. These ports
-belong only to `scripts/docs_validation/`: keep their domain rules independent
-of I/O, and do not reuse them as general repository file or Git APIs. Unit
-tests inject deterministic readers, while a temporary Git integration test
-covers actual revision reads.
+the current source revision and Git-backed readers. `roadmap_status` uses the
+injected revision and does not resolve Git state itself. These ports belong
+only to `scripts/docs_validation/`: keep their domain rules independent of I/O,
+and do not reuse them as general repository file or Git APIs. Unit tests inject
+deterministic readers, while temporary Git integration tests cover actual
+revision reads and byte-identical ADR moves.
 
 Generated arithmetic tests use the pinned Hypothesis dependency to exercise I64
 operand pairs, ordered reductions, scan prefixes, and nullable sums. Their

@@ -16,7 +16,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.freeze import RevisionJsonReader
+from docs_validation.freeze import CurrentBytesReader, RevisionBytesReader, RevisionJsonReader
 from docs_validation.preregistration import check_acceptance_controls
 
 import check_docs
@@ -291,11 +291,15 @@ class ValidationReport(unittest.TestCase):
         observed: dict[str, object] = {}
 
         def freeze(context: ValidationContext, base_revision: str | None,
-                   read_json_at_revision: RevisionJsonReader) -> str:
+                   read_json_at_revision: RevisionJsonReader,
+                   read_bytes_at_revision: RevisionBytesReader,
+                   read_current_bytes: CurrentBytesReader) -> str:
             """Capture command-line values and the composition-root reader."""
             observed['as_of'] = context.as_of
             observed['base_revision'] = base_revision
             observed['reader_is_callable'] = callable(read_json_at_revision)
+            observed['revision_bytes_reader_is_callable'] = callable(read_bytes_at_revision)
+            observed['current_bytes_reader_is_callable'] = callable(read_current_bytes)
             return 'Freeze check fixture passed.'
 
         stderr = io.StringIO()
@@ -308,6 +312,8 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(observed, {
             'as_of': date(2026, 10, 15), 'base_revision': 'fixture-base',
             'reader_is_callable': True,
+            'revision_bytes_reader_is_callable': True,
+            'current_bytes_reader_is_callable': True,
         }, 'the parsed CLI values must reach the context and freeze check')
         self.assertIn('Freeze check fixture passed.', stderr.getvalue(),
                       'the caller must see the summary returned by the freeze check')
