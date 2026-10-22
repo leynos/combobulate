@@ -6,11 +6,12 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 be kept up to date as work proceeds.
 
 Status: DRAFT. A community-of-experts review has been applied (see
-`Design review record`). The plan awaits sponsor approval. No implementation
-milestone may begin until the sponsor approves this plan and answers the
-decisions listed under `Decisions requested at approval`. Approving the plan
-does not accept any decision, ADR, or control amendment; each of those is
-accepted separately, at the checkpoint named for it.
+`Design review record`). On 2026-10-22 the sponsor accepted the recommended
+option for every item under `Sponsor decisions`. Two things remain before EP-M1
+begins: explicit sponsor approval of the plan itself, and the answer on whether
+Q3 joins `in_scope_questions`. Accepting a decision's direction does not accept
+its final text; amendments, D16, and ADR-0010 are still approved at the
+checkpoints named for them.
 
 ## Purpose / big picture
 
@@ -70,10 +71,13 @@ property of Combobulate itself. The capability records say what the tools did
 on probe fixtures; the profile builds say what compiled; the parser and scanner
 are tested gate components. Task 1.2.4 makes the first proof claim.
 
-## Decisions requested at approval
+## Sponsor decisions
 
-The sponsor (`leynos`, the D01 authority) is asked to settle these before
-implementation begins. Each has a recommended option; trade-offs are in
+The sponsor (`leynos`, the D01 authority) was asked to settle these before
+implementation begins. On 2026-10-22 the sponsor accepted the recommended
+option for all eight, in this session. Items 2, 3, 4, and 7 are accepted in
+direction; their final texts are approved at the checkpoints named. The
+question in item 7 about `in_scope_questions` is still open. Trade-offs are in
 `Decision log`.
 
 1. CI shape for the Polars-enabled profile (DL-03). Recommended: the
@@ -108,8 +112,8 @@ implementation begins. Each has a recommended option; trade-offs are in
    records the crate boundary, dependency direction, feature profiles, gate
    feature lists, and the supported-toolchain set that answers ToR Q3 in place
    of one MSRV. The sponsor accepts D16 after EP-M4 publishes ADR-0010; the
-   approval reference is committed before the tick. The sponsor also says
-   whether Q3 joins `in_scope_questions` in `spec/decisions.json`.
+   approval reference is committed before the tick. Still open: whether Q3 joins
+   `in_scope_questions` in `spec/decisions.json`.
 8. PR title numbering (DL-12). The request asked for `(1.1)` in the title, but
    this task is roadmap item 1.2.1. The draft PR uses `(1.2.1)`; the sponsor
    may ask for the literal `(1.1)` instead.
@@ -289,7 +293,10 @@ implementation begins. Each has a recommended option; trade-offs are in
 - [x] (2026-10-22) Draft this ExecPlan (commit `d2361d6`).
 - [x] (2026-10-22) Community-of-experts review by four reviewers; findings
   applied in this revision (see `Design review record`).
-- [ ] Sponsor approval of the plan and of the decisions requested at approval.
+- [x] (2026-10-22) Sponsor accepted the recommended option for all eight
+  sponsor decisions.
+- [ ] Sponsor approval of the plan to begin EP-M1, and the answer on Q3 in
+  `in_scope_questions`.
 - [ ] EP-M1. Prototype: toolchain, profile, and hosted-cost probes.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
@@ -350,29 +357,30 @@ committed together with its Green change.
   gain. The exclusion is needed because the calibration probe is a path
   dev-dependency with its own `[workspace]` table. Date/Author: 2026-10-22,
   planning agent.
-- DL-02. Decision (proposed, accepted by the sponsor as D16 after EP-M4):
-  ADR-0010 records the crate boundary, dependency direction, feature profiles,
-  gate feature lists, the proof-dependency allowlist for task 1.2.4, the
-  selected Verus wiring, and the supported-toolchain set. It resolves candidate
-  subjects CA3 and CA5 and answers ToR Q3 with a supported-toolchain set rather
-  than one MSRV. A new decision is used because accepted decisions are
-  append-only (`scripts/docs_validation/freeze.py`); superseding D07 would
-  restate all eight candidate dispositions. The `adr` disposition schema has no
-  `bet` field, so CA5's link to B01 is carried by ADR-0010, which states that
-  B01 can still falsify the kernel in task 1.2.4. Rejected alternative: a
-  separate `combobulate-polars` adapter crate (see DL-19). Date/Author:
-  2026-10-22, planning agent.
-- DL-03. Decision (proposed, sponsor choice): CI shape for the Polars-enabled
-  profile. Options: (A) one `build-test` job with Polars in every route, which
-  risks the hard timeout on every cold cache; (B) keep `build-test` on the
-  native-only profile and add parallel Polars-enabled lint and test jobs, each
-  sized from hosted measurements; (C) defer the facade's Polars dependency to
-  task 1.2.6, which contradicts this task's success criterion. Recommended: B,
-  with GitHub Actions sccache, coverage and Whitaker target caches, and cache
-  saves only on `main`. Every option edits `ci.yml` and so needs DL-14.
-  Coverage keeps measuring the native-only profile; `coverage-main.yml` changes
-  in the same commit so that its baseline uses the same features. Date/Author:
-  2026-10-22, planning agent.
+- DL-02. Decision (direction accepted by the sponsor, 2026-10-22; D16 itself
+  is accepted after EP-M4): ADR-0010 records the crate boundary, dependency
+  direction, feature profiles, gate feature lists, the proof-dependency
+  allowlist for task 1.2.4, the selected Verus wiring, and the
+  supported-toolchain set. It resolves candidate subjects CA3 and CA5 and
+  answers ToR Q3 with a supported-toolchain set rather than one MSRV. A new
+  decision is used because accepted decisions are append-only
+  (`scripts/docs_validation/freeze.py`); superseding D07 would restate all
+  eight candidate dispositions. The `adr` disposition schema has no `bet`
+  field, so CA5's link to B01 is carried by ADR-0010, which states that B01 can
+  still falsify the kernel in task 1.2.4. Rejected alternative: a separate
+  `combobulate-polars` adapter crate (see DL-19). Date/Author: 2026-10-22,
+  planning agent.
+- DL-03. Decision (accepted by the sponsor, 2026-10-22): CI shape for the
+  Polars-enabled profile. Options: (A) one `build-test` job with Polars in
+  every route, which risks the hard timeout on every cold cache; (B) keep
+  `build-test` on the native-only profile and add parallel Polars-enabled lint
+  and test jobs, each sized from hosted measurements; (C) defer the facade's
+  Polars dependency to task 1.2.6, which contradicts this task's success
+  criterion. Recommended: B, with GitHub Actions sccache, coverage and Whitaker
+  target caches, and cache saves only on `main`. Every option edits `ci.yml`
+  and so needs DL-14. Coverage keeps measuring the native-only profile;
+  `coverage-main.yml` changes in the same commit so that its baseline uses the
+  same features. Date/Author: 2026-10-22, planning agent.
 - DL-04. Decision: the kernel is `#![no_std]` without `alloc` and declares no
   dependency in this task. Its only item is `TargetFacts`, which reports the
   target's `usize` width as a constant evaluated for the compilation target.
@@ -380,23 +388,25 @@ committed together with its Green change.
   allocation and external state, and §18.1 forbids substituting the host's
   pointer width for the target's. Allocation can be admitted later only by an
   ADR-0010 amendment. Date/Author: 2026-10-22, planning agent.
-- DL-05. Decision (proposed, sponsor choice): `combobulate-macros` is created
-  now as a `proc-macro = true` crate with no exported macro and no dependency;
-  the facade's default `macros` feature enables it. Rationale: the task
-  requires the macro boundary to exist, and its wiring and build cost belong in
-  the profile record and AC-04, but adding `syn` or a placeholder macro before
-  task 2.3.1 would be speculative. Alternative: defer the crate, which narrows
-  this task's stated scope. Date/Author: 2026-10-22, planning agent.
+- DL-05. Decision (accepted by the sponsor, 2026-10-22): `combobulate-macros`
+  is created now as a `proc-macro = true` crate with no exported macro and no
+  dependency; the facade's default `macros` feature enables it. Rationale: the
+  task requires the macro boundary to exist, and its wiring and build cost
+  belong in the profile record and AC-04, but adding `syn` or a placeholder
+  macro before task 2.3.1 would be speculative. Alternative: defer the crate,
+  which narrows this task's stated scope. Date/Author: 2026-10-22, planning
+  agent.
 - DL-06. Decision: the macro crate must not depend on the kernel, and the
   kernel may not appear in any build-dependency or procedural-macro closure.
   Rationale: a procedural macro and a build script run on the host, so
   host-side kernel evaluation would substitute host facts for target facts
   (technical design §18.1). Date/Author: 2026-10-22, planning agent.
-- DL-07. Decision (proposed, sponsor choice): task 1.2.1 builds and registers
-  the Kani parser only; task 1.2.4 builds and registers the Verus parser.
-  Rationale: the roadmap's three named log classes are Kani outcomes, and task
-  1.2.4 registers parsers "for this kernel's evidence". The trust-audit scanner
-  covers both vocabularies now. Date/Author: 2026-10-22, planning agent.
+- DL-07. Decision (accepted by the sponsor, 2026-10-22): task 1.2.1 builds and
+  registers the Kani parser only; task 1.2.4 builds and registers the Verus
+  parser. Rationale: the roadmap's three named log classes are Kani outcomes,
+  and task 1.2.4 registers parsers "for this kernel's evidence". The
+  trust-audit scanner covers both vocabularies now. Date/Author: 2026-10-22,
+  planning agent.
 - DL-08. Decision: the parser and scanner are Python modules in
   `scripts/docs_validation/`, beside the gate they feed. Rationale: the gate,
   `VerifiedLogResult`, and `AdmissionContext` are Python, and ADR-0009 keeps
@@ -424,7 +434,7 @@ committed together with its Green change.
   opt-in and has no consumer until task 5.2.1; an unexercised feature would be
   an untested profile. The kernel boundary forbids glam regardless.
   Date/Author: 2026-10-22, planning agent.
-- DL-12. Decision (proposed): the draft PR title is
+- DL-12. Decision (accepted by the sponsor, 2026-10-22): the draft PR title is
   `Plan: establish the workspace and pinned profiles (1.2.1)`. Rationale: the
   request asked for `(1.1)`, but this task is roadmap item 1.2.1 and earlier
   PRs used the number of the item they delivered. Date/Author: 2026-10-22,
@@ -437,16 +447,18 @@ committed together with its Green change.
   decision function, which receives an exhaustive enumeration check instead
   (VO-11b). Verus and Kani run only as probe subjects and log producers.
   Date/Author: 2026-10-22, planning agent.
-- DL-14. Decision (proposed, sponsor approval at EP-M3): the AC-07 amendment
-  described in `Decisions requested at approval` item 2, with matching changes
-  to `ci_controls.py` and `preregistration.py` so that the checker accepts
-  several required jobs and reads each job's runner and timeout. Date/Author:
+- DL-14. Decision (direction accepted by the sponsor,
+  2026-10-22; final text approved at EP-M3): the AC-07 amendment described in
+  `Sponsor decisions` item 2, with matching changes to `ci_controls.py` and
+  `preregistration.py` so that the checker accepts several required jobs and
+  reads each job's runner and timeout. Date/Author: 2026-10-22, planning agent.
+- DL-15. Decision (direction accepted by the sponsor,
+  2026-10-22; final text approved at EP-M4): the AC-04 amendment described in
+  `Sponsor decisions` item 3. If the selected Polars feature set differs from
+  the calibrated `lazy` set, the amendment records the difference. Date/Author:
   2026-10-22, planning agent.
-- DL-15. Decision (proposed, sponsor approval at EP-M4): the AC-04 amendment
-  described in `Decisions requested at approval` item 3. If the selected Polars
-  feature set differs from the calibrated `lazy` set, the amendment records the
-  difference. Date/Author: 2026-10-22, planning agent.
-- DL-16. Decision (proposed, sponsor approval at EP-M5): amend ADR-0009 so that
+- DL-16. Decision (direction accepted by the sponsor,
+  2026-10-22; final text approved at EP-M5): amend ADR-0009 so that
   `AdmissionContext` also carries scanner-derived trust audits. The I/O shell
   checks the digest of every source file the harness manifest names, runs the
   scanner over them, and passes a `VerifiedTrustAudit`; `abstract_record`
@@ -456,19 +468,20 @@ committed together with its Green change.
   repository. A record whose `method.tool` names a registered parser must have
   `evidence_kind` deductive or bounded, so a Kani run cannot be relabelled as a
   test to bypass the parser. Date/Author: 2026-10-22, planning agent.
-- DL-17. Decision (proposed, part of DL-16): the matching rule for the ADR-0009
-  vocabulary. The scanner lexes Rust, skips comments and literals, and reports
-  an identifier as a trusted item when it is (i) a Kani vocabulary item reached
-  through a path or `use` tree rooted at `kani`, including `kani::any_where` and
-  `#[cfg_attr(kani, kani::stub(..))]`; (ii) a Verus vocabulary item inside a
-  `verus!` body, a `#[verifier::…]`, `#[verifier(…)]`, `#[verus_verify(…)]`, or
-  `#[verus_spec(…)]` attribute, a `cfg_attr` carrying one of those, or a `use`
-  tree rooted at `vstd` or `verus_builtin`; or (iii) any unqualified vocabulary
-  identifier in a file that imports from `kani`, `vstd`, or `verus_builtin` by
-  glob or alias. An unqualified `should_panic`, `assume`, or `external` in a
-  file with no such import is ordinary Rust and is not reported. The Verus list
-  also covers `external_trait_specification`, `assume_specification[…]`, and
-  `exec_allows_no_decreases_clause`. Date/Author: 2026-10-22, planning agent.
+- DL-17. Decision (direction accepted with DL-16): the matching rule for the
+  ADR-0009 vocabulary. The scanner lexes Rust, skips comments and literals, and
+  reports an identifier as a trusted item when it is (i) a Kani vocabulary item
+  reached through a path or `use` tree rooted at `kani`, including
+  `kani::any_where` and `#[cfg_attr(kani, kani::stub(..))]`; (ii) a Verus
+  vocabulary item inside a `verus!` body, a `#[verifier::…]`, `#[verifier(…)]`,
+  `#[verus_verify(…)]`, or `#[verus_spec(…)]` attribute, a `cfg_attr` carrying
+  one of those, or a `use` tree rooted at `vstd` or `verus_builtin`; or (iii)
+  any unqualified vocabulary identifier in a file that imports from `kani`,
+  `vstd`, or `verus_builtin` by glob or alias. An unqualified `should_panic`,
+  `assume`, or `external` in a file with no such import is ordinary Rust and is
+  not reported. The Verus list also covers `external_trait_specification`,
+  `assume_specification[…]`, and `exec_allows_no_decreases_clause`.
+  Date/Author: 2026-10-22, planning agent.
 - DL-18. Decision: ordinary Make gates stop using `--all-features`. Each gate
   route runs per gate profile with an explicit feature list (native-only:
   `--no-default-features`; Polars-enabled: default features), selected by
@@ -1394,3 +1407,8 @@ kept `license` and `publish` literal; added the package route, the
 `make_gate_order.rs` split, the external native consumer, VO-14, re-use
 policies, and per-milestone recovery and gates. Remaining work is unchanged in
 scope: implementation begins only after sponsor approval.
+
+2026-10-22, revision 3: recorded the sponsor's acceptance of the recommended
+option for all eight sponsor decisions, and renamed the section to
+`Sponsor decisions`. Explicit approval of the plan and the Q3
+`in_scope_questions` answer remain before EP-M1 begins.
