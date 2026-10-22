@@ -51,10 +51,13 @@ today:
    unsupported, or inconclusive, and each tool's trusted computing base.
    `make design-check` fails when any other pin in the repository disagrees
    with that record.
-5. Run `make install-proof-tools` to obtain the pinned Kani and Verus releases
-   through checksum-verified, atomic, idempotent installs, while ordinary
-   builds and every ordinary Make gate continue to pass on a host with neither
-   tool installed.
+5. Run `make install-kani` and `make install-verus`, which delegate to the
+   `prover-tools` command from `leynos/rust-prover-tools` at the commit pinned
+   in `tools/rust-prover-tools/REF`, to install the Kani and Verus releases
+   pinned in `tools/kani/VERSION` and `tools/verus/VERSION`. The Verus archive
+   is checked against `tools/verus/SHA256SUMS`. `make kani-check` confirms that
+   the running Kani matches its pin. Ordinary builds and every ordinary Make
+   gate continue to pass on a host with neither tool installed.
 6. Run `python3 scripts/check_evidence.py` over a fixture evidence record that
    cites a committed Kani log and harness manifest, and see the gate re-derive
    the verdict through the registered `kani` parser and the trust audit through
@@ -137,6 +140,17 @@ question in item 7 about `in_scope_questions` is still open. Trade-offs are in
   facade's crate-private Polars module (VO-14).
 - Proof support must not use `cfg(kani)` or a proof feature to replace a
   production body with a different implementation (technical design §17.7).
+- Kani and Verus are installed, version-checked, and run only through
+  `prover-tools` from `leynos/rust-prover-tools`, pinned by commit in
+  `tools/rust-prover-tools/REF` and invoked through `uv tool run --from` that
+  pinned Git source. No repository-owned installer script is written. Make
+  recipes contain none of `cargo install`, `cargo kani setup`, `curl`, `unzip`,
+  `sha256sum`, or `rustup toolchain install`, and route through an
+  `override`-locked `$(PROVER_TOOLS)` variable whose only substitution seam is
+  the contract-test pair `PROVER_TOOLS_CONTRACT_TEST=1 PROVER_TOOLS=<fake>`
+  given on the `make` command line (the `kani` skill's project on-ramp). A
+  needed capability that `prover-tools` lacks is proposed upstream, not
+  reimplemented here.
 - The pinned Kani 0.67.0, Verus 0.2026.09.06.8dea4a2, and Z3 4.16.0 revisions
   are part of the pre-registered environment of controls AC-01, AC-02, AC-04,
   and AC-07. Changing any of them requires a sponsor-approved control amendment
@@ -197,6 +211,8 @@ question in item 7 about `in_scope_questions` is still open. Trade-offs are in
   exceed 6 minutes cold, if the AC-04 acceptance measurement fails a ceiling,
   if a probe exceeds its AC-01 or AC-02 budget, or if a hosted route exceeds 12
   GiB of peak memory or the runner's free disk.
+- Upstream tooling: stop if the plan needs a change to `rust-prover-tools`;
+  propose it upstream and wait for the sponsor rather than working around it.
 - Iterations: stop if a gate still fails after three fix attempts on the same
   cause.
 - Ambiguity: stop and present options when a choice materially changes a
@@ -272,9 +288,28 @@ question in item 7 about `in_scope_questions` is still open. Trade-offs are in
   checked in EP-M3; a bump to 0.28.0 is pre-authorized, anything larger
   escalates.
 - Risk: the Z3 binary used during calibration lived under `/tmp` and is not
-  reproducible. Severity: medium. Likelihood: certain. Mitigation: the
-  installer takes Z3 from the Verus release archive or a pinned,
-  checksum-verified Z3 asset and records its source.
+  reproducible. Severity: medium. Likelihood: certain. Mitigation:
+  `prover-tools verus install` unpacks the checksum-verified Verus release
+  archive; EP-M1 confirms that it bundles Z3 4.16.0 and records its path. If it
+  does not, the gap is proposed upstream to `rust-prover-tools`.
+- Risk: `prover-tools kani install` runs
+  `cargo install --locked kani-verifier --version 0.67.0` and
+  `cargo kani setup`, which downloads the Kani bundle without a repository-side
+  digest check. Severity: medium. Likelihood: certain. Mitigation: the trusted
+  computing base records the crates.io `kani-verifier` source and the
+  unverified bundle download, with the release asset digest kept for reference
+  in the profile record; a verified bundle option is proposed upstream to
+  `rust-prover-tools`.
+- Risk: `prover-tools` has no `cargo verus` route; `prover-tools verus run`
+  verifies a single proof root. Severity: medium. Likelihood: certain.
+  Mitigation: the EP-M1 wiring probe includes the estate's single-root pattern
+  (DL-22); a crate-based wiring is selected only if it is decisively better,
+  and then its `cargo verus` route is proposed upstream before task 1.2.4.
+- Risk: `prover-tools verus install` unpacks about 456 MB into
+  `.verus/<version>/` in each worktree, where Markdown, spelling, and Whitaker
+  scans could find it. Severity: low. Likelihood: certain. Mitigation: ignore
+  `.verus/` in `.gitignore` and in the Markdown lint configuration, and record
+  the per-worktree disk cost in `docs/developers-guide.md`.
 - Risk: the AC-04 hosted measurement fails a ceiling, most plausibly the
   10-minute Polars cold build. Severity: medium. Likelihood: low to medium.
   Mitigation: none by extension (AC-04 forbids it); a failure stops the task
@@ -340,6 +375,16 @@ committed together with its Green change.
   `generate-coverage` action with default features. Evidence:
   `.github/workflows/ci.yml` lines 105-126. Impact: profile checks need their
   own hosted steps, and coverage features must be set explicitly.
+- Observation: `leynos/rust-prover-tools` (at
+  `9c4a27a86c678ceac1155404f45d95ee4a14a172`, no tagged release) already
+  provides `prover-tools kani install`, `kani check-version`, `kani exec`,
+  `verus install`, and `verus run`. `kani exec` qualifies Kani 0.67.0 on Linux
+  x86_64 for repositories like this one: it strips the Cranelift backend, the
+  `mold` linker selection, and frontend threads from the child, keeps
+  `RUSTC_WRAPPER` admission wrappers, and supports a `cargo-llvm-cov` parent.
+  Evidence: its README and users' guide. Impact: the plan drops its own
+  installer and the in-place Kani risk largely dissolves; EP-M1 still records
+  the observed behaviour (DL-21).
 - Observation: the trust audit is read from the record itself, and
   `VerifiedLogResult` carries no trust facts. Evidence:
   `scripts/docs_validation/evidence_gate.py` lines 73-98, 192-199, 303. Impact:
@@ -501,6 +546,40 @@ committed together with its Green change.
 - DL-20. Decision: delivery uses one stacked PR per milestone (the
   `github-stacks` skill), with a commit after each gated Green or Refactor
   step. Date/Author: 2026-10-22, planning agent.
+- DL-21. Decision: adopt `rust-prover-tools` as the only installer and runner
+  for Kani and Verus, following the `kani` and `verus` skills' project
+  on-ramps. Pins live in `tools/kani/VERSION`, `tools/verus/VERSION`,
+  `tools/verus/SHA256SUMS`, `tools/verus/README.md`, and
+  `tools/rust-prover-tools/REF` (repository, branch, a 40-character `ref`, and a
+  `verify` command that fetches the pinned commit). Make targets
+  `install-kani`, `kani-check`, `install-verus`, and the probe targets delegate
+  to `$(PROVER_TOOLS)`; every proof target depends on `kani-check`. Kani runs
+  through
+  `prover-tools kani exec --installation <kani-0.67.0> --cwd <proof package>`
+  from the proof package, never with `--manifest-path`. Rationale: the user
+  directed that the plan use these helpers; they already solve pinning,
+  checksum verification, toolchain discovery, and this repository's build
+  standard, and the estate's reviewers reject repository shell installers.
+  Date/Author: 2026-10-22, planning agent at the sponsor's direction.
+- DL-22. Decision: the EP-M1 Verus wiring probe adds candidate (d), the
+  estate's established single-root pattern: production source carries
+  `cfg_attr(verus_keep_ghost, …)` specification attributes that are inert in
+  ordinary builds, and a proof root under `verus/` imports the production
+  module with `#[path]`, run by `prover-tools verus run --proof-file`. A design
+  check asserts that each `#[path]` target and the referenced items still
+  exist. Rationale: (d) adds no dependency to the kernel, so VO-1 and VO-3 hold
+  unchanged, and Verus compiles the same production source rather than a mirror
+  (technical design §17.2). Candidates (a) to (c) remain for comparison; (d) is
+  preferred if it passes the same exact-count acceptance. Date/Author:
+  2026-10-22, planning agent.
+- DL-23. Decision: formal jobs stay outside `ci.yml` in this task. Kani and
+  Verus run in a separate, non-required workflow on a weekly schedule and on
+  manual dispatch; a pull-request `kani-smoke` job arrives with task 1.2.4's
+  first shipped harnesses. Until then, `make kani` and `make kani-full` are
+  explicit stubs that print `FORMAL-SKIP: <target> not yet implemented` and
+  exit 0 unless `FORMAL_STRICT=1`. Rationale: there is no shipped harness to
+  run, and a required formal job would enter AC-07's amended workload for no
+  evidence. Date/Author: 2026-10-22, planning agent.
 
 ## Design review record
 
@@ -650,6 +729,7 @@ TD §17.2, ADR-0009, D15 -> EP-M5 -> scripts/docs_validation/kani_log/ -> script
 TD §17.2, ADR-0009 vocabulary, DL-17 -> EP-M5 -> scripts/docs_validation/trust_audit/ -> scripts/tests/test_trust_audit.py
 AC-07, DL-03, DL-14 -> EP-M3 -> .github/workflows/ci.yml profile jobs
 AC-04, DL-15 -> EP-M6 -> spec/measurements/ac-04-*.json
+DL-21, kani and verus on-ramps -> EP-M1 -> tests/prover_tools_contract.rs
 Roadmap 1.2.1 -> EP-M6 -> spec/task-completion.json -> ticked in docs/roadmap.md
 ```
 
@@ -751,10 +831,11 @@ both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
     boundary.
 - VO-7, pin consistency: every pinned revision agrees across
   `spec/toolchain-profiles.json`, `rust-toolchain.toml`, `Cargo.lock`,
-  `tools/kani/VERSION`, `tools/verus/VERSION`, the installer scripts, the
-  workflows, and the `environment.toolchains` of controls AC-01, AC-02, AC-04,
-  and AC-07; a sweep of tracked files for each pinned version string finds no
-  pin site outside the enumerated sources.
+  `tools/kani/VERSION`, `tools/verus/VERSION`, `tools/verus/SHA256SUMS`,
+  `tools/rust-prover-tools/REF`, the `Makefile`, the workflows, and the
+  `environment.toolchains` of controls AC-01, AC-02, AC-04, and AC-07; a sweep
+  of tracked files for each pinned version string finds no pin site outside the
+  enumerated sources.
   - Artefacts: `scripts/docs_validation/toolchain_profiles.py`,
     `scripts/tests/test_toolchain_profiles.py`.
   - Non-vacuity: one test per source mutates that source's pin in a temporary
@@ -860,6 +941,23 @@ both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
   lexer.
   - Non-vacuity: a seeded `use polars::` in a copy of `src/profile.rs` must
     fail.
+- VO-15, prover-tools wiring contract: every prover Make target delegates
+  through `$(PROVER_TOOLS)` with the exact `prover-tools` invocation, flag
+  forwarding, and exit-status propagation expected; every proof target depends
+  on `kani-check`; no recipe contains `cargo install`, `cargo kani setup`,
+  `curl`, `unzip`, `sha256sum`, or `rustup toolchain install`;
+  `tools/rust-prover-tools/REF` holds a 40-character `ref`;
+  `tools/kani/VERSION` and `tools/verus/VERSION` are non-empty; and
+  `tools/verus/SHA256SUMS` has a row naming the configured archive. The
+  `FORMAL-SKIP` stubs exit 0, and exit non-zero under `FORMAL_STRICT=1`.
+  - Method: Make contract tests in the style of `tests/make_gate_order.rs`,
+    running each target against a recording fake executable (not `echo`)
+    passed as `PROVER_TOOLS_CONTRACT_TEST=1 PROVER_TOOLS=<fake>` on the `make`
+    command line, plus static checks of the recipes and pin files.
+  - Artefact: `tests/prover_tools_contract.rs` with helpers in `tests/support/`.
+  - Non-vacuity: the same seam supplied only through the environment must not
+    unlock the fake; a fake that exits non-zero must make the target fail; a
+    malformed `ref` must stop Make before any recipe runs.
 
 ### Axioms
 
@@ -878,6 +976,11 @@ both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
 - AXIOM-06: a harness manifest's roles and expected control failures are
   reviewed repository facts, bound to the record by digest and checked against
   the sources' harness set.
+- AXIOM-07: `prover-tools` at the pinned commit installs and runs exactly the
+  pinned releases it reports, verifies the Verus archive digest, and, through
+  `kani exec`, removes only the flags its users' guide documents. Its
+  `kani install` route trusts the crates.io `kani-verifier` crate and the Kani
+  bundle that `cargo kani setup` downloads.
 
 ## Plan of work
 
@@ -893,28 +996,32 @@ This milestone records each tool and profile capability and trust boundary
 before anything depends on it. Its probe crates are kept as fixtures when later
 milestones use them and are deleted otherwise. No shipped code changes.
 
-- Proof-tool installation. Write `scripts/install-proof-tools.sh` reusing
-  `scripts/build-tools-common.sh`, and `make install-proof-tools`. Pin Kani in
-  `tools/kani/VERSION` (0.67.0) and `tools/kani/SHA256SUMS` (asset
-  `kani-0.67.0-x86_64-unknown-linux-gnu.tar.gz`, sha256
-  `3b5f7afd3b51603ee720db7bc1bc4fe46b5a4f5d36daad9939c4b4c658b51ac0`), and
-  Verus in `tools/verus/VERSION` (0.2026.09.06.8dea4a2) and
-  `tools/verus/SHA256SUMS` (asset `verus-0.2026.09.06.8dea4a2-x86-linux.zip`,
-  sha256 `13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16`).
-  Install into `${XDG_DATA_HOME:-$HOME/.local/share}/combobulate-proof-tools/`,
-  with `KANI_HOME` set there in the installer and every Make route, and
-  `cargo kani setup --use-local-bundle` on the verified archive. Install
-  atomically by extracting into a `.partial-<pid>` directory on the same
-  filesystem and renaming; use a stamp file holding the digest for idempotence
-  and `flock` against concurrent agents. Record the rustup toolchains Kani and
-  Verus fetch (nightly-2025-11-21 and 1.98.0) and the crates.io `cargo-kani`
-  source. Determine whether the Verus archive bundles Z3 4.16.0; if not, pin a
-  Z3 asset the same way.
+- Proof-tool pins and Make wiring (DL-21). Add `tools/rust-prover-tools/REF`
+  pinning `9c4a27a86c678ceac1155404f45d95ee4a14a172` (or the `main` head at
+  implementation time, recorded with its `verify` output); `tools/kani/VERSION`
+  (0.67.0); `tools/verus/VERSION` (0.2026.09.06.8dea4a2);
+  `tools/verus/SHA256SUMS` in `sha256sum` format, naming
+  `verus-0.2026.09.06.8dea4a2-x86-linux.zip` with digest
+  `13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16`; and
+  `tools/verus/README.md` saying what is pinned and how to bump it. Add the
+  `PROVER_TOOLS` block from the `kani` skill's on-ramp to the `Makefile`, with
+  targets `install-kani`, `kani-check`, `install-verus`, `kani` and `kani-full`
+  (`FORMAL-SKIP` stubs, DL-23), `kani-log-corpus`, and `verus-probe`. Ignore
+  `.verus/` in Git and in the Markdown lint configuration. Red first: add
+  `tests/prover_tools_contract.rs` (VO-15), run it, and record the failure.
+  Then run `make install-kani`, `make kani-check`, and `make install-verus`,
+  recording the rustup toolchains each fetches (nightly-2025-11-21 for Kani,
+  1.98.0 for Verus), the crates.io `kani-verifier` source, whether the Verus
+  archive bundles Z3 4.16.0, and, for reference, the Kani release asset digest
+  `3b5f7afd3b51603ee720db7bc1bc4fe46b5a4f5d36daad9939c4b4c658b51ac0`.
 - Kani log corpus. Create `tools/verifier-fixtures/kani-corpus/`, a standalone
   crate with its own `[workspace]` table and a harness manifest. Its labelled
-  subjects produce, through `make kani-log-corpus`, one log per class: a claim
-  that passes with a satisfied cover; a claim with a counterexample; a claim
-  whose success line hides an unreachable cover; a symbolic full-width
+  subjects produce, through `make kani-log-corpus` (which runs
+  `make kani-check`, then
+  `prover-tools kani exec --cwd tools/verifier-fixtures/kani-corpus` with each
+  verifier argument passed as a separate `--extra-arg`), one log per class: a
+  claim that passes with a satisfied cover; a claim with a counterexample; a
+  claim whose success line hides an unreachable cover; a symbolic full-width
   multiplication run with `-Z unstable-options --harness-timeout 5s`; a failed
   unwinding check; a pure skip (`--harness X --exact`, with all run results
   passing); a `--fail-fast` run mixing a counterexample with skipped harnesses;
@@ -928,29 +1035,34 @@ milestones use them and are deleted otherwise. No shipped code changes.
   unwinding-assertion flag; if it does not, the unwinding-check capability is
   recorded `inconclusive`.
 - Verus wiring probe. Create `tools/verifier-fixtures/verus-wiring-probe/` with
-  three candidates for the kernel's eventual proof profile, each a `#![no_std]`
-  crate without `alloc` using `vstd` with `default-features = false`: (a) a
-  non-optional `vstd` dependency with `verus!` blocks; (b) an optional `vstd`
+  four candidates for the kernel's eventual proof profile, each a `#![no_std]`
+  crate without `alloc`: (a) a non-optional `vstd` dependency
+  (`default-features = false`) with `verus!` blocks; (b) an optional `vstd`
   dependency behind a `verus` feature, with attribute-form specifications inert
-  in ordinary builds; and (c) a companion proof crate that depends on the
+  in ordinary builds; (c) a companion proof crate that depends on the
   production crate and states lemmas about its public functions (technical
-  design §17.7). Each holds one labelled capability lemma and one seeded
-  mutant. Acceptance is by exact counts: the lemma run reports one function
-  verified and zero errors (zero verified means the attributes were inert,
-  which is a failure); the mutant run reports exactly one "postcondition not
-  satisfied" located at the mutant. Record for each candidate whether
-  `cargo verus verify` succeeds in place under the repository's
-  `.cargo/config.toml`, whether an ordinary build succeeds without a verifier,
-  tested in a rootless Podman container because this host has Verus installed,
-  the extra build time, the lock-file package names (for VO-3), the scanner's
-  trust items, and how VO-1 would be amended for that wiring. Confirm that
-  `vstd` `0.0.0-2026-09-06-0133` matches the pinned Verus. The probe selects
-  the wiring task 1.2.4 will use; it adds no proof content to the kernel.
+  design §17.7); and (d) the single-root pattern of DL-22, run by
+  `prover-tools verus run --proof-file`. Candidates (a) to (c) need
+  `cargo verus`, which `prover-tools` does not wrap, so they run the
+  `cargo-verus` binary from the installed release directly and record that gap.
+  Each holds one labelled capability lemma and one seeded mutant. Acceptance is
+  by exact counts: the lemma run reports one function verified and zero errors
+  (zero verified means the attributes were inert, which is a failure); the
+  mutant run reports exactly one "postcondition not satisfied" located at the
+  mutant. Record for each candidate whether its verifier route succeeds in
+  place under the repository's `.cargo/config.toml`, whether an ordinary build
+  succeeds without a verifier, tested in a rootless Podman container because
+  this host has Verus installed, the extra build time, the lock-file package
+  names (for VO-3), the scanner's trust items, and how VO-1 would be amended
+  for that wiring. Confirm that `vstd` `0.0.0-2026-09-06-0133` matches the
+  pinned Verus. The probe selects the wiring task 1.2.4 will use; it adds no
+  proof content to the kernel.
 - Kani in place. On a scratch copy of the planned kernel and native-only facade
   inside the repository tree, run one completed harness whose cover is
-  satisfied, recording whether Kani's nightly-2025-11-21 accepts the
-  repository's Cargo configuration, the workspace lint tables, and a
-  `#![no_std]` crate.
+  satisfied through `prover-tools kani exec`, recording whether it accepts the
+  repository's Cargo configuration, the compile-admission wrapper, the
+  workspace lint tables, and a `#![no_std]` crate, and which flags it removed
+  from the child.
 - Toolchain identities. Record `rustc -vV` and `cargo -V` for the repository
   nightly, Kani's toolchain, and Verus's Rust 1.98.0.
 - Polars feature set. Determine the smallest Polars 0.55.2 feature set,
@@ -974,12 +1086,14 @@ milestones use them and are deleted otherwise. No shipped code changes.
   succeed without weakening the ordinary build standard, and a job split is
   predicted within 6 minutes per job. Otherwise set status `BLOCKED` and record
   the deviation in `Decision log`.
-- Validation: `make install-proof-tools` (run twice to show idempotence);
-  `make kani-log-corpus`; `make verus-probe`, which runs `cargo verus verify`
-  on each candidate and checks the exact counts above; the hosted measurement
-  run; then the common gates.
-- Recovery: delete `tools/verifier-fixtures/`, `tools/probes/`, the installer,
-  and the measurement workflow; nothing else depends on them yet.
+- Validation: `make install-kani`, `make kani-check`, and `make install-verus`
+  (each run twice, to show that a repeated install is harmless);
+  `make kani-log-corpus`; `make verus-probe`, which runs each candidate's
+  verifier route and checks the exact counts above; the hosted measurement run;
+  then the common gates.
+- Recovery: delete `tools/verifier-fixtures/`, `tools/probes/`, the pin files,
+  the prover Make targets, and the measurement workflow; nothing else depends
+  on them yet.
 
 ### EP-M2. Workspace, crate boundaries, and dependency-direction checks
 
@@ -1104,7 +1218,9 @@ Feature: Build profiles report what was compiled
   the target `x86_64-unknown-linux-gnu`; the four profiles with crates,
   features, toolchains, and commands; the supported-toolchain set; every EP-M1
   capability with status and log citation; and each tool's trusted computing
-  base, including the rustup toolchains and the crates.io `cargo-kani`.
+  base, including the rustup toolchains, the crates.io `kani-verifier` crate,
+  the unverified Kani bundle download, and `rust-prover-tools` at its pinned
+  commit.
 - Add `scripts/docs_validation/toolchain_profiles.py`, registered in
   `scripts/check_docs.py`. Green: rerun.
 - Write `docs/adrs/adr-0010-workspace-crate-boundaries-and-profiles.md` as
@@ -1165,19 +1281,26 @@ Feature: Build profiles report what was compiled
   `crates/combobulate-kernel/src/lib.rs`; sccache off with `RUSTC_WRAPPER`
   verified unset; an untimed `cargo fetch --locked`; `CARGO_BUILD_JOBS=4`; one
   step per timed invocation; `nproc`, memory, and image version recorded;
-  partial results uploaded with `if: always()`. The proof profile is
-  `cargo kani --only-codegen -p combobulate-kernel`. Commit the acceptance
-  record to `spec/measurements/` and report its verdict honestly.
-- Add a weekly scheduled trigger, not required for merging, that runs the
-  installer and probes so that the verifier route does not rot before task
-  1.2.4.
+  partial results uploaded with `if: always()`. The proof profile is Kani
+  codegen of the kernel through `make install-kani`, `make kani-check`, and
+  `prover-tools kani exec --cwd crates/combobulate-kernel` with
+  `--extra-arg=--only-codegen` (plus `-Z unstable-options` if Kani 0.67.0
+  requires it), timing only the `kani exec` step. Commit the acceptance record
+  to `spec/measurements/` and report its verdict honestly.
+- Add `.github/workflows/formal.yml` (DL-23), not required for merging,
+  triggered weekly and by manual dispatch, which runs `make install-kani`,
+  `make kani-check`, `make kani-log-corpus`, `make install-verus`, and
+  `make verus-probe`, so the verifier route does not rot before task 1.2.4. It
+  has its own `concurrency` group and timeout.
 - Documents: ADR-0010; the decision register; technical design §3 (crate
   names, dependency direction, profiles, and the component table's reuse column
   for the kernel and the profile report), §15 (GAP4), §17.7 (profile wiring),
   and §19.1 (selected Polars release); `docs/users-guide.md` (features,
   native-only use, `BuildProfile`, the reserved `macros` feature);
   `docs/developers-guide.md` (workspace layout, profiles, `GATE_PROFILE`,
-  proof-tool installation, the module-owner rows and re-use policies below);
+    proof-tool installation through `prover-tools`, the `.verus/` disk cost, a
+  harness inventory for the Kani corpus with each harness's role, bounds, and
+  expected outcome, the module-owner rows, and the re-use policies below);
   `docs/repository-layout.md`; `docs/contents.md` (ADR-0010 and this plan);
   `docs/evidence-and-decision-records.md`; `docs/validation.md` (GAP9 in part);
   `docs/references.md` (Kani, Verus, and Polars release sources);
@@ -1215,7 +1338,8 @@ Re-use policies to record in `docs/developers-guide.md`:
 
 - EP-M1: probes, corpus, and measurements committed; no product code changed.
   Requirements: Q3, Q9, AC-04 and AC-07 inputs, B01 and B05 preconditions.
-  Evidence: `make kani-log-corpus`, `make verus-probe`, hosted measurement run.
+  Evidence: VO-15, `make kani-check`, `make kani-log-corpus`,
+  `make verus-probe`, hosted measurement run.
 - EP-M2: three-crate workspace; boundary tests green. Requirements: technical
   design §3, §18.1, CA5 structure. Evidence: VO-1, VO-2, VO-3 (native-only),
   VO-6, `make package`.
@@ -1246,7 +1370,8 @@ All commands run from the repository root. Long outputs go through `tee` into
 `/tmp/$ACTION-combobulate-1-2-1-establish-workspace-and-profiles.out`.
 
 ```bash
-make install-proof-tools 2>&1 | tee /tmp/install-proof-tools-combobulate-1-2-1-establish-workspace-and-profiles.out
+make install-kani kani-check 2>&1 | tee /tmp/install-kani-combobulate-1-2-1-establish-workspace-and-profiles.out
+make install-verus 2>&1 | tee /tmp/install-verus-combobulate-1-2-1-establish-workspace-and-profiles.out
 make kani-log-corpus 2>&1 | tee /tmp/kani-corpus-combobulate-1-2-1-establish-workspace-and-profiles.out
 make verus-probe 2>&1 | tee /tmp/verus-probe-combobulate-1-2-1-establish-workspace-and-profiles.out
 make check-fmt 2>&1 | tee /tmp/check-fmt-combobulate-1-2-1-establish-workspace-and-profiles.out
@@ -1296,8 +1421,9 @@ Quality criteria:
 
 ## Idempotence and recovery
 
-The installer is idempotent through its digest stamp and atomic rename, and
-safe under concurrent agents through `flock`. `make kani-log-corpus`
+Installation idempotence and download integrity belong to `prover-tools`;
+`make kani-check` after every install, and the Verus archive's checksum,
+establish that the installed tools match their pins. `make kani-log-corpus`
 regenerates logs and provenance; regenerated logs differ in timings, so their
 digests are refreshed together with the fixture records and manifests, and the
 parser tests assert classifications rather than timings. Every milestone ends
@@ -1362,8 +1488,12 @@ Dependencies (caret requirements):
   dependency.
 - Proof tools (not Cargo dependencies of shipped crates): Kani 0.67.0, Verus
   0.2026.09.06.8dea4a2, Z3 4.16.0, and `vstd` `=0.0.0-2026-09-06-0133` in the
-  Verus probe only; the exact pin is required because Verus checks that `vstd`
-  matches the verifier build.
+  Verus probe's crate-based candidates only; the exact pin is required because
+  Verus checks that `vstd` matches the verifier build.
+- Prover tooling: `rust-prover-tools` at the commit in
+  `tools/rust-prover-tools/REF`, run through `uv tool run --from` its pinned
+  Git source (Python 3.14, already required by the repository's tooling); it is
+  not a project dependency.
 
 ## Signposts
 
@@ -1380,7 +1510,11 @@ B05; `docs/adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md`;
 `docs/complexity-antipatterns-and-refactoring-strategies.md`;
 `docs/references.md` (E-KANI-*, E-VERUS-*, E-POLARS2-*);
 `docs/documentation-style-guide.md` (ADR template and naming);
-`docs/scripting-standards.md`.
+`docs/scripting-standards.md`. Outside the repository: the
+`leynos/rust-prover-tools` README, users' guide (`docs/users-guide.md`, in
+particular "Explicit legacy Kani execution"), and CLI design
+(`docs/prover-tools-cli-design.md`); and the `kani` and `verus` skills'
+`references/project-on-ramp.md`.
 
 Skills: `execplans`, `rust-router`, `arch-crate-design`,
 `arch-decision-records`, `arch-supply-chain`, `rust-unit-testing`, `kani`,
@@ -1412,3 +1546,14 @@ scope: implementation begins only after sponsor approval.
 option for all eight sponsor decisions, and renamed the section to
 `Sponsor decisions`. Explicit approval of the plan and the Q3
 `in_scope_questions` answer remain before EP-M1 begins.
+
+2026-10-22, revision 4: at the sponsor's direction, adopted
+`leynos/rust-prover-tools` as the only installer and runner for Kani and Verus
+(DL-21). Dropped the repository-owned installer; added the pinned
+`tools/rust-prover-tools/REF`, the on-ramp's Make wiring and recording-fake
+contract tests (VO-15), `prover-tools kani exec` as the Kani route, the
+single-root Verus wiring candidate (DL-22), and a separate non-required formal
+workflow with `FORMAL-SKIP` stubs (DL-23). New risks cover the unverified Kani
+bundle download, the missing `cargo verus` route, and `.verus/` disk use.
+Remaining work is unchanged otherwise; EP-M1 still awaits explicit plan
+approval and the Q3 answer.
