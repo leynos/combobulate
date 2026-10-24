@@ -12,9 +12,12 @@
 
 [unstable]
 codegen-backend = true
+embed-metadata = false
 
 [profile.dev]
 codegen-backend = "cranelift"
+incremental = false
+debug = 0
 
 [build]
 rustflags = ["-Zthreads=8"]
