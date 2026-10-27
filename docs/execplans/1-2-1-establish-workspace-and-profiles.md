@@ -5,13 +5,10 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT. A community-of-experts review has been applied (see
-`Design review record`). On 2026-10-22 the sponsor accepted the recommended
-option for every item under `Sponsor decisions`. Two things remain before EP-M1
-begins: explicit sponsor approval of the plan itself, and the answer on whether
-Q3 joins `in_scope_questions`. Accepting a decision's direction does not accept
-its final text; amendments, D16, and ADR-0010 are still approved at the
-checkpoints named for them.
+Status: APPROVED. The sponsor approved execution on 2026-10-27 and directed
+that Q3 join `in_scope_questions`, with its decision based on implementation
+findings. The 2026-10-22 sponsor decisions remain subject to the final-text
+approval checkpoints for the amendments, D16, and ADR-0010.
 
 ## Purpose / big picture
 
@@ -79,8 +76,8 @@ are tested gate components. Task 1.2.4 makes the first proof claim.
 The sponsor (`leynos`, the D01 authority) was asked to settle these before
 implementation begins. On 2026-10-22 the sponsor accepted the recommended
 option for all eight, in this session. Items 2, 3, 4, and 7 are accepted in
-direction; their final texts are approved at the checkpoints named. The
-question in item 7 about `in_scope_questions` is still open. Trade-offs are in
+direction; their final texts are approved at the checkpoints named. The sponsor
+directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
 `Decision log`.
 
 1. CI shape for the Polars-enabled profile (DL-03). Recommended: the
@@ -115,8 +112,8 @@ question in item 7 about `in_scope_questions` is still open. Trade-offs are in
    records the crate boundary, dependency direction, feature profiles, gate
    feature lists, and the supported-toolchain set that answers ToR Q3 in place
    of one MSRV. The sponsor accepts D16 after EP-M4 publishes ADR-0010; the
-   approval reference is committed before the tick. Still open: whether Q3 joins
-   `in_scope_questions` in `spec/decisions.json`.
+   approval reference is committed before the tick. Q3 joins
+   `in_scope_questions` when D16 is proposed, informed by the probe findings.
 8. PR title numbering (DL-12). The request asked for `(1.1)` in the title, but
    this task is roadmap item 1.2.1. The draft PR uses `(1.2.1)`; the sponsor
    may ask for the literal `(1.1)` instead.
@@ -330,8 +327,8 @@ question in item 7 about `in_scope_questions` is still open. Trade-offs are in
   applied in this revision (see `Design review record`).
 - [x] (2026-10-22) Sponsor accepted the recommended option for all eight
   sponsor decisions.
-- [ ] Sponsor approval of the plan to begin EP-M1, and the answer on Q3 in
-  `in_scope_questions`.
+- [x] (2026-10-27) Sponsor approved the plan and directed Q3 to join
+  `in_scope_questions`, with the decision based on implementation findings.
 - [ ] EP-M1. Prototype: toolchain, profile, and hosted-cost probes.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
@@ -1557,3 +1554,6 @@ workflow with `FORMAL-SKIP` stubs (DL-23). New risks cover the unverified Kani
 bundle download, the missing `cargo verus` route, and `.verus/` disk use.
 Remaining work is unchanged otherwise; EP-M1 still awaits explicit plan
 approval and the Q3 answer.
+
+2026-10-27, revision 5: recorded sponsor approval to implement the plan and the
+direction to bring Q3 into scope when its evidence-based D16 is proposed.
