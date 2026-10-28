@@ -137,7 +137,7 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   facade's crate-private Polars module (VO-14).
 - Proof support must not use `cfg(kani)` or a proof feature to replace a
   production body with a different implementation (technical design §17.7).
-- Kani and Verus are installed, version-checked, and run only through
+- Kani and Verus are preferably installed, version-checked, and run through
   `prover-tools` from `leynos/rust-prover-tools`, pinned by commit in
   `tools/rust-prover-tools/REF` and invoked through `uv tool run --from` that
   pinned Git source. No repository-owned installer script is written. Make
@@ -146,8 +146,8 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   `override`-locked `$(PROVER_TOOLS)` variable whose only substitution seam is
   the contract-test pair `PROVER_TOOLS_CONTRACT_TEST=1 PROVER_TOOLS=<fake>`
   given on the `make` command line (the `kani` skill's project on-ramp). A
-  needed capability that `prover-tools` lacks is proposed upstream, not
-  reimplemented here.
+  probe that needs a capability unavailable through `prover-tools` may invoke
+  the pinned tool directly, with the reason and invocation recorded.
 - The pinned Kani 0.67.0, Verus 0.2026.09.06.8dea4a2, and Z3 4.16.0 revisions
   are part of the pre-registered environment of controls AC-01, AC-02, AC-04,
   and AC-07. Changing any of them requires a sponsor-approved control amendment
@@ -208,8 +208,8 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   exceed 6 minutes cold, if the AC-04 acceptance measurement fails a ceiling,
   if a probe exceeds its AC-01 or AC-02 budget, or if a hosted route exceeds 12
   GiB of peak memory or the runner's free disk.
-- Upstream tooling: stop if the plan needs a change to `rust-prover-tools`;
-  propose it upstream and wait for the sponsor rather than working around it.
+- Upstream tooling: prefer `rust-prover-tools`; when a probe cannot use its
+  interface, record the limitation and use the pinned tool directly.
 - Iterations: stop if a gate still fails after three fix attempts on the same
   cause.
 - Ambiguity: stop and present options when a choice materially changes a
@@ -498,7 +498,10 @@ committed together with its Green change.
   2026-10-22; final text approved at EP-M4): the AC-04 amendment described in
   `Sponsor decisions` item 3. If the selected Polars feature set differs from
   the calibrated `lazy` set, the amendment records the difference. Date/Author:
-  2026-10-22, planning agent.
+  2026-10-22, planning agent. On 2026-10-28 the sponsor directed that the
+  amended measurement follow the rebased target configuration: warm builds
+  reuse the target directory with incremental compilation disabled. Record the
+  changed workload and environment in the amendment before measurement.
 - DL-16. Decision (direction accepted by the sponsor,
   2026-10-22; final text approved at EP-M5): amend ADR-0009 so that
   `AdmissionContext` also carries scanner-derived trust audits. The I/O shell
@@ -543,7 +546,7 @@ committed together with its Green change.
 - DL-20. Decision: delivery uses one stacked PR per milestone (the
   `github-stacks` skill), with a commit after each gated Green or Refactor
   step. Date/Author: 2026-10-22, planning agent.
-- DL-21. Decision: adopt `rust-prover-tools` as the only installer and runner
+- DL-21. Decision: prefer `rust-prover-tools` as installer and runner
   for Kani and Verus, following the `kani` and `verus` skills' project
   on-ramps. Pins live in `tools/kani/VERSION`, `tools/verus/VERSION`,
   `tools/verus/SHA256SUMS`, `tools/verus/README.md`, and
@@ -1271,15 +1274,16 @@ Feature: Build profiles report what was compiled
 - Red: add a check rejecting a `deferred` candidate ADR subject whose roadmap
   item is ticked; with CA3 and CA5 still deferred to 1.2.1, a trial tick in a
   temporary copy must fail it.
-- AC-04: extend `profile-measurements.yml` with the frozen protocol: five cold
-  and five incremental builds per profile, profiles alternating run by run, one
-  discarded incremental warm-up; a fresh `CARGO_TARGET_DIR` for each cold run,
-  deleted afterwards; incremental runs touch `src/lib.rs` or
+- AC-04: extend `profile-measurements.yml` with the amended protocol: five cold
+  and five warm builds per profile, profiles alternating run by run, one
+  discarded warm-up; a fresh `CARGO_TARGET_DIR` for each cold run, deleted
+  afterwards; warm runs reuse the target directory and touch `src/lib.rs` or
   `crates/combobulate-kernel/src/lib.rs`; sccache off with `RUSTC_WRAPPER`
-  verified unset; an untimed `cargo fetch --locked`; `CARGO_BUILD_JOBS=4`; one
-  step per timed invocation; `nproc`, memory, and image version recorded;
-  partial results uploaded with `if: always()`. The proof profile is Kani
-  codegen of the kernel through `make install-kani`, `make kani-check`, and
+  verified unset; incremental compilation remains disabled as on the rebased
+  target; an untimed `cargo fetch --locked`; `CARGO_BUILD_JOBS=4`; one step per
+  timed invocation; `nproc`, memory, and image version recorded; partial
+  results uploaded with `if: always()`. The proof profile is Kani codegen of
+  the kernel through `make install-kani`, `make kani-check`, and
   `prover-tools kani exec --cwd crates/combobulate-kernel` with
   `--extra-arg=--only-codegen` (plus `-Z unstable-options` if Kani 0.67.0
   requires it), timing only the `kani exec` step. Commit the acceptance record
@@ -1557,3 +1561,7 @@ approval and the Q3 answer.
 
 2026-10-27, revision 5: recorded sponsor approval to implement the plan and the
 direction to bring Q3 into scope when its evidence-based D16 is proposed.
+
+2026-10-28, revision 6: adopted the rebased development configuration for AC-04
+warm measurements and clarified the amendment; prefer `prover-tools`, with a
+documented direct pinned-tool route when a probe requires it.
