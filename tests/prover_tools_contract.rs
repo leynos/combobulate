@@ -191,10 +191,14 @@ fn environment_cannot_unlock_the_helper(prover: TestResult<ProverProbe>) -> Test
         output.status.success(),
         "the dry-run must parse successfully",
     )?;
+    let reference = read("tools/rust-prover-tools/REF")?;
+    let pin = reference
+        .lines()
+        .find_map(|line| line.strip_prefix("ref: "))
+        .ok_or("missing prover-tools ref")?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     check(
-        stdout.contains("uv tool run --from")
-            && stdout.contains("9c4a27a86c678ceac1155404f45d95ee4a14a172"),
+        stdout.contains("uv tool run --from") && stdout.contains(pin),
         format_args!("environment-only substitution must retain the pin: {stdout}"),
     )
 }
@@ -278,6 +282,17 @@ fn probe_targets_preserve_the_real_command_boundary(
         calls.contains(&expected),
         format_args!("{target} must forward selected arguments; got {calls:?}"),
     )?;
+    if tool == "verus" {
+        for count in ["1 verified", "0 verified"] {
+            fixture.set_count_inflation(Some(count))?;
+            let inflated = fixture.run_probe(target, false)?;
+            check(
+                !inflated.status.success(),
+                format_args!("inflated {count} must not qualify"),
+            )?;
+        }
+    }
+    fixture.set_count_inflation(None)?;
     let failure = fixture.run_probe(target, true)?;
     check(
         !failure.status.success(),

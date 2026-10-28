@@ -7,4 +7,4 @@ warning: Found the following unsupported constructs:
 
 Wrote list results to /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/kani-list.json
 warning: unused config key `unstable.embed-metadata` in `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/.cargo/config.toml`
-    Finished `dev` profile [unoptimized] target(s) in 0.00s
+    Finished `dev` profile [unoptimized] target(s) in 0.01s

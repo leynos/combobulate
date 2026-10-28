@@ -1,14 +1,14 @@
 Kani Rust Verifier 0.67.0 (cargo plugin)
 [Kani] Running: `CARGO_ENCODED_RUSTFLAGS="-Coverflow-checks=on-Zunstable-options-Ztrim-diagnostic-paths=no-Zhuman_readable_cgu_names-Zalways-encode-mir--cfg=kani-Zcrate-attr=feature(register_tool)-Zcrate-attr=register_tool(kanitool)--sysroot/home/leynos/.kani/kani-0.67.0-L/home/leynos/.kani/kani-0.67.0/lib--externkani--externnoprelude:std=/home/leynos/.kani/kani-0.67.0/lib/libstd.rlib-Dwarnings-Cpanic=abort-Csymbol-mangling-version=v0-Zpanic_abort_tests=yes-Zmir-enable-passes=-RemoveStorageMarkers--check-cfg=cfg(kani)-Clinker=echo--kani-compiler-Cllvm-args=--check-version=0.67.0" CARGO_TERM_PROGRESS_WHEN="never" RUSTC="/home/leynos/.kani/kani-0.67.0/bin/kani-compiler" RUSTC_BOOTSTRAP="1" /home/leynos/.kani/kani-0.67.0/toolchain/bin/cargo rustc --target x86_64-unknown-linux-gnu -Zhost-config -Ztarget-applies-to-host --config=host.rustflags=["--cfg=kani_host"] --target-dir /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani --message-format json-diagnostic-rendered-ansi -v -p path+file:///home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus#0.1.0 --lib -- "-Cllvm-args=--reachability=harnesses --log-level=info --assertion-reach-checks --harness harnesses::insufficient_unwind --exact"`
 [Kani] Running: `goto-cc /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.symtab.out /home/leynos/.kani/kani-0.67.0/library/kani/kani_lib.c -o /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out`
-Finished goto-cc in 0.06321895s
+Finished goto-cc in 0.06694736s
 [Kani] Running: `goto-cc /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out --function _RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind -o /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out`
-Finished goto-cc in 0.026167631s
+Finished goto-cc in 0.039224837s
 [Kani] Running: `goto-instrument --add-library --no-malloc-may-fail /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out`
 Reading GOTO program from '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out'
 Adding CPROVER library (x86_64)
 Writing GOTO program to '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out'
-Finished goto-instrument in 0.026186503s
+Finished goto-instrument in 0.039667886s
 [Kani] Running: `goto-instrument --generate-function-body-options assert-false-assume-false --generate-function-body .* --drop-unused-functions /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out`
 Reading GOTO program from '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out'
 Function Pointer Removal
@@ -16,12 +16,12 @@ Virtual function removal
 Cleaning inline assembler statements
 Removing unused functions
 Writing GOTO program to '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out'
-Finished goto-instrument in 0.03222383s
+Finished goto-instrument in 0.03947964s
 [Kani] Running: `goto-instrument --ensure-one-backedge-per-target /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out`
 Reading GOTO program from '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out'
 Trying to force one backedge per target
 Writing GOTO program to '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out'
-Finished goto-instrument in 0.025464421s
+Finished goto-instrument in 0.040315203s
 Checking harness harnesses::insufficient_unwind...
 [Kani] Running: `cbmc --no-malloc-may-fail --no-undefined-shift-check --no-signed-overflow-check --nan-check --no-self-loops-to-assumptions --no-pointer-primitive-check --object-bits 16 --unwind 2 --sat-solver cadical --slice-formula /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-3a048058e47b210a__RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.out --verbosity 9 --json-ui`
 CBMC 6.8.0 (cbmc-6.8.0)
@@ -36,35 +36,35 @@ Starting Bounded Model Checking
 Unwinding loop _RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.0 iteration 1 file src/harnesses.rs line 56 column 5 function harnesses::insufficient_unwind thread 0
 Not unwinding loop _RNvNtCs633O74qA4T4_11kani_corpus9harnesses19insufficient_unwind.0 iteration 2 file src/harnesses.rs line 56 column 5 function harnesses::insufficient_unwind thread 0
 aborting path on assume(false) at file src/harnesses.rs line 59 column 5 function harnesses::insufficient_unwind thread 0
-Runtime Symex: 0.00419957s
+Runtime Symex: 0.00726784s
 size of program expression: 239 steps
 slicing removed 142 assignments
 Generated 8 VCC(s), 5 remaining after simplification
-Runtime Postprocess Equation: 3.8511e-05s
+Runtime Postprocess Equation: 9.6262e-05s
 Passing problem to propositional reduction
 converting SSA
-Runtime Convert SSA: 0.000538608s
+Runtime Convert SSA: 0.000812983s
 Running propositional reduction
 Post-processing
-Runtime Post-process: 6.34e-06s
+Runtime Post-process: 8.64e-06s
 Solving with CaDiCaL 2.0.0
 567 variables, 624 clauses
 SAT checker: instance is SATISFIABLE
-Runtime Solver: 8.1491e-05s
-Runtime decision procedure: 0.00067377s
+Runtime Solver: 0.000123252s
+Runtime decision procedure: 0.00102184s
 Running propositional reduction
 Solving with CaDiCaL 2.0.0
 568 variables, 625 clauses
 SAT checker: instance is SATISFIABLE
-Runtime Solver: 1.944e-05s
-Runtime decision procedure: 3.7301e-05s
+Runtime Solver: 2.4961e-05s
+Runtime decision procedure: 4.9351e-05s
 Running propositional reduction
 Solving with CaDiCaL 2.0.0
 569 variables, 626 clauses
 SAT checker: instance is UNSATISFIABLE
-Runtime Solver: 1.8411e-05s
-Runtime decision procedure: 2.9331e-05s
-Finished run_cbmc in 0.03197287s
+Runtime Solver: 1.937e-05s
+Runtime decision procedure: 3.3631e-05s
+Finished run_cbmc in 0.047724307s
 
 RESULTS:
 Check 1: harnesses::insufficient_unwind.assertion.1
@@ -96,7 +96,7 @@ Failed Checks: unwinding assertion loop 0
 VERIFICATION:- FAILED
 [Kani] info: Verification output shows one or more unwinding failures.
 [Kani] tip: Consider increasing the unwinding value or disabling `--unwinding-assertions`.
-Verification Time: 0.031741627s
+Verification Time: 0.047394626s
 
 Manual Harness Summary:
 Verification failed for - harnesses::insufficient_unwind
@@ -132,7 +132,7 @@ Expressions:
   - AddressOf: 1
 
 -------------------------------------------
-    Finished `dev` profile [unoptimized] target(s) in 0.02s
+    Finished `dev` profile [unoptimized] target(s) in 0.01s
 generate function bodies: matched function '__CPROVER_object_upto' begins with __CPROVER the generated body for this function may interfere with analysis
 generate function bodies: matched function '__CPROVER_object_from' begins with __CPROVER the generated body for this function may interfere with analysis
 generate function bodies: matched function '__CPROVER_freeable' begins with __CPROVER the generated body for this function may interfere with analysis

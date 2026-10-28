@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import tomllib
 from pathlib import Path
 import shlex
 import shutil
@@ -45,6 +47,7 @@ def kani(
     output_dir: Path = OUTPUT,
 ) -> None:
     """Capture the Kani corpus through an explicitly recorded execution route."""
+    reference = (ROOT / "tools/rust-prover-tools/REF").read_text().split("ref: ", 1)[1].splitlines()[0]
     directory = FIXTURES / "kani-corpus"
     environment = dict(os.environ)
     if route == "helper":
@@ -120,7 +123,7 @@ def kani(
         provenance = {
             "tool": "Kani 0.67.0",
             "route": route,
-            "prover_tools_ref": "9c4a27a86c678ceac1155404f45d95ee4a14a172",
+            "prover_tools_ref": reference,
             "stream_order": "captured stdout followed by captured stderr",
             "source_digests": {
                 str(path.relative_to(ROOT)): digest(path) for path in sources
@@ -259,9 +262,9 @@ def verus(
         if (
             statuses[0] == 0
             and statuses[1] != 0
-            and "1 verified, 0 errors" in positive
+            and re.search(r"(?m)^verification results:: 1 verified, 0 errors(?: \(|$)", positive)
             and "postcondition not satisfied" in negative
-            and "0 verified, 1 errors" in negative
+            and re.search(r"(?m)^verification results:: 0 verified, 1 errors(?: \(|$)", negative)
         ):
             qualified.append(candidate)
     print("Qualified wiring candidates: " + ", ".join(qualified))
@@ -337,7 +340,8 @@ def verifier_free() -> None:
     if built["exit_code"] != 0:
         raise RuntimeError("the verifier-free build environment could not be prepared")
     home = Path.home()
-    toolchain = home / ".rustup/toolchains/nightly-2026-08-27-x86_64-unknown-linux-gnu"
+    channel = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
+    toolchain = home / f".rustup/toolchains/{channel}-x86_64-unknown-linux-gnu"
     paths = [
         directory,
         home / ".cargo",
@@ -370,7 +374,7 @@ def verifier_free() -> None:
         "HOME": str(home),
         "CARGO_HOME": str(home / ".cargo"),
         "RUSTUP_HOME": str(home / ".rustup"),
-        "RUSTUP_TOOLCHAIN": "nightly-2026-08-27",
+        "RUSTUP_TOOLCHAIN": channel,
         "PATH": f"{toolchain}/bin:/usr/local/bin:/usr/bin:/bin",
     }
     for key, value in child.items():

@@ -136,6 +136,18 @@ impl ProverProbe {
             .output()
     }
 
+    /// Sets optional count inflation, restoring the original fake when absent.
+    pub(super) fn set_count_inflation(&self, count: Option<&str>) -> io::Result<()> {
+        let mut script = self.directory.read_to_string("bin/kani-driver")?;
+        if let Some(summary) = count {
+            script = script.replace(summary, &format!("1{summary}"));
+        }
+        for executable in ["prover", "cargo-verus"] {
+            self.directory.write(executable, &script)?;
+        }
+        Ok(())
+    }
+
     /// Decodes newline-delimited, NUL-framed fake invocations.
     pub(super) fn calls(&self) -> io::Result<Vec<Vec<String>>> {
         Ok(self

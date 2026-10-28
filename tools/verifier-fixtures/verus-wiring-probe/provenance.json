@@ -21,7 +21,7 @@
       "cwd": "tools/verifier-fixtures/verus-wiring-probe",
       "exit_code": 0,
       "log": "tools/verifier-fixtures/verus-wiring-probe/observations/macro-capability.log",
-      "sha256": "0aa0f852d64e345e21903d5fd73b0a1c2ae0f2b5efc6a3cd177c2e1ca7f6d4d8"
+      "sha256": "f252de5ba947c5381d44f15426fdd14b629dad1421afa355258e7487f8f974ec"
     },
     {
       "candidate": "macro",
@@ -59,7 +59,7 @@
       "cwd": "tools/verifier-fixtures/verus-wiring-probe",
       "exit_code": 0,
       "log": "tools/verifier-fixtures/verus-wiring-probe/observations/attributes-capability.log",
-      "sha256": "4c7560e38dbeecf964976f04daa6a11d206ac7cc1c5523534557eaec190913d4"
+      "sha256": "d8b2a4a89b0f93dce7b17e986455f8845e4530cf968242a90d12b90323854b50"
     },
     {
       "candidate": "attributes",
