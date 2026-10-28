@@ -1,14 +1,14 @@
 Kani Rust Verifier 0.67.0 (cargo plugin)
 [Kani] Running: `CARGO_ENCODED_RUSTFLAGS="-Coverflow-checks=on-Zunstable-options-Ztrim-diagnostic-paths=no-Zhuman_readable_cgu_names-Zalways-encode-mir--cfg=kani-Zcrate-attr=feature(register_tool)-Zcrate-attr=register_tool(kanitool)--sysroot/home/leynos/.kani/kani-0.67.0-L/home/leynos/.kani/kani-0.67.0/lib--externkani--externnoprelude:std=/home/leynos/.kani/kani-0.67.0/lib/libstd.rlib-Dwarnings-Cpanic=abort-Csymbol-mangling-version=v0-Zpanic_abort_tests=yes-Zmir-enable-passes=-RemoveStorageMarkers--check-cfg=cfg(kani)-Clinker=echo--kani-compiler-Cllvm-args=--check-version=0.67.0" CARGO_TERM_PROGRESS_WHEN="never" RUSTC="/home/leynos/.kani/kani-0.67.0/bin/kani-compiler" RUSTC_BOOTSTRAP="1" /home/leynos/.kani/kani-0.67.0/toolchain/bin/cargo rustc --target x86_64-unknown-linux-gnu -Zhost-config -Ztarget-applies-to-host --config=host.rustflags=["--cfg=kani_host"] --target-dir /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani --message-format json-diagnostic-rendered-ansi -v -p path+file:///home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus#0.1.0 --lib -- "-Cllvm-args=--reachability=harnesses --log-level=info --assertion-reach-checks --harness harnesses::counterexample --exact"`
 [Kani] Running: `goto-cc /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.symtab.out /home/leynos/.kani/kani-0.67.0/library/kani/kani_lib.c -o /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out`
-Finished goto-cc in 0.047937s
+Finished goto-cc in 0.16148488s
 [Kani] Running: `goto-cc /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out --function _RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample -o /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out`
-Finished goto-cc in 0.026940634s
+Finished goto-cc in 0.089761734s
 [Kani] Running: `goto-instrument --add-library --no-malloc-may-fail /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out`
 Reading GOTO program from '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out'
 Adding CPROVER library (x86_64)
 Writing GOTO program to '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out'
-Finished goto-instrument in 0.026748732s
+Finished goto-instrument in 0.09655924s
 [Kani] Running: `goto-instrument --generate-function-body-options assert-false-assume-false --generate-function-body .* --drop-unused-functions /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out`
 Reading GOTO program from '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out'
 Function Pointer Removal
@@ -16,12 +16,12 @@ Virtual function removal
 Cleaning inline assembler statements
 Removing unused functions
 Writing GOTO program to '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out'
-Finished goto-instrument in 0.02798707s
+Finished goto-instrument in 0.08599996s
 [Kani] Running: `goto-instrument --ensure-one-backedge-per-target /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out`
 Reading GOTO program from '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out'
 Trying to force one backedge per target
 Writing GOTO program to '/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out'
-Finished goto-instrument in 0.051592045s
+Finished goto-instrument in 0.08837873s
 Checking harness harnesses::counterexample...
 [Kani] Running: `cbmc --no-malloc-may-fail --no-undefined-shift-check --no-signed-overflow-check --nan-check --no-self-loops-to-assumptions --no-pointer-primitive-check --object-bits 16 --sat-solver cadical --slice-formula /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/target/kani/x86_64-unknown-linux-gnu/debug/deps/kani_corpus-bcb5e19279cdcf13__RNvNtCs633O74qA4T4_11kani_corpus9harnesses14counterexample.out --verbosity 9 --json-ui`
 CBMC 6.8.0 (cbmc-6.8.0)
@@ -34,23 +34,23 @@ Generic Property Instrumentation
 Running with 16 object bits, 48 offset bits (user-specified)
 Starting Bounded Model Checking
 aborting path on assume(false) at file src/harnesses.rs line 18 column 5 function harnesses::counterexample thread 0
-Runtime Symex: 0.00362678s
+Runtime Symex: 0.00788755s
 size of program expression: 193 steps
 slicing removed 110 assignments
 Generated 3 VCC(s), 2 remaining after simplification
-Runtime Postprocess Equation: 4.4021e-05s
+Runtime Postprocess Equation: 4.6471e-05s
 Passing problem to propositional reduction
 converting SSA
-Runtime Convert SSA: 0.000463067s
+Runtime Convert SSA: 0.00481276s
 Running propositional reduction
 Post-processing
-Runtime Post-process: 7.18e-06s
+Runtime Post-process: 2.8151e-05s
 Solving with CaDiCaL 2.0.0
 536 variables, 545 clauses
 SAT checker: instance is SATISFIABLE
-Runtime Solver: 6.4061e-05s
-Runtime decision procedure: 0.000570548s
-Finished run_cbmc in 0.033455852s
+Runtime Solver: 0.000243194s
+Runtime decision procedure: 0.00531598s
+Finished run_cbmc in 0.10958419s
 
 RESULTS:
 Check 1: core::fmt::Arguments::<'_>::from_str.assertion.1
@@ -70,7 +70,7 @@ Failed Checks: This is a placeholder message; Kani doesn't support message forma
  File: "src/harnesses.rs", line 18, in harnesses::counterexample
 
 VERIFICATION:- FAILED
-Verification Time: 0.033089876s
+Verification Time: 0.107930005s
 
 Manual Harness Summary:
 Verification failed for - harnesses::counterexample
@@ -104,7 +104,7 @@ Expressions:
   - UnaryOp: 1
 
 -------------------------------------------
-    Finished `dev` profile [unoptimized] target(s) in 0.01s
+    Finished `dev` profile [unoptimized] target(s) in 0.04s
 generate function bodies: matched function '__CPROVER_assert' begins with __CPROVER the generated body for this function may interfere with analysis
 generate function bodies: matched function '__CPROVER_was_freed' begins with __CPROVER the generated body for this function may interfere with analysis
 generate function bodies: matched function '__CPROVER_object_whole' begins with __CPROVER the generated body for this function may interfere with analysis

@@ -194,7 +194,8 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
 
 - Scope: stop and escalate if one milestone needs more than 40 changed files or
   more than 1,800 net added lines, excluding committed verifier logs,
-  `Cargo.lock`, and generated exports.
+  `Cargo.lock`, and generated exports. The sponsor approved an EP-M1-only limit
+  of 1,825 lines on 2026-10-28 for count and pin-consistency fixes.
 - Interface: stop if any public item beyond `BuildProfile` in the facade and
   `TargetFacts` in the kernel, and the two Cargo features named in
   `Interfaces and dependencies`, seems necessary.
@@ -344,6 +345,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
 - [x] (2026-10-28) Existing Python Make fixtures now copy the prover pin;
   `/tmp/green-docstring-fixture-combobulate-epm1.out` passes all three tests
   after design-check exposed their missing temporary-directory resource.
+- [x] (2026-10-28) Count regression: inflated positive and mutant summaries
+  failed before the fix; the scratch correction passed all eleven contracts.
+  Evidence: `/tmp/red-count-review-combobulate-epm1.out`.
 - [ ] EP-M1 hosted costs and verifier-free isolation; publish the measurement
   workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
@@ -412,6 +416,11 @@ committed together with its Green change.
   reach `bounded` (DL-16).
 
 ## Decision log
+
+- DL-27 (2026-10-28). Review fixes anchor exact Verus counts and derive pins.
+  Preserve literal command provenance: raw logs retain the same paths. The
+  proposed complexity/NumPy rules have no repository instruction basis; retain
+  existing interfaces. Duplicate findings share these dispositions.
 
 - DL-24 (2026-10-28). The pinned helper refuses the existing backend keys with
   `Kani exec cannot prove isolation of Cargo backend configuration`. The
@@ -883,10 +892,10 @@ both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
 - VO-7, pin consistency: every pinned revision agrees across
   `spec/toolchain-profiles.json`, `rust-toolchain.toml`, `Cargo.lock`,
   `tools/kani/VERSION`, `tools/verus/VERSION`, `tools/verus/SHA256SUMS`,
-  `tools/rust-prover-tools/REF`, the `Makefile`, the workflows, and the
-  `environment.toolchains` of controls AC-01, AC-02, AC-04, and AC-07; a sweep
-  of tracked files for each pinned version string finds no pin site outside the
-  enumerated sources.
+  `tools/rust-prover-tools/REF`, the probe CLI PEP 723 dependency, the
+  `Makefile`, the workflows, and the `environment.toolchains` of controls
+  AC-01, AC-02, AC-04, and AC-07; a sweep of tracked files for each pinned
+  version string finds no pin site outside the enumerated sources.
   - Artefacts: `scripts/docs_validation/toolchain_profiles.py`,
     `scripts/tests/test_toolchain_profiles.py`.
   - Non-vacuity: one test per source mutates that source's pin in a temporary
