@@ -1,0 +1,13 @@
+verification results:: 0 verified, 1 errors (partial verification with `--verify-*`)
+    Checking wiring-macro v0.1.0 (/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/verus-wiring-probe/macro)
+note: verifying root module (selected functions)
+
+error: postcondition not satisfied
+  --> macro/../macro.rs:15:13
+   |
+15 |     ensures result == value + 1,
+   |             ^^^^^^^^^^^^^^^^^^^ failed this postcondition
+16 | { value + 2 }
+   |   --------- at the end of the function body
+
+error: could not compile `wiring-macro` (lib) due to 1 previous error

@@ -788,3 +788,60 @@ an explicitly selected YAML field beneath existing parents; missing and null
 remain different cases. Whitaker assertions share policy traversal while
 retaining distinct driver and configuration expectation data. These helpers
 serve their named integration suites, with no cross-suite public API.
+
+## Verifier capability probes
+
+Task 1.2.1's probes are tool observations, not proofs of Combobulate. Run
+`make install-kani`, `make kani-check`, `make install-verus`,
+`make kani-log-corpus`, and `make verus-probe` from the root. The ordinary
+commit gates do not install or execute a verifier. `make kani` and
+`make kani-full` visibly report `FORMAL-SKIP` until task 1.2.4;
+`FORMAL_STRICT=1` rejects those placeholders.
+
+The CLI in `scripts/run_verifier_probes.py` owns probe orchestration. Its
+private `verifier_probe_support` module owns capture, digests, and scratch
+workspace construction; only that CLI may import it. These helpers are not an
+evidence parser and must not enter the evidence gate or product code. Recording
+fixtures and result-based expectations stay private to the prover command
+contracts. The runner reuses `rust-prover-tools`' Cuprum command boundary
+rather than another installer.
+
+The pinned helper rejects ancestor `codegen-backend` configuration before
+running Kani. The explicit `KANI_PROBE_ROUTE=direct` route selects Kani
+0.67.0's matching LLVM SDK and child flags, retains compiler admission, and
+changes no ordinary Cargo file or executable source body. Installation and
+version checks still use the helper. `KANI_PROBE_ROUTE=helper` retains the
+preferred route for retesting that compatibility boundary.
+
+The Verus archive does not bundle Z3. The probe's tool environment therefore
+uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
+supplies its resolved path through `VERUS_Z3_PATH`. Single-root verification
+uses `prover-tools verus run`; crate comparisons use the pinned `cargo-verus`
+directly. Each selected function is rebuilt because `cargo-verus` does not
+fingerprint function-selection arguments. A successful capability must report
+exactly one verified function; its mutant must report one postcondition error.
+
+Kani harness inventory (all subjects are deliberately separate fixture bodies):
+
+| Harness                  | Inputs and bounds                                   | Observation                                |
+| ------------------------ | --------------------------------------------------- | ------------------------------------------ |
+| `verified`               | Every `u8`                                          | Saturation property and a reachable cover  |
+| `counterexample`         | Every `u8`                                          | Deliberately false upper bound             |
+| `unsatisfied_cover`      | Every `u8`                                          | Passing assertion with an impossible cover |
+| `multiplication_timeout` | Two `u128` values restricted to `2..=u64::MAX`; 5 s | Solver timeout                             |
+| `insufficient_unwind`    | Count `0..=4`; unwind 2                             | Failed unwinding check                     |
+| `vacuous_assumption`     | Contradictory assumption                            | Unsatisfied witness                        |
+| `unsupported`            | Empty inline assembly                               | Unsupported operation                      |
+| `expected_panic`         | No symbolic inputs                                  | Expected-panic output semantics            |
+| `seeded_wrapping_mutant` | Every `u8`                                          | Failed wrapping arithmetic mutant          |
+
+Run definitions, the tool-produced inventory, source digests, exact commands,
+and statuses accompany the captured logs. Exit status alone cannot establish a
+verdict: the impossible-cover subject exits successfully. The corpus is not
+registered as an evidence parser until task 1.2.1's parser milestone passes.
+
+`uv run --script scripts/run_verifier_probes.py verifier-free` builds the
+comparison sources in a rootless container without verifier installations. This
+local host's admission supervisor launches compilers outside the container
+namespace, so its result is explicitly inconclusive. The script refuses to
+remove the wrapper; the separate hosted observation job uses a fresh runner.

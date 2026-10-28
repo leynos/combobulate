@@ -1,0 +1,14 @@
+verification results:: 0 verified, 1 errors (partial verification with `--verify-*`)
+    Checking wiring-attributes v0.1.0 (/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/verus-wiring-probe/attributes)
+note: verifying root module (selected functions)
+
+error: postcondition not satisfied
+  --> attributes/../attributes.rs:16:13
+   |
+16 |     ensures result == value + 1,
+   |             ^^^^^^^^^^^^^^^^^^^ failed this postcondition
+17 | ))]
+18 | pub fn mutant(value: u8) -> u8 { value + 2 }
+   |                                  --------- at the end of the function body
+
+error: could not compile `wiring-attributes` (lib) due to 1 previous error

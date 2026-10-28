@@ -67,6 +67,7 @@ class DocstringCoverageGateTests(unittest.TestCase):
     def test_gate_fails_when_git_source_discovery_fails(self) -> None:
         """Reject a source-list failure instead of running with an empty list."""
         with tempfile.TemporaryDirectory() as temporary_directory:
+            self._copy_prover_pin(Path(temporary_directory))
             result = subprocess.run(
                 ['make', '-f', str(MAKEFILE), 'check-python-sources'],
                 cwd=temporary_directory,
@@ -103,6 +104,7 @@ class DocstringCoverageGateTests(unittest.TestCase):
     def _initialize_repository(self, root: Path) -> None:
         """Create a temporary repository with tracked and untracked sources."""
         subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
+        self._copy_prover_pin(root)
         for source_path in SOURCE_PATHS[:-1]:
             path = root / source_path
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,6 +113,13 @@ class DocstringCoverageGateTests(unittest.TestCase):
         stub_path.parent.mkdir(parents=True, exist_ok=True)
         stub_path.write_text('"""A fixture typing stub."""\n')
         subprocess.run(['git', 'add', *SOURCE_PATHS[:-1]], cwd=root, check=True)
+
+    def _copy_prover_pin(self, root: Path) -> None:
+        """Supply the real Makefile's pinned configuration to the fixture."""
+        relative = Path('tools/rust-prover-tools/REF')
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((REPOSITORY_ROOT / relative).read_bytes())
 
     def _write_uv_stub(self, root: Path) -> Path:
         """Return a fake uv executable that records Interrogate's arguments."""
@@ -127,6 +136,7 @@ class DocstringCoverageGateTests(unittest.TestCase):
         override: str | None,
     ) -> None:
         """Assert that Make rejects empty sources before invoking Interrogate."""
+        self._copy_prover_pin(root)
         invocation_log = root / 'uv-arguments.txt'
         uv = self._write_uv_stub(root)
         command = [

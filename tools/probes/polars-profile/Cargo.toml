@@ -1,0 +1,20 @@
+[package]
+name = "polars-profile"
+version = "0.1.0"
+edition = "2024"
+license = "ISC"
+publish = false
+
+[workspace]
+
+[features]
+default = ["macros", "polars"]
+macros = []
+polars = ["dep:polars"]
+
+[dependencies]
+polars = { version = "0.55.2", optional = true, default-features = false, features = ["lazy"] }
+
+[dev-dependencies]
+cardinality-probe = { path = "../../calibration/cardinality-probe" }
+trybuild = "1.0.122"

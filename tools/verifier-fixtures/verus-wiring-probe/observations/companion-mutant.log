@@ -1,0 +1,14 @@
+    Checking wiring-companion v0.1.0 (/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/verus-wiring-probe/companion)
+error: `wiring_production::implementation::increment` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`)
+  --> companion/../companion.rs:11:3
+   |
+11 | { increment(value) }
+   |   ^^^^^^^^^^^^^^^^
+...
+17 | { increment(value) + 1 }
+   |   ----------------
+   |
+   = help: The following declaration may resolve this error:
+           pub assume_specification [wiring_production::increment] (_0: u8) -> u8;
+
+error: could not compile `wiring-companion` (lib) due to 1 previous error
