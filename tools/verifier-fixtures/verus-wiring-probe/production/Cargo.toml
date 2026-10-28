@@ -1,0 +1,12 @@
+[package]
+name = "wiring-production"
+version = "0.1.0"
+edition = "2024"
+license = "ISC"
+publish = false
+
+[lib]
+path = "lib.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(verus_keep_ghost)"] }

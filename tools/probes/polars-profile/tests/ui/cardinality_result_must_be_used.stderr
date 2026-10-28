@@ -1,0 +1,15 @@
+error: unused return value of `checked_cardinality` that must be used
+ --> tests/ui/cardinality_result_must_be_used.rs:7:5
+  |
+7 |     checked_cardinality(&[usize::MAX, 2]);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+note: the lint level is defined here
+ --> tests/ui/cardinality_result_must_be_used.rs:2:9
+  |
+2 | #![deny(unused_must_use)]
+  |         ^^^^^^^^^^^^^^^
+help: use `let _ = ...` to ignore the resulting value
+  |
+7 |     let _ = checked_cardinality(&[usize::MAX, 2]);
+  |     +++++++

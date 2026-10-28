@@ -1,0 +1,251 @@
+{
+  "tool": "Kani 0.67.0",
+  "route": "direct",
+  "prover_tools_ref": "9c4a27a86c678ceac1155404f45d95ee4a14a172",
+  "stream_order": "captured stdout followed by captured stderr",
+  "source_digests": {
+    "tools/verifier-fixtures/kani-corpus/src/lib.rs": "a732985c6ad4dafdd8dcaf525b71d1339a2778794708cb1dc7380ca5e7f3735e",
+    "tools/verifier-fixtures/kani-corpus/src/harnesses.rs": "c6e97f3511f3dc0410dff001921a9d8f0ef38886c856105f49dc320c769cd0ab",
+    "tools/verifier-fixtures/kani-corpus/harnesses.json": "70db201bb2bba3f39a6a58fec624f83960d694c487a8aa1bdedfb6174002acbd",
+    "tools/verifier-fixtures/kani-corpus/kani-list.json": "8d3f6132d9c9444b4028cca8642bbc1dcbe67c6c901303a521902dd388be34c1",
+    "scripts/run_verifier_probes.py": "0feab0717b861ceba85d7c57bc1c531ccbde26c3d6d8f5366238c6f344fe0bf3",
+    "scripts/verifier_probe_support.py": "0d53612fd03b6660c2ea798b9f8906b53c957d62122859d6e183181b7a35966a"
+  },
+  "observations": [
+    {
+      "id": "verified",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::verified",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/verified.log",
+      "sha256": "76c91580ab5de2416609b4f942165ca0e01a087d21332134cb6d419cb36d8086"
+    },
+    {
+      "id": "counterexample",
+      "expected_exit": 1,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::counterexample",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/counterexample.log",
+      "sha256": "3d7b6eff941a80b0b879ff418794251db13dbd1a42eab4b1a9f87aaf940d07b1"
+    },
+    {
+      "id": "unsatisfied_cover",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::unsatisfied_cover",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/unsatisfied_cover.log",
+      "sha256": "6c30f301a4d98162a80120d08ecae28c47664c2f119720484399448ef3a80626"
+    },
+    {
+      "id": "multiplication_timeout",
+      "expected_exit": 1,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::multiplication_timeout",
+        "--exact",
+        "--verbose",
+        "-Z",
+        "unstable-options",
+        "--harness-timeout",
+        "5s"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/multiplication_timeout.log",
+      "sha256": "c7790d3754960d15c9c1221c427300979a9e57bcdd2e9f769e90f68698baa533"
+    },
+    {
+      "id": "insufficient_unwind",
+      "expected_exit": 1,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::insufficient_unwind",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/insufficient_unwind.log",
+      "sha256": "5dd56e298e716fb48146d89c40f06458b717934fd06ebc06ba860e608fadf790"
+    },
+    {
+      "id": "vacuous_assumption",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::vacuous_assumption",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/vacuous_assumption.log",
+      "sha256": "ec104d77323d536057f3c804c523da29d2c950c290469dfcd159fe2ba3449783"
+    },
+    {
+      "id": "unsupported",
+      "expected_exit": 1,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::unsupported",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/unsupported.log",
+      "sha256": "bc893d5f3ec425e79cff0eb39fd40254eeb7c366cb58bc41eaa1758f171a3621"
+    },
+    {
+      "id": "expected_panic",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::expected_panic",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/expected_panic.log",
+      "sha256": "05e8768d3ab0043905af30920401668801e99c87c863a46d0be0d99640d8bfae"
+    },
+    {
+      "id": "seeded_wrapping_mutant",
+      "expected_exit": 1,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::seeded_wrapping_mutant",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/seeded_wrapping_mutant.log",
+      "sha256": "c39eec5f9efcb17582d557bd3f9a35bf099025f5708a8a6f7ae22137763f0400"
+    },
+    {
+      "id": "selected_harness",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::verified",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/selected_harness.log",
+      "sha256": "a323571eb9edb2ae4145640a47374d807f1a36b7bdae6aa9f521ea89ffe90e6a"
+    },
+    {
+      "id": "fail_fast",
+      "expected_exit": 1,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::counterexample",
+        "--harness",
+        "harnesses::verified",
+        "--harness",
+        "harnesses::seeded_wrapping_mutant",
+        "--exact",
+        "--fail-fast",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/fail_fast.log",
+      "sha256": "157ba6c473983543380ea478f114017a526c8710ed4160dbd00c558e6fd3004f"
+    },
+    {
+      "id": "truncated",
+      "expected_exit": 124,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "8s",
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::multiplication_timeout",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 124,
+      "log": "scripts/tests/fixtures/kani_logs/truncated.log",
+      "sha256": "d611ed4416bf673946c89211a748bbe26367df9626104a700a99c35e1d728675"
+    },
+    {
+      "id": "list",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "list",
+        "--format",
+        "json"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/list.log",
+      "sha256": "3514e5787850cff094dc197f7156ca87ea9aedaaf779a741612ecaa8391ea0ec"
+    },
+    {
+      "id": "in_place",
+      "expected_exit": 0,
+      "command": [
+        "/home/leynos/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "verification::target_facts",
+        "--exact",
+        "--verbose"
+      ],
+      "cwd": "target/epm1-native-workspace/facade",
+      "exit_code": 0,
+      "log": "scripts/tests/fixtures/kani_logs/in_place.log",
+      "sha256": "e8731e3b7e8d84c11b441b4cd64227a27dbcd05626f096eea329239e148d63b2"
+    }
+  ]
+}

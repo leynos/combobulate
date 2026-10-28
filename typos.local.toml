@@ -40,4 +40,9 @@ ignore = [
 ]
 
 [files]
-exclude = []
+# Verifier output is evidence: changing its spelling would invalidate digests.
+exclude = [
+  "scripts/tests/fixtures/kani_logs/*.log",
+  "tools/verifier-fixtures/verus-wiring-probe/observations/*.log",
+  "tools/probes/observations/*.log",
+]

@@ -284,11 +284,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   newer than the pinned 0.27.0. Severity: low. Likelihood: medium. Mitigation:
   checked in EP-M3; a bump to 0.28.0 is pre-authorized, anything larger
   escalates.
-- Risk: the Z3 binary used during calibration lived under `/tmp` and is not
-  reproducible. Severity: medium. Likelihood: certain. Mitigation:
-  `prover-tools verus install` unpacks the checksum-verified Verus release
-  archive; EP-M1 confirms that it bundles Z3 4.16.0 and records its path. If it
-  does not, the gap is proposed upstream to `rust-prover-tools`.
+- Risk: the Verus archive omits Z3, leaving an uncontrolled solver selection.
+  Severity: medium. Likelihood: observed. Mitigation: the probe selects
+  `z3-solver==4.16.0.0`, checks Z3 4.16.0, and records its binary digest.
+  Hosted installation remains unconfirmed until the measurement workflow runs.
 - Risk: `prover-tools kani install` runs
   `cargo install --locked kani-verifier --version 0.67.0` and
   `cargo kani setup`, which downloads the Kani bundle without a repository-side
@@ -329,7 +328,24 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   sponsor decisions.
 - [x] (2026-10-27) Sponsor approved the plan and directed Q3 to join
   `in_scope_questions`, with the decision based on implementation findings.
-- [ ] EP-M1. Prototype: toolchain, profile, and hosted-cost probes.
+- [ ] (2026-10-28) EP-M1 in progress. Red prover-wiring contracts failed as
+  expected (`/tmp/red-prover-tools-combobulate-epm1.out`): missing pins,
+  targets, and explicit formal placeholders. Prototype: toolchain, profile, and
+  hosted-cost probes.
+- [x] (2026-10-28) EP-M1 local probes: repeated installs, 14 Kani observations
+  with matching source/log digests, and exact positive/mutant Verus counts.
+  `make kani-log-corpus` and `make verus-probe` passed; logs are under
+  `/tmp/kani-corpus-combobulate-epm1.out` and
+  `/tmp/verus-probe-combobulate-epm1.out`.
+- [x] (2026-10-28) Polars 0.55.2 with only `lazy` passed its library, doctest,
+  and UI checks. Eleven prover command contracts passed after Red evidence in
+  `/tmp/red-prover-execution-status-combobulate-epm1.out` exposed a swallowed
+  execution failure. Source and stderr copies retain the existing UI oracle.
+- [x] (2026-10-28) Existing Python Make fixtures now copy the prover pin;
+  `/tmp/green-docstring-fixture-combobulate-epm1.out` passes all three tests
+  after design-check exposed their missing temporary-directory resource.
+- [ ] EP-M1 hosted costs and verifier-free isolation; publish the measurement
+  workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
@@ -341,6 +357,13 @@ Red state is never committed on its own, because it fails `make test`; it is
 committed together with its Green change.
 
 ## Surprises & discoveries
+
+- EP-M1 observations (2026-10-28): `DataFrame::new` in Rust Polars 0.55.2
+  requires an explicit height. The `lazy` feature alone supports the required
+  Int64 and lazy-collection path. Kani can return zero with an unsatisfied
+  cover; statuses therefore remain transport checks, not proof verdicts. Its
+  verbose CBMC command omits an explicit unwinding-assertion flag, so that
+  capability remains inconclusive despite the observed failed unwind check.
 
 - Observation: Kani 0.68.0 and newer `vstd` releases exist, but the
   pre-registered controls name Kani 0.67.0 and Verus 0.2026.09.06.8dea4a2.
@@ -389,6 +412,24 @@ committed together with its Green change.
   reach `bounded` (DL-16).
 
 ## Decision log
+
+- DL-24 (2026-10-28). The pinned helper refuses the existing backend keys with
+  `Kani exec cannot prove isolation of Cargo backend configuration`. The
+  explicit direct probe route uses the matching SDK's LLVM backend and runtime
+  in the child, preserves compiler admission, and changes no ordinary Cargo
+  configuration or executable body. Installation/version checks stay with the
+  helper. Log: `/tmp/kani-first-combobulate-epm1.out`.
+- DL-25 (2026-10-28). The checked Verus archive contains no Z3 executable.
+  Use the pinned `z3-solver==4.16.0.0` tooling distribution, independently
+  check Z3 4.16.0, and pass its resolved executable to the helper. This is a
+  solver transport choice, not a solver-version or control-threshold change.
+- DL-26 (2026-10-28). `cargo-verus` omits function-selection arguments from
+  its fingerprint; refresh the candidate timestamp before each positive and
+  mutant run. A cached zero-exit run without a fresh count is not evidence.
+  Macro, optional-attribute, and single-root wiring passed exact positive and
+  mutant counts; companion wiring could not see its ordinary dependency's
+  specification. Prefer single-root wiring because it adds no kernel Cargo
+  dependency. Hosted costs and verifier-free isolation remain pending.
 
 - DL-01. Decision: the root package remains the `combobulate` facade and also
   becomes the workspace root, with members under `crates/`,
@@ -612,7 +653,11 @@ separate Polars adapter crate, is recorded and rejected in DL-19.
 
 ## Outcomes & retrospective
 
-Not yet started.
+EP-M1 local probes and the measurement workflow are implemented. Single-root
+Verus wiring preserves a dependency-free ordinary kernel and passed its seeded
+mutant check. The captured corpus supports the later parser work; no parser is
+registered and no product theorem is claimed. Hosted measurements and genuine
+verifier-free isolation remain required before the milestone can close.
 
 ## Context and orientation
 
@@ -693,6 +738,9 @@ Terms used in this plan:
 
 ## Conformance basis
 
+EP-M1 adds no shipped API or dependency and leaves frozen calibration sources
+and `ci.yml` unchanged. Hosted budget acceptance remains pending.
+
 - Terms of reference: `docs/terms-of-reference.md`, revision 0.2 of 6 October
   2026, tracing G1, G2, G6, G7, G8; S7 (native-only, proof-capable, and
   Polars-enabled profiles within budgets); C1, C5, C7, C8; Q3 (MSRV and feature
@@ -740,6 +788,9 @@ part (a parser and a bound scanner exist). GAP7 and GAP8 stay open for tasks
 verifier log to a record's `binding.executable_digest` or `source_revision`.
 
 ## Verification plan
+
+EP-M1 transport contracts also reject a failing SDK execution after a passing
+version preflight; the regression was observed before its fix.
 
 ### Method selection
 
@@ -913,7 +964,7 @@ both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
     succeeded with every declared cover satisfied.
   - Artefacts: `scripts/docs_validation/kani_log/decide.py`,
     `scripts/tests/fixtures/kani_decision_table.json`.
-  - Non-vacuity: the corpus includes a log whose last line reports success
+  - Non-vacuity: the corpus includes a log whose completion reports success
     while a cover is unsatisfied; the suite runs the corpus against three
     deliberately broken parsers (always `verified`; success line only; manifest
     ignored) and requires all three to fail; `mutmut` over the package.
@@ -941,11 +992,12 @@ both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
   lexer.
   - Non-vacuity: a seeded `use polars::` in a copy of `src/profile.rs` must
     fail.
-- VO-15, prover-tools wiring contract: every prover Make target delegates
-  through `$(PROVER_TOOLS)` with the exact `prover-tools` invocation, flag
-  forwarding, and exit-status propagation expected; every proof target depends
-  on `kani-check`; no recipe contains `cargo install`, `cargo kani setup`,
-  `curl`, `unzip`, `sha256sum`, or `rustup toolchain install`;
+- VO-15, prover-tools wiring contract: installation and version checks delegate
+  through `$(PROVER_TOOLS)`; the explicitly recorded direct probe routes retain
+  the pinned SDK and admission. Test the exact argument vectors, flag
+  forwarding, and exit-status propagation; every proof target depends on
+  `kani-check`; no recipe contains `cargo install`, `cargo kani setup`, `curl`,
+  `unzip`, `sha256sum`, or `rustup toolchain install`;
   `tools/rust-prover-tools/REF` holds a 40-character `ref`;
   `tools/kani/VERSION` and `tools/verus/VERSION` are non-empty; and
   `tools/verus/SHA256SUMS` has a row naming the configured archive. The
@@ -1051,12 +1103,13 @@ milestones use them and are deleted otherwise. No shipped code changes.
   mutant run reports exactly one "postcondition not satisfied" located at the
   mutant. Record for each candidate whether its verifier route succeeds in
   place under the repository's `.cargo/config.toml`, whether an ordinary build
-  succeeds without a verifier, tested in a rootless Podman container because
-  this host has Verus installed, the extra build time, the lock-file package
-  names (for VO-3), the scanner's trust items, and how VO-1 would be amended
-  for that wiring. Confirm that `vstd` `0.0.0-2026-09-06-0133` matches the
-  pinned Verus. The probe selects the wiring task 1.2.4 will use; it adds no
-  proof content to the kernel.
+  succeeds without a verifier, tested in a rootless Podman container on a fresh
+  hosted runner. Local admission launches compilers outside the container
+  namespace, so local isolation is inconclusive. Record extra build time,
+  package names (for VO-3), the scanner's trust items, and how VO-1 would be
+  amended for that wiring. Confirm that `vstd` `0.0.0-2026-09-06-0133` matches
+  the pinned Verus. The probe selects the wiring task 1.2.4 will use; it adds
+  no proof content to the kernel.
 - Kani in place. On a scratch copy of the planned kernel and native-only facade
   inside the repository tree, run one completed harness whose cover is
   satisfied through `prover-tools kani exec`, recording whether it accepts the
@@ -1565,3 +1618,6 @@ direction to bring Q3 into scope when its evidence-based D16 is proposed.
 2026-10-28, revision 6: adopted the rebased development configuration for AC-04
 warm measurements and clarified the amendment; prefer `prover-tools`, with a
 documented direct pinned-tool route when a probe requires it.
+
+2026-10-28, revision 7: recorded the local probe evidence, explicit helper
+compatibility route, solver transport, and hosted acceptance gaps.
