@@ -122,6 +122,9 @@ def resolve_env(step: dict, values: dict, base: dict) -> dict[str, str]:
             result[name] = base['WHITAKER_INSTALLER_PATH']
         elif expression == '${{ steps.validate-inputs.outputs.installer-version }}':
             result[name] = values['installer-version']
+        elif expression == '${{ steps.snapshot-download.outputs.bundle }}':
+            # The probe never downloads a Clippy snapshot, so the step publishes no bundle.
+            result[name] = ''
         else:
             raise ValueError(f'unsupported probe environment expression: {name}={expression}')
     return result
