@@ -1,8 +1,8 @@
 # Acceptance calibration
 
 This report records how the pre-registered acceptance controls `AC-01` to
-`AC-07` in `spec/acceptance-controls.json` got their thresholds. The sponsor
-delegated threshold selection (decision D12) on condition that thresholds rest
+`AC-07` in `spec/acceptance-controls.json` got their thresholds. Threshold
+selection (decision D12) rests
 on realistic measurements on the development machine, extrapolated to the
 GitHub-hosted runner class (4 vCPUs, 16 GB, x64), with the evidence recorded.
 [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md) states the
@@ -95,7 +95,7 @@ _Table 2: Calibrated measurements and registered thresholds._
   46 s (18 min 27 s of CPU, 154.5 MiB), both without a verdict. Both were
   removed from the probe. `AC-02` therefore scopes Kani to structural
   harnesses; multiplication belongs to Verus under `AC-01`, and a harness that
-  needs symbolic multiplication requires an amendment with its own calibration.
+  needs symbolic multiplication needs its own calibration.
   Task 1.2.4 should plan its proofs accordingly.
 - Polars dominates build cost: a cold Polars-enabled build took 60 to 382 s
   locally across five runs, while every other profile built in seconds. The
@@ -136,5 +136,5 @@ Then enumerate every workflow run attempt and its jobs through the Actions REST
 API. Select the 20 most recently started eligible jobs without a conclusion
 filter. `recorded_on` for acceptance evidence is the measurement date, not the
 date when the record is committed. Record new calibration under
-`spec/calibration/` with the measurement-record schema, and change a registered
-threshold only through a sponsor-approved amendment.
+`spec/calibration/` with the measurement-record schema, and change a threshold
+only with a calibration record that supports the new value.

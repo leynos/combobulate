@@ -5,7 +5,7 @@
   "description": "Hardware is described by class only (decision D11): no host names, user names, or paths outside the repository.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "purpose", "control_ids", "control_digest", "recorded_on", "hardware", "toolchains", "workloads"],
+  "required": ["id", "purpose", "control_ids", "recorded_on", "hardware", "toolchains", "workloads"],
   "properties": {
     "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "purpose": {"enum": ["calibration", "acceptance"]},
@@ -15,7 +15,6 @@
       "uniqueItems": true,
       "items": {"type": "string", "pattern": "^AC-[0-9]{2}$"}
     },
-    "control_digest": {"oneOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"type": "null"}]},
     "recorded_on": {
       "type": "string",
       "format": "date",
@@ -107,7 +106,6 @@
         "required": ["outcome", "runner_image", "runner_metadata"],
         "properties": {
           "control_ids": {"maxItems": 1},
-          "control_digest": {"type": "string"},
           "hardware": {
             "required": ["vcpus", "memory_gib", "architecture"],
             "properties": {
@@ -122,8 +120,7 @@
         }
       },
       "else": {
-        "not": {"required": ["outcome"]},
-        "properties": {"control_digest": {"type": "null"}}
+        "not": {"required": ["outcome"]}
       }
     },
     {

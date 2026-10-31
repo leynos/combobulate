@@ -4,7 +4,6 @@
   "control_ids": [
     "AC-07"
   ],
-  "control_digest": null,
   "recorded_on": "2026-10-11",
   "hardware": {
     "class": "github-hosted-runner",

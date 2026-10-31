@@ -35,8 +35,7 @@ it and free of retired or open-status wording for accepted questions. The
 semantic contract register (`SC-01` to `SC-11`) evaluates 68 tagged-scalar
 examples and a 29-entry `comb!` corpus in documentation models, and proves each
 seeded mutation changes an outcome. The acceptance controls (`AC-01` to
-`AC-07`) carry every frozen field, digests that close their amendment chains,
-and host-free calibration records. The evidence gate's reason codes match their
+`AC-07`) define every registered field, and host-free calibration records bind to them. The evidence gate's reason codes match their
 registry, the exception register satisfies D02, and the package manifest agrees
 with the licence and publication decisions. Roadmap closure accepts a ticked
 task only when its prerequisites, completion record, accepted decisions, and

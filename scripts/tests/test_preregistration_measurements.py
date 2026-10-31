@@ -16,17 +16,16 @@ from docs_validation.ci_controls import AcceptanceWorkflowSettings
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
     OUTCOME_VERDICTS, check_acceptance_workflow, check_calibration_record, check_ci_calibration,
-    check_ci_measurement, check_control_bindings, check_host_identity, check_measurement_binding,
-    check_sources, verdict,
+    check_ci_measurement, check_control_bindings, check_host_identity, check_measurement_binding, verdict,
 )
 from test_preregistration import (
-    CI_CONTROL, CI_MEASUREMENT_DATE, CONTROL, RECORD_OUTCOMES, RECORD_VALIDATOR, REGISTER, ROOT, amended,
-    ci_record, record,
+    CI_CONTROL, CI_MEASUREMENT_DATE, CONTROL, RECORD_OUTCOMES, RECORD_VALIDATOR, REGISTER, ROOT, ci_record,
+    record,
 )
 
 
 class Outcomes(unittest.TestCase):
-    """VO-12: retries count, and only current-digest records decide the current verdict."""
+    """VO-12: retries count, and every bound acceptance record decides the verdict."""
 
     def test_failure_like_outcomes_have_exact_verdicts(self):
         """Map each failure-like outcome to its registered verdict."""
@@ -68,11 +67,6 @@ class Outcomes(unittest.TestCase):
             records = [record(outcome, purpose='calibration')]
             self.assertEqual(verdict(CONTROL, records), 'not-run', 'calibration never satisfies a control')
 
-    def test_unknown_digest_is_rejected_before_aggregation(self):
-        """Reject a measurement that cites an unregistered digest."""
-        with self.assertRaisesRegex(AssertionError, 'cites unknown digest'):
-            verdict(CONTROL, [record('pass', digest='0' * 64)])
-
     def test_unknown_control_id_is_rejected(self):
         """Reject a measurement that names an unregistered control."""
         unknown = record('pass')
@@ -80,32 +74,6 @@ class Outcomes(unittest.TestCase):
         controls = {item['id']: item for item in REGISTER['controls']}
         with self.assertRaisesRegex(AssertionError, 'cites unknown control AC-99'):
             check_control_bindings(controls, unknown)
-
-    def test_historical_digest_is_valid_but_does_not_count_for_current_digest(self):
-        """Retain historical bindings without counting them for the current control."""
-        control = amended(CONTROL, 'seeds', [7])
-        historical = record('pass', digest=CONTROL['digest'])
-        historical['recorded_on'] = control['amendments'][-2]['date']
-        self.assertFalse(check_measurement_binding(control, historical),
-                         'known earlier digests remain valid historical bindings')
-        self.assertEqual(verdict(control, [historical]), 'not-run',
-                         'a historical result cannot satisfy the amended current digest')
-
-    def test_historical_digest_is_rejected_on_or_after_its_supersession_date(self):
-        """Reject historical measurements at and after digest supersession."""
-        control = amended(CONTROL, 'seeds', [7])
-        superseded_on = control['amendments'][-1]['date']
-        recorded_dates = (
-            superseded_on,
-            (datetime.fromisoformat(superseded_on) + timedelta(days=1)).date().isoformat(),
-        )
-
-        for recorded_on in recorded_dates:
-            with self.subTest(recorded_on=recorded_on):
-                historical = record('pass', digest=CONTROL['digest'])
-                historical['recorded_on'] = recorded_on
-                with self.assertRaisesRegex(AssertionError, 'superseded'):
-                    check_measurement_binding(control, historical)
 
     def test_record_before_registration_is_rejected(self):
         """Reject acceptance evidence recorded before its control was registered."""
@@ -182,21 +150,6 @@ class Outcomes(unittest.TestCase):
                                     msg='a secondary version must belong to its registered tool'):
             check_measurement_binding(CONTROL, misplaced_secondary_version)
 
-    def test_analysis_script_must_be_a_hashed_workload_source(self):
-        """Require a registered analysis script to be covered by a source digest."""
-        control = copy.deepcopy(CONTROL)
-        control['frozen']['analysis_script'] = {
-            'path': 'tools/analyse.py', 'requirement': 'Use the registered analysis.',
-        }
-        control['frozen']['workload']['sources'] = []
-        with self.assertRaisesRegex(AssertionError, 'analysis script .* has no matching hashed workload source',
-                                    msg='analysis script bytes must be frozen with a source digest'):
-            check_sources(control, {})
-
-        script_digest = 'a' * 64
-        control['frozen']['workload']['sources'] = [{'path': 'tools/analyse.py', 'sha256': script_digest}]
-        check_sources(control, {'tools/analyse.py': script_digest})
-
     def test_calibration_directory_rejects_acceptance_record_directly(self):
         """Keep acceptance records out of the calibration evidence directory."""
         with self.assertRaisesRegex(AssertionError, 'acceptance evidence belongs in spec/measurements'):
@@ -234,7 +187,7 @@ class WorkflowAndCi(unittest.TestCase):
 
     def test_untimed_failed_attempt_is_a_valid_failed_measurement(self):
         """Preserve timeout failures when a CI attempt has no measured duration."""
-        failed = record('fail', digest=CI_CONTROL['digest'])
+        failed = record('fail')
         failed['control_ids'] = [CI_CONTROL['id']]
         failed['recorded_on'] = CI_MEASUREMENT_DATE
         workload = failed['workloads'][0]

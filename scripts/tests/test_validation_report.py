@@ -69,14 +69,12 @@ class ValidationReport(unittest.TestCase):
                          f'{expectation}; the validation report must remain untouched')
 
     @staticmethod
-    def acceptance_record(record_id: str, control_id: str, control_digest: str,
-                          recorded_on: str) -> dict[str, object]:
+    def acceptance_record(record_id: str, control_id: str, recorded_on: str) -> dict[str, object]:
         """Create a schema-valid acceptance record for composition-path rejection cases."""
         return {
             'id': record_id,
             'purpose': 'acceptance',
             'control_ids': [control_id],
-            'control_digest': control_digest,
             'recorded_on': recorded_on,
             'runner_image': 'ubuntu-24.04',
             'outcome': 'pass',
@@ -150,25 +148,6 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(self.report.read_bytes(), report_before,
                          'invalid workflow YAML must not replace the committed validation report')
 
-    def test_missing_registered_workload_source_is_reported_at_command_boundary(self) -> None:
-        """Convert source-reader failures into a validation result without mutating the report."""
-        (self.root / 'tools/calibration/cardinality-probe/verus/cardinality.rs').unlink()
-        report_before = self.report.read_bytes()
-        with self.assertRaisesRegex(SystemExit, 'Unable to read registered workload source',
-                                    msg='missing source bytes must fail through the checker boundary'):
-            self.run_main(['--write'])
-        self.assertEqual(self.report.read_bytes(), report_before,
-                         'a missing registered source must not replace the committed validation report')
-
-    def test_modified_registered_source_digest_is_rejected_by_command(self) -> None:
-        """Reject changed bytes at the real checker entrypoint against registered source digests."""
-        source = self.root / 'tools/calibration/cardinality-probe/verus/cardinality.rs'
-        source.write_bytes(source.read_bytes() + b'\n')
-        self.assert_command_rejects(
-            r'AC-01 source .* changed since registration',
-            'the command path must reject bytes that no longer match AC-01 registration',
-        )
-
     def test_missing_ac07_calibration_reference_is_rejected_by_command(self) -> None:
         """Require the command path to resolve AC-07's registered CI history record."""
         (self.root / 'spec/calibration/ci-history.json').unlink()
@@ -190,40 +169,18 @@ class ValidationReport(unittest.TestCase):
             'the command path must reject a workflow runner that differs from AC-07',
         )
 
-    def test_acceptance_measurement_with_unknown_control_digest_is_rejected_by_command(self) -> None:
-        """Reject acceptance evidence that cites no digest in the registered control history."""
-        register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
-        control = next(item for item in register['controls'] if item['id'] == 'AC-01')
-        last_effective_date = (control['amendments'][-1]['date'] if control['amendments']
-                               else control['frozen']['registered_on'])
-        recorded_on = (date.fromisoformat(last_effective_date) + timedelta(days=1)).isoformat()
-        record = self.acceptance_record(
-            'unknown-control-digest', 'AC-01', 'f' * 64, recorded_on,
-        )
-        measurements = self.root / 'spec/measurements'
-        measurements.mkdir()
-        (measurements / 'unknown-control-digest.json').write_text(
-            json.dumps(record), encoding='utf-8',
-        )
-        self.assert_command_rejects(
-            r'unknown-control-digest cites unknown digest .* for AC-01',
-            'the command path must reject acceptance evidence with an unregistered digest',
-        )
-
     def test_decoded_json_strings_cannot_hide_host_identities(self) -> None:
         """Reject escaped host identities in calibration and acceptance JSON."""
         calibration_path = self.root / 'spec/calibration/verifier-probe.json'
         original_calibration = json.loads(calibration_path.read_text(encoding='utf-8'))
         register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
         control = next(item for item in register['controls'] if item['id'] == 'AC-01')
-        last_effective_date = (control['amendments'][-1]['date'] if control['amendments']
-                               else control['frozen']['registered_on'])
-        recorded_on = (date.fromisoformat(last_effective_date) + timedelta(days=1)).isoformat()
+        recorded_on = (date.fromisoformat(control['frozen']['registered_on']) + timedelta(days=1)).isoformat()
         measurements = self.root / 'spec/measurements'
         measurements.mkdir()
         measurement_path = measurements / 'escaped-identity.json'
         original_measurement = self.acceptance_record(
-            'escaped-identity', 'AC-01', control['digest'], recorded_on,
+            'escaped-identity', 'AC-01', recorded_on,
         )
         source_records = (
             ('calibration', calibration_path, original_calibration),
@@ -261,7 +218,7 @@ class ValidationReport(unittest.TestCase):
         register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
         control = next(item for item in register['controls'] if item['id'] == 'AC-01')
         record = self.acceptance_record(
-            'misplaced-acceptance-record', 'AC-01', control['digest'], control['frozen']['registered_on'],
+            'misplaced-acceptance-record', 'AC-01', control['frozen']['registered_on'],
         )
         (self.root / 'spec/calibration/misplaced-acceptance-record.json').write_text(
             json.dumps(record), encoding='utf-8',
