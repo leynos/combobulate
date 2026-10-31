@@ -205,6 +205,11 @@ impl GateProbe {
         )?;
         self.directory
             .write("Makefile", repository.read("Makefile")?)?;
+        self.directory.create_dir_all("tools/rust-prover-tools")?;
+        self.directory.write(
+            "tools/rust-prover-tools/REF",
+            repository.read("tools/rust-prover-tools/REF")?,
+        )?;
         Ok(())
     }
 

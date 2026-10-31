@@ -1,0 +1,27 @@
+rustc 1.100.0-nightly (bff8e12ff 2026-08-26)
+binary: rustc
+commit-hash: bff8e12ff5e6bcd53dfb1dbccdcec80a60a856ed
+commit-date: 2026-08-26
+host: x86_64-unknown-linux-gnu
+release: 1.100.0-nightly
+LLVM version: 23.1.0
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.3
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-06-0133
+   Compiling verus_builtin v0.0.0-2026-09-06-0133
+   Compiling wiring-production v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/production)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_builtin_macros v0.0.0-2026-09-06-0133
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling wiring-companion v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/companion)
+   Compiling wiring-attributes v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/attributes)
+   Compiling wiring-macro v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/macro)
+    Finished `dev` profile [unoptimized] target(s) in 11.33s

@@ -1,0 +1,55 @@
+rustc 1.100.0-nightly (bff8e12ff 2026-08-26)
+binary: rustc
+commit-hash: bff8e12ff5e6bcd53dfb1dbccdcec80a60a856ed
+commit-date: 2026-08-26
+host: x86_64-unknown-linux-gnu
+release: 1.100.0-nightly
+LLVM version: 23.1.0
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.3
+   Compiling vstd v0.0.0-2026-09-06-0133
+   Compiling convert_case v0.4.0
+   Compiling verus_builtin v0.0.0-2026-09-06-0133
+   Compiling wiring-production v0.1.0 (/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/production)
+error: linking with `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh` failed: exit status: 1
+  |
+  = note:  "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh" "-m64" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/quote/980911c5fe05bffc/out/rustcET6Yh4/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/quote/980911c5fe05bffc/out/rustcET6Yh4/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/quote/980911c5fe05bffc/out/build_script_build" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,--strip-debug" "-nodefaultlibs" "-fuse-ld=mold"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/build-tools-common.sh: line 98: rustup: command not found
+          build-tools: the mold build route requires a native x86_64-unknown-linux-gnu host
+          
+
+error: could not compile `quote` (build script) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: linking with `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh` failed: exit status: 1
+  |
+  = note:  "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh" "-m64" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/verus_prettyplease/0c57e5f83608406b/out/rustcw3OL0J/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/verus_prettyplease/0c57e5f83608406b/out/rustcw3OL0J/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/verus_prettyplease/0c57e5f83608406b/out/build_script_build" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,--strip-debug" "-nodefaultlibs" "-fuse-ld=mold"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/build-tools-common.sh: line 98: rustup: command not found
+          build-tools: the mold build route requires a native x86_64-unknown-linux-gnu host
+          
+
+error: could not compile `verus_prettyplease` (build script) due to 1 previous error
+error: linking with `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh` failed: exit status: 1
+  |
+  = note:  "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh" "-m64" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/proc-macro2/6c95990113898985/out/rustcumUGJG/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/proc-macro2/6c95990113898985/out/rustcumUGJG/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/proc-macro2/6c95990113898985/out/build_script_build" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,--strip-debug" "-nodefaultlibs" "-fuse-ld=mold"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/build-tools-common.sh: line 98: rustup: command not found
+          build-tools: the mold build route requires a native x86_64-unknown-linux-gnu host
+          
+
+error: could not compile `proc-macro2` (build script) due to 1 previous error
+error: linking with `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh` failed: exit status: 1
+  |
+  = note:  "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/native-clang-linker.sh" "-m64" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/vstd/0b2b27809eac6d4c/out/rustcNXHb9n/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/vstd/0b2b27809eac6d4c/out/rustcNXHb9n/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/probe/target/debug/build/vstd/0b2b27809eac6d4c/out/build_script_build" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,--strip-debug" "-nodefaultlibs" "-fuse-ld=mold"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/target/epm1-verifier-free-workspace/scripts/build-tools-common.sh: line 98: rustup: command not found
+          build-tools: the mold build route requires a native x86_64-unknown-linux-gnu host
+          
+
+error: could not compile `vstd` (build script) due to 1 previous error

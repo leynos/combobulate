@@ -62,6 +62,16 @@
   retroactively update completed execplan documents to reflect subsequent
   changes in API, structures, or behaviour.
 
+## Rebases and active plans
+
+- Treat the fetched target branch as authoritative after a rebase. Reconcile
+  active plans, measurements, and implementation with accepted target changes;
+  do not stop merely because the target has evolved. Preserve the purpose of
+  both branches, update affected records, and validate the resulting candidate.
+- When a target change affects a pre-registered control, record the actual
+  environment and follow its amendment process before measuring. Continue work
+  that does not depend on the amended measurement.
+
 ## Change quality & committing
 
 - **Atomicity:** Aim for small, focused, atomic changes. Each change (and

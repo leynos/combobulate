@@ -13,6 +13,52 @@ MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
 SHELL := bash
 
+# The prover targets are declared first so `make install-kani` and friends read
+# beside their version pins. Without an explicit default goal Make would adopt
+# `install-kani`, turning a bare `make` into a tool installation, so pin the
+# ordinary build instead.
+.DEFAULT_GOAL := build
+
+
+override PROVER_TOOLS_REF_FILE := tools/rust-prover-tools/REF
+override PROVER_TOOLS_REF := $(shell awk '/^ref:/ { print $$2 }' $(PROVER_TOOLS_REF_FILE))
+ifeq ($(shell printf '%s' '$(PROVER_TOOLS_REF)' | grep -Ec '^[0-9a-f]{40}$$'),0)
+$(error PROVER_TOOLS_REF missing or malformed; expected "ref: <40-hex>" in $(PROVER_TOOLS_REF_FILE))
+endif
+override PROVER_TOOLS_SOURCE := git+https://github.com/leynos/rust-prover-tools.git@$(PROVER_TOOLS_REF)
+# Only the paired command-line seam may replace the pinned helper in tests.
+PROVER_TOOLS_ORIGINS := $(origin PROVER_TOOLS_CONTRACT_TEST),$(origin PROVER_TOOLS),$(PROVER_TOOLS_CONTRACT_TEST)
+ifeq ($(PROVER_TOOLS_ORIGINS),command line,command line,1)
+else
+override PROVER_TOOLS := uv tool run --from "$(PROVER_TOOLS_SOURCE)" prover-tools
+endif
+KANI ?= cargo kani
+KANI_INSTALLATION ?= $(HOME)/.kani/kani-$(shell cat tools/kani/VERSION)
+KANI_FLAGS ?=
+KANI_PROBE_ROUTE ?= direct
+VERUS_FLAGS ?=
+FORMAL_STRICT ?= 0
+
+.PHONY: install-kani kani-check install-verus kani kani-full kani-log-corpus verus-probe
+
+install-kani: ## Install the pinned Kani release
+	$(PROVER_TOOLS) kani install --repo-root .
+
+kani-check: ## Require the calibrated Kani release
+	$(PROVER_TOOLS) kani check-version --repo-root . --kani-command "$(KANI)"
+
+install-verus: ## Install the checksum-verified Verus release
+	$(PROVER_TOOLS) verus install --repo-root .
+
+kani kani-full: kani-check ## Report that product proofs arrive in task 1.2.4
+	@printf 'FORMAL-SKIP: %s has no product harnesses until task 1.2.4\n' '$@'
+	@test "$(FORMAL_STRICT)" != 1
+
+kani-log-corpus: kani-check ## Capture real Kani parser fixtures
+	@uv run --script scripts/run_verifier_probes.py kani --prover-tools '$(PROVER_TOOLS)' --installation '$(KANI_INSTALLATION)' --route '$(KANI_PROBE_ROUTE)' $(KANI_FLAGS)
+
+verus-probe: kani-check ## Compare the four pinned Verus wiring candidates
+	@uv run --script scripts/run_verifier_probes.py verus --prover-tools '$(PROVER_TOOLS)' $(VERUS_FLAGS)
 
 TARGET ?= libcombobulate.rlib
 

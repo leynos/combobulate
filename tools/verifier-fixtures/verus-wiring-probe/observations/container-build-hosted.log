@@ -1,0 +1,141 @@
+STEP 1/2: FROM quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834
+STEP 2/2: RUN dnf install -y --setopt=install_weak_deps=False clang gcc-c++ make libatomic && dnf clean all
+Rocky Linux 10 - BaseOS                          11 MB/s |  42 MB     00:03    
+Rocky Linux 10 - AppStream                      4.0 MB/s | 2.9 MB     00:00    
+Rocky Linux 10 - Extras                          25 kB/s | 6.1 kB     00:00    
+Dependencies resolved.
+================================================================================
+ Package                        Arch   Version                  Repo       Size
+================================================================================
+Installing:
+ clang                          x86_64 21.1.8-1.el10            appstream 7.3 M
+ gcc-c++                        x86_64 14.3.1-4.4.el10          appstream  15 M
+ libatomic                      x86_64 14.3.1-4.4.el10          baseos     49 k
+ make                           x86_64 1:4.4.1-9.el10           baseos    590 k
+Installing dependencies:
+ clang-libs                     x86_64 21.1.8-1.el10            appstream  30 M
+ clang-resource-filesystem      x86_64 21.1.8-1.el10            appstream  19 k
+ cpp                            x86_64 14.3.1-4.4.el10          appstream  13 M
+ gcc                            x86_64 14.3.1-4.4.el10          appstream  38 M
+ gcc-toolset-15-binutils        x86_64 2.44-8.el10              appstream 5.8 M
+ gcc-toolset-15-gcc             x86_64 15.2.1-7.1.el10_2        appstream  52 M
+ gcc-toolset-15-gcc-c++         x86_64 15.2.1-7.1.el10_2        appstream  16 M
+ gcc-toolset-15-libstdc++-devel x86_64 15.2.1-7.1.el10_2        appstream 3.5 M
+ gcc-toolset-15-runtime         x86_64 15.0-11.el10             appstream  11 k
+ glibc-devel                    x86_64 2.39-121.el10_2          appstream 475 k
+ kernel-headers                 x86_64 6.12.0-211.69.1.el10_2   appstream 3.4 M
+ libedit                        x86_64 3.1-52.20230828cvs.el10  baseos    105 k
+ libmpc                         x86_64 1.3.1-7.el10             appstream  70 k
+ libpkgconf                     x86_64 2.1.0-3.el10             baseos     38 k
+ libstdc++-devel                x86_64 14.3.1-4.4.el10          appstream 2.8 M
+ libxcrypt-devel                x86_64 4.4.36-10.el10           appstream  29 k
+ llvm-filesystem                x86_64 21.1.8-1.el10            appstream  13 k
+ llvm-libs                      x86_64 21.1.8-1.el10            appstream  31 M
+ pkgconf                        x86_64 2.1.0-3.el10             baseos     44 k
+ pkgconf-m4                     noarch 2.1.0-3.el10             baseos     14 k
+ pkgconf-pkg-config             x86_64 2.1.0-3.el10             baseos    9.8 k
+
+Transaction Summary
+================================================================================
+Install  25 Packages
+
+Total download size: 220 M
+Installed size: 753 M
+Downloading Packages:
+(1/25): libpkgconf-2.1.0-3.el10.x86_64.rpm      475 kB/s |  38 kB     00:00    
+(2/25): libatomic-14.3.1-4.4.el10.x86_64.rpm    457 kB/s |  49 kB     00:00    
+(3/25): libedit-3.1-52.20230828cvs.el10.x86_64. 786 kB/s | 105 kB     00:00    
+(4/25): pkgconf-2.1.0-3.el10.x86_64.rpm         1.5 MB/s |  44 kB     00:00    
+(5/25): pkgconf-m4-2.1.0-3.el10.noarch.rpm      525 kB/s |  14 kB     00:00    
+(6/25): pkgconf-pkg-config-2.1.0-3.el10.x86_64. 365 kB/s | 9.8 kB     00:00    
+(7/25): make-4.4.1-9.el10.x86_64.rpm            5.5 MB/s | 590 kB     00:00    
+(8/25): clang-resource-filesystem-21.1.8-1.el10  81 kB/s |  19 kB     00:00    
+(9/25): clang-21.1.8-1.el10.x86_64.rpm           13 MB/s | 7.3 MB     00:00    
+(10/25): cpp-14.3.1-4.4.el10.x86_64.rpm          38 MB/s |  13 MB     00:00    
+(11/25): gcc-c++-14.3.1-4.4.el10.x86_64.rpm     115 MB/s |  15 MB     00:00    
+(12/25): clang-libs-21.1.8-1.el10.x86_64.rpm     38 MB/s |  30 MB     00:00    
+(13/25): gcc-toolset-15-binutils-2.44-8.el10.x8  57 MB/s | 5.8 MB     00:00    
+(14/25): gcc-toolset-15-gcc-c++-15.2.1-7.1.el10 120 MB/s |  16 MB     00:00    
+(15/25): gcc-14.3.1-4.4.el10.x86_64.rpm          85 MB/s |  38 MB     00:00    
+(16/25): gcc-toolset-15-libstdc++-devel-15.2.1-  52 MB/s | 3.5 MB     00:00    
+(17/25): gcc-toolset-15-runtime-15.0-11.el10.x8 237 kB/s |  11 kB     00:00    
+(18/25): glibc-devel-2.39-121.el10_2.x86_64.rpm  11 MB/s | 475 kB     00:00    
+(19/25): libmpc-1.3.1-7.el10.x86_64.rpm         1.9 MB/s |  70 kB     00:00    
+(20/25): kernel-headers-6.12.0-211.69.1.el10_2.  57 MB/s | 3.4 MB     00:00    
+(21/25): libxcrypt-devel-4.4.36-10.el10.x86_64. 746 kB/s |  29 kB     00:00    
+(22/25): libstdc++-devel-14.3.1-4.4.el10.x86_64  48 MB/s | 2.8 MB     00:00    
+(23/25): gcc-toolset-15-gcc-15.2.1-7.1.el10_2.x 113 MB/s |  52 MB     00:00    
+(24/25): llvm-filesystem-21.1.8-1.el10.x86_64.r 131 kB/s |  13 kB     00:00    
+(25/25): llvm-libs-21.1.8-1.el10.x86_64.rpm     137 MB/s |  31 MB     00:00    
+--------------------------------------------------------------------------------
+Total                                           127 MB/s | 220 MB     00:01     
+Running transaction check
+Transaction check succeeded.
+Running transaction test
+Transaction test succeeded.
+Running transaction
+  Preparing        :                                                        1/1 
+  Installing       : libmpc-1.3.1-7.el10.x86_64                            1/25 
+  Installing       : libstdc++-devel-14.3.1-4.4.el10.x86_64                2/25 
+  Installing       : gcc-toolset-15-runtime-15.0-11.el10.x86_64            3/25 
+  Installing       : make-1:4.4.1-9.el10.x86_64                            4/25 
+  Installing       : gcc-toolset-15-binutils-2.44-8.el10.x86_64            5/25 
+  Running scriptlet: gcc-toolset-15-binutils-2.44-8.el10.x86_64            5/25 
+/var/tmp/rpm-tmp.FUNCTd: line 15: restorecon: command not found
+/var/tmp/rpm-tmp.FUNCTd: line 18: restorecon: command not found
+
+  Installing       : cpp-14.3.1-4.4.el10.x86_64                            6/25 
+  Installing       : llvm-filesystem-21.1.8-1.el10.x86_64                  7/25 
+  Installing       : kernel-headers-6.12.0-211.69.1.el10_2.x86_64          8/25 
+  Installing       : gcc-toolset-15-libstdc++-devel-15.2.1-7.1.el10_2.x    9/25 
+  Installing       : clang-resource-filesystem-21.1.8-1.el10.x86_64       10/25 
+  Installing       : pkgconf-m4-2.1.0-3.el10.noarch                       11/25 
+  Installing       : libpkgconf-2.1.0-3.el10.x86_64                       12/25 
+  Installing       : pkgconf-2.1.0-3.el10.x86_64                          13/25 
+  Installing       : pkgconf-pkg-config-2.1.0-3.el10.x86_64               14/25 
+  Installing       : glibc-devel-2.39-121.el10_2.x86_64                   15/25 
+  Installing       : libxcrypt-devel-4.4.36-10.el10.x86_64                16/25 
+  Installing       : gcc-14.3.1-4.4.el10.x86_64                           17/25 
+  Installing       : gcc-c++-14.3.1-4.4.el10.x86_64                       18/25 
+  Installing       : gcc-toolset-15-gcc-15.2.1-7.1.el10_2.x86_64          19/25 
+  Installing       : gcc-toolset-15-gcc-c++-15.2.1-7.1.el10_2.x86_64      20/25 
+  Installing       : libedit-3.1-52.20230828cvs.el10.x86_64               21/25 
+  Installing       : llvm-libs-21.1.8-1.el10.x86_64                       22/25 
+  Installing       : clang-libs-21.1.8-1.el10.x86_64                      23/25 
+  Installing       : clang-21.1.8-1.el10.x86_64                           24/25 
+  Installing       : libatomic-14.3.1-4.4.el10.x86_64                     25/25 
+  Running scriptlet: libatomic-14.3.1-4.4.el10.x86_64                     25/25 
+
+Installed:
+  clang-21.1.8-1.el10.x86_64                                                    
+  clang-libs-21.1.8-1.el10.x86_64                                               
+  clang-resource-filesystem-21.1.8-1.el10.x86_64                                
+  cpp-14.3.1-4.4.el10.x86_64                                                    
+  gcc-14.3.1-4.4.el10.x86_64                                                    
+  gcc-c++-14.3.1-4.4.el10.x86_64                                                
+  gcc-toolset-15-binutils-2.44-8.el10.x86_64                                    
+  gcc-toolset-15-gcc-15.2.1-7.1.el10_2.x86_64                                   
+  gcc-toolset-15-gcc-c++-15.2.1-7.1.el10_2.x86_64                               
+  gcc-toolset-15-libstdc++-devel-15.2.1-7.1.el10_2.x86_64                       
+  gcc-toolset-15-runtime-15.0-11.el10.x86_64                                    
+  glibc-devel-2.39-121.el10_2.x86_64                                            
+  kernel-headers-6.12.0-211.69.1.el10_2.x86_64                                  
+  libatomic-14.3.1-4.4.el10.x86_64                                              
+  libedit-3.1-52.20230828cvs.el10.x86_64                                        
+  libmpc-1.3.1-7.el10.x86_64                                                    
+  libpkgconf-2.1.0-3.el10.x86_64                                                
+  libstdc++-devel-14.3.1-4.4.el10.x86_64                                        
+  libxcrypt-devel-4.4.36-10.el10.x86_64                                         
+  llvm-filesystem-21.1.8-1.el10.x86_64                                          
+  llvm-libs-21.1.8-1.el10.x86_64                                                
+  make-1:4.4.1-9.el10.x86_64                                                    
+  pkgconf-2.1.0-3.el10.x86_64                                                   
+  pkgconf-m4-2.1.0-3.el10.noarch                                                
+  pkgconf-pkg-config-2.1.0-3.el10.x86_64                                        
+
+Complete!
+18 files removed
+COMMIT localhost/combobulate-epm1-verifier-free:20261028
+--> b7161efe5a0b
+Successfully tagged localhost/combobulate-epm1-verifier-free:20261028
+b7161efe5a0b01ed6e5757360bf76c2d6e4bbd9755782364be57e01380067046
