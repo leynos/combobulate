@@ -850,7 +850,11 @@ the same rewrite to the resolved solver path. Without it, a record would name
 the developer's account and worktree and could not be reproduced elsewhere.
 Captured observation logs stay verbatim: they are the tool's own output, and
 rewriting them would break the evidence the digest binds. The split is
-deliberate — metadata is rewritten, output is not.
+deliberate — metadata is rewritten, output is not. A record captured before
+this rule keeps the path it ran under until it is rewritten in place; because
+the digest binds the log and not the metadata, that edit leaves the evidence
+valid. The provenance test scans every committed fixture record and fails on
+any remaining account home.
 
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,

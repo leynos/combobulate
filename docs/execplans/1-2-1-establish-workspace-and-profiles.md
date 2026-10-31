@@ -474,6 +474,11 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     longer consumes the character it probes, so a content quote inside a raw
     string cannot hide the crate attributes; the manifest projection marks
     `workspace` as `NotRequired`; and the repository layout names `.verus/`.
+  - [x] (2026-11-01) Eighth review round (DL-42). The hosted verifier-free
+    record predates the DL-39 rewrite and still published twelve
+    `/home/runner` paths in its command; they now use `<repo>` and `~`, the log
+    and its digest are unchanged, and the provenance test scans every committed
+    record for an account home.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -594,6 +599,23 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-42 (2026-11-01). EP-M2 eighth review round. The review on head `d92cbee`
+  raised one concern: `verifier-free-hosted.json` publishes twelve
+  `/home/runner/...` paths in its `command` array, contrary to the DL-39 rule
+  that committed metadata carries no host detail. Verified: the record derives
+  from hosted run `41227443972` on head `833ef0c`, which predates the
+  `portable_argument` change in `403996e`, and `f0b1650` replaced the build
+  script, digest, and provenance without touching those paths. Repaired by
+  applying the same rewrite a fresh capture now performs — repository root to
+  `<repo>`, home to `~` — and leaving the captured log untouched; recomputing
+  its digest still yields the recorded `2a81245b…`, so the binding holds. The
+  new test `test_committed_commands_publish_no_host_paths` scans every
+  committed fixture record and was observed red with exactly those twelve
+  arguments before the rewrite and green after it. Recapturing on the hosted
+  job was the reviewer's alternative; the in-place rewrite is preferred because
+  it changes no observation. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt9.out`.
+  Date/Author: 2026-11-01, implementation agent.
 - DL-41 (2026-10-31). EP-M2 seventh review round. The review on head `5e517d4`
   completed with seven findings covering five distinct concerns. Three were
   verified against source and repaired. (a) `raw_string_closes` consumed the
@@ -2099,3 +2121,8 @@ design specifies are restored in the live boundary checks (DL-40).
 terminator probe no longer consumes the character it tests, the manifest
 projection marks `workspace` optional, the layout documents `.verus/`, and the
 duplicate `EP-M2` progress entry introduced by revision 14 is removed (DL-41).
+
+2026-11-01, revision 16: recorded the eighth review round: the hosted
+verifier-free record now names `<repo>` and `~` instead of the runner's account
+path, with its captured log and digest unchanged, and a committed-record test
+holds the convention (DL-42).
