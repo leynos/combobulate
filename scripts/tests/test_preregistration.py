@@ -38,6 +38,8 @@ RECORD_VALIDATOR = Draft202012Validator(
 RECORD_OUTCOMES = sorted(OUTCOME_VERDICTS)
 LATEST_CONTROL_AMENDMENT_DATE = CONTROL['amendments'][-1]['date']
 TEST_MEASUREMENT_DATE = (date.fromisoformat(LATEST_CONTROL_AMENDMENT_DATE) + timedelta(days=1)).isoformat()
+# The CI control is amended independently of the first control, so its records follow its own chain.
+CI_MEASUREMENT_DATE = (date.fromisoformat(CI_CONTROL['amendments'][-1]['date']) + timedelta(days=1)).isoformat()
 
 
 def amended(control: dict, field: str, value: object) -> dict:
@@ -79,6 +81,7 @@ def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
     """Build an AC-07 record in newest-first order with timestamped job attempts."""
     entry = record(outcome, digest=CI_CONTROL['digest'])
     entry['control_ids'] = [CI_CONTROL['id']]
+    entry['recorded_on'] = CI_MEASUREMENT_DATE
     workload = entry['workloads'][0]
     workload['id'] = 'ci-build-test'
     attempts = []

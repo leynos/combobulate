@@ -20,7 +20,8 @@ from docs_validation.preregistration import (
     check_sources, verdict,
 )
 from test_preregistration import (
-    CI_CONTROL, CONTROL, RECORD_OUTCOMES, RECORD_VALIDATOR, REGISTER, ROOT, amended, ci_record, record,
+    CI_CONTROL, CI_MEASUREMENT_DATE, CONTROL, RECORD_OUTCOMES, RECORD_VALIDATOR, REGISTER, ROOT, amended,
+    ci_record, record,
 )
 
 
@@ -235,6 +236,7 @@ class WorkflowAndCi(unittest.TestCase):
         """Preserve timeout failures when a CI attempt has no measured duration."""
         failed = record('fail', digest=CI_CONTROL['digest'])
         failed['control_ids'] = [CI_CONTROL['id']]
+        failed['recorded_on'] = CI_MEASUREMENT_DATE
         workload = failed['workloads'][0]
         workload['id'] = 'ci-build-test'
         workload['samples'] = []

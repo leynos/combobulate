@@ -45,6 +45,7 @@ class Scenario:
     missing_asset: bool = False
     suite_version: str = ''
     installer_version: str | None = None
+    bundle: str = ''
 
 
 def require(condition: bool, message: str) -> None:
@@ -107,6 +108,7 @@ def environment(root: Path, values: dict, scenario: Scenario) -> dict[str, str]:
             'GITHUB_PATH': str(root / 'path'), 'GITHUB_STEP_SUMMARY': str(root / 'summary'),
             'PROBE_ROOT': str(root), 'PROBE_STDOUT': scenario.stdout, 'PROBE_STDERR': scenario.stderr,
             'PROBE_STATUS': str(scenario.status), 'PROBE_MISSING_ASSET': str(scenario.missing_asset).lower(),
+            'PROBE_BUNDLE': scenario.bundle,
             'WHITAKER_INSTALLER_PATH': str(installer), 'WHITAKER_INSTALLER_VERSION': values['installer-version']}
 
 
@@ -123,8 +125,9 @@ def resolve_env(step: dict, values: dict, base: dict) -> dict[str, str]:
         elif expression == '${{ steps.validate-inputs.outputs.installer-version }}':
             result[name] = values['installer-version']
         elif expression == '${{ steps.snapshot-download.outputs.bundle }}':
-            # The probe never downloads a Clippy snapshot, so the step publishes no bundle.
-            result[name] = ''
+            # The probe never downloads a Clippy snapshot: the step publishes no bundle
+            # unless a scenario supplies a synthetic path to check the argument hand-off.
+            result[name] = base['PROBE_BUNDLE']
         else:
             raise ValueError(f'unsupported probe environment expression: {name}={expression}')
     return result
@@ -148,7 +151,8 @@ def run_scenario(parts: tuple, scenario: Scenario, expectation: str) -> None:
     """Drive one source-derived lifecycle and compare actual effects with its contract."""
     validation, installation, inputs = parts
     with tempfile.TemporaryDirectory(prefix='combobulate-whitaker-probe-') as directory:
-        root = Path(directory)
+        # Resolved so the installer path matches the fixture's `pwd -P` cargo-home.
+        root = Path(directory).resolve()
         values = input_values(inputs, scenario, root)
         base = environment(root, values, scenario)
         validated = execute(validation, root, resolve_env(validation, values, base))
@@ -169,6 +173,7 @@ def run_scenario(parts: tuple, scenario: Scenario, expectation: str) -> None:
         require(not (root / 'cargo-started').exists(), 'missing assets permitted a source build')
         arguments = (root / 'arguments').read_text().splitlines() if (root / 'arguments').exists() else []
         expected_args = ['--no-source-fallback'] + (['--cranelift'] if scenario.cranelift == 'true' else [])
+        expected_args += ['--clippy-snapshot-bundle', scenario.bundle] if scenario.bundle else []
         require(arguments == expected_args, f'installer arguments violate binary-only policy: {arguments}')
         if expectation == 'success':
             require(result.returncode == 0, f'prebuilt route failed: {result.stderr}')
@@ -181,6 +186,7 @@ def probe_manifest(manifest: dict) -> int:
     parts = fragments(manifest)
     scenarios = [
         (Scenario(cranelift='true'), 'success'), (Scenario(), 'success'),
+        (Scenario(bundle='/synthetic/clippy-snapshot.tar.zst'), 'success'),
         (Scenario(ci_mode='false'), 'success'),
         (Scenario(status=43), 'installer-failure'),
         (Scenario(stdout='Installing whitaker lints from source\n'), 'source-stdout'),
