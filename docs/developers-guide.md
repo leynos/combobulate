@@ -342,14 +342,28 @@ uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py \
   --workflow .github/workflows/ci.yml
 ```
 
-The gate resolves the caller's current full SHA and fetches `action.yml`, the
-installer digest manifest, and all three referenced helpers at that exact
-commit. `tools/whitaker-approved.json` records the reviewed content digests and
-source provenance. The complete manifest digest also covers nested action
-references. Unavailable or changed content fails before the action runs. A
-commit bump with identical approved content passes. Execution-content changes
-require review and an explicit evidence-map update, including raw source
-provenance and passing hermetic capability mutations.
+The gate resolves the caller's current full SHA and fetches every file in
+`tools/whitaker-approved.json` at that exact commit: `action.yml`, the
+installer digest manifest, the release, archive and rolling-asset helpers, and
+the files installer 0.2.11 adds for the verified Clippy snapshot bootstrap
+(`scripts/bootstrap-paths.sh`, `scripts/resolve-snapshot.sh`,
+`clippy-snapshots.tsv` and `snapshot-digests.sha256`). The manifest records the
+reviewed content digests and source provenance. The complete manifest digest
+also covers nested action references. Unavailable or changed content fails
+before the action runs. A commit bump with identical approved content passes.
+Execution-content changes require review and an explicit evidence-map update,
+including raw source provenance and passing hermetic capability mutations.
+
+Installer 0.2.11 builds the Dylint driver from a verified Clippy snapshot
+instead of cloning Clippy's `master` branch, which upstream Dylint 6.0.1 still
+expects and which no longer exists. The action resolves the snapshot named in
+`clippy-snapshots.tsv`, checks its archive against `snapshot-digests.sha256`,
+and hands the verified bundle to the installer. It caches the bootstrap and
+validates a restored cache before use. The probe does not download snapshots:
+it resolves the bundle to absent for most scenarios and supplies a synthetic
+path to two, so it checks that the installer receives the bundle argument. It
+cannot test the snapshot-download, digest-failure or cache-validation paths.
+The upstream action's own tests own those paths.
 
 The probes exercise source-derived validation and installation fragments with a
 fake installer, denied download and build executors, and private environment
