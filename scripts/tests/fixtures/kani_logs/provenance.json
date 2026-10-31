@@ -8,8 +8,8 @@
     "tools/verifier-fixtures/kani-corpus/src/harnesses.rs": "6a928eabe2a87634235daeaec0fb9a368ab6f00643e48a8d92f9de30fd6761f8",
     "tools/verifier-fixtures/kani-corpus/harnesses.json": "70db201bb2bba3f39a6a58fec624f83960d694c487a8aa1bdedfb6174002acbd",
     "tools/verifier-fixtures/kani-corpus/kani-list.json": "8d3f6132d9c9444b4028cca8642bbc1dcbe67c6c901303a521902dd388be34c1",
-    "scripts/run_verifier_probes.py": "8f65065c3d42e2f01ee451068fdd38372edf9ce2359f82cd722a19937fae0fb5",
-    "scripts/verifier_probe_support.py": "0d53612fd03b6660c2ea798b9f8906b53c957d62122859d6e183181b7a35966a"
+    "scripts/run_verifier_probes.py": "7ae6aaa172dcef27fed50640abcf098637d0a4ba4a12432d684f6be14eb12a25",
+    "scripts/verifier_probe_support.py": "e68f91478232694f85ac3bccc3c4734581ea13b7898ee7988c7c8af886a0bd21"
   },
   "observations": [
     {
@@ -26,7 +26,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/verified.log",
-      "sha256": "d17427ef3535a2c3a1bf9a43992269459c1f8e5be23dd48bcdf6f707615a0e07"
+      "sha256": "a168aef51fc0f809d0b7b6d2d7ff88c86c272069c2548ccb2327c2c0f140bde6"
     },
     {
       "id": "counterexample",
@@ -42,7 +42,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/counterexample.log",
-      "sha256": "133ee83841a004e1e03949771eb7cfa7fe889c789506afe303766fdfbc11f996"
+      "sha256": "71655ef420df6176a6f8fcde4197996e54a365b075d5c2aeb1d89036e1f93b92"
     },
     {
       "id": "unsatisfied_cover",
@@ -58,7 +58,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/unsatisfied_cover.log",
-      "sha256": "f18c91af17e5731f70c516052bdc1c6cae289aaf30d2804f94b26c1829ca120c"
+      "sha256": "5a0eea6038f16c052b81ed6972078e324e39cd5abb952dfc7e854796a6641c43"
     },
     {
       "id": "multiplication_timeout",
@@ -78,7 +78,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/multiplication_timeout.log",
-      "sha256": "74c69e11c9a781a3ec41dc185de1bf0f3992e034337295d824b830ebc1b3eca3"
+      "sha256": "079049950ee3cff4774957daa0c4957eec323f7ec6d32c27c01d14cd4dcc2e24"
     },
     {
       "id": "insufficient_unwind",
@@ -94,7 +94,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/insufficient_unwind.log",
-      "sha256": "bb0e2ca4da6a465899f0149ddb84e5d45ba73f3a39237b6ea4649d092fc0c998"
+      "sha256": "e3672b498829da66fff663d15c8aee1ecca68fcf929274c782262e9859f251de"
     },
     {
       "id": "vacuous_assumption",
@@ -110,7 +110,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/vacuous_assumption.log",
-      "sha256": "7e7293d2838801a4f77960dca529e9cec0c997e4360557196bb5f395664a6bb8"
+      "sha256": "2256772bdfc0a74e763f11fba2de68e1b1883598d0e6ed1439f1566ee0a43117"
     },
     {
       "id": "unsupported",
@@ -126,7 +126,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/unsupported.log",
-      "sha256": "26b1ed25e190927bc09776eea74cd6d556b2c974f67632bc4a732230b1c39bcb"
+      "sha256": "6481cb95131df95a48d1e4217177206683f7640258e8258c2a0d2e6765dbb386"
     },
     {
       "id": "expected_panic",
@@ -142,7 +142,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/expected_panic.log",
-      "sha256": "50f8071743503ac630bace380ff9794b083234e0bc9c6f6f5a193d738d966d76"
+      "sha256": "88cfe40ece360983ee445139bdb9173a99468aa8ece4a964cf8d53e984c600bd"
     },
     {
       "id": "seeded_wrapping_mutant",
@@ -158,7 +158,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/seeded_wrapping_mutant.log",
-      "sha256": "fa35597f03ccadcb89e88065b8a28069472f230e3b18cf32b8fae600af893da4"
+      "sha256": "8f86e668e520acabe75c15706be667d2a0b3b205b55f125fb11c63747f219b63"
     },
     {
       "id": "selected_harness",
@@ -174,7 +174,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/selected_harness.log",
-      "sha256": "88b2db497576e7a40eada7d317219a342edf576a59695a85111eac4b40857194"
+      "sha256": "81acbcca3e715a4659db1cb5a5711bfc23a095241e062b307fbd5bd231b9494c"
     },
     {
       "id": "fail_fast",
@@ -195,7 +195,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/fail_fast.log",
-      "sha256": "3ea817b51f6ae9218c1e5b0f8da01fa22fcafd2db92c55044453fd27f625a34b"
+      "sha256": "2615be9d217a1362222af8a91476c112c991ca3a562496719309df6a4943529f"
     },
     {
       "id": "truncated",
@@ -214,7 +214,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 124,
       "log": "scripts/tests/fixtures/kani_logs/truncated.log",
-      "sha256": "ccc8750664b6550f42022e6b41492d509836ea6b9812a3a2649e345f11c04a61"
+      "sha256": "140194789a1f7749a4563d58c3f386aa08b32896f31d0d7c6d29bbe0822a1efd"
     },
     {
       "id": "list",
@@ -229,7 +229,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/list.log",
-      "sha256": "dccdbca8a877a8d67f5234be54bd94acbac932d7ca49e98fd506113e398a9e9a"
+      "sha256": "5fe9e138bf1914ff328342b9f7a7cb530d088bf9e06abd33455e9e2c6012c7da"
     },
     {
       "id": "in_place",
@@ -245,7 +245,7 @@
       "cwd": "target/epm1-native-workspace/facade",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/in_place.log",
-      "sha256": "2373445a9f55e816ad25000d3f6eb8d5275c671d6d9273de9f6720a8590e3cdb"
+      "sha256": "a6ab7a2d97d80ac3436afeda2847315ee621db83dfce7d6b651b272b6b4f003f"
     }
   ]
 }

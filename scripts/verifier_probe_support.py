@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
+import re
 
 from rust_prover_tools.commands import CommandSpec, run_command
 from rust_prover_tools.versions import parse_tool_version
@@ -16,6 +17,36 @@ from rust_prover_tools.versions import parse_tool_version
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tools/verifier-fixtures"
 OUTPUT = ROOT / "scripts/tests/fixtures/kani_logs"
+LINT_TABLE = re.compile(
+    r"(?m)^\[(?:workspace\.)?lints\.(?P<name>[A-Za-z0-9_-]+)\]\n"
+    r"(?P<body>(?:(?!^\[)[^\n]*\n?)*)"
+)
+
+
+def workspace_lint_tables(manifest: str) -> str:
+    """Rename every lint table so a virtual workspace can inherit it.
+
+    Only the lint tables are copied, so a table that follows them cannot make
+    the scratch manifest invalid. Both ``[lints.<name>]`` and
+    ``[workspace.lints.<name>]`` spellings are accepted, which keeps the probe
+    working across the move planned for the three-crate workspace.
+
+    For example, a manifest holding ``[lints.clippy]`` and ``[lints.rust]``
+    yields tables named ``[workspace.lints.clippy]`` and
+    ``[workspace.lints.rust]``.
+
+    Raises
+    ------
+    RuntimeError
+        When the manifest defines no lint table at all.
+    """
+    tables = [
+        f"[workspace.lints.{match.group('name')}]\n{match.group('body')}"
+        for match in LINT_TABLE.finditer(manifest)
+    ]
+    if not tables:
+        raise RuntimeError("the root manifest must define at least one lint table")
+    return "".join(tables)
 
 
 def digest(path: Path) -> str:
@@ -81,13 +112,9 @@ def native_workspace() -> Path:
     """Create the planned kernel/facade scratch shape with the repository's live lints."""
     directory = ROOT / "target/epm1-native-workspace"
     directory.mkdir(parents=True, exist_ok=True)
-    lints = (
-        "[lints.clippy]"
-        + (ROOT / "Cargo.toml").read_text().split("[lints.clippy]", 1)[1]
-    )
+    lints = workspace_lint_tables((ROOT / "Cargo.toml").read_text())
     (directory / "Cargo.toml").write_text(
-        '[workspace]\nmembers = ["kernel", "facade"]\nresolver = "3"\n'
-        + lints.replace("[lints.", "[workspace.lints.")
+        '[workspace]\nmembers = ["kernel", "facade"]\nresolver = "3"\n' + lints
     )
     for name in ("kernel", "facade"):
         package = directory / name
