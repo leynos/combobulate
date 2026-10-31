@@ -361,6 +361,25 @@ fn real_alloc_declarations_are_reported(#[case] source: &str) {
     );
 }
 
+/// VO-6 control: a content quote inside a raw string must not hide the root.
+///
+/// `r#"x""#` holds a bare `"` before its terminator. A scanner that consumed
+/// that quote while probing the terminator would swallow the crate attributes
+/// and report a valid kernel as missing its boundary.
+#[test]
+fn raw_string_content_quotes_do_not_hide_the_kernel_attributes() {
+    let source = concat!(
+        "#![doc = r#\"x\"\"#]\n",
+        "#![no_std]\n",
+        "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
+    );
+    assert_that!(
+        source::kernel_source_violations(source),
+        is_empty(),
+        "the crate root after a raw-string content quote must still be read"
+    );
+}
+
 /// VO-6 control: the real attribute set passes the code-only check.
 #[test]
 fn kernel_boundary_accepts_the_real_attribute_set() {

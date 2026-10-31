@@ -27,6 +27,7 @@ exist; the array algebra and build profiles in the
 | `.github/workflows/audit.yml`                | Scheduled dependency audit.                                                                    |
 | `.github/workflows/mutation-testing.yml`     | Scheduled shared Rust mutation workflow.                                                       |
 | `.github/dependabot.yml`                     | Cargo and GitHub Actions dependency updates.                                                   |
+| `.verus/`                                    | Verus release unpacked by `make install-verus`; Git-ignored, about 456 MB.                     |
 | `docs/`                                      | Design, guides, reference material, and recorded decisions.                                    |
 | `docs/contents.md`                           | Canonical documentation index.                                                                 |
 | `docs/adrs/`                                 | ADRs named `adr-nnnn-title-slug.md`; four-digit, zero-padded numbers.                          |

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import NotRequired, TypedDict, cast
 
 from .context import ValidationContext, require
 from .roadmap_status import roadmap_tasks
@@ -32,7 +32,9 @@ class CargoManifest(TypedDict):
     """Typed projection of the Cargo manifest fields used by this checker."""
 
     package: CargoPackageFields
-    workspace: CargoWorkspaceFields
+    # Member manifests carry no `[workspace]` table, and the callers read it
+    # through `get`, so the key must not be required.
+    workspace: NotRequired[CargoWorkspaceFields]
 
 
 def check_manifest(manifest: CargoManifest, *, require_isc: bool = True,

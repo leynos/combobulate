@@ -252,8 +252,19 @@ fn skip_raw_string(chars: &mut Peekable<Chars<'_>>, hashes: usize) {
 }
 
 /// Consumes the closing `#` run and reports whether it completes the string.
+///
+/// The `#` run is probed on a clone and committed only when it matches. A raw
+/// string may contain a bare `"` before its terminator (as in `r#"x""#`); a
+/// probe that consumed that quote would hide the real terminator and swallow
+/// the rest of the file.
 fn raw_string_closes(chars: &mut Peekable<Chars<'_>>, hashes: usize) -> bool {
-    (0..hashes).all(|_| chars.next() == Some('#'))
+    let mut lookahead = chars.clone();
+    if (0..hashes).all(|_| lookahead.next() == Some('#')) {
+        *chars = lookahead;
+        true
+    } else {
+        false
+    }
 }
 
 /// Skips a quoted string, honouring backslash escapes.
