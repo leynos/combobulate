@@ -356,6 +356,13 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   against the previous source (`/tmp/red-durable-solver-combobulate-epm1.out`)
   and passes after the fix (`/tmp/green-durable-solver-combobulate-epm1.out`).
   The regenerated corpus keeps matching source and log digests.
+- [x] (2026-10-31) Hosted measurement run `41148253840` measured rustdoc,
+  clippy, nextest, coverage, and UI cold runs; its whitaker and verifier-free
+  jobs failed on environment defects. The verifier-free image now installs
+  `libatomic` (reproduced Red at `/tmp/epm1-verifier-free-red.log`; guarded by
+  `scripts/tests/test_verifier_free_container.py`), and the measurement
+  workflow pins `whitaker-installer` 0.2.11 so the dylint 6.0.1 driver is not
+  built (DL-29). A replacement run is required before the go/no-go decision.
 - [ ] EP-M1 hosted costs and verifier-free isolation; publish the measurement
   workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
@@ -422,9 +429,40 @@ committed together with its Green change.
   `scripts/docs_validation/evidence_gate.py` lines 73-98, 192-199, 303. Impact:
   registering a parser without binding the audit would let a fabricated audit
   reach `bounded` (DL-16).
+- Observation (2026-10-31): hosted measurement run `41148253840` passed five of
+  seven jobs. `measure-profile (whitaker)` failed because
+  `dylint_driver v6.0.1` builds its driver by checking out `master` in
+  `rust-lang/rust-clippy`, whose default branch was renamed to `main` on
+  2026-10-28. `whitaker-installer` 0.2.9, the shared action's default and the
+  pin the frozen `ci.yml` uses, ships cargo-dylint 6.0.1; 0.2.11 ships 6.3.0,
+  whose `dylint_internal` no longer checks out `master`. Evidence: the run log,
+  `Cargo.lock` at both whitaker tags, and the two `dylint_internal` sources.
+  Impact: the frozen `ci.yml` whitaker route is broken upstream for reasons
+  unrelated to this candidate; the measurement workflow pins installer 0.2.11
+  with an independently verified digest, and the `ci.yml` bump belongs to the
+  AC-07 amendment at EP-M3 (DL-29). Local `make lint` passes because the local
+  driver is cargo-dylint 6.3.0.
+- Observation (2026-10-31): the same run's `verifier-free` job failed before
+  compiling the probe. The pinned `mold` binary is dynamically linked against
+  `libatomic.so.1`, which Rocky's clang package does not install, so every
+  container link exited 127 with "cannot open shared object file". Reproduced
+  locally against the committed image recipe
+  (`/tmp/epm1-verifier-free-red.log`); adding `libatomic` to the recipe makes
+  the wrapper link and run (`LINK_AND_RUN_OK`). Impact: the recipe installs
+  `libatomic` and a regression test guards the package list.
 
 ## Decision log
 
+- DL-29 (2026-10-31). Repair the hosted measurement without touching the frozen
+  CI. Measure the Whitaker route with `whitaker-installer` 0.2.11 (cargo-dylint
+  6.3.0), because 0.2.9's dylint 6.0.1 driver cannot build after the rust-clippy
+  `master` to `main` rename; the digest `a32a665d…e5410236` was verified by an
+  independent download. Leave `.github/workflows/ci.yml` unchanged: its
+  installer bump is a required job change and lands with the sponsor-approved
+  AC-07 amendment at EP-M3. Install `libatomic` in the verifier-free image so
+  the pinned `mold` linker can run. Rationale: both failures are environment
+  defects, not candidate behaviour, and measuring the runnable route is what
+  the job-split prediction needs. Date/Author: 2026-10-31, implementation agent.
 - DL-28 (2026-10-30). The sponsor raised the EP-M1 changed-line limit to 3,600
   so the solver-selection fix, its durable regression test, and the regenerated
   verifier logs can land in one gated commit. The fix resolves the pinned Z3

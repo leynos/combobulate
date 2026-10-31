@@ -36,6 +36,23 @@ from verifier_probe_support import (
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
 Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
+
+
+def verifier_free_containerfile() -> str:
+    """Build the verifier-free image recipe, including mold's runtime library.
+
+    For example, the returned recipe starts ``FROM`` the pinned Rocky base and
+    installs ``libatomic`` alongside the compiler package set. Clang installs
+    no ``libatomic``, yet the pinned mold binary links against it, so omitting
+    it makes every link inside the container fail before the probe's build.
+    """
+    return (
+        f"FROM {BASE_IMAGE}\n"
+        "RUN dnf install -y --setopt=install_weak_deps=False "
+        "clang gcc-c++ make libatomic && dnf clean all\n"
+    )
+
+
 app = App()
 
 
@@ -316,9 +333,8 @@ def verifier_free() -> None:
         target = directory / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, target)
-    (directory / "Containerfile").write_text(
-        f"FROM {BASE_IMAGE}\nRUN dnf install -y --setopt=install_weak_deps=False clang gcc-c++ make && dnf clean all\n"
-    )
+    containerfile = verifier_free_containerfile()
+    (directory / "Containerfile").write_text(containerfile)
     output = FIXTURES / "verus-wiring-probe/observations"
     image = "localhost/combobulate-epm1-verifier-free:20261028"
     if (

@@ -52,6 +52,12 @@ jobs:
         run: cargo binstall --no-confirm --locked cargo-nextest cargo-llvm-cov
       - uses: leynos/shared-actions/.github/actions/install-whitaker@6dea5677a84fec60ca51b07202570e3af12ffdb4
         with:
+          # 0.2.9 ships cargo-dylint 6.0.1, whose driver build checks out
+          # rust-clippy's `master`, renamed to `main` on 2026-10-28. 0.2.11
+          # ships cargo-dylint 6.3.0, which no longer does. The digest is not
+          # in the action's manifest, so it is passed explicitly.
+          installer-version: '0.2.11'
+          installer-sha256: a32a665d01c4a2eb03a87c584d57329fc72a3aac421c8c2b15bbdb19e5410236
           cranelift: 'true'
       - name: Fetch dependencies and record identities
         run: |
