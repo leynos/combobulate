@@ -1,8 +1,8 @@
 # User guide
 
-Combobulate's array algebra is not yet implemented. The current crate provides
-only a disposable `greet()` stub for scaffold checks; it carries no stability
-promise. Do not use the proposed design examples as working Rust examples.
+Combobulate's array algebra is not yet implemented. The workspace provides no
+public API yet, so nothing in it carries a stability promise. Do not use the
+proposed design examples as working Rust examples.
 
 Read the [language reference](language-reference.md) for the intended `comb!`
 pipeline notation, verbs, modifiers, and conjunctions. The

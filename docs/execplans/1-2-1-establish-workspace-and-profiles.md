@@ -262,6 +262,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   test uses a stub Cargo, so nothing notices. Severity: medium. Likelihood:
   high. Mitigation: path dependencies carry `version = "0.1.0"`; EP-M2 runs the
   real `make package` and decides whether the route becomes `-p combobulate`.
+  Outcome 2026-10-31: the default route fails during tarball preparation, so
+  the route is now `-p combobulate` with two local `[patch.crates-io]` config
+  arguments that keep verification working (DL-33).
 - Risk: `trybuild` in `tests/cardinality_probe_ui.rs` builds a generated crate
   in its own target directory with the current features, compiling Polars
   again. Severity: medium. Likelihood: medium. Mitigation: EP-M1 measures it;
@@ -391,8 +394,28 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     verbatim, all 20 pass, and all six gates passed on the uncommitted
     candidate (`345` nextest cases, `442` unittest, `521` pytest + `687`
     subtests).
-  - [ ] Boundary tests, workspace conversion, kernel and macro crates, package
-    policy, stub removal, and `make package`.
+  - [x] (2026-10-31) Boundary contracts. Red at
+    `/tmp/red-workspace-boundaries-combobulate-1-2-1-establish-workspace-and-profiles.out`:
+    four live-workspace rules failed because neither member crate existed, while
+    the six fixture non-vacuity cases passed. Green at
+    `/tmp/green-workspace-boundaries-combobulate-1-2-1-establish-workspace-and-profiles.out`:
+    11/11 pass, and `cargo tree -p combobulate-kernel --all-features --target
+    all -e all --prefix none` prints only the kernel. The eleventh case is a
+    positive control: `workspace-valid.json` reports no direction violation,
+    so the rules do not reject a correctly directed graph.
+  - [x] (2026-10-31) Workspace conversion: `Cargo.toml` is the workspace root
+    with `members = ["crates/*"]`, `default-members` for the three crates,
+    `exclude = ["tools"]`, `resolver = "3"`, and `[workspace.lints]` including
+    `unexpected_cfgs` for `cfg(kani)` and `cfg(verus_keep_ghost)`. The new
+    `crates/combobulate-kernel` is `#![no_std]` with `TargetFacts`, one unit
+    test, and one doctest; `crates/combobulate-macros` is a `proc-macro` crate
+    with documentation only. The facade depends on both by path with
+    `version = "0.1.0"`; `greet()` and `tests/stub.rs` are removed.
+  - [x] (2026-10-31) Package policy now checks every member selected by the root
+    `members` globs for literal `license = "ISC"` and `publish = false`, and
+    rejects a `crates/*/Cargo.toml` no glob selects. All 16 policy tests pass.
+    `make package` verified through the route recorded in DL-33, using
+    `--allow-dirty` before the commit.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -500,6 +523,31 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-34 (2026-10-31). Two test-only dev-dependencies join the facade:
+  `googletest = "0.14.3"` and `serde_json = "1.0.154"`. `googletest` supplies
+  the matcher vocabulary EP-M2 mandates for `tests/workspace_boundaries.rs`, and
+  `serde_json` parses `cargo metadata` output and the canned JSON fixtures.
+  `serde_json` was already in `Cargo.lock` as a transitive dependency; the
+  kernel and macro crates keep empty dependency tables and the facade gains no
+  production dependency, so the conformance phrase "no new external dependency"
+  holds for the shipped graph. Evidence: `Cargo.lock` adds only `googletest`,
+  `googletest_macro`, `autocfg`, `num-traits`, and `rustversion`. Date/Author:
+  2026-10-31, implementation agent.
+- DL-33 (2026-10-31). `make package` becomes
+  `cargo package --locked -p combobulate` with two
+  `--config patch.crates-io.<member>.path='$(CURDIR)/crates/<member>'`
+  arguments. The facade now depends on two `publish = false` members (D05), and
+  `cargo package` resolves the rewritten registry versions while preparing the
+  tarball, before verification; without the patches it fails with "no matching
+  package named `combobulate-kernel` found". `--no-verify` does not help,
+  because preparation fails first. The patches restore the local members for
+  resolution only: the packaged manifest still declares `version = "0.1.0"`,
+  carries no `[patch]` table, and verification builds the facade. When D05 is
+  superseded and the members reach the registry, the patch arguments are
+  removed. Evidence:
+  `/tmp/package-probe-1-2-1-establish-workspace-and-profiles.out` (default
+  route fails), `/tmp/package-route-1-2-1-establish-workspace-and-profiles.out`
+  (candidate route verifies). Date/Author: 2026-10-31, implementation agent.
 - DL-32 (2026-10-31). The EP-M1 milestone-close CodeRabbit CLI assessment is
   unavailable: three byte-identical runs of
   `coderabbit review --agent --committed --fresh --base main` on head `242f03a`

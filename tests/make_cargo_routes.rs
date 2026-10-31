@@ -163,7 +163,7 @@ fn release_and_package_select_llvm_without_development_flags() {
     let probe = CargoProbe::new().expect("create an isolated fake Cargo executable");
     for (target, expected_command) in [
         ("release", "build --release"),
-        ("package", "package --locked"),
+        ("package", "package --locked -p combobulate"),
     ] {
         let output = Command::new("make")
             .arg(target)

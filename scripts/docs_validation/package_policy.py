@@ -8,6 +8,7 @@ validated task 4.3.3 closure are both present.
 from __future__ import annotations
 
 import tomllib
+from pathlib import Path
 from typing import TypedDict, cast
 
 from .context import ValidationContext, require
@@ -21,10 +22,17 @@ class CargoPackageFields(TypedDict, total=False):
     publish: bool | list[str]
 
 
+class CargoWorkspaceFields(TypedDict, total=False):
+    """Cargo workspace fields consumed by the member publication policy."""
+
+    members: list[str]
+
+
 class CargoManifest(TypedDict):
     """Typed projection of the Cargo manifest fields used by this checker."""
 
     package: CargoPackageFields
+    workspace: CargoWorkspaceFields
 
 
 def check_manifest(manifest: CargoManifest, *, require_isc: bool = True,
@@ -60,6 +68,41 @@ def check_manifest(manifest: CargoManifest, *, require_isc: bool = True,
     if require_unpublished:
         require(package.get('publish') is False,
                 'Cargo.toml must set publish = false until task 4.3.3 passes and release is approved (D05)')
+
+
+def member_manifests(root: Path, workspace: CargoWorkspaceFields) -> tuple[list[Path], list[Path]]:
+    """Return the manifests the member globs select and any crates directory they miss.
+
+    Parameters
+    ----------
+    root
+        Repository root holding the workspace manifest.
+    workspace
+        The root manifest's ``[workspace]`` table.
+
+    Returns
+    -------
+    tuple[list[Path], list[Path]]
+        The selected ``Cargo.toml`` paths, then every ``crates/*/Cargo.toml``
+        path no member glob selects. An unlisted manifest would escape the
+        licence and publication checks, so it is a policy failure rather than
+        an ignored file.
+
+    Examples
+    --------
+    A glob that covers every crate leaves nothing unlisted::
+
+        root = Path.cwd()
+        selected, unlisted = member_manifests(root, {'members': ['crates/*']})
+        [path.parent.name for path in selected]
+        # ['combobulate-kernel', 'combobulate-macros']
+        unlisted
+        # []
+    """
+    patterns = workspace.get('members', [])
+    selected = sorted({path for pattern in patterns for path in root.glob(f'{pattern}/Cargo.toml')})
+    unlisted = sorted(path for path in root.glob('crates/*/Cargo.toml') if path not in selected)
+    return selected, unlisted
 
 
 def _has_accepted_d05_supersession(decisions: dict[str, dict]) -> bool:
@@ -112,20 +155,24 @@ def _has_validated_core_dossier(context: ValidationContext) -> bool:
 
 
 def check_package_policy(context: ValidationContext) -> None:
-    """Apply accepted licence and publication decisions to ``Cargo.toml``.
+    """Apply accepted licence and publication decisions to every crate manifest.
+
+    The root package follows the accepted decisions, while every member the
+    ``[workspace] members`` globs select must carry the literal ISC licence and
+    ``publish = false`` whatever the decisions say.
 
     Parameters
     ----------
     context
         Repository validation context. A successful ``roadmap-status`` result
         and a completed task 4.3.3 record are required before an accepted D05
-        supersession can lift the publication guard.
+        supersession can lift the root publication guard.
 
     Raises
     ------
     AssertionError
-        If the package licence or publication setting violates the policy
-        enforced by the accepted decision records.
+        If a package licence or publication setting violates the policy, or a
+        ``crates/*/Cargo.toml`` manifest matches no member glob.
 
     Examples
     --------
@@ -145,6 +192,13 @@ def check_package_policy(context: ValidationContext) -> None:
     manifest = cast(CargoManifest, tomllib.loads((context.root / 'Cargo.toml').read_text(encoding='utf-8')))
     check_manifest(manifest, require_isc=decisions.get('D04', {}).get('lifecycle') == 'accepted',
                    require_unpublished=require_unpublished)
+    selected, unlisted = member_manifests(context.root, manifest.get('workspace', {}))
+    require(not unlisted,
+            'every crates/*/Cargo.toml must match a workspace member glob: '
+            + ', '.join(str(path.relative_to(context.root)) for path in unlisted))
+    for path in selected:
+        member = cast(CargoManifest, tomllib.loads(path.read_text(encoding='utf-8')))
+        check_manifest(member)
     rules = {
         'D04': ('the ISC licence', decisions.get('D04', {}).get('lifecycle') == 'accepted'),
         'D05': ('publish = false', require_unpublished),

@@ -1,14 +1,17 @@
 # Repository layout
 
 Combobulate uses the Rust development structure adapted from Peregrine Web pull
-request 11. The current crate is a scaffold; the multi-crate architecture in the
-[technical design](technical-design.md) remains a delivery proposal.
+request 11. The facade, `#![no_std]` kernel, and procedural-macro crates now
+exist; the array algebra and build profiles in the
+[technical design](technical-design.md) remain a delivery proposal.
 
 ## Paths and responsibilities
 
 | Path                                     | Responsibility                                                                                 |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `src/lib.rs`                             | Current crate root and disposable greeting stub.                                               |
+| `src/lib.rs`                             | Facade crate root; its first public item arrives with the profile milestone.                   |
+| `crates/combobulate-kernel/`             | `#![no_std]` kernel crate that owns `TargetFacts`.                                             |
+| `crates/combobulate-macros/`             | `proc-macro` crate for the future `comb!` notation; it exports no macro yet.                   |
 | `tests/`                                 | Integration tests for build routes, workflow policy, Make commands, and shell preflights.      |
 | `tests/support/`                         | Private helpers owned by the corresponding integration test modules.                           |
 | `scripts/`                               | Toolchain installation, build preflights, native Clang linker wrapper, and all Python scripts. |

@@ -1,31 +1,49 @@
+[workspace]
+members = ["crates/*"]
+default-members = [".", "crates/combobulate-kernel", "crates/combobulate-macros"]
+exclude = ["tools"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+repository = "https://github.com/leynos/combobulate"
+homepage = "https://github.com/leynos/combobulate"
+
 [package]
 name = "combobulate"
 version = "0.1.0"
-edition = "2024"
+edition.workspace = true
 description = "Inspectable array and typed-collection algebra for Rust"
 license = "ISC"
 # Not published until the Core acceptance dossier (task 4.3.3) passes and the
 # sponsor approves release: decision D05, docs/adrs/adr-0004-licence-and-publication.md.
 publish = false
-repository = "https://github.com/leynos/combobulate"
-homepage = "https://github.com/leynos/combobulate"
+repository.workspace = true
+homepage.workspace = true
 readme = "README.md"
 keywords = ["arrays", "algebra", "polars", "verification"]
 categories = ["mathematics", "data-structures"]
 
 [dependencies]
+combobulate-kernel = { path = "crates/combobulate-kernel", version = "0.1.0" }
+combobulate-macros = { path = "crates/combobulate-macros", version = "0.1.0" }
 
 [dev-dependencies]
 cardinality-probe = { path = "tools/calibration/cardinality-probe" }
 camino = "1.2.0"
 cap-std = { version = "3.4.6", features = ["fs_utf8"] }
+googletest = "0.14.3"
 rstest = { version = "0.27.0", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.154"
 serde_yaml = "0.9.34"
 toml = "1.1.3"
 trybuild = "1.0.122"
 
-[lints.clippy]
+[lints]
+workspace = true
+
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 missing_docs_in_private_items     = "deny"
 
@@ -90,13 +108,15 @@ missing_panics_doc                  = "deny"
 error_impl_error                    = "deny"
 result_large_err                    = "deny"
 
-[lints.rust]
+[workspace.lints.rust]
+# Verifier toolchains compile these crates under their own configuration.
+unexpected_cfgs = { level = "deny", check-cfg = ['cfg(kani)', 'cfg(verus_keep_ghost)'] }
 unknown_lints                       = "deny"
 renamed_and_removed_lints           = "deny"
 unsafe_code                         = "forbid"
 missing_docs                        = "deny"
 
-[lints.rustdoc]
+[workspace.lints.rustdoc]
 missing_crate_level_docs            = "deny"
 broken_intra_doc_links              = "deny"
 private_intra_doc_links             = "deny"

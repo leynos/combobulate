@@ -6,13 +6,14 @@
 Combobulate is an experimental Rust library for expressive, composable,
 inspectable array programming.
 
-**Current reality:** this repository contains the development scaffold and
-revision 0.2 design. The crate exports only a disposable `greet()` stub. The
-array API, `comb!`, backends, costing, and verification interfaces described
-below are proposed; the Rust snippets are conceptual sketches, not runnable
-examples of the current crate. No completed Kani or Verus proof accompanies the
-design. The [language reference](docs/language-reference.md) governs the
-proposed API and its contracts.
+**Current reality:** this repository contains the workspace layout and the
+revision 0.2 design. The workspace has a facade crate, a `#![no_std]` kernel
+that owns target facts, and a procedural-macro crate that exports no macro yet.
+The array API, `comb!`, backends, costing, and verification interfaces
+described below are proposed; the Rust snippets are conceptual sketches, not
+runnable examples of the current crates. No completed Kani or Verus proof
+accompanies the design. The [language reference](docs/language-reference.md)
+governs the proposed API and its contracts.
 
 It takes the parts of APL that feel like they were recovered from an alien
 spacecraft, especially **verbs, higher-order operators, rank, reduction,

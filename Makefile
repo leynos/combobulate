@@ -88,7 +88,13 @@ BUILD_HOST_TRIPLE := $(shell rustup show 2>/dev/null | sed -n 's/^Default host: 
 DEV_LINKER_FLAGS ?= $(if $(and $(filter Linux,$(BUILD_HOST_OS)),$(filter x86_64,$(BUILD_HOST_ARCH)),$(filter x86_64-unknown-linux-gnu,$(BUILD_HOST_TRIPLE))),-C link-arg=-fuse-ld=mold)
 DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_THREADS_FLAGS) $(DEV_LINKER_FLAGS)
 RELEASE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS)
-PACKAGE_FLAGS ?=
+# The kernel and macro crates are unpublished (D05), so `cargo package` cannot
+# resolve them from the registry on its own. Patch them to their workspace
+# paths for this run: the packaged manifest still names versions, and
+# verification still compiles the facade against the local members.
+PACKAGE_FLAGS ?= -p combobulate \
+	--config "patch.crates-io.combobulate-kernel.path='$(CURDIR)/crates/combobulate-kernel'" \
+	--config "patch.crates-io.combobulate-macros.path='$(CURDIR)/crates/combobulate-macros'"
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --all-targets --all-features
