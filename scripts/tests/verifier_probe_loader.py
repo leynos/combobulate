@@ -43,6 +43,19 @@ def _load(name: str, path: Path, stubs: dict[str, object]) -> ModuleType:
     return module
 
 
+def _probe_dependencies(stubs: dict[str, object]) -> dict[str, object]:
+    """Load the probe's private modules so the CLI's imports resolve."""
+    return {
+        **stubs,
+        'probe_provenance': _load(
+            'probe_provenance', SCRIPTS / 'probe_provenance.py', stubs
+        ),
+        'verifier_free_probe': _load(
+            'verifier_free_probe', SCRIPTS / 'verifier_free_probe.py', stubs
+        ),
+    }
+
+
 def load_verifier_probes() -> ModuleType:
     """Load ``run_verifier_probes.py`` without Cyclopts or the prover helper."""
     stubs = {
@@ -55,7 +68,27 @@ def load_verifier_probes() -> ModuleType:
         ),
         'verifier_probe_support': _support_stub(),
     }
-    return _load('verifier_probe_cli', SCRIPTS / 'run_verifier_probes.py', stubs)
+    return _load(
+        'verifier_probe_cli',
+        SCRIPTS / 'run_verifier_probes.py',
+        _probe_dependencies(stubs),
+    )
+
+
+def load_verifier_free_probe() -> ModuleType:
+    """Load ``verifier_free_probe.py`` without the prover helper."""
+    stubs = {
+        'rust_prover_tools': SimpleNamespace(),
+        'rust_prover_tools.commands': SimpleNamespace(
+            CommandSpec=lambda argv: argv, run_command=None
+        ),
+        'verifier_probe_support': _support_stub(),
+    }
+    return _load(
+        'verifier_free_probe_under_test',
+        SCRIPTS / 'verifier_free_probe.py',
+        stubs,
+    )
 
 
 def load_verifier_probe_support() -> ModuleType:

@@ -816,21 +816,29 @@ commit gates do not install or execute a verifier. `make kani` and
 `make kani-full` visibly report `FORMAL-SKIP` until task 1.2.4;
 `FORMAL_STRICT=1` rejects those placeholders.
 
-The CLI in `scripts/run_verifier_probes.py` owns probe orchestration. Its
+The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
 private `verifier_probe_support` module owns capture, digests, and scratch
-workspace construction; only that CLI may import it. These helpers are not an
-evidence parser and must not enter the evidence gate or product code. Recording
-fixtures and result-based expectations stay private to the prover command
-contracts. The runner reuses `rust-prover-tools`' Cuprum command boundary
-rather than another installer.
+workspace construction; the private `probe_provenance` module owns the source
+digest records and the captured-output guard; and the private
+`verifier_free_probe` module owns the container workflow. Only the probe
+scripts may import them. These helpers are not an evidence parser and must not
+enter the evidence gate or product code. Recording fixtures and result-based
+expectations stay private to the prover command contracts. The runner reuses
+`rust-prover-tools`' Cuprum command boundary rather than another installer.
 
 The CLI's command builders — `kani_prefix`, `kani_arguments`,
-`kani_observations`, `kani_in_place_observation`, `write_kani_provenance`,
-`resolve_z3`, `verus_environment`, `verus_command`, `write_verus_provenance`,
-and `qualified_candidates` — are private to that script. They exist so each
-route step can be read and tested on its own. They are not a public API, must
-not be imported by the support module, the evidence gate, or product code, and
-a new probe route composes them instead of adding a parallel capture path.
+`kani_observations`, `kani_in_place_observation`, `resolve_z3`,
+`verus_environment`, `verus_command`, and `qualified_candidates` — stay beside
+the commands. The provenance writers `write_kani_provenance` and
+`write_verus_provenance` and the guard `require_captured_output` live in
+`probe_provenance`. The verifier-free workflow lives in `verifier_free_probe` as
+`verifier_free_containerfile`, `write_inconclusive_record`,
+`stage_verifier_free_workspace`, `ensure_base_image`, `container_run_command`,
+and `run_verifier_free`. These helpers are private to the probe scripts. They
+exist so each route step can be read and tested on its own. They are not a
+public API, must not be imported by the support module, the evidence gate, or
+product code, and a new probe route composes them instead of adding a parallel
+capture path.
 
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The explicit `KANI_PROBE_ROUTE=direct` route selects Kani

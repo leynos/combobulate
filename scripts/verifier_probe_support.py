@@ -1,7 +1,8 @@
 """Private observation storage and native-workspace construction for EP-M1.
 
-Only run_verifier_probes uses these helpers. Product code and the evidence gate
-must not import this module or use its observations as admitted proof verdicts.
+Only the verifier probe scripts use these helpers. Product code and the
+evidence gate must not import this module or use its observations as admitted
+proof verdicts.
 """
 
 from __future__ import annotations

@@ -380,8 +380,8 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   `make kani-log-corpus` then regenerated all fourteen observations (thirteen
   labelled subjects plus the in-place run) with every status unchanged (exit 0
   overall); the log diff is limited to timings, the Cargo dirty note, and the
-  compile-admission queue line, and `provenance.json` now records the new
-  script digests (`7ae6aaa1…` and `e68f9147…`).
+  compile-admission queue line, and `provenance.json` recorded the then-current
+  script digests (`7ae6aaa1…` and `e68f9147…`, since superseded by DL-35).
 - [x] (2026-10-31) EP-M1 close published as `242f03a` with a clean local gate
   run. The milestone CLI review is rate-limited rather than clean (DL-32), so
   the hosted assessment is handed to `pr-babysitting`.
@@ -416,6 +416,20 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     rejects a `crates/*/Cargo.toml` no glob selects. All 16 policy tests pass.
     `make package` verified through the route recorded in DL-33, using
     `--allow-dirty` before the commit.
+  - [x] (2026-10-31) Milestone review repairs (DL-35). VO-6 now inspects code
+    with comments and string literals removed, so the kernel's own
+    documentation cannot satisfy `#![no_std]`; three new rstest cases cover
+    line comments, block comments, and plain and raw string literals, and a
+    control case proves the real attribute set passes. The contents index,
+    repository layout, `Conformance basis`, `Outcomes & retrospective`, and
+    revision notes are current. `scripts/run_verifier_probes.py` is 400 lines:
+    the verifier-free workflow moved to `scripts/verifier_free_probe.py` and
+    the shared provenance writers to `scripts/probe_provenance.py`.
+    `make kani-log-corpus` regenerated the corpus after the producer digest
+    changed: all fourteen statuses are unchanged (exit 0 overall), and
+    `provenance.json` records
+    `9b086e48…` (entry script), `952d6c62…` (support), and `ae38573c…`
+    (provenance writers).
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -520,9 +534,54 @@ committed together with its Green change.
   probe would compile under weaker rules than the crate. Impact: the repair
   renames every lint table and stops at the next non-lint table, which keeps
   the rules and still excludes `[dev-dependencies]`.
+- Observation (2026-10-31): VO-6's raw `contains` check was satisfied by the
+  kernel's own module documentation, so deleting the real `#![no_std]`
+  attribute still passed. Evidence: `crates/combobulate-kernel/src/lib.rs` line
+  3 names the attribute. Impact: the check now strips line comments, nested
+  block comments, and plain and raw string literals before matching, and the
+  new comment-only and literal-only cases fail against the previous
+  implementation.
+- Observation (2026-10-31): the review's remedy for the 575-line probe script
+  claimed that extracting only the verifier-free workflow leaves both modules
+  under 400 lines; the remaining script is about 460 lines. Impact: the shared
+  provenance writers and captured-output guard moved to `probe_provenance` as
+  well, which is a relocation rather than a decomposition of the Kani and Verus
+  workflows.
 
 ## Decision log
 
+- DL-35 (2026-10-31). EP-M2 milestone review repairs. The review raised five
+  unique concerns; each was verified against current source and repaired. (a)
+  VO-6 used `contains`, so a doc comment naming `#![no_std]`, or a string
+  literal naming the lints, satisfied the check after the real attribute was
+  deleted. The check now strips line comments, nested block comments, and plain
+  and raw string literals, then collapses whitespace, so
+  `extern /*c*/ crate alloc` is still caught. Three rstest cases prove comments
+  and literals cannot satisfy the boundary, two prove real declarations are
+  reported, and a control proves the real attribute set passes. (b) The
+  `docs/contents.md` entry said "(draft)"; it now records the approved and
+  in-progress status. (c) The `Conformance basis`, `Outcomes & retrospective`,
+  and revision notes now cover EP-M2. (d) `docs/repository-layout.md` gained the
+  `tools/` and measurement workflow rows and an ownership rule for facade,
+  kernel, macro, tests, and toolchain scripts. (e)
+  `scripts/run_verifier_probes.py` was 575 lines, above the 400-line rule. The
+  verifier-free workflow moved verbatim to `scripts/verifier_free_probe.py` and
+  the shared provenance writers to `scripts/probe_provenance.py`; the entry
+  script is now exactly 400 lines. The Kani and Verus command workflows stay in
+  the entry script: `test_verifier_solver.py` patches `run_command` and
+  `shutil.which` there, so moving them would be a decomposition, which the
+  review explicitly excluded. A new test asserts the container command keeps
+  `podman run`, `--network=none`, `--userns=keep-id`,
+  `--security-opt=label=disable`, the writable workspace and Cargo mounts, the
+  read-only `mold` mounts, the `bash -c` build script, and the
+  `test ! -e "$HOME/.kani"` guard. Because the producer digest changed,
+  `make kani-log-corpus` regenerated all fourteen observations with every
+  status unchanged (exit 0 overall), and `provenance.json` now records
+  `9b086e48d0568dcf5823022b4df9b1ad862ba4d671f1289deb815023e0546a39`,
+  `952d6c62183de6383e85647ec8ea393bf78fe416d109d50450a0bd9314c14417`, and
+  `ae38573c10cd59c1d1cfa5d6536ecf3837c0a7149b2bd672a2fd6a6b43e5d26e`. Evidence:
+  `/tmp/kani-log-corpus-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-34 (2026-10-31). Two test-only dev-dependencies join the facade:
   `googletest = "0.14.3"` and `serde_json = "1.0.154"`. `googletest` supplies
   the matcher vocabulary EP-M2 mandates for `tests/workspace_boundaries.rs`, and
@@ -863,6 +922,15 @@ captured corpus supports the later parser work; no parser is registered and no
 product theorem is claimed. The predicted required-job sizes are recorded in
 DL-30 for the EP-M3 CI shape.
 
+EP-M2 is complete. The workspace now has a `#![no_std]` kernel owning
+`TargetFacts`, an empty procedural-macro crate, and a documentation-only
+facade. Dependency direction, backend exclusion, verifier exclusion, and the
+kernel's `no_std` boundary are checked by `tests/workspace_boundaries.rs`
+against the live Cargo graph and canned non-vacuity fixtures, and the package
+policy checks every member the root globs select. `make package` verifies
+through the patched route in DL-33. The workspace layout is published without
+claiming the array algebra or `comb!` notation, which remain unimplemented.
+
 ## Context and orientation
 
 Combobulate is a proposed Rust library for inspectable array and
@@ -943,7 +1011,12 @@ Terms used in this plan:
 ## Conformance basis
 
 EP-M1 adds no shipped API or dependency and leaves frozen calibration sources
-and `ci.yml` unchanged. Hosted budget acceptance remains pending.
+and `ci.yml` unchanged. EP-M2 adds the workspace crates
+`crates/combobulate-kernel`, which declares the `pub` `TargetFacts` item, and
+`crates/combobulate-macros`. The facade depends on both by path. The kernel and
+macro crates declare no dependencies, the kernel stays `#![no_std]` and
+allocation-free, and the `googletest` and `serde_json` dev-dependencies are
+test-only (DL-34). Hosted budget acceptance remains pending.
 
 - Terms of reference: `docs/terms-of-reference.md`, revision 0.2 of 6 October
   2026, tracing G1, G2, G6, G7, G8; S7 (native-only, proof-capable, and
@@ -1841,3 +1914,11 @@ documented direct pinned-tool route when a probe requires it.
 
 2026-10-28, revision 7: recorded the local probe evidence, explicit helper
 compatibility route, solver transport, and hosted acceptance gaps.
+
+2026-10-30, revision 8: recorded the durable solver-selection probe, its Red
+and Green evidence, and the regenerated corpus.
+
+2026-10-31, revision 9: recorded EP-M1 hosted measurement and close, then
+EP-M2: the three-crate workspace, the dependency-direction, backend, verifier,
+and `no_std` contracts, per-member package policy, the package route, and the
+milestone review repairs (DL-31 through DL-35).

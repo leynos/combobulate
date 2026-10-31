@@ -198,3 +198,57 @@ fn kernel_keeps_the_no_std_boundary() -> Result<(), Box<dyn Error>> {
     assert_that!(source::kernel_source_violations(&source), is_empty());
     Ok(())
 }
+
+/// VO-6 non-vacuity: comments and literals cannot stand in for attributes.
+#[rstest]
+#[case::line_comment(concat!(
+    "// The crate is #![no_std] and denies clippy::std_instead_of_core.\n",
+    "//! The alloc lint is clippy::alloc_instead_of_core.\n",
+    "#![allow(dead_code)]\n"
+))]
+#[case::block_comment(concat!(
+    "/*\n#![no_std]\nclippy::std_instead_of_core\n",
+    "clippy::alloc_instead_of_core\n*/\n",
+    "#![allow(dead_code)]\n"
+))]
+#[case::string_literals(concat!(
+    "const DOC: &str = \"#![no_std] extern crate alloc\";\n",
+    "const RAW: &str = r#\"clippy::std_instead_of_core\"#;\n",
+    "const NESTED: &str = r##\"clippy::alloc_instead_of_core\"##;\n"
+))]
+fn comments_and_literals_cannot_satisfy_the_kernel_boundary(#[case] source: &str) {
+    let violations = source::kernel_source_violations(source).join("; ");
+    for expected in [
+        "must declare #![no_std]",
+        "must deny clippy::std_instead_of_core",
+        "must deny clippy::alloc_instead_of_core",
+    ] {
+        assert_that!(violations.as_str(), contains_substring(expected));
+    }
+    assert_that!(
+        violations.as_str(),
+        not(contains_substring("must not contain extern crate alloc"))
+    );
+}
+
+/// VO-6 non-vacuity: a real allocation declaration is still reported.
+#[rstest]
+#[case::plain("extern crate alloc;")]
+#[case::interleaved_comment("extern /* keep */ crate alloc;")]
+fn real_alloc_declarations_are_reported(#[case] source: &str) {
+    assert_that!(
+        source::kernel_source_violations(source).join("; ").as_str(),
+        contains_substring("must not contain extern crate alloc")
+    );
+}
+
+/// VO-6 control: the real attribute set passes the code-only check.
+#[test]
+fn kernel_boundary_accepts_the_real_attribute_set() {
+    let source = concat!(
+        "//! Kernel crate root that mentions #![no_std] in prose.\n",
+        "#![no_std]\n",
+        "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
+    );
+    assert_that!(source::kernel_source_violations(source), is_empty());
+}

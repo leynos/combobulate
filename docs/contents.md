@@ -46,7 +46,8 @@ implemented API or completed verification.
 - [Roadmap 1.1: resolve the decisions that control acceptance][roadmap-1-1]:
   ExecPlan for roadmap step 1.1, implemented in stacked pull requests.
 - [Roadmap 1.2.1: establish the workspace and pinned profiles][roadmap-1-2-1]:
-  ExecPlan for the facade, macro, and semantic-kernel workspace (draft).
+  ExecPlan for the facade, macro, and semantic-kernel workspace, approved and
+  being implemented in stacked pull requests.
 
 [roadmap-1-1]: execplans/1-1-resolve-acceptance-control-decisions.md
 [roadmap-1-2-1]: execplans/1-2-1-establish-workspace-and-profiles.md

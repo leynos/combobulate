@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import tomllib
 from pathlib import Path
 import shlex
 import shutil
@@ -22,36 +21,25 @@ import shutil
 from cyclopts import App
 from rust_prover_tools.commands import CommandSpec, run_command
 
+from probe_provenance import (
+    Z3_DISTRIBUTION,
+    require_captured_output,
+    write_kani_provenance,
+    write_verus_provenance,
+)
+# The container recipe contract test reads it from this module.
+from verifier_free_probe import run_verifier_free, verifier_free_containerfile
 from verifier_probe_support import (
     ROOT,
     FIXTURES,
     OUTPUT,
     capture,
-    digest,
     kani_environment,
     native_workspace,
-    require_command_statuses,
 )
 
-BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
-Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
 Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
 VERUS_CANDIDATES = ("macro", "attributes", "companion", "single-root")
-
-
-def verifier_free_containerfile() -> str:
-    """Build the verifier-free image recipe, including `mold`'s runtime library.
-
-    For example, the returned recipe starts ``FROM`` the pinned Rocky base and
-    installs ``libatomic`` alongside the compiler package set. Clang installs
-    no ``libatomic``, yet the pinned `mold` binary links against it, so omitting
-    it makes every link inside the container fail before the probe's build.
-    """
-    return (
-        f"FROM {BASE_IMAGE}\n"
-        "RUN dnf install -y --setopt=install_weak_deps=False "
-        "clang gcc-c++ make libatomic && dnf clean all\n"
-    )
 
 
 def kani_prefix(
@@ -167,54 +155,6 @@ def kani_in_place_observation(
             environment,
         ),
     }
-
-
-def write_kani_provenance(
-    directory: Path,
-    route: str,
-    reference: str,
-    observations: list[dict],
-    output_dir: Path,
-) -> None:
-    """Record the tool, route, sources, and observations behind the corpus."""
-    sources = [
-        directory / name
-        for name in (
-            "src/lib.rs",
-            "src/harnesses.rs",
-            "harnesses.json",
-            "kani-list.json",
-        )
-    ]
-    sources.extend(
-        [
-            ROOT / "scripts/run_verifier_probes.py",
-            ROOT / "scripts/verifier_probe_support.py",
-        ]
-    )
-    provenance = {
-        "tool": f"Kani {(ROOT / 'tools/kani/VERSION').read_text().strip()}",
-        "route": route,
-        "prover_tools_ref": reference,
-        "stream_order": "captured stdout followed by captured stderr",
-        "source_digests": {str(path.relative_to(ROOT)): digest(path) for path in sources},
-        "observations": observations,
-    }
-    (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
-
-
-def require_captured_output(observations: list[dict]) -> None:
-    """Reject empty or missing captured output before recording a verdict."""
-    if not observations or any(
-        not (
-            Path(item["log"]) if Path(item["log"]).is_absolute() else ROOT / item["log"]
-        )
-        .stat()
-        .st_size
-        for item in observations
-    ):
-        raise RuntimeError("missing verifier output cannot qualify a corpus")
-    require_command_statuses(observations)
 
 
 app = App()
@@ -359,30 +299,6 @@ def verus_command(
     return command + ["--", "--verify-root", selection]
 
 
-def write_verus_provenance(
-    path: Path,
-    version: str,
-    z3_path: Path,
-    banner: str,
-    observations: list[dict],
-) -> None:
-    """Record the Verus and solver identities behind the observations."""
-    path.write_text(
-        json.dumps(
-            {
-                "verus": version,
-                "z3": str(z3_path),
-                "z3_distribution": Z3_DISTRIBUTION,
-                "z3_version": banner,
-                "z3_sha256": digest(z3_path),
-                "observations": observations,
-            },
-            indent=2,
-        )
-        + "\n"
-    )
-
-
 def qualified_candidates(output: Path, observations: list[dict]) -> list[str]:
     """Return candidates whose positive and mutant logs show exact counts."""
     qualified = []
@@ -458,118 +374,26 @@ def verus(
 
 @app.command
 def verifier_free() -> None:
-    """Build fixtures in a verifier-free container without bypassing host admission."""
-    environment = dict(os.environ)
-    record = FIXTURES / "verus-wiring-probe/verifier-free.json"
-    if environment.get("RUSTC_WRAPPER"):
-        record.write_text(
-            json.dumps(
-                {
-                    "status": "inconclusive",
-                    "reason": "Host-side admission/cache compilers do not preserve the container mount namespace.",
-                    "log": "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free.log",
-                },
-                indent=2,
-            )
-            + "\n"
-        )
-        raise RuntimeError(
-            "verifier-free isolation needs a runner without a host-side compiler wrapper; admission must not be removed"
-        )
-    directory = ROOT / "target/epm1-verifier-free-workspace"
-    directory.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(
-        FIXTURES / "verus-wiring-probe",
-        directory / "probe",
-        dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(
-            "target", "observations", "provenance.json", "verifier-free.json"
-        ),
-    )
-    for name in (
-        ".cargo/config.toml",
-        "scripts/native-clang-linker.sh",
-        "scripts/build-tools-common.sh",
-        "tools/mold/VERSION",
-        "rust-toolchain.toml",
-    ):
-        target = directory / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / name, target)
-    containerfile = verifier_free_containerfile()
-    (directory / "Containerfile").write_text(containerfile)
-    output = FIXTURES / "verus-wiring-probe/observations"
-    image = "localhost/combobulate-epm1-verifier-free:20261028"
-    if (
-        run_command(CommandSpec(("podman", "image", "exists", BASE_IMAGE))).exit_code
-        != 0
-    ):
-        pulled = capture(
-            ["podman", "pull", BASE_IMAGE],
-            ROOT,
-            output / "container-pull.log",
-            environment,
-        )
-        if pulled["exit_code"] != 0:
-            raise RuntimeError("the pinned container base could not be fetched")
-    built = capture(
-        ["podman", "build", "--pull=never", "-t", image, str(directory)],
-        ROOT,
-        output / "container-build.log",
-        environment,
-    )
-    if built["exit_code"] != 0:
-        raise RuntimeError("the verifier-free build environment could not be prepared")
-    home = Path.home()
-    channel = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())["toolchain"]["channel"]
-    toolchain = home / f".rustup/toolchains/{channel}-x86_64-unknown-linux-gnu"
-    paths = [
-        directory,
-        home / ".cargo",
-        toolchain,
-        home / ".local/bin/mold",
-        home / ".local/bin/ld.mold",
-    ]
-    command = [
-        "podman",
-        "run",
-        "--rm",
-        "--network=none",
-        "--userns=keep-id",
-        "--security-opt=label=disable",
-    ]
-    for path in paths:
-        command += [
-            "-v",
-            f"{path}:{path}" + ("" if path in (directory, home / ".cargo") else ":ro"),
-        ]
-    command += [
-        "-v",
-        f"{home}/.cargo/bin/rustup:/usr/local/bin/rustup:ro",
-        "--tmpfs",
-        f"{home}/.cargo/bin",
-        "--workdir",
-        str(directory / "probe"),
-    ]
-    child = {
-        "HOME": str(home),
-        "CARGO_HOME": str(home / ".cargo"),
-        "RUSTUP_HOME": str(home / ".rustup"),
-        "RUSTUP_TOOLCHAIN": channel,
-        "PATH": f"{toolchain}/bin:/usr/local/bin:/usr/bin:/bin",
-    }
-    for key, value in child.items():
-        command += ["-e", f"{key}={value}"]
-    command += [
-        image,
-        "bash",
-        "-c",
-        'set -euo pipefail; ! command -v verus; ! command -v cargo-kani; test ! -e "$HOME/.kani"; rustc -vV; cargo build --offline --locked --workspace --all-features',
-    ]
-    observation = capture(command, ROOT, output / "verifier-free.log", environment)
-    if observation["exit_code"] != 0:
-        raise RuntimeError("the ordinary build failed in the verifier-free container")
-    record.write_text(json.dumps({"status": "pass", **observation}, indent=2) + "\n")
+    """Build fixtures in a verifier-free container without bypassing host admission.
+
+    Returns
+    -------
+    None
+        Writes the verifier-free observation record.
+
+    Raises
+    ------
+    RuntimeError
+        If host admission rejects the environment or the verifier-free build
+        fails.
+
+    Examples
+    --------
+    The hosted observation job runs the command after a fresh runner boot::
+
+        verifier_free()
+    """
+    run_verifier_free()
 
 
 if __name__ == "__main__":
