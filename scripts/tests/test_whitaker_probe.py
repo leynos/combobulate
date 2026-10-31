@@ -42,7 +42,7 @@ class SourceBindingTests(unittest.TestCase):
             evidence = verify_workflow(caller(reference), acquire)
             self.assertEqual(evidence['reference'], reference)
             self.assertEqual(evidence['manifest_sha256'], hashlib.sha256(CAPABLE.encode()).hexdigest())
-            self.assertEqual(evidence['scenarios'], 13)
+            self.assertEqual(evidence['scenarios'], 14)
         self.assertEqual(seen, [(ref, path) for ref in candidates for path in APPROVED])
 
     def test_old_capability_is_rejected_despite_valid_sha_shape(self):
@@ -166,5 +166,5 @@ class SourceBindingTests(unittest.TestCase):
                 factory.return_value.open.side_effect = response
                 self.assertEqual(main(['--workflow', str(workflow)]), 0)
                 self.assertIn('ref=' + 'b' * 40, output.getvalue())
-                self.assertIn('scenarios=13', output.getvalue())
+                self.assertIn('scenarios=14', output.getvalue())
         self.assertEqual(seen, list(APPROVED))

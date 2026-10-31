@@ -187,6 +187,7 @@ def probe_manifest(manifest: dict) -> int:
     scenarios = [
         (Scenario(cranelift='true'), 'success'), (Scenario(), 'success'),
         (Scenario(bundle='/synthetic/clippy-snapshot.tar.zst'), 'success'),
+        (Scenario(cranelift='true', bundle='/synthetic/clippy-snapshot.tar.zst'), 'success'),
         (Scenario(ci_mode='false'), 'success'),
         (Scenario(status=43), 'installer-failure'),
         (Scenario(stdout='Installing whitaker lints from source\n'), 'source-stdout'),
