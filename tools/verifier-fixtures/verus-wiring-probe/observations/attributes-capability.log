@@ -2,4 +2,4 @@ verification results:: 1 verified, 0 errors (partial verification with `--verify
     Checking wiring-attributes v0.1.0 (/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/verus-wiring-probe/attributes)
 note: verifying root module (selected functions)
 
-    Finished `dev` profile [unoptimized] target(s) in 1.98s
+    Finished `dev` profile [unoptimized] target(s) in 0.67s

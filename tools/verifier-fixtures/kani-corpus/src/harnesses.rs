@@ -42,7 +42,7 @@ fn multiplication_timeout() {
     );
     assert!(
         left.wrapping_mul(right) != 170141183460469231731687303715884105727,
-        "the seeded factorisation claim consumes the timeout budget"
+        "the seeded factorization claim consumes the timeout budget"
     );
 }
 
