@@ -5,8 +5,10 @@ name: Profile measurements
   pull_request:
     types: [labeled]
 
+# The label name is part of the group so two different measurement labels on
+# one pull request queue independently instead of one waiting on the other.
 concurrency:
-  group: profile-measurements-${{ github.event.pull_request.number || github.ref }}
+  group: profile-measurements-${{ github.event.pull_request.number || github.ref }}-${{ github.event.label.name || 'manual' }}
   cancel-in-progress: false
 
 jobs:
