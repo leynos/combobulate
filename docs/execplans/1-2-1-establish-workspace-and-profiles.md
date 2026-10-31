@@ -455,6 +455,11 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     because the earlier "no public API" wording was inaccurate. Both
     `typing.cast` calls in the package policy pass their annotation as a
     string.
+  - [x] (2026-10-31) Fifth review round (DL-39). Committed provenance no longer
+    publishes the account name or worktree path: `capture` records a portable
+    copy of the command while executing the real vector, and the Verus solver
+    path is rewritten the same way. Both corpora were regenerated, and the
+    developer guide states the convention.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -575,6 +580,21 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-39 (2026-10-31). EP-M2 fifth review round. The review on head `890792e`
+  completed with two concerns sharing one root cause: committed provenance
+  recorded raw argument vectors and the resolved solver path, so the Kani and
+  Verus records published `/home/leynos`, the worktree identifier, and the uv
+  cache location. Repaired at the generators: `capture` executes the real
+  vector but records a portable copy, replacing the repository root with
+  `<repo>` and the home directory with `~`, and `write_verus_provenance`
+  rewrites the solver path the same way. The developer guide states the
+  convention, new tests cover the rewrite and the real execution, and both
+  corpora were regenerated with `make kani-log-corpus` and `make verus-probe`.
+  Captured observation logs stay verbatim, because they are the tool's own
+  output and rewriting them would break the digest that binds the evidence; the
+  guide states that the split is deliberate. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt5-retry1.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-38 (2026-10-31). EP-M2 fourth review round. The review on head `c4dd43f`
   completed with two concerns, both verified against source and repaired. (a)
   The user guide said the workspace "provides no public API yet", but the
@@ -2018,3 +2038,7 @@ corpus provenance, the corrected route defaults, and the spelling fixes (DL-37).
 
 2026-10-31, revision 12: recorded the fourth review round: the corrected
 user-guide scope statement and the string-form `typing.cast` calls (DL-38).
+
+2026-10-31, revision 13: recorded the fifth review round: portable paths in
+committed provenance, applied at the generators, with both corpora regenerated
+(DL-39).

@@ -11,7 +11,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from verifier_probe_support import ROOT, digest, require_command_statuses
+from verifier_probe_support import (
+    ROOT,
+    digest,
+    portable_argument,
+    require_command_statuses,
+)
 
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
 
@@ -103,7 +108,7 @@ def write_verus_provenance(
         json.dumps(
             {
                 "verus": version,
-                "z3": str(z3_path),
+                "z3": portable_argument(str(z3_path)),
                 "z3_distribution": Z3_DISTRIBUTION,
                 "z3_version": banner,
                 "z3_sha256": digest(z3_path),

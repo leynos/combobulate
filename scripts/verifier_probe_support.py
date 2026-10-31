@@ -55,6 +55,32 @@ def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def portable_argument(argument: str) -> str:
+    """Replace host-specific roots so a recorded command stays reproducible.
+
+    The probe still executes the real argument vector. Only the copy written to
+    the committed record is rewritten, so the evidence keeps the invocation
+    without publishing an account name or a machine-specific worktree path.
+
+    Parameters
+    ----------
+    argument
+        One element of a recorded argument vector.
+
+    Returns
+    -------
+    str
+        The argument with the repository root and home directory replaced.
+
+    Examples
+    --------
+    A path under the repository becomes relative to a stable placeholder::
+
+        portable_argument(str(ROOT / 'tools')) == '<repo>/tools'
+    """
+    return argument.replace(str(ROOT), "<repo>").replace(str(Path.home()), "~")
+
+
 def capture(
     argv: list[str], cwd: Path, output: Path, environment: dict[str, str]
 ) -> dict:
@@ -64,7 +90,7 @@ def capture(
     output.write_text(result.stdout + result.stderr)
     print(f"{output}: exit {result.exit_code}", flush=True)
     return {
-        "command": argv,
+        "command": [portable_argument(argument) for argument in argv],
         "cwd": str(cwd.relative_to(ROOT)),
         "exit_code": result.exit_code,
         "log": str(output.relative_to(ROOT))

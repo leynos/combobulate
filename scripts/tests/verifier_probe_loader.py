@@ -20,6 +20,7 @@ SUPPORT_FUNCTIONS = (
     'digest',
     'kani_environment',
     'native_workspace',
+    'portable_argument',
     'require_command_statuses',
 )
 
@@ -89,6 +90,12 @@ def load_verifier_free_probe() -> ModuleType:
         SCRIPTS / 'verifier_free_probe.py',
         stubs,
     )
+
+
+def load_probe_provenance() -> ModuleType:
+    """Load ``probe_provenance.py`` with the real support helpers available."""
+    stubs = {'verifier_probe_support': load_verifier_probe_support()}
+    return _load('probe_provenance_under_test', SCRIPTS / 'probe_provenance.py', stubs)
 
 
 def load_verifier_probe_support() -> ModuleType:

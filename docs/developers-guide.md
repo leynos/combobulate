@@ -843,6 +843,15 @@ public API, must not be imported by the support module, the evidence gate, or
 product code, and a new probe route composes them instead of adding a parallel
 capture path.
 
+Committed metadata must not publish host detail. `capture` still executes the
+real argument vector but stores a portable copy, replacing the repository root
+with `<repo>` and the home directory with `~`; `write_verus_provenance` applies
+the same rewrite to the resolved solver path. Without it, a record would name
+the developer's account and worktree and could not be reproduced elsewhere.
+Captured observation logs stay verbatim: they are the tool's own output, and
+rewriting them would break the evidence the digest binds. The split is
+deliberate — metadata is rewritten, output is not.
+
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
 which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
