@@ -42,7 +42,7 @@ pub(super) const ACTIONS: &[ActionContract] = &[
     (
         "leynos/shared-actions/.github/actions/install-mdtablefix",
         "Install mdtablefix",
-        &[("version", "0.6.0")],
+        &[("version", "0.6.1")],
     ),
     (
         "DavidAnson/markdownlint-cli2-action",
@@ -351,7 +351,7 @@ fn valid_manual_action_prefix(steps: &[Value]) -> bool {
         (
             "leynos/shared-actions/.github/actions/install-mdtablefix",
             "version",
-            "0.6.0",
+            "0.6.1",
         ),
         (
             "leynos/shared-actions/.github/actions/setup-rust@\
