@@ -189,7 +189,7 @@ def check_package_policy(context: ValidationContext) -> None:
     release_conditions_met = (_has_accepted_d05_supersession(decisions)
                               and _has_validated_core_dossier(context))
     require_unpublished = not release_conditions_met
-    manifest = cast(CargoManifest, tomllib.loads((context.root / 'Cargo.toml').read_text(encoding='utf-8')))
+    manifest = cast('CargoManifest', tomllib.loads((context.root / 'Cargo.toml').read_text(encoding='utf-8')))
     check_manifest(manifest, require_isc=decisions.get('D04', {}).get('lifecycle') == 'accepted',
                    require_unpublished=require_unpublished)
     selected, unlisted = member_manifests(context.root, manifest.get('workspace', {}))
@@ -197,7 +197,7 @@ def check_package_policy(context: ValidationContext) -> None:
             'every crates/*/Cargo.toml must match a workspace member glob: '
             + ', '.join(str(path.relative_to(context.root)) for path in unlisted))
     for path in selected:
-        member = cast(CargoManifest, tomllib.loads(path.read_text(encoding='utf-8')))
+        member = cast('CargoManifest', tomllib.loads(path.read_text(encoding='utf-8')))
         check_manifest(member)
     rules = {
         'D04': ('the ISC licence', decisions.get('D04', {}).get('lifecycle') == 'accepted'),

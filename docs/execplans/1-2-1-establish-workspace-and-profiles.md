@@ -450,6 +450,11 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     sequentially on the resulting commit `f0b1650` (364 nextest cases passed
     and one skipped; 447 unittest cases; 526 pytest cases plus 691 subtests;
     285 files packaged and the facade recompiled from the tarball).
+  - [x] (2026-10-31) Fourth review round (DL-38). The user guide now names the
+    facade as empty and the kernel's `TargetFacts` as its only public type,
+    because the earlier "no public API" wording was inaccurate. Both
+    `typing.cast` calls in the package policy pass their annotation as a
+    string.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -570,6 +575,16 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-38 (2026-10-31). EP-M2 fourth review round. The review on head `c4dd43f`
+  completed with two concerns, both verified against source and repaired. (a)
+  The user guide said the workspace "provides no public API yet", but the
+  unpublished kernel crate does expose `pub struct TargetFacts`; the sentence
+  now separates the empty facade from the kernel's single public type. (b)
+  `scripts/docs_validation/package_policy.py` passed Python types to
+  `typing.cast`; both calls now pass the annotation as a string, matching the
+  module's deferred-annotation posture. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt4.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-37 (2026-10-31). EP-M2 third review round. The confirmation review on
   head `833ef0c` completed with five findings; each was verified and repaired.
   (a) The hosted verifier-free record still embedded the pre-repair
@@ -2000,3 +2015,6 @@ and the separate candidate-fingerprint command (DL-36).
 2026-10-31, revision 11: recorded the confirmation review: recaptured hosted
 verifier-free evidence on measurement run `41227443972`, the regenerated Kani
 corpus provenance, the corrected route defaults, and the spelling fixes (DL-37).
+
+2026-10-31, revision 12: recorded the fourth review round: the corrected
+user-guide scope statement and the string-form `typing.cast` calls (DL-38).
