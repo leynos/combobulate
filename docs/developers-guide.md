@@ -828,9 +828,12 @@ expectations stay private to the prover command contracts. The runner reuses
 
 The CLI's command builders — `kani_prefix`, `kani_arguments`,
 `kani_observations`, `kani_in_place_observation`, `resolve_z3`,
-`verus_environment`, `verus_command`, and `qualified_candidates` — stay beside
-the commands. The provenance writers `write_kani_provenance` and
-`write_verus_provenance` and the guard `require_captured_output` live in
+`verus_environment`, `refresh_candidate_fingerprint`, `verus_command`, and
+`qualified_candidates` — stay beside the commands. The fingerprint refresh is a
+command, separate from `verus_command`, because cargo-verus does not
+fingerprint the function-selection arguments and the proof file must be touched
+immediately before each build. The provenance writers `write_kani_provenance`
+and `write_verus_provenance` and the guard `require_captured_output` live in
 `probe_provenance`. The verifier-free workflow lives in `verifier_free_probe` as
 `verifier_free_containerfile`, `write_inconclusive_record`,
 `stage_verifier_free_workspace`, `ensure_base_image`, `container_run_command`,

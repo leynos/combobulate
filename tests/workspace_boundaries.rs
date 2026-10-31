@@ -231,6 +231,38 @@ fn comments_and_literals_cannot_satisfy_the_kernel_boundary(#[case] source: &str
     );
 }
 
+/// VO-6 non-vacuity: a lint name must sit in an effective `deny`.
+#[rstest]
+#[case::allow_only(
+    concat!(
+        "#![no_std]\n",
+        "#![allow(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
+    ),
+    "the kernel crate root must deny clippy::std_instead_of_core; the kernel crate root must deny clippy::alloc_instead_of_core"
+)]
+#[case::warn_only(
+    concat!(
+        "#![no_std]\n",
+        "#![warn(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
+    ),
+    "the kernel crate root must deny clippy::std_instead_of_core; the kernel crate root must deny clippy::alloc_instead_of_core"
+)]
+#[case::deny_then_allow(
+    concat!(
+        "#![no_std]\n",
+        "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n",
+        "#![allow(clippy::std_instead_of_core)]\n"
+    ),
+    "the kernel crate root must deny clippy::std_instead_of_core"
+)]
+fn lint_mentions_outside_a_deny_are_reported(#[case] source: &str, #[case] expected: &str) {
+    assert_eq!(
+        source::kernel_source_violations(source).join("; "),
+        expected,
+        "only a final deny or forbid may satisfy the kernel lint boundary"
+    );
+}
+
 /// VO-6 non-vacuity: a real allocation declaration is still reported.
 #[rstest]
 #[case::plain("extern crate alloc;")]

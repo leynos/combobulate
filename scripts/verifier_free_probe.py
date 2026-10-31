@@ -19,8 +19,14 @@ from rust_prover_tools.commands import CommandSpec, run_command
 from verifier_probe_support import FIXTURES, ROOT, capture
 
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
+# `set -e` does not abort on a failed `! command -v ...`, so each verifier check
+# is an explicit branch whose failure status the shell acts on.
 BUILD_SCRIPT = (
-    "set -euo pipefail; ! command -v verus; ! command -v cargo-kani; "
+    "set -euo pipefail; "
+    "if command -v verus >/dev/null 2>&1; then "
+    'echo "verus must be absent" >&2; exit 1; fi; '
+    "if command -v cargo-kani >/dev/null 2>&1; then "
+    'echo "cargo-kani must be absent" >&2; exit 1; fi; '
     'test ! -e "$HOME/.kani"; rustc -vV; '
     "cargo build --offline --locked --workspace --all-features"
 )

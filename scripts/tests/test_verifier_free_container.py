@@ -36,3 +36,14 @@ class VerifierFreeCommandTests(unittest.TestCase):
         self.assertIn(f'{home}/.local/bin/mold:{home}/.local/bin/mold:ro', command, 'pinned tools must stay read-only')
         self.assertEqual(command[-3:-1], ['bash', '-c'], 'the build script must be the container command')
         self.assertIn('test ! -e "$HOME/.kani"', command[-1], 'the script must prove no verifier is installed')
+
+    def test_verifier_absence_checks_abort_under_errexit(self) -> None:
+        """A negated `command -v` cannot fail under `set -e`, so use a branch."""
+        script = load_verifier_free_probe().BUILD_SCRIPT
+
+        self.assertNotIn('! command -v', script, 'a negated command cannot abort under `set -e`')
+        for verifier in ('verus', 'cargo-kani'):
+            guard = f'if command -v {verifier} >/dev/null 2>&1; then'
+            self.assertIn(guard, script, f'the {verifier} check must be an explicit branch')
+            failure = script.split(guard, 1)[1].split('fi;', 1)[0]
+            self.assertIn('exit 1', failure, f'the {verifier} branch must fail the build')

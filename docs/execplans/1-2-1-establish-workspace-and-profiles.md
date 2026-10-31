@@ -431,6 +431,12 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     `9b086e48…` (entry script), `952d6c62…` (support), and `ae38573c…`
     (provenance writers). The gate run covered this commit's content, and
     `make package` verified the clean tree at `1f09c18`.
+  - [x] (2026-10-31) Milestone-close CLI review repairs (DL-36). The review
+    completed on `8e1d7fa` with three distinct defects: a vacuous verifier
+    absence check under `set -e`, a lint check that accepted `allow`/`warn`,
+    and a command builder that touched a file. All three are repaired, the
+    developer guide names the new helper, and the focused suites pass
+    (20 boundary cases; 8 verifier cases plus 2 subtests).
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -551,6 +557,26 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-36 (2026-10-31). EP-M2 second review round. The milestone-close CodeRabbit
+  CLI review completed on head `8e1d7fa` (base `origin/main`, resolved to
+  `e61a744`) with five findings covering three distinct defects. (a) The
+  verifier-free build script used `! command -v verus` and
+  `! command -v cargo-kani`; bash does not apply `errexit` to a negated
+  command, so the container never proved the verifiers were absent. Each check
+  is now an `if command -v ...; then ... exit 1; fi` branch, and a new test
+  asserts both branches fail the build and that no negated form remains. The
+  `test ! -e "$HOME/.kani"` guard is unchanged. (b) VO-6 accepted any
+  occurrence of a lint name, so `#![allow(...)]` or `#![warn(...)]` satisfied a
+  required `deny`. The check now parses crate-level attributes in source order
+  and requires the final level for each lint to be `deny` or `forbid`; two new
+  rstest cases cover `allow`-only and `warn`-only sources, and a third covers a
+  later `allow` overriding an earlier `deny`. (c) `verus_command` touched the
+  candidate proof file while returning a command, mixing a command with a
+  query. The touch moved to `refresh_candidate_fingerprint`, called immediately
+  before each capture; `verus_command` is now pure. The entry script remains
+  398 lines. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt2.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-35 (2026-10-31). EP-M2 milestone review repairs. The review raised five
   unique concerns; each was verified against current source and repaired. (a)
   VO-6 used `contains`, so a doc comment naming `#![no_std]`, or a string
@@ -927,17 +953,18 @@ EP-M2 is complete. The workspace now has a `#![no_std]` kernel owning
 `TargetFacts`, an empty procedural-macro crate, and a documentation-only
 facade. Dependency direction, backend exclusion, verifier exclusion, and the
 kernel's `no_std` boundary are checked by `tests/workspace_boundaries.rs`
-against the live Cargo graph and canned non-vacuity fixtures, and the package
-policy checks every member the root globs select. `make package` verifies
-through the patched route in DL-33. All commit gates passed sequentially on
-`1f09c18`: `make check-fmt`, `make lint` (rustdoc `-D warnings`, Clippy,
-Whitaker, interrogate 100%), `make test` (361 nextest cases passed, one
-skipped; the kernel doctest passed), `make design-check` (446 unittest cases;
-525 pytest cases plus 691 subtests), `make markdownlint` with the spelling gate,
-`make nixie`, and `make package`, which packaged and recompiled
-`combobulate v0.1.0` from the unpacked tarball. The workspace layout is
-published without claiming the array algebra or `comb!` notation, which remain
-unimplemented.
+against the live Cargo graph and canned non-vacuity fixtures. The lint checks
+require the final crate-level level to be `deny` or `forbid`, so an `allow` or
+`warn` mention cannot satisfy the boundary. The package policy checks every
+member the root globs select. `make package` verifies through the patched route
+in DL-33. All commit gates passed sequentially on `1f09c18`: `make check-fmt`,
+`make lint` (rustdoc `-D warnings`, Clippy, Whitaker, interrogate 100%),
+`make test` (361 nextest cases passed, one skipped; the kernel doctest passed),
+`make design-check` (446 unittest cases; 525 pytest cases plus 691 subtests),
+`make markdownlint` with the spelling gate, `make nixie`, and `make package`,
+which packaged and recompiled `combobulate v0.1.0` from the unpacked tarball.
+The workspace layout is published without claiming the array algebra or `comb!`
+notation, which remain unimplemented.
 
 ## Context and orientation
 
@@ -1055,6 +1082,7 @@ Trace chains:
 TD §3, §15 row 6, CA5 -> D16/ADR-0010 -> EP-M2 -> tests/workspace_boundaries.rs::kernel_excludes_backends
 TD §18.1, DL-06 -> EP-M2 -> tests/workspace_boundaries.rs::kernel_never_host_compiled
 TD §3, ToR line 152 -> EP-M2, EP-M3 -> tests/workspace_boundaries.rs::ordinary_profiles_exclude_verifiers
+TD §18.1, VO-6 -> EP-M2 -> tests/workspace_boundaries.rs::kernel_keeps_the_no_std_boundary
 ToR S7, TD §3 -> EP-M3 -> tests/features/build_profiles.feature, tests/native_consumer_e2e.rs
 TD §19.1, ToR Q9, B05 -> EP-M3, EP-M4 -> spec/toolchain-profiles.json -> scripts/tests/test_toolchain_profiles.py
 ToR Q3, D06 -> D16/ADR-0010 -> EP-M4 -> spec/toolchain-profiles.json::supported_toolchains
@@ -1930,3 +1958,7 @@ and Green evidence, and the regenerated corpus.
 EP-M2: the three-crate workspace, the dependency-direction, backend, verifier,
 and `no_std` contracts, per-member package policy, the package route, and the
 milestone review repairs (DL-31 through DL-35).
+
+2026-10-31, revision 10: recorded the milestone-close CLI review and its three
+repaired defects: the verifier-absence branches, the effective-deny lint check,
+and the separate candidate-fingerprint command (DL-36).

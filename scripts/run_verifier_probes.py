@@ -22,20 +22,13 @@ from cyclopts import App
 from rust_prover_tools.commands import CommandSpec, run_command
 
 from probe_provenance import (
-    Z3_DISTRIBUTION,
-    require_captured_output,
-    write_kani_provenance,
+    Z3_DISTRIBUTION, require_captured_output, write_kani_provenance,
     write_verus_provenance,
 )
 # The container recipe contract test reads it from this module.
 from verifier_free_probe import run_verifier_free, verifier_free_containerfile
 from verifier_probe_support import (
-    ROOT,
-    FIXTURES,
-    OUTPUT,
-    capture,
-    kani_environment,
-    native_workspace,
+    ROOT, FIXTURES, OUTPUT, capture, kani_environment, native_workspace,
 )
 
 Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
@@ -78,12 +71,9 @@ def kani_prefix(
         return (
             [
                 *shlex.split(prover_tools),
-                "kani",
-                "exec",
-                "--installation",
-                str(installation),
-                "--cwd",
-                str(directory),
+                "kani", "exec",
+                "--installation", str(installation),
+                "--cwd", str(directory),
             ],
             environment,
         )
@@ -263,6 +253,15 @@ def verus_environment(z3_path: Path) -> dict[str, str]:
     return environment
 
 
+def refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
+    """Touch the proof file before a build so cargo-verus reruns the selection.
+
+    cargo-verus does not fingerprint the function-selection arguments, so a
+    warm target directory would otherwise reuse another function's verdict.
+    """
+    (directory / f"{candidate}.rs").touch()
+
+
 def verus_command(
     binaries: Path,
     candidate: str,
@@ -272,8 +271,6 @@ def verus_command(
 ) -> list[str]:
     """Return the verifier command for one candidate and one function."""
     selection = f"--verify-function={function}"
-    # cargo-verus does not fingerprint the function-selection arguments.
-    (directory / f"{candidate}.rs").touch()
     if candidate == "single-root":
         return [
             *shlex.split(prover_tools),
@@ -288,11 +285,8 @@ def verus_command(
             f"--extra-arg={selection}",
         ]
     command = [
-        str(binaries / "cargo-verus"),
-        "verus",
-        "focus",
-        "--manifest-path",
-        str(directory / candidate / "Cargo.toml"),
+        str(binaries / "cargo-verus"), "verus", "focus",
+        "--manifest-path", str(directory / candidate / "Cargo.toml"),
     ]
     if candidate == "attributes":
         command += ["--features", "verus"]
@@ -346,20 +340,24 @@ def verus(
     z3_path, banner = resolve_z3(z3)
     environment = verus_environment(z3_path)
     output = output_dir or directory / "observations"
-    observations = [
-        {
-            "candidate": candidate,
-            "function": function,
-            **capture(
-                verus_command(binaries, candidate, directory, function, prover_tools),
-                directory,
-                output / f"{candidate}-{function}.log",
-                environment,
-            ),
-        }
-        for candidate in VERUS_CANDIDATES
-        for function in ("capability", "mutant")
-    ]
+    observations = []
+    for candidate in VERUS_CANDIDATES:
+        for function in ("capability", "mutant"):
+            refresh_candidate_fingerprint(directory, candidate)
+            observations.append(
+                {
+                    "candidate": candidate,
+                    "function": function,
+                    **capture(
+                        verus_command(
+                            binaries, candidate, directory, function, prover_tools
+                        ),
+                        directory,
+                        output / f"{candidate}-{function}.log",
+                        environment,
+                    ),
+                }
+            )
     provenance_path = (
         output / "provenance.json" if output_dir else directory / "provenance.json"
     )
