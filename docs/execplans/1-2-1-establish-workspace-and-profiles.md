@@ -379,6 +379,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   overall); the log diff is limited to timings, the Cargo dirty note, and the
   compile-admission queue line, and `provenance.json` now records the new
   script digests (`7ae6aaa1…` and `e68f9147…`).
+- [x] (2026-10-31) EP-M1 close published as `242f03a` with a clean local gate
+  run. The milestone CLI review is rate-limited rather than clean (DL-32), so
+  the hosted assessment is handed to `pr-babysitting`.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
@@ -487,6 +490,19 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-32 (2026-10-31). The EP-M1 milestone-close CodeRabbit CLI assessment is
+  unavailable: three byte-identical runs of
+  `coderabbit review --agent --committed --fresh --base main` on head `242f03a`
+  returned `errorType: rate_limit` after 26- and 29-minute backoffs, and the
+  org has used all ten included reviews (`onDemandReviewAvailable: false`).
+  This is absence of evidence, not a clean review: no finding count may be read
+  as zero concerns. The six findings from the earlier review of `a560168` were
+  each verified against current source and repaired (DL-31). The local gates on
+  the final candidate passed. The hosted assessment therefore passes to
+  `pr-babysitting` unchanged, and the CLI assessment should be re-requested
+  once a review window reopens or usage-based reviews are enabled. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt{1,2,3}.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-31 (2026-10-31). EP-M1 review repairs. This entry supersedes only DL-27's
   complexity and NumPy docstring disposition; every other DL-27 decision stands.
   `kani` and `verus` now compose private builders (`kani_prefix`,
