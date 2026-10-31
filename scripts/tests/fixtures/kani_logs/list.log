@@ -8,5 +8,5 @@ warning: Found the following unsupported constructs:
 Wrote list results to /home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus/kani-list.json
 warning: unused config key `unstable.embed-metadata` in `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/.cargo/config.toml`
    Compiling kani-corpus v0.1.0 (/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/tools/verifier-fixtures/kani-corpus)
-[build-limits] kani_corpus: the managed sccache server is not serving compilations; compiling without the cache
-    Finished `dev` profile [unoptimized] target(s) in 8.33s
+[build-limits] kani_corpus: waiting for a compile slot (98 ahead, 45s)
+    Finished `dev` profile [unoptimized] target(s) in 1m 14s

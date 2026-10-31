@@ -806,6 +806,14 @@ fixtures and result-based expectations stay private to the prover command
 contracts. The runner reuses `rust-prover-tools`' Cuprum command boundary
 rather than another installer.
 
+The CLI's command builders — `kani_prefix`, `kani_arguments`,
+`kani_observations`, `kani_in_place_observation`, `write_kani_provenance`,
+`resolve_z3`, `verus_environment`, `verus_command`, `write_verus_provenance`,
+and `qualified_candidates` — are private to that script. They exist so each
+route step can be read and tested on its own. They are not a public API, must
+not be imported by the support module, the evidence gate, or product code, and
+a new probe route composes them instead of adding a parallel capture path.
+
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The explicit `KANI_PROBE_ROUTE=direct` route selects Kani
 0.67.0's matching LLVM SDK and child flags, retains compiler admission, and
