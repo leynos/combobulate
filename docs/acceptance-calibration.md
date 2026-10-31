@@ -2,9 +2,9 @@
 
 This report records how the pre-registered acceptance controls `AC-01` to
 `AC-07` in `spec/acceptance-controls.json` got their thresholds. Threshold
-selection (decision D12) rests
-on realistic measurements on the development machine, extrapolated to the
-GitHub-hosted runner class (4 vCPUs, 16 GB, x64), with the evidence recorded.
+selection (decision D12) rests on realistic measurements on the development
+machine, extrapolated to the GitHub-hosted runner class (4 vCPUs, 16 GB, x64),
+with the evidence recorded.
 [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md) states the
 protocol. Calibration runs are not acceptance evidence: no control has been
 measured for acceptance yet, and every threshold is registered, not met.
@@ -95,8 +95,8 @@ _Table 2: Calibrated measurements and registered thresholds._
   46 s (18 min 27 s of CPU, 154.5 MiB), both without a verdict. Both were
   removed from the probe. `AC-02` therefore scopes Kani to structural
   harnesses; multiplication belongs to Verus under `AC-01`, and a harness that
-  needs symbolic multiplication needs its own calibration.
-  Task 1.2.4 should plan its proofs accordingly.
+  needs symbolic multiplication needs its own calibration. Task 1.2.4 should
+  plan its proofs accordingly.
 - Polars dominates build cost: a cold Polars-enabled build took 60 to 382 s
   locally across five runs, while every other profile built in seconds. The
   additional cold runs took 60 and 62.24 s. The registered 10-minute ceiling

@@ -695,16 +695,17 @@ Acceptance-control rule checks in
 `scripts/docs_validation/acceptance_registration.py`,
 `scripts/docs_validation/acceptance_evidence.py`, and
 `scripts/docs_validation/ci_controls.py` belong only to the documentation-pack
-checker. They accept parsed values and do not read repository files. The `preregistration.py` composition path scans serialized
-JSON evidence for host identities and then recursively scans its decoded string
-keys and values, so escaped characters cannot hide an identity from the check.
-The Markdown calibration report is scanned as raw text. Keep this recursive
-scan private to the acceptance-control composition path. Keep filesystem reads
-and schema loading in the composition path rooted at
-`check_acceptance_controls` in `scripts/docs_validation/preregistration.py` and
-its shared `ValidationContext`. `ValidationContext.load_yaml` converts parser
-failures into checker errors. The composition path passes the small
-`AcceptanceWorkflowSettings` value to the pure rules. The original named imports remain re-exported from preregistration
+checker. They accept parsed values and do not read repository files. The
+`preregistration.py` composition path scans serialized JSON evidence for host
+identities and then recursively scans its decoded string keys and values, so
+escaped characters cannot hide an identity from the check. The Markdown
+calibration report is scanned as raw text. Keep this recursive scan private to
+the acceptance-control composition path. Keep filesystem reads and schema
+loading in the composition path rooted at `check_acceptance_controls` in
+`scripts/docs_validation/preregistration.py` and its shared `ValidationContext`.
+`ValidationContext.load_yaml` converts parser failures into checker errors.
+The composition path passes the small `AcceptanceWorkflowSettings` value to the
+pure rules. The original named imports remain re-exported from preregistration
 for focused tests; these helpers are not general GitHub Actions parsers,
 measurement libraries, or repository file APIs.
 
@@ -715,13 +716,14 @@ by its [schema](../spec/acceptance-controls.schema.json); measurement records
 use the [measurement-record schema](../spec/measurement-record.schema.json).
 Keep calibration records in `spec/calibration/` and acceptance measurements in
 `spec/measurements/`: calibration evidence cannot satisfy an acceptance
-control. Validation checks that every control defines the registered fields
-and that each measurement record binds to its control, registration date,
-runner and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner, and
-`build-test` has an eight-minute timeout. The matching `make act-validation`
-target maps that job to the configured `ubuntu-24.04` Act runner image. See the
-[acceptance calibration report](acceptance-calibration.md)
-for methodology, tool versions, and reproduction commands, and the standalone
+control. Validation checks that every control defines the registered fields and
+that each measurement record binds to its control, registration date, runner
+and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner,
+and `build-test` has an eight-minute timeout. The matching
+`make act-validation` target maps that job to the configured `ubuntu-24.04` Act
+runner image. See the
+[acceptance calibration report](acceptance-calibration.md) for methodology,
+tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
 Kani calibration artefacts.
 

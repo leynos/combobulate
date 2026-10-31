@@ -4,12 +4,12 @@
 
 Accepted on 2026-10-10: every acceptance experiment is registered, with its
 workload, control, environment, estimand, statistic, and decision rule defined
-before any acceptance measurement; thresholds come from
-recorded calibration extrapolated to the hosted runner class. Amended on
-2026-10-31: the digests, source hashes and sponsor-approved amendments are
-retired (see [Amendments](#amendments)). Records D11 and
-D12 in the [decision register](../decision-register.md); the controls are
-`AC-01` to `AC-07` in `spec/acceptance-controls.json`, calibrated in
+before any acceptance measurement; thresholds come from recorded calibration
+extrapolated to the hosted runner class. Amended on 2026-10-31: the digests,
+source hashes and sponsor-approved amendments are retired (see
+[Amendments](#amendments)). Records D11 and D12 in the
+[decision register](../decision-register.md); the controls are `AC-01` to
+`AC-07` in `spec/acceptance-controls.json`, calibrated in
 [acceptance calibration](../acceptance-calibration.md).
 
 ## Date
@@ -22,9 +22,9 @@ Terms of reference Q2 asked which runtime, memory, compile-cost, proof-cost,
 and CI thresholds govern the experiments, and success criterion S7 requires
 them to be recorded before candidate acceptance is measured. A threshold chosen
 after seeing a result can be tuned to pass, and a measurement taken on a busy
-development machine can say more about the machine than about the code. Threshold
-selection (D12) rests on realistic local measurements extrapolated to the
-GitHub-hosted runner class, with the evidence recorded.
+development machine can say more about the machine than about the code.
+Threshold selection (D12) rests on realistic local measurements extrapolated to
+the GitHub-hosted runner class, with the evidence recorded.
 
 ## Decision drivers
 
@@ -94,11 +94,12 @@ GitHub-hosted runner class, with the evidence recorded.
 2026-10-31: the approval process for acceptance controls is retired, on the
 maintainer's ruling that a contract test which breaks on a reformat wastes
 everyone's time and that this is a single developer and a set of robots with no
-sponsor to approve anything. Removed: the SHA-256 digest of each control and its
-amendment chain, the sponsor-approved amendment and its approval reference, the
-registered SHA-256 of the workload source files (including the `ci.yml` hash
-that failed on any edit of the workflow), the digest on measurement records, and
-the base-revision freeze of the controls register. Kept: each control's
-measurement definition (workload, metric, estimand, statistic, decision rule,
-environment, calibration), the schema that types it, and the checks that bind
-records to their control, registration date, hosted runner and toolchains.
+sponsor to approve anything. Removed: the SHA-256 digest of each control and
+its amendment chain, the sponsor-approved amendment and its approval reference,
+the registered SHA-256 of the workload source files (including the `ci.yml`
+hash that failed on any edit of the workflow), the digest on measurement
+records, and the base-revision freeze of the controls register. Kept: each
+control's measurement definition (workload, metric, estimand, statistic,
+decision rule, environment, calibration), the schema that types it, and the
+checks that bind records to their control, registration date, hosted runner and
+toolchains.
