@@ -369,6 +369,16 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   target sizes are recorded in `Artefacts and notes`.
 - [x] EP-M1 hosted costs and verifier-free isolation; publish the measurement
   workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
+- [x] (2026-10-31) EP-M1 milestone review repairs (DL-31): split the verifier
+  command builders, add NumPy-style CLI parameter sections, pin the Make
+  default goal, scope the measurement concurrency group by label, and keep
+  every lint table in the scratch workspace. The Python suites passed before
+  the Rust gates (`pytest`: 521 passed, 687 subtests; `unittest`: 442 tests).
+  `make kani-log-corpus` then regenerated all fourteen observations (thirteen
+  labelled subjects plus the in-place run) with every status unchanged (exit 0
+  overall); the log diff is limited to timings, the Cargo dirty note, and the
+  compile-admission queue line, and `provenance.json` now records the new
+  script digests (`7ae6aaa1…` and `e68f9147…`).
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
@@ -462,9 +472,42 @@ committed together with its Green change.
   `status: pass` with exit 0 after proving `verus`, `cargo-kani`, and `~/.kani`
   absent inside the container. Impact: the go/no-go rule is satisfied and the
   milestone proceeds to EP-M2.
+- Observation (2026-10-31): the milestone review found that the new `Makefile`
+  declares its prover targets first, so a bare `make` adopted `install-kani` as
+  its default goal and would install a verifier instead of building. A dry run
+  without the fix prints exactly one recipe line,
+  `prover-tools kani install --repo-root .`. Impact: `.DEFAULT_GOAL := build`
+  pins the ordinary build and `tests/make_default_goal.rs` guards it.
+- Observation (2026-10-31): the review's suggested scratch-manifest split kept
+  only the `[lints.clippy]` table. Applying it literally would drop
+  `[lints.rust]` and `[lints.rustdoc]` from the in-place Kani workspace, so the
+  probe would compile under weaker rules than the crate. Impact: the repair
+  renames every lint table and stops at the next non-lint table, which keeps
+  the rules and still excludes `[dev-dependencies]`.
 
 ## Decision log
 
+- DL-31 (2026-10-31). EP-M1 review repairs. This entry supersedes only DL-27's
+  complexity and NumPy docstring disposition; every other DL-27 decision stands.
+  `kani` and `verus` now compose private builders (`kani_prefix`,
+  `kani_arguments`, `kani_observations`, `kani_in_place_observation`,
+  `write_kani_provenance`, `resolve_z3`, `verus_environment`, `verus_command`,
+  `write_verus_provenance`, and `qualified_candidates`), and the three CLI
+  commands carry NumPy-style `Parameters` sections so each route step is
+  readable and testable on its own. The builders change no command, log, or
+  provenance field; the regenerated corpus is the behavioural check. The
+  `Makefile` gains `.DEFAULT_GOAL := build`, because the prover targets are
+  declared first and a bare `make` otherwise ran `install-kani`; the Red state
+  is `/tmp/Makefile.red-check` reproduction and the guard is
+  `tests/make_default_goal.rs`. The measurement workflow's concurrency group
+  now includes the label name, so two measurement labels on one pull request
+  queue independently. The scratch workspace renames every lint table through
+  `workspace_lint_tables`, which keeps `[lints.rust]` and `[lints.rustdoc]`
+  instead of the review's weaker `[lints.clippy]`-only split, and stops a
+  following non-lint table from reaching the virtual manifest; the guard is
+  `scripts/tests/test_verifier_support_lints.py`. The verifier tests share one
+  stub loader, `scripts/tests/verifier_probe_loader.py`. Date/Author:
+  2026-10-31, implementation agent.
 - DL-30 (2026-10-31). Hosted cost go/no-go: proceed. All six routes passed
   three cold runs and verifier-free isolation passed on a fresh runner.
   Predicted job size is the slowest cold run plus fixed setup overhead; the
