@@ -36,7 +36,7 @@ const MDTABLEFIX_ACTION: &str = "leynos/shared-actions/.github/actions/install-m
 const UNPINNED_MDTABLEFIX_ACTION: &str =
     "leynos/shared-actions/.github/actions/install-mdtablefix@main";
 /// Approved mdtablefix version for the Act route.
-const MDTABLEFIX_VERSION: &str = "0.6.0";
+const MDTABLEFIX_VERSION: &str = "0.6.1";
 
 /// The ACT values relevant to hosted coverage and its local test fallback.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,7 +61,7 @@ fn installs_linker_prerequisites_before_act_validation() {
     );
     assert!(
         workflow_has_mdtablefix_before_act_validation(&workflow),
-        "the pinned mdtablefix action must install version 0.6.0 before make test WITH_ACT=1"
+        "the pinned mdtablefix action must install version 0.6.1 before make test WITH_ACT=1"
     );
 }
 
