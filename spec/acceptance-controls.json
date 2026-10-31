@@ -497,7 +497,7 @@
           "sources": [
             {
               "path": ".github/workflows/ci.yml",
-              "sha256": "a7df05458bc84d1b74b6496d3eca0d2ae381eb461b05733d6f4821f7b07a6545"
+              "sha256": "02431b699f785c482a4876ec93ca5bbd8d0085d5499107e827ff1a6773b27d72"
             }
           ]
         },
@@ -546,7 +546,7 @@
         "authority": "Registered by the implementing agent under the sponsor's D12 delegation; amendments require approval by the sponsor (leynos)."
       },
       "registered_digest": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
-      "digest": "8504ab3401c2c281f0a97d31b0467a3b40617224cf6150af4a52acbfa11a639b",
+      "digest": "0e679406c07ca6bdacb279308be5490352c17a862bee713476525afe29ce9994",
       "amendments": [
         {
           "date": "2026-10-12",
@@ -555,6 +555,14 @@
           "replaces": "509923c3c300f0a901dfd35c9915fb728d632798f7a4bc1eecf83990fb6686d2",
           "new_digest": "8504ab3401c2c281f0a97d31b0467a3b40617224cf6150af4a52acbfa11a639b",
           "reason": "Sponsor requested all Python scripts under scripts/. Update the CI workflow probe path; retain the workload, thresholds, and measurement protocol."
+        },
+        {
+          "date": "2026-10-31",
+          "approved_by": "leynos",
+          "approval_reference": "https://github.com/leynos/combobulate/pull/24",
+          "replaces": "8504ab3401c2c281f0a97d31b0467a3b40617224cf6150af4a52acbfa11a639b",
+          "new_digest": "0e679406c07ca6bdacb279308be5490352c17a862bee713476525afe29ce9994",
+          "reason": "Sponsor authorised this amendment on 30 October 2026 (instruction to implement Whitaker correctly in this repository and in CI). Repinning install-whitaker to shared-actions 5a99aed7 changes the bytes of the AC-07 source .github/workflows/ci.yml; the workload, thresholds and measurement protocol are retained."
         }
       ]
     }

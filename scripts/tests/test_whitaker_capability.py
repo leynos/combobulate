@@ -33,19 +33,29 @@ class CapabilityMutationTests(unittest.TestCase):
 
     def test_missing_binary_only_flag_rejects_cold_source_fallback(self):
         """Dropping the flag fails even when the ordinary stub would return success."""
-        changed = self.changed_run('"$WHITAKER_INSTALLER_PATH" --no-source-fallback',
-                                   '"$WHITAKER_INSTALLER_PATH"')
+        changed = self.changed_run('set -- --no-source-fallback', 'set --')
         with self.assertRaisesRegex(ValueError, 'arguments'):
             probe_manifest(changed)
 
     def test_each_flag_arm_is_required_independently(self):
         """Changing just Cranelift or just the ordinary arm cannot pass the probe."""
-        for suffix in (' --cranelift 2>', ' 2>'):
-            with self.subTest(arm=suffix):
-                changed = self.changed_run('"$WHITAKER_INSTALLER_PATH" --no-source-fallback' + suffix,
-                                           '"$WHITAKER_INSTALLER_PATH"' + suffix)
+        # The ordinary-arm mutation keeps the flag when Cranelift is requested, so it
+        # cannot be detected through the Cranelift scenario and the ordinary scenario
+        # alone has to catch it.
+        ordinary_only = ('if [[ "$WHITAKER_CRANELIFT" == "true" ]]; then '
+                         'set -- --no-source-fallback; else set --; fi')
+        for original, replacement in (('set -- "$@" --cranelift', ':'),
+                                      ('set -- --no-source-fallback', ordinary_only)):
+            with self.subTest(arm=original):
+                changed = self.changed_run(original, replacement)
                 with self.assertRaisesRegex(ValueError, 'arguments'):
                     probe_manifest(changed)
+
+    def test_a_bundle_path_is_handed_to_the_installer(self):
+        """A non-empty snapshot bundle reaches the installer as its own flag and argument."""
+        with self.assertRaisesRegex(ValueError, 'arguments'):
+            probe_manifest(self.changed_run('--clippy-snapshot-bundle "$WHITAKER_SNAPSHOT_BUNDLE"',
+                                            '--clippy-snapshot-bundle ""'))
 
     def test_upstream_legacy_fragments_fail_capability_directly(self):
         """Pre-#522 source is unsuitable even without the content-approval guard."""
