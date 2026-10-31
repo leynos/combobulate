@@ -429,7 +429,8 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     changed: all fourteen statuses are unchanged (exit 0 overall), and
     `provenance.json` records
     `9b086e48…` (entry script), `952d6c62…` (support), and `ae38573c…`
-    (provenance writers).
+    (provenance writers). The gate run covered this commit's content, and
+    `make package` verified the clean tree at `1f09c18`.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -928,8 +929,15 @@ facade. Dependency direction, backend exclusion, verifier exclusion, and the
 kernel's `no_std` boundary are checked by `tests/workspace_boundaries.rs`
 against the live Cargo graph and canned non-vacuity fixtures, and the package
 policy checks every member the root globs select. `make package` verifies
-through the patched route in DL-33. The workspace layout is published without
-claiming the array algebra or `comb!` notation, which remain unimplemented.
+through the patched route in DL-33. All commit gates passed sequentially on
+`1f09c18`: `make check-fmt`, `make lint` (rustdoc `-D warnings`, Clippy,
+Whitaker, interrogate 100%), `make test` (361 nextest cases passed, one
+skipped; the kernel doctest passed), `make design-check` (446 unittest cases;
+525 pytest cases plus 691 subtests), `make markdownlint` with the spelling gate,
+`make nixie`, and `make package`, which packaged and recompiled
+`combobulate v0.1.0` from the unpacked tarball. The workspace layout is
+published without claiming the array algebra or `comb!` notation, which remain
+unimplemented.
 
 ## Context and orientation
 
