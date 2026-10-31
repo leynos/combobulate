@@ -460,19 +460,12 @@ Never edit or delete an approved exception: the freeze check rejects it, and an
 expired one stays as history. The weekly `Design contracts` run surfaces expiry
 on `main` before it reaches an unrelated pull request.
 
-To amend a registered acceptance control, change its frozen fields, compute the
-new digest with `preregistration.frozen_digest`, append an amendment whose
-`replaces` is the previous digest and whose `new_digest` is the new one, with
-the sponsor as `approved_by` and an approval reference, and set `digest` to the
-new value. If any acceptance measurement already exists for the control,
-register a new control identifier instead and keep the original result.
-
-Registered workload sources use repository-relative paths, such as
-`.github/workflows/ci.yml`, with no `..` components. Absolute paths are
-rejected. Each source file, including any resolved symlink target, must remain
-inside the repository and match its recorded SHA-256 digest. When source
-content changes, update its source digest and follow the control amendment
-procedure above; after an acceptance measurement, register a new control.
+To change a registered acceptance control, edit `spec/acceptance-controls.json`
+in a pull request; the schema and `make design-check` type and complete it, and
+Git history is the record. If any acceptance measurement already exists for the
+control, register a new control identifier instead and keep the original
+result. The register holds no digests, approvals or source hashes, so a
+reformat of a file a control names breaks nothing.
 
 When `docs/validation-results.json` conflicts between stacked branches, take
 either side, rerun the generators and `scripts/export_roadmap.py`, then run
@@ -702,36 +695,35 @@ Acceptance-control rule checks in
 `scripts/docs_validation/acceptance_registration.py`,
 `scripts/docs_validation/acceptance_evidence.py`, and
 `scripts/docs_validation/ci_controls.py` belong only to the documentation-pack
-checker. They accept parsed values and source digests, and do not read
-repository files. The `preregistration.py` composition path scans serialized
-JSON evidence for host identities and then recursively scans its decoded string
-keys and values, so escaped characters cannot hide an identity from the check.
-The Markdown calibration report is scanned as raw text. Keep this recursive
-scan private to the acceptance-control composition path. Keep filesystem reads
-and schema loading in the composition path rooted at
-`check_acceptance_controls` in `scripts/docs_validation/preregistration.py` and
-its shared `ValidationContext`. `ValidationContext.load_yaml` converts parser
-failures into checker errors, and `ValidationContext.read_bytes` supplies
-source data for composition-time digest calculation. The composition path
-passes source digests and the small `AcceptanceWorkflowSettings` value to the
+checker. They accept parsed values and do not read repository files. The
+`preregistration.py` composition path scans serialized JSON evidence for host
+identities and then recursively scans its decoded string keys and values, so
+escaped characters cannot hide an identity from the check. The Markdown
+calibration report is scanned as raw text. Keep this recursive scan private to
+the acceptance-control composition path. Keep filesystem reads and schema
+loading in the composition path rooted at `check_acceptance_controls` in
+`scripts/docs_validation/preregistration.py` and its shared `ValidationContext`.
+`ValidationContext.load_yaml` converts parser failures into checker errors.
+The composition path passes the small `AcceptanceWorkflowSettings` value to the
 pure rules. The original named imports remain re-exported from preregistration
 for focused tests; these helpers are not general GitHub Actions parsers,
 measurement libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
-documentation-pack validation. The frozen register is
+documentation-pack validation. The control register is
 [`spec/acceptance-controls.json`](../spec/acceptance-controls.json), validated
 by its [schema](../spec/acceptance-controls.schema.json); measurement records
 use the [measurement-record schema](../spec/measurement-record.schema.json).
 Keep calibration records in `spec/calibration/` and acceptance measurements in
 `spec/measurements/`: calibration evidence cannot satisfy an acceptance
-control. Validation binds registered source digests, checks the frozen fields
-and digest chain, and requires sponsor-approved, append-only amendments for
-changes. The accepted environment is the hosted `ubuntu-24.04` runner, and
-`build-test` has an eight-minute timeout. The matching `make act-validation`
-target maps that job to the configured `ubuntu-24.04` Act runner image. See the
-[acceptance calibration report](acceptance-calibration.md)
-for methodology, tool versions, and reproduction commands, and the standalone
+control. Validation checks that every control defines the registered fields and
+that each measurement record binds to its control, registration date, runner
+and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner,
+and `build-test` has an eight-minute timeout. The matching
+`make act-validation` target maps that job to the configured `ubuntu-24.04` Act
+runner image. See the
+[acceptance calibration report](acceptance-calibration.md) for methodology,
+tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
 Kani calibration artefacts.
 

@@ -78,10 +78,6 @@ class ValidationContext:
         except yaml.YAMLError as error:
             raise ValueError(f'Invalid YAML in {name}: {error}') from error
 
-    def read_bytes(self, name: str) -> bytes:
-        """Read raw source bytes; e.g. hash a registered workload file."""
-        return (self.root / name).read_bytes()
-
     def record(self, name: str, detail: str, count: int | None = None) -> None:
         """Append a check result; e.g. context.record('tasks', 'Pass', 10)."""
         row: dict[str, object] = {'check': name, 'status': 'pass', 'detail': detail}

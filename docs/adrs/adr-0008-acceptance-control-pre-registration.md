@@ -8,7 +8,8 @@ under a digest, before any acceptance measurement; thresholds come from
 recorded calibration extrapolated to the hosted runner class. Records D11 and
 D12 in the [decision register](../decision-register.md); the controls are
 `AC-01` to `AC-07` in `spec/acceptance-controls.json`, calibrated in
-[acceptance calibration](../acceptance-calibration.md).
+[acceptance calibration](../acceptance-calibration.md). Amended on 2026-10-31:
+see [Amendments](#amendments).
 
 ## Date
 
@@ -94,3 +95,30 @@ with the evidence recorded.
   calibrated.
 - Without code-owner review (D13), the freeze check makes an unamended edit a
   named failure, and the sponsor's review is the human control.
+
+## Amendments
+
+2026-10-31: the approval process for acceptance controls is retired, on the
+maintainer's ruling that a contract test which breaks on a reformat wastes
+everyone's time and that this is a single developer and a set of robots with no
+sponsor to approve anything. This replaces the Registration digest, Amendments
+and approval rules above, which stay as the original decision.
+
+Removed: the SHA-256 digest of each control and its amendment chain, the
+sponsor-approved amendment and its approval reference, the registered SHA-256
+of the workload source files (including the `ci.yml` hash that failed on any
+edit of the workflow), the digest on measurement records, and the base-revision
+freeze of the controls register. Kept: each control's measurement definition
+(workload, metric, estimand, statistic, decision rule, environment,
+calibration), the schema that types it, and the checks that bind records to
+their control, registration date, hosted runner and toolchains.
+
+Rules in force after this amendment: a control defines its workload, control,
+sizes, seeds, timed region, metric, unit, estimand, statistic, decision rule,
+warm-up, interleaving, sample counts, outlier policy, environment, cache
+policy, proof scope, measurement tool, analysis script, calibration reference
+and registration date. A control is an ordinary reviewed file: a change goes
+through a pull request and Git history is the record. Each acceptance record
+names its control, is dated on or after the control's registration date, and
+uses the hosted acceptance environment. A threshold change after an acceptance
+measurement is registered as a new control identifier.

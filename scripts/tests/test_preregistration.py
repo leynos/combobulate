@@ -1,32 +1,27 @@
-"""Prove pre-registration freezes every control field and amendment history (VO-11)."""
+"""Prove acceptance controls are typed, complete and bound by their measurement records (VO-11)."""
 from __future__ import annotations
 
 import copy
-import hashlib
 import socket
 import sys
-import tempfile
 import unittest
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from hypothesis import example, given, settings, strategies as st
 from jsonschema import Draft202012Validator, ValidationError
 
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
-    FROZEN_FIELDS, OUTCOME_VERDICTS, _load_source_digests, check_acceptance_controls, check_amendment_chain,
-    check_completeness, check_measurement_binding, check_registration_declarations, check_sources,
-    frozen_digest,
+    FROZEN_FIELDS, OUTCOME_VERDICTS, check_acceptance_controls, check_completeness, check_measurement_binding,
+    check_registration_declarations,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTER = ValidationContext(ROOT).load('spec/acceptance-controls.json')
 CONTROL = REGISTER['controls'][0]
 CI_CONTROL = next(item for item in REGISTER['controls'] if item['id'] == 'AC-07')
-SPONSOR = 'leynos'
 REGISTER_VALIDATOR = Draft202012Validator(
     ValidationContext(ROOT).load('spec/acceptance-controls.schema.json'),
     format_checker=Draft202012Validator.FORMAT_CHECKER,
@@ -36,30 +31,13 @@ RECORD_VALIDATOR = Draft202012Validator(
     format_checker=Draft202012Validator.FORMAT_CHECKER,
 )
 RECORD_OUTCOMES = sorted(OUTCOME_VERDICTS)
-LATEST_CONTROL_AMENDMENT_DATE = CONTROL['amendments'][-1]['date']
-TEST_MEASUREMENT_DATE = (date.fromisoformat(LATEST_CONTROL_AMENDMENT_DATE) + timedelta(days=1)).isoformat()
-# The CI control is amended independently of the first control, so its records follow its own chain.
-CI_MEASUREMENT_DATE = (date.fromisoformat(CI_CONTROL['amendments'][-1]['date']) + timedelta(days=1)).isoformat()
+TEST_MEASUREMENT_DATE = (date.fromisoformat(CONTROL['frozen']['registered_on']) + timedelta(days=1)).isoformat()
+CI_MEASUREMENT_DATE = (date.fromisoformat(CI_CONTROL['frozen']['registered_on']) + timedelta(days=1)).isoformat()
 
 
-def amended(control: dict, field: str, value: object) -> dict:
-    """Return a copy with one frozen field changed through an approved amendment."""
-    edited = copy.deepcopy(control)
-    edited['frozen'][field] = value
-    new_digest = frozen_digest(edited)
-    previous_date = edited['amendments'][-1]['date'] if edited['amendments'] else edited['frozen']['registered_on']
-    amendment_date = (date.fromisoformat(previous_date) + timedelta(days=1)).isoformat()
-    edited['amendments'].append({'date': amendment_date, 'approved_by': SPONSOR,
-                                 'approval_reference': 'https://example.org/approval',
-                                 'replaces': edited['digest'], 'new_digest': new_digest, 'reason': 'Test.'})
-    edited['digest'] = new_digest
-    return edited
-
-
-def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None) -> dict:
+def record(outcome: str, purpose: str = 'acceptance') -> dict:
     """Build one schema-valid measurement record for the first control."""
     entry = {'id': 'fixture', 'purpose': purpose, 'control_ids': [CONTROL['id']],
-             'control_digest': None if purpose == 'calibration' else (digest or CONTROL['digest']),
              'recorded_on': TEST_MEASUREMENT_DATE,
              'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
                           'vcpus': 4, 'memory_gib': 16, 'architecture': 'x64',
@@ -79,7 +57,7 @@ def record(outcome: str, purpose: str = 'acceptance', digest: str | None = None)
 
 def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
     """Build an AC-07 record in newest-first order with timestamped job attempts."""
-    entry = record(outcome, digest=CI_CONTROL['digest'])
+    entry = record(outcome)
     entry['control_ids'] = [CI_CONTROL['id']]
     entry['recorded_on'] = CI_MEASUREMENT_DATE
     workload = entry['workloads'][0]
@@ -101,24 +79,24 @@ def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
 
 
 class Registration(unittest.TestCase):
-    """VO-11: frozen protocols are typed, digested, and governed by an approved chain."""
+    """VO-11: acceptance controls are typed, complete, and bind their measurement records."""
 
     def test_committed_register_passes(self):
-        """Validate every registered control and source in the committed register."""
+        """Validate every registered control in the committed register."""
         # Home-path checks catch user names; a generic CI account name is ordinary text.
         check_acceptance_controls(ValidationContext(ROOT), (socket.gethostname(),))
 
     def test_register_lists_the_frozen_fields(self):
-        """Require the register to name the fields used by its digest."""
+        """Require the register to name the fields every control must define."""
         self.assertEqual(REGISTER['frozen_fields'], list(FROZEN_FIELDS), 'the register must state its frozen fields')
 
-    def test_register_frozen_fields_match_digest_implementation(self):
-        """Keep the declared frozen fields aligned with the digest implementation."""
+    def test_register_frozen_fields_match_the_implementation(self):
+        """Keep the declared field list aligned with the executable list."""
         check_registration_declarations(REGISTER)
         candidate = copy.deepcopy(REGISTER)
-        candidate['frozen_fields'][-1] = 'unhashed-field'
-        with self.assertRaisesRegex(AssertionError, 'must match the executable digest fields',
-                                    msg='the declared frozen fields must match the digest implementation'):
+        candidate['frozen_fields'][-1] = 'unchecked-field'
+        with self.assertRaisesRegex(AssertionError, 'must match the executable frozen-field list',
+                                    msg='the declared fields must match the implementation'):
             check_registration_declarations(candidate)
 
     def test_missing_calibration_reference_fails(self):
@@ -128,44 +106,12 @@ class Registration(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, 'lacks frozen fields: calibration'):
             check_completeness(control)
 
-    def test_threshold_and_digest_edited_together_fail(self):
-        """Reject a changed threshold even when its digest is recalculated."""
+    def test_an_unregistered_field_fails(self):
+        """Reject a control that carries a field the register does not define."""
         control = copy.deepcopy(CONTROL)
-        control['frozen']['decision_rule']['thresholds'] = {'anything': 1}
-        control['digest'] = frozen_digest(control)
-        with self.assertRaisesRegex(AssertionError, 'digest is not the end of its amendment chain'):
-            check_amendment_chain(control, SPONSOR)
-
-    def test_correct_amendment_passes(self):
-        """Accept a correctly approved amendment with a matching digest chain."""
-        check_amendment_chain(amended(CONTROL, 'seeds', [7]), SPONSOR)
-
-    def test_amendment_before_first_measurement_remains_authorized(self):
-        """Allow an amendment made before its first acceptance measurement."""
-        control = amended(CONTROL, 'seeds', [7])
-        measurement = record('pass', digest=control['digest'])
-        measurement['recorded_on'] = (
-            date.fromisoformat(control['amendments'][-1]['date']) + timedelta(days=1)
-        ).isoformat()
-        check_amendment_chain(control, SPONSOR, [measurement])
-        self.assertTrue(check_measurement_binding(control, measurement),
-                        'a measurement after an approved amendment binds the amended digest')
-
-    def test_amendment_cannot_backdate_measurement_authority(self):
-        """Reject an amendment dated before its preceding effective date."""
-        control = amended(CONTROL, 'seeds', [7])
-        control['amendments'][0]['date'] = '2026-10-10'
-        between_registration_and_record = record('pass', digest=control['digest'])
-        between_registration_and_record['recorded_on'] = '2026-10-11'
-        with self.assertRaisesRegex(AssertionError, 'amendment date cannot predate its previous effective date'):
-            check_amendment_chain(control, SPONSOR, [between_registration_and_record])
-
-    def test_amendment_date_must_follow_the_previous_amendment(self):
-        """Reject a chain whose amendment dates move backwards."""
-        control = amended(amended(CONTROL, 'seeds', [7]), 'seeds', [8])
-        control['amendments'][-1]['date'] = '2026-10-11'
-        with self.assertRaisesRegex(AssertionError, 'amendment date cannot predate its previous effective date'):
-            check_amendment_chain(control, SPONSOR)
+        control['frozen']['sponsor_note'] = 'x'
+        with self.assertRaisesRegex(AssertionError, 'has unregistered frozen fields: sponsor_note'):
+            check_completeness(control)
 
     def test_register_outcome_map_matches_executable_verdicts(self):
         """Keep schema and runtime outcome mappings consistent."""
@@ -185,21 +131,8 @@ class Registration(unittest.TestCase):
                 with self.assertRaises(ValidationError, msg='the register schema must reject a changed outcome map'):
                     REGISTER_VALIDATOR.validate(candidate)
 
-    def test_amendment_needs_the_sponsor(self):
-        """Reject an amendment approved by someone other than the sponsor."""
-        control = amended(CONTROL, 'seeds', [7])
-        control['amendments'][-1]['approved_by'] = 'someone-else'
-        with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
-            check_amendment_chain(control, SPONSOR)
-
-    def test_amendment_on_measurement_date_requires_a_new_control_identifier(self):
-        """Reject an amendment made on an acceptance measurement date."""
-        control = amended(CONTROL, 'seeds', [7])
-        with self.assertRaisesRegex(AssertionError, 'must predate the earliest acceptance measurement'):
-            check_amendment_chain(control, SPONSOR, [record('pass')])
-
-    def test_protocol_content_is_typed_after_digest_recalculation(self):
-        """Validate frozen protocol types even when the digest is recomputed."""
+    def test_protocol_content_is_typed(self):
+        """Validate protocol field types against the register schema."""
         for field, value in (('seeds', None), ('registered_on', 'not-a-date'), ('decision_rule', 'bad threshold')):
             with self.subTest(field=field):
                 control = copy.deepcopy(CONTROL)
@@ -207,171 +140,64 @@ class Registration(unittest.TestCase):
                     control['frozen'][field]['thresholds']['budget'] = value
                 else:
                     control['frozen'][field] = value
-                digest = frozen_digest(control)
-                control['registered_digest'] = digest
-                control['digest'] = digest
                 candidate = copy.deepcopy(REGISTER)
                 candidate['controls'] = [control if item['id'] == control['id'] else item
                                           for item in REGISTER['controls']]
-                with self.assertRaises(ValidationError,
-                                       msg=f'{field} must fail schema validation with a recomputed digest'):
+                with self.assertRaises(ValidationError, msg=f'{field} must fail schema validation'):
                     REGISTER_VALIDATOR.validate(candidate)
 
-    def test_changed_source_needs_an_amendment(self):
-        """Reject missing or changed bytes for a registered source."""
-        control = copy.deepcopy(CI_CONTROL)
-        sources = {source['path']: source['sha256'] for source in control['frozen']['workload']['sources']}
-        check_sources(control, sources)
-        sources['.github/workflows/ci.yml'] = '0' * 64
-        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml changed since registration',
-                                    msg='changed source bytes must require a registered amendment'):
-            check_sources(control, sources)
-        with self.assertRaisesRegex(AssertionError, 'AC-07 source .github/workflows/ci.yml is missing',
-                                    msg='every registered source must be supplied to the pure rule'):
-            check_sources(control, {})
+    def test_the_register_carries_no_digest_or_approval_machinery(self):
+        """Reject the retired digest, amendment and source-hash fields."""
+        for field in ('digest', 'registered_digest', 'amendments'):
+            with self.subTest(field=field):
+                candidate = copy.deepcopy(REGISTER)
+                candidate['controls'][0][field] = 'x'
+                with self.assertRaises(ValidationError, msg=f'{field} is no longer part of a control'):
+                    REGISTER_VALIDATOR.validate(candidate)
 
-    def test_registered_source_paths_are_confined_to_the_repository(self):
-        """Reject source paths that escape the repository while allowing internal symlinks."""
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            parent = Path(temporary_directory)
-            root = parent / 'repo'
-            root.mkdir()
-            source = root / 'source.yml'
-            source.write_text('workflow: valid\n', encoding='utf-8')
-            (root / 'internal-link.yml').symlink_to(source)
-            outside = parent / 'outside.yml'
-            outside.write_text('workflow: outside\n', encoding='utf-8')
-            (root / 'external-link.yml').symlink_to(outside)
-            context = ValidationContext(root)
+    def test_retired_fields_are_rejected_wherever_they_were_injected(self):
+        """Reject a record digest, workload sources and a frozen authority in otherwise valid fixtures."""
+        with self.subTest(field='control_digest'):
+            with_digest = record('pass')
+            with_digest['control_digest'] = 'a' * 64
+            with self.assertRaises(ValidationError, msg='measurement records no longer carry a control digest'):
+                RECORD_VALIDATOR.validate(with_digest)
+        for label, mutate in (
+            ('workload.sources', lambda control: control['frozen']['workload'].update(sources=[])),
+            ('frozen.authority', lambda control: control['frozen'].update(authority='Registered by the sponsor.')),
+        ):
+            with self.subTest(field=label):
+                control = copy.deepcopy(CONTROL)
+                mutate(control)
+                candidate = copy.deepcopy(REGISTER)
+                candidate['controls'] = [control if item['id'] == control['id'] else item
+                                          for item in REGISTER['controls']]
+                with self.assertRaises(ValidationError, msg=f'{label} is no longer part of a control'):
+                    REGISTER_VALIDATOR.validate(candidate)
 
-            def controls(path: str) -> list[dict]:
-                """Build one frozen-control source record for the supplied path."""
-                return [{'id': 'AC-07', 'frozen': {'workload': {'sources': [{'path': path}]}}}]
+    def test_a_measurement_on_the_registration_date_is_accepted(self):
+        """Accept a record dated on the day the control was registered."""
+        on_the_day = record('pass')
+        on_the_day['recorded_on'] = CONTROL['frozen']['registered_on']
+        check_measurement_binding(CONTROL, on_the_day)
 
-            digests = _load_source_digests(context, controls('internal-link.yml'))
-            self.assertEqual(digests['internal-link.yml'], hashlib.sha256(source.read_bytes()).hexdigest(),
-                             'an internal symlink must hash its in-repository target')
+    def test_a_measurement_binds_to_a_control_after_its_registration(self):
+        """Accept a record for the control, measured after the control was registered."""
+        check_measurement_binding(CONTROL, record('pass'))
 
-            invalid_paths = (
-                (str(source), 'must be repository-relative'),
-                ('/etc/hostname', 'must be repository-relative'),
-                ('C:\\outside.yml', 'must be repository-relative'),
-                ('../outside.yml', 'contains a parent path component'),
-                ('nested/../source.yml', 'contains a parent path component'),
-                ('..\\outside.yml', 'contains a parent path component'),
-                ('external-link.yml', 'escapes the repository'),
-            )
-            for path, message in invalid_paths:
-                with self.subTest(path=path), self.assertRaisesRegex(AssertionError, message):
-                    _load_source_digests(context, controls(path))
+    def test_a_measurement_before_registration_is_rejected(self):
+        """Reject a record dated before the control's registration."""
+        early = record('pass')
+        early['recorded_on'] = (date.fromisoformat(CONTROL['frozen']['registered_on']) - timedelta(days=1)).isoformat()
+        with self.assertRaisesRegex(AssertionError, 'predates registration'):
+            check_measurement_binding(CONTROL, early)
 
-    @settings(deadline=None)
-    @example(components=['plain'], symlink_outside=True)
-    @given(components=st.lists(st.text(alphabet='abcXYZ09_-', min_size=1, max_size=12),
-                               min_size=1, max_size=4), symlink_outside=st.booleans())
-    def test_generated_source_paths_preserve_the_repository_boundary(self, components, symlink_outside):
-        """Check generated relative paths, parent placements, absolute forms, and link targets."""
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / 'repo'
-            relative = Path(*(f'node-{component}' for component in components)) / 'source.txt'
-            source = root / relative
-            source.parent.mkdir(parents=True)
-            source.write_bytes(b'registered source\n')
-            outside = Path(directory) / 'outside.txt'
-            outside.write_bytes(source.read_bytes())
-            control = copy.deepcopy(CONTROL)
-            binding = {'path': relative.as_posix(), 'sha256': hashlib.sha256(source.read_bytes()).hexdigest()}
-            control['frozen']['workload']['sources'] = [binding]
-            context = ValidationContext(root)
-
-            def validate_binding() -> None:
-                """Recompute the registered source digest and validate its binding."""
-                digests = _load_source_digests(context, [control])
-                check_sources(control, digests)
-
-            validate_binding()
-            binding['path'] = str(source.resolve())
-            with self.assertRaisesRegex(AssertionError, 'must be repository-relative'):
-                validate_binding()
-
-            for position in range(len(components) + 1):
-                prefix, suffix = relative.parts[:position], relative.parts[position:]
-                (root.joinpath(*prefix) / 'anchor').mkdir(exist_ok=True)
-                binding['path'] = Path(*prefix, 'anchor', '..', *suffix).as_posix()
-                with self.assertRaisesRegex(AssertionError, 'contains a parent path component'):
-                    validate_binding()
-
-            link = root / 'registered-link'
-            link.symlink_to(outside if symlink_outside else source)
-            binding['path'] = link.name
-            if symlink_outside:
-                with self.assertRaisesRegex(AssertionError, 'escapes the repository'):
-                    validate_binding()
-            else:
-                validate_binding()
-
-    def test_every_frozen_field_changes_the_digest(self):
-        """Exercise every frozen field against the digest and chain checks."""
-        exercised: set[str] = set()
-
-        @settings(max_examples=200, derandomize=True, deadline=None)
-        @given(st.sampled_from(FROZEN_FIELDS), st.integers())
-        def mutate(field: str, value: int) -> None:
-            """Replace one sampled frozen field and verify that it cannot bypass the digest check."""
-            exercised.add(field)
-            control = copy.deepcopy(CONTROL)
-            control['frozen'][field] = {'mutated': value}
-            self.assertNotEqual(frozen_digest(control), CONTROL['digest'], f'{field} must be covered by the digest')
-            with self.assertRaises(AssertionError):
-                check_amendment_chain(control, SPONSOR)
-
-        mutate()
-        self.assertEqual(exercised, set(FROZEN_FIELDS), 'every frozen field must be exercised')
-
-    @settings(max_examples=40, derandomize=True, deadline=None)
-    @given(st.lists(st.integers(min_value=-1_000_000, max_value=1_000_000)
-                    .filter(lambda value: [value] != CONTROL['frozen']['seeds']),
-                    min_size=2, max_size=6, unique=True))
-    def test_generated_amendment_chains_reject_invalid_mutations(self, seed_values: list[int]) -> None:
-        """Exercise valid amendment chains and generated authority, ancestry, chronology, repetition, and cutoff failures."""
-        chain = copy.deepcopy(CONTROL)
-        for seed in seed_values:
-            chain = amended(chain, 'seeds', [seed])
-
-        check_amendment_chain(chain, SPONSOR)
-        valid_measurement = record('pass', digest=chain['digest'])
-        valid_measurement['recorded_on'] = (
-            date.fromisoformat(chain['amendments'][-1]['date']) + timedelta(days=1)
-        ).isoformat()
-        check_amendment_chain(chain, SPONSOR, [valid_measurement])
-
-        broken_ancestry = copy.deepcopy(chain)
-        previous_digest = broken_ancestry['amendments'][-1]['replaces']
-        broken_ancestry['amendments'][-1]['replaces'] = 'f' * 64 if previous_digest != 'f' * 64 else 'e' * 64
-        with self.assertRaisesRegex(AssertionError, 'does not replace digest'):
-            check_amendment_chain(broken_ancestry, SPONSOR)
-
-        repeated_digest = copy.deepcopy(chain)
-        repeated_digest['amendments'][-1]['new_digest'] = repeated_digest['registered_digest']
-        with self.assertRaisesRegex(AssertionError, 'repeats a digest'):
-            check_amendment_chain(repeated_digest, SPONSOR)
-
-        non_monotonic_date = copy.deepcopy(chain)
-        previous_date = date.fromisoformat(non_monotonic_date['amendments'][-2]['date'])
-        non_monotonic_date['amendments'][-1]['date'] = (previous_date - timedelta(days=1)).isoformat()
-        with self.assertRaisesRegex(AssertionError, 'cannot predate its previous effective date'):
-            check_amendment_chain(non_monotonic_date, SPONSOR)
-
-        wrong_sponsor = copy.deepcopy(chain)
-        wrong_sponsor['amendments'][-1]['approved_by'] = 'another-sponsor'
-        with self.assertRaisesRegex(AssertionError, 'not approved by the sponsor'):
-            check_amendment_chain(wrong_sponsor, SPONSOR)
-
-        first_generated_amendment = chain['amendments'][len(CONTROL['amendments'])]
-        cutoff_measurement = record('pass', digest=chain['digest'])
-        cutoff_measurement['recorded_on'] = first_generated_amendment['date']
-        with self.assertRaisesRegex(AssertionError, 'must predate the earliest acceptance measurement'):
-            check_amendment_chain(chain, SPONSOR, [cutoff_measurement])
+    def test_a_measurement_for_another_control_is_rejected(self):
+        """Reject a record that does not name the control it is bound to."""
+        other = record('pass')
+        other['control_ids'] = [CI_CONTROL['id']]
+        with self.assertRaisesRegex(AssertionError, 'is not acceptance evidence for'):
+            check_measurement_binding(CONTROL, other)
 
 
 if __name__ == '__main__':

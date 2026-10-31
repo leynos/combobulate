@@ -9,60 +9,46 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 
-from .acceptance_registration import digest_dates
 from .ci_controls import OUTCOME_VERDICTS, check_ci_measurement
 from .context import require
 
 PINNED_VERSION = re.compile(r'\bnightly-\d{4}-\d{2}-\d{2}\b|\b\d+(?:\.\d+){2,}(?:[.-][A-Za-z0-9]+)*\b')
 ACCEPTANCE_RUNNER_CLASS = 'GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64'
 
-def check_measurement_binding(control: Mapping[str, object], record: Mapping[str, object]) -> bool:
-    """Validate a measurement's effective digest and report whether it is current.
+def check_measurement_binding(control: Mapping[str, object], record: Mapping[str, object]) -> None:
+    """Validate that a measurement is acceptance evidence for a control on the hosted runner.
 
     Parameters
     ----------
     control : Mapping[str, object]
-        Registered control whose digest history governs the measurement.
+        Registered control the measurement names.
     record : Mapping[str, object]
-        Acceptance record naming the control, digest, date, runner metadata, hardware,
+        Acceptance record naming the control, date, runner metadata, hardware,
         and measured toolchain versions.
 
     Returns
     -------
-    bool
-        True for the current digest and False for a historical digest effective on the
-        measurement date.
+    None
+        Returns only when the record binds to the control.
 
     Raises
     ------
     AssertionError
-        If the record is unbound, outside its digest's effective date range, or differs
-        from the registered runner profile or toolchain configuration.
+        If the record is for another control, predates the control's registration, or
+        differs from the registered runner profile or toolchain configuration.
     KeyError
         If the control or record omits a field required for binding.
 
     Examples
     --------
-    check_measurement_binding(control, record) returns False for a result bound to a
-    digest superseded after that result's recorded date.
+    check_measurement_binding(control, record) accepts a record measured on the
+    registered runner after the control's registration date.
     """
     require(record['purpose'] == 'acceptance' and control['id'] in record['control_ids'],
             f"{record['id']} is not acceptance evidence for {control['id']}")
-    bindings = digest_dates(control)
-    record_digest = record['control_digest']
-    digest_positions = [index for index, (digest, _) in enumerate(bindings) if digest == record_digest]
-    require(bool(digest_positions),
-            f"{record['id']} cites unknown digest {record_digest} for {control['id']}")
-    index = digest_positions[-1]
-    effective_date = bindings[index][1]
-    recorded_on = record['recorded_on']
-    require(recorded_on >= effective_date,
-            f"{record['id']} predates registration of {control['id']} digest {record_digest}")
-    if index + 1 < len(bindings):
-        superseded_on = bindings[index + 1][1]
-        require(recorded_on < superseded_on,
-                f"{record['id']} cites {control['id']} digest {record_digest} superseded on "
-                f"{superseded_on}")
+    registered_on = control['frozen']['registered_on']
+    require(record['recorded_on'] >= registered_on,
+            f"{record['id']} predates registration of {control['id']} on {registered_on}")
     environment = control['frozen']['environment']
     require(environment['runner_class'] == ACCEPTANCE_RUNNER_CLASS,
             f"{control['id']} has an unsupported frozen acceptance runner class")
@@ -83,7 +69,6 @@ def check_measurement_binding(control: Mapping[str, object], record: Mapping[str
                     for name in ('image_os', 'image_version')),
             f"{record['id']} lacks observed GitHub ImageOS or ImageVersion metadata")
     _check_registered_toolchains(control, record)
-    return record_digest == control['digest']
 
 
 def _check_registered_toolchains(control: Mapping[str, object], record: Mapping[str, object]) -> None:
@@ -221,10 +206,9 @@ def check_control_bindings(controls: Mapping[str, Mapping[str, object]], record:
 def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object]]) -> str:
     """Return the acceptance verdict after binding every matching measurement.
 
-    Valid historical digests are checked but do not affect the current verdict.
     Any failing outcome fails; otherwise any inconclusive outcome is
-    inconclusive; otherwise at least one current record must pass. With no
-    current record the control is not-run.
+    inconclusive; otherwise at least one record must pass. With no matching
+    record the control is not-run.
 
     Parameters
     ----------
@@ -241,7 +225,7 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
     Raises
     ------
     AssertionError
-        If a matching acceptance record violates digest, environment, or AC-07 rules.
+        If a matching acceptance record violates binding, environment, or AC-07 rules.
     KeyError
         If a matching record omits a required field.
     ValueError
@@ -255,10 +239,9 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
                         if record['purpose'] == 'acceptance' and control['id'] in record['control_ids']]
     outcomes = []
     for record in matching_records:
-        is_current = check_measurement_binding(control, record)
+        check_measurement_binding(control, record)
         check_ci_measurement(control, record)
-        if is_current:
-            outcomes.append(OUTCOME_VERDICTS[record['outcome']])
+        outcomes.append(OUTCOME_VERDICTS[record['outcome']])
     if not outcomes:
         return 'not-run'
     if 'fail' in outcomes:

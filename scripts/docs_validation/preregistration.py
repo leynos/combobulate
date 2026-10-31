@@ -1,20 +1,17 @@
 """Validate pre-registered acceptance controls and their measurement records (ADR-0008).
 
-A control freezes everything that decides its result before any acceptance
-measurement exists. Its digest is SHA-256 over the canonical JSON of the frozen
-fields; a later change must arrive as a sponsor-approved amendment whose
-`replaces` equals the previous digest (VO-11). Outcomes map so that budget
+A control defines everything that decides its result before any acceptance
+measurement exists: workload, metric, thresholds, environment and calibration.
+Git history is the record of a change to it. Outcomes map so that budget
 overruns, exhausted resources, and missing records never pass, and calibration
 records never count as acceptance evidence (VO-12). Records describe hardware by
 class only, never by host name or home path (VO-16).
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping
-from pathlib import PurePosixPath, PureWindowsPath
 
 from jsonschema import Draft202012Validator
 
@@ -22,10 +19,7 @@ from .acceptance_evidence import (
     check_calibration_record, check_calibration_reference, check_control_bindings, check_measurement_binding,
     verdict,
 )
-from .acceptance_registration import (
-    FROZEN_FIELDS, check_amendment_chain, check_completeness, check_registration_declarations, check_sources,
-    digest_dates, frozen_digest,
-)
+from .acceptance_registration import FROZEN_FIELDS, check_completeness, check_registration_declarations
 from .ci_controls import (
     OUTCOME_VERDICTS, AcceptanceWorkflowSettings, check_acceptance_workflow, check_ci_calibration,
     check_ci_measurement,
@@ -34,10 +28,10 @@ from .context import ValidationContext, require
 
 __all__ = [
     'AcceptanceWorkflowSettings', 'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'check_acceptance_controls',
-    'check_acceptance_workflow', 'check_amendment_chain', 'check_calibration_record',
+    'check_acceptance_workflow', 'check_calibration_record',
     'check_calibration_reference', 'check_ci_calibration', 'check_ci_measurement', 'check_completeness',
     'check_control_bindings', 'check_host_identity', 'check_measurement_binding', 'check_registration_declarations',
-    'check_sources', 'digest_dates', 'frozen_digest', 'verdict',
+    'verdict',
 ]
 
 HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
@@ -51,32 +45,6 @@ def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
         runner_image=job.get('runs-on') if isinstance(job, Mapping) else None,
         timeout_minutes=job.get('timeout-minutes') if isinstance(job, Mapping) else None,
     )
-
-
-def _load_source_digests(context: ValidationContext, controls: list[dict]) -> dict[str, str]:
-    """Hash sources while requiring repository-relative paths; e.g. bind CI YAML to AC-07.
-
-    Absolute paths and literal parent components are rejected before resolution.
-    Resolved paths must remain beneath the repository root, including symlink targets.
-    """
-    paths = sorted({source['path'] for control in controls for source in control['frozen']['workload']['sources']})
-    root = context.root.resolve()
-    digests: dict[str, str] = {}
-    for path in paths:
-        posix_path = PurePosixPath(path)
-        windows_path = PureWindowsPath(path)
-        require(not posix_path.is_absolute() and not windows_path.is_absolute() and not windows_path.drive,
-                f'Registered source {path} must be repository-relative')
-        require('..' not in posix_path.parts and '..' not in windows_path.parts,
-                f'Registered source {path} contains a parent path component')
-        resolved_path = (root / path).resolve()
-        require(resolved_path.is_relative_to(root), f'Registered source {path} escapes the repository')
-        relative_path = resolved_path.relative_to(root).as_posix()
-        try:
-            digests[path] = hashlib.sha256(context.read_bytes(relative_path)).hexdigest()
-        except OSError as error:
-            raise ValueError(f'Unable to read registered workload source {path}: {error}') from error
-    return digests
 
 
 def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -> None:
@@ -149,17 +117,6 @@ def _load_identity_checked_json(name: str, text: str, extra_names: Iterable[str]
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[str] = ()) -> None:
     """Validate the control register, its calibration records, and the calibration report.
 
@@ -178,12 +135,11 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     Raises
     ------
     AssertionError
-        If a register, source binding, calibration record, or measurement violates a rule.
+        If a register, calibration record, or measurement violates a rule.
     jsonschema.ValidationError
         If a control or measurement does not match its schema.
     ValueError
-        If the workflow YAML is malformed or a registered workload source cannot
-        be read.
+        If the workflow YAML is malformed.
     OSError
         If a register, schema, calibration record, measurement record, or
         calibration report cannot be read.
@@ -213,10 +169,10 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     check_acceptance_workflow(_workflow_settings(workflow), controls_by_id['AC-07'])
     check_ci_calibration(controls_by_id['AC-07'], records)
     _check_acceptance_measurements(controls_by_id, records, measurements)
-    _check_registered_controls(controls, context, records, measurements)
-    context.record('acceptance-controls', 'Typed frozen protocols close their approved digest chains; measurement '
-                                          'records bind known controls, registered dates and the hosted image; '
-                                          'calibration evidence is excluded from acceptance verdicts.', len(ids))
+    _check_registered_controls(controls, records, measurements)
+    context.record('acceptance-controls', 'Typed protocols are complete; measurement records bind known controls, '
+                                          'registered dates and the hosted image; calibration evidence is '
+                                          'excluded from acceptance verdicts.', len(ids))
 
 
 def _load_calibration_records(
@@ -263,15 +219,11 @@ def _check_acceptance_measurements(
 
 
 def _check_registered_controls(
-    controls: list[dict], context: ValidationContext, records: Mapping[str, dict], measurements: list[dict],
+    controls: list[dict], records: Mapping[str, dict], measurements: list[dict],
 ) -> None:
     """Check every frozen control; for example, reject calibration used as acceptance evidence."""
-    source_digests = _load_source_digests(context, controls)
-    sponsor = context.load('spec/decisions.json')['authorities']['roles']['sponsor']
     for control in controls:
         check_completeness(control)
-        check_amendment_chain(control, sponsor, measurements)
-        check_sources(control, source_digests)
         check_calibration_reference(control, records)
         require(verdict(control, records.values()) == 'not-run',
                 f"{control['id']} has acceptance evidence in the calibration directory")

@@ -12,7 +12,7 @@
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 107
+      "count": 108
     },
     {
       "check": "catalogue",
@@ -113,7 +113,7 @@
     {
       "check": "acceptance-controls",
       "status": "pass",
-      "detail": "Typed frozen protocols close their approved digest chains; measurement records bind known controls, registered dates and the hosted image; calibration evidence is excluded from acceptance verdicts.",
+      "detail": "Typed protocols are complete; measurement records bind known controls, registered dates and the hosted image; calibration evidence is excluded from acceptance verdicts.",
       "count": 7
     },
     {

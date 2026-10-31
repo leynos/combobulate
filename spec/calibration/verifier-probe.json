@@ -5,7 +5,6 @@
     "AC-01",
     "AC-02"
   ],
-  "control_digest": null,
   "recorded_on": "2026-10-11",
   "hardware": {
     "class": "shared-development-host",
