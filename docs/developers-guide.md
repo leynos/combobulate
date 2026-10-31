@@ -850,3 +850,6 @@ comparison sources in a rootless container without verifier installations. This
 local host's admission supervisor launches compilers outside the container
 namespace, so its result is explicitly inconclusive. The script refuses to
 remove the wrapper; the separate hosted observation job uses a fresh runner.
+Its first observation passed and is recorded in
+`tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
+the container build and probe logs in the adjacent `observations/` directory.
