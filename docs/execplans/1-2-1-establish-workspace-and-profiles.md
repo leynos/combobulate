@@ -331,7 +331,7 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   sponsor decisions.
 - [x] (2026-10-27) Sponsor approved the plan and directed Q3 to join
   `in_scope_questions`, with the decision based on implementation findings.
-- [ ] (2026-10-28) EP-M1 in progress. Red prover-wiring contracts failed as
+- [x] (2026-10-28) EP-M1 in progress. Red prover-wiring contracts failed as
   expected (`/tmp/red-prover-tools-combobulate-epm1.out`): missing pins,
   targets, and explicit formal placeholders. Prototype: toolchain, profile, and
   hosted-cost probes.
@@ -363,7 +363,11 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   `scripts/tests/test_verifier_free_container.py`), and the measurement
   workflow pins `whitaker-installer` 0.2.11 so the dylint 6.0.1 driver is not
   built (DL-29). A replacement run is required before the go/no-go decision.
-- [ ] EP-M1 hosted costs and verifier-free isolation; publish the measurement
+- [x] (2026-10-31) Hosted measurement run `41163302274` passed all seven jobs on
+  head `4d4f031`: six routes cold three times each, plus verifier-free
+  isolation. The go/no-go rule passes (DL-30); per-route timings, memory, and
+  target sizes are recorded in `Artefacts and notes`.
+- [x] EP-M1 hosted costs and verifier-free isolation; publish the measurement
   workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
@@ -450,8 +454,27 @@ committed together with its Green change.
   (`/tmp/epm1-verifier-free-red.log`); adding `libatomic` to the recipe makes
   the wrapper link and run (`LINK_AND_RUN_OK`). Impact: the recipe installs
   `libatomic` and a regression test guards the package list.
+- Observation (2026-10-31): after both repairs, hosted run `41163302274` passed
+  all seven jobs. Every route completed three cold runs; Whitaker's first run
+  paid a 34 s driver build (57.71 s against 23.10 s and 27.23 s warm), setup
+  took 61-80 s per job, and Clippy after rustdoc took 13.08 s, confirming that
+  those routes share dependency metadata. The verifier-free job reported
+  `status: pass` with exit 0 after proving `verus`, `cargo-kani`, and `~/.kani`
+  absent inside the container. Impact: the go/no-go rule is satisfied and the
+  milestone proceeds to EP-M2.
 
 ## Decision log
+
+- DL-30 (2026-10-31). Hosted cost go/no-go: proceed. All six routes passed
+  three cold runs and verifier-free isolation passed on a fresh runner.
+  Predicted job size is the slowest cold run plus fixed setup overhead; the
+  largest is the UI route at 134.23 s + 73 s = 207 s, inside the 6-minute
+  ceiling, and peak memory is 2.10 GiB, far below the 12 GiB stop. Single-root
+  Verus wiring and the in-place Kani run already succeeded without weakening
+  the ordinary build standard (DL-24, DL-26). Evidence: hosted run
+  `41163302274`, `Artefacts and notes`, and
+  `tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`.
+  Date/Author: 2026-10-31, implementation agent.
 
 - DL-29 (2026-10-31). Repair the hosted measurement without touching the frozen
   CI. Measure the Whitaker route with `whitaker-installer` 0.2.11 (cargo-dylint
@@ -715,11 +738,13 @@ separate Polars adapter crate, is recorded and rejected in DL-19.
 
 ## Outcomes & retrospective
 
-EP-M1 local probes and the measurement workflow are implemented. Single-root
-Verus wiring preserves a dependency-free ordinary kernel and passed its seeded
-mutant check. The captured corpus supports the later parser work; no parser is
-registered and no product theorem is claimed. Hosted measurements and genuine
-verifier-free isolation remain required before the milestone can close.
+EP-M1 is complete. Local probes, the Kani corpus, and the measurement workflow
+are implemented and gated, and hosted run `41163302274` measured every route
+and proved verifier-free isolation. Single-root Verus wiring preserves a
+dependency-free ordinary kernel and passed its seeded mutant check. The
+captured corpus supports the later parser work; no parser is registered and no
+product theorem is claimed. The predicted required-job sizes are recorded in
+DL-30 for the EP-M3 CI shape.
 
 ## Context and orientation
 
@@ -1547,6 +1572,22 @@ in a committed, gated state, so reverting one milestone's commits returns to
 the previous plateau; EP-M3 must be reverted as a unit.
 
 ## Artefacts and notes
+
+Hosted profile measurements, run `41163302274` on head `4d4f031`
+(`ubuntu24 20261026.354.1`, four vCPUs), 2026-10-31, three cold runs each:
+
+- rustdoc: 38.45 / 36.85 / 36.75 s; peak 0.68 GiB; target 0.24 GiB
+- clippy: 39.16 / 37.85 / 39.40 s; peak 0.68 GiB; target 0.24 GiB
+- whitaker: 57.71 / 23.10 / 27.23 s; peak 0.83 GiB; target 0.47 GiB
+- nextest: 52.08 / 51.50 / 51.03 s; peak 2.08 GiB; target 1.08 GiB
+- coverage: 58.89 / 56.40 / 57.47 s; peak 1.68 GiB; target 0.95 GiB
+- ui: 134.23 / 128.67 / 130.26 s; peak 2.10 GiB; target 1.13 GiB
+
+Setup before the first run took 61-80 s per job. Clippy after rustdoc took
+13.08 s, so those routes share dependency metadata. The verifier-free job
+recorded `status: pass` in
+`tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
+the container build and probe logs beside its local counterparts.
 
 Release digests obtained on 2026-10-22 from the GitHub releases API:
 
