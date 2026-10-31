@@ -13,6 +13,12 @@ MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
 SHELL := bash
 
+# The prover targets are declared first so `make install-kani` and friends read
+# beside their version pins. Without an explicit default goal Make would adopt
+# `install-kani`, turning a bare `make` into a tool installation, so pin the
+# ordinary build instead.
+.DEFAULT_GOAL := build
+
 
 override PROVER_TOOLS_REF_FILE := tools/rust-prover-tools/REF
 override PROVER_TOOLS_REF := $(shell awk '/^ref:/ { print $$2 }' $(PROVER_TOOLS_REF_FILE))
