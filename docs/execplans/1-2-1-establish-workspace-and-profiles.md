@@ -385,7 +385,7 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
 - [x] (2026-10-31) EP-M1 close published as `242f03a` with a clean local gate
   run. The milestone CLI review is rate-limited rather than clean (DL-32), so
   the hosted assessment is handed to `pr-babysitting`.
-- [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
+- [x] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
   - [x] (2026-10-31) Refactor first (commit `4df69a3`):
     `tests/make_gate_order.rs` is 237 lines after moving its stage table and
     command assertions to `tests/support/make_gate_order_commands.rs` and its
@@ -464,11 +464,16 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     run `cargo fetch --locked` once before the offline `cargo tree` calls and
     clear `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and `CARGO_BUILD_TARGET` from
     every Cargo child, which restores the design's stated route.
-- [x] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
-  Round-5 gates passed on `403996e` (364 nextest cases, 1 skipped; 452
-  unittest; 531 pytest + 691 subtests; interrogate 100%; 38 Markdown files
-  clean; `make package` packaged 286 files and recompiled the facade from the
-  tarball).
+  - [x] (2026-10-31) Milestone close. The round-5 gates passed on `403996e`
+    (364 nextest cases, 1 skipped; 452 unittest; 531 pytest + 691 subtests;
+    interrogate 100%; 38 Markdown files clean) and `make package` packaged 286
+    files. The round-6 repair (DL-40) then passed the six gates on the
+    committed candidate (365 nextest cases) and `make package` on the clean
+    tree at `5e517d4`.
+  - [x] (2026-10-31) Seventh review round (DL-41). `raw_string_closes` no
+    longer consumes the character it probes, so a content quote inside a raw
+    string cannot hide the crate attributes; the manifest projection marks
+    `workspace` as `NotRequired`; and the repository layout names `.verus/`.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -589,6 +594,25 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-41 (2026-10-31). EP-M2 seventh review round. The review on head `5e517d4`
+  completed with seven findings covering five distinct concerns. Three were
+  verified against source and repaired. (a) `raw_string_closes` consumed the
+  character it probed, so a raw string holding a bare quote before its
+  terminator (`r#"x""#`) hid every following crate attribute; the probe now
+  runs on a clone and commits only a complete `#` run, and the new test
+  `raw_string_content_quotes_do_not_hide_the_kernel_attributes` was observed
+  red before the fix and green after it. (b) `CargoManifest.workspace` was
+  declared required although member manifests omit it and callers read it
+  through `get`; it is now `NotRequired`. (c) `docs/repository-layout.md` now
+  records the generated `.verus/` release, which `make install-verus` unpacks
+  per worktree and Git ignores. A fourth concern, that `run_verifier_probes.py`
+  public helpers need structured NumPy sections, was declined: no repository
+  document states that rule, the file is 398 lines against the 400-line limit in
+  `AGENTS.md`, and peer probe modules use the same single-line form. The
+  remaining finding, that `Progress` listed `EP-M2` twice, was a defect
+  introduced by revision 14 and is repaired by this revision. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt8.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-40 (2026-10-31). EP-M2 sixth review round. The review on head `403996e`
   raised one concern: the live dependency checks ran `cargo tree --target all`
   under `--offline` without the dependency fetch the approved design specifies,
@@ -2070,3 +2094,8 @@ committed provenance, applied at the generators, with both corpora regenerated
 2026-10-31, revision 14: recorded the sixth review round, EP-M2 completion, and
 the round-5 gate evidence: the dependency fetch and build-override clearing the
 design specifies are restored in the live boundary checks (DL-40).
+
+2026-10-31, revision 15: recorded the seventh review round: the raw-string
+terminator probe no longer consumes the character it tests, the manifest
+projection marks `workspace` optional, the layout documents `.verus/`, and the
+duplicate `EP-M2` progress entry introduced by revision 14 is removed (DL-41).
