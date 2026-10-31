@@ -446,7 +446,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     digest (`795f4ef4…`) with every observation status unchanged. The
     `direct`-route description now names both defaults (the `Makefile`
     defaults to `direct`, the script to `helper`), and two comments use
-    oxendict spellings.
+    oxendict spellings. All six commit gates and `make package` passed
+    sequentially on the resulting commit `f0b1650` (364 nextest cases passed
+    and one skipped; 447 unittest cases; 526 pytest cases plus 691 subtests;
+    285 files packaged and the facade recompiled from the tarball).
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -986,7 +989,7 @@ against the live Cargo graph and canned non-vacuity fixtures. The lint checks
 require the final crate-level level to be `deny` or `forbid`, so an `allow` or
 `warn` mention cannot satisfy the boundary. The package policy checks every
 member the root globs select. `make package` verifies through the patched route
-in DL-33. All commit gates passed sequentially on `833ef0c`: `make check-fmt`,
+in DL-33. All commit gates passed sequentially on `f0b1650`: `make check-fmt`,
 `make lint` (rustdoc `-D warnings`, Clippy, Whitaker, interrogate 100%),
 `make test` (364 nextest cases passed, one skipped; the kernel doctest passed),
 `make design-check` (447 unittest cases; 526 pytest cases plus 691 subtests),
