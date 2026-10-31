@@ -155,6 +155,32 @@ class Registration(unittest.TestCase):
                 with self.assertRaises(ValidationError, msg=f'{field} is no longer part of a control'):
                     REGISTER_VALIDATOR.validate(candidate)
 
+    def test_retired_fields_are_rejected_wherever_they_were_injected(self):
+        """Reject a record digest, workload sources and a frozen authority in otherwise valid fixtures."""
+        with self.subTest(field='control_digest'):
+            with_digest = record('pass')
+            with_digest['control_digest'] = 'a' * 64
+            with self.assertRaises(ValidationError, msg='measurement records no longer carry a control digest'):
+                RECORD_VALIDATOR.validate(with_digest)
+        for label, mutate in (
+            ('workload.sources', lambda control: control['frozen']['workload'].update(sources=[])),
+            ('frozen.authority', lambda control: control['frozen'].update(authority='Registered by the sponsor.')),
+        ):
+            with self.subTest(field=label):
+                control = copy.deepcopy(CONTROL)
+                mutate(control)
+                candidate = copy.deepcopy(REGISTER)
+                candidate['controls'] = [control if item['id'] == control['id'] else item
+                                          for item in REGISTER['controls']]
+                with self.assertRaises(ValidationError, msg=f'{label} is no longer part of a control'):
+                    REGISTER_VALIDATOR.validate(candidate)
+
+    def test_a_measurement_on_the_registration_date_is_accepted(self):
+        """Accept a record dated on the day the control was registered."""
+        on_the_day = record('pass')
+        on_the_day['recorded_on'] = CONTROL['frozen']['registered_on']
+        check_measurement_binding(CONTROL, on_the_day)
+
     def test_a_measurement_binds_to_a_control_after_its_registration(self):
         """Accept a record for the control, measured after the control was registered."""
         check_measurement_binding(CONTROL, record('pass'))

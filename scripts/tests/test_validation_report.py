@@ -148,6 +148,26 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(self.report.read_bytes(), report_before,
                          'invalid workflow YAML must not replace the committed validation report')
 
+    def test_a_reformatted_workflow_still_passes_the_full_checker(self) -> None:
+        """Keep a comment and blank lines in ci.yml from failing any acceptance-control check."""
+        workflow = self.root / '.github/workflows/ci.yml'
+        contents = workflow.read_text(encoding='utf-8')
+        workflow.write_text('# A harmless comment.\n\n' + contents.replace('\n', '\n\n', 3), encoding='utf-8')
+        report_before = self.report.read_bytes()
+        self.assertEqual(self.run_main([]), 0, 'a reformat that changes no behaviour must pass the checker')
+        self.assertEqual(self.report.read_bytes(), report_before, 'the validation report must not change')
+
+    def test_a_valid_control_edit_passes_against_a_base_revision(self) -> None:
+        """Let a reviewed threshold edit through the checker with a base revision supplied."""
+        path = self.root / 'spec/acceptance-controls.json'
+        register = json.loads(path.read_text(encoding='utf-8'))
+        control = next(item for item in register['controls'] if item['id'] == 'AC-01')
+        thresholds = control['frozen']['decision_rule']['thresholds']
+        thresholds['wall_seconds'] = thresholds['wall_seconds'] + 1
+        path.write_text(json.dumps(register, indent=2) + '\n', encoding='utf-8')
+        self.assertEqual(self.run_main(['--base-rev', 'HEAD']), 0,
+                         'a control edit is an ordinary reviewed change, with no amendment or digest')
+
     def test_missing_ac07_calibration_reference_is_rejected_by_command(self) -> None:
         """Require the command path to resolve AC-07's registered CI history record."""
         (self.root / 'spec/calibration/ci-history.json').unlink()
