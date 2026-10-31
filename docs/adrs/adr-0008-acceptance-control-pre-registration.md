@@ -8,8 +8,8 @@ under a digest, before any acceptance measurement; thresholds come from
 recorded calibration extrapolated to the hosted runner class. Records D11 and
 D12 in the [decision register](../decision-register.md); the controls are
 `AC-01` to `AC-07` in `spec/acceptance-controls.json`, calibrated in
-[acceptance calibration](../acceptance-calibration.md). Amended on
-2026-10-31: see [Amendments](#amendments).
+[acceptance calibration](../acceptance-calibration.md). Amended on 2026-10-31:
+see [Amendments](#amendments).
 
 ## Date
 
