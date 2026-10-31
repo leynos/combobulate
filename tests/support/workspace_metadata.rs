@@ -19,7 +19,7 @@ pub(super) const MEMBERS: &[&str] = &[FACADE, KERNEL, MACROS];
 pub(super) struct Package {
     /// Cargo package name.
     pub(super) name: String,
-    /// Build targets, used to recognise procedural-macro crates.
+    /// Build targets, used to recognize procedural-macro crates.
     #[serde(default)]
     pub(super) targets: Vec<Target>,
     /// Declared dependencies of every kind and target.

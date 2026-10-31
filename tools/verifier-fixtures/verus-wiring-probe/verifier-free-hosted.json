@@ -36,18 +36,18 @@
     "localhost/combobulate-epm1-verifier-free:20261028",
     "bash",
     "-c",
-    "set -euo pipefail; ! command -v verus; ! command -v cargo-kani; test ! -e \"$HOME/.kani\"; rustc -vV; cargo build --offline --locked --workspace --all-features"
+    "set -euo pipefail; if command -v verus >/dev/null 2>&1; then echo \"verus must be absent\" >&2; exit 1; fi; if command -v cargo-kani >/dev/null 2>&1; then echo \"cargo-kani must be absent\" >&2; exit 1; fi; test ! -e \"$HOME/.kani\"; rustc -vV; cargo build --offline --locked --workspace --all-features"
   ],
   "cwd": ".",
   "exit_code": 0,
   "log": "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free-hosted.log",
-  "sha256": "98b26005b38fce31609a79d0d493ebdb68cce0c1f40180ad23bb6bcbad996b31",
+  "sha256": "2a81245b2920b53a2dcbcf6d65f4ae201256b7728f3c7fa6cab912cd9d871e9f",
   "provenance": {
     "workflow": ".github/workflows/profile-measurements.yml",
     "job": "verifier-free",
-    "run_id": 41163302274,
-    "run_url": "https://github.com/leynos/combobulate/actions/runs/41163302274",
-    "head_sha": "4d4f03182652da3afe68cb66199800f59100b8dc",
+    "run_id": 41227443972,
+    "run_url": "https://github.com/leynos/combobulate/actions/runs/41227443972",
+    "head_sha": "833ef0c5e942d64608d164272d46d1ff337fc1c9",
     "runner_image": "ubuntu24 20261026.354.1",
     "base_image": "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834",
     "container_build_log": "tools/verifier-fixtures/verus-wiring-probe/observations/container-build-hosted.log",

@@ -437,6 +437,16 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     and a command builder that touched a file. All three are repaired, the
     developer guide names the new helper, and the focused suites pass
     (20 boundary cases; 8 verifier cases plus 2 subtests).
+  - [x] (2026-10-31) Confirmation review repairs (DL-37). The confirmation
+    review on `833ef0c` raised five findings. The recorded hosted
+    verifier-free observation still embedded the pre-repair build script, so
+    the measurement workflow was dispatched on `833ef0c`; run `41227443972`
+    passed all seven jobs, and the record, both logs, and the digest were
+    replaced together. `make kani-log-corpus` then refreshed the stale entry
+    digest (`795f4ef4…`) with every observation status unchanged. The
+    `direct`-route description now names both defaults (the `Makefile`
+    defaults to `direct`, the script to `helper`), and two comments use
+    oxendict spellings.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -557,6 +567,25 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-37 (2026-10-31). EP-M2 third review round. The confirmation review on
+  head `833ef0c` completed with five findings; each was verified and repaired.
+  (a) The hosted verifier-free record still embedded the pre-repair
+  `! command -v` script, so its recorded pass did not establish verifier
+  absence. The measurement workflow was dispatched on `833ef0c`; run
+  `41227443972` passed all seven jobs, and its `verifier-free` artefact was
+  copied with the record and both logs replaced together. The record now cites
+  the explicit branch script, digest `2a81245b…`, and head `833ef0c`. (b)
+  `provenance.json` recorded the pre-edit entry-script digest. The corpus was
+  regenerated; every observation status is unchanged, and the entry digest is
+  now `795f4ef4…`. (c) The developer guide called `KANI_PROBE_ROUTE=direct` an
+  explicit selection although the `Makefile` defaults to `direct` and the
+  script defaults to `helper`; both defaults are now stated. (d) Two comments
+  used non-oxendict spellings; they now read "recognize" and "parenthesized".
+  Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt3.out`
+  and
+  `/tmp/kani-log-corpus-round3-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-36 (2026-10-31). EP-M2 second review round. The milestone-close CodeRabbit
   CLI review completed on head `8e1d7fa` (base `origin/main`, resolved to
   `e61a744`) with five findings covering three distinct defects. (a) The
@@ -957,14 +986,16 @@ against the live Cargo graph and canned non-vacuity fixtures. The lint checks
 require the final crate-level level to be `deny` or `forbid`, so an `allow` or
 `warn` mention cannot satisfy the boundary. The package policy checks every
 member the root globs select. `make package` verifies through the patched route
-in DL-33. All commit gates passed sequentially on `1f09c18`: `make check-fmt`,
+in DL-33. All commit gates passed sequentially on `833ef0c`: `make check-fmt`,
 `make lint` (rustdoc `-D warnings`, Clippy, Whitaker, interrogate 100%),
-`make test` (361 nextest cases passed, one skipped; the kernel doctest passed),
-`make design-check` (446 unittest cases; 525 pytest cases plus 691 subtests),
+`make test` (364 nextest cases passed, one skipped; the kernel doctest passed),
+`make design-check` (447 unittest cases; 526 pytest cases plus 691 subtests),
 `make markdownlint` with the spelling gate, `make nixie`, and `make package`,
 which packaged and recompiled `combobulate v0.1.0` from the unpacked tarball.
-The workspace layout is published without claiming the array algebra or `comb!`
-notation, which remain unimplemented.
+The recorded hosted verifier-free evidence now matches the repaired build
+script, from measurement run `41227443972`, and the Kani corpus records the
+current producer digest. The workspace layout is published without claiming the
+array algebra or `comb!` notation, which remain unimplemented.
 
 ## Context and orientation
 
@@ -1962,3 +1993,7 @@ milestone review repairs (DL-31 through DL-35).
 2026-10-31, revision 10: recorded the milestone-close CLI review and its three
 repaired defects: the verifier-absence branches, the effective-deny lint check,
 and the separate candidate-fingerprint command (DL-36).
+
+2026-10-31, revision 11: recorded the confirmation review: recaptured hosted
+verifier-free evidence on measurement run `41227443972`, the regenerated Kani
+corpus provenance, the corrected route defaults, and the spelling fixes (DL-37).

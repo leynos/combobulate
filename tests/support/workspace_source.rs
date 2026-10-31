@@ -124,7 +124,7 @@ fn matching_bracket(tail: &str) -> Option<usize> {
     None
 }
 
-/// Splits `deny(a, b)` into its level name and its parenthesised list.
+/// Splits `deny(a, b)` into its level name and its parenthesized list.
 fn split_attribute(attribute: &str) -> Option<(&str, &str)> {
     let open = attribute.find('(')?;
     let close = attribute.rfind(')')?;

@@ -844,11 +844,11 @@ product code, and a new probe route composes them instead of adding a parallel
 capture path.
 
 The pinned helper rejects ancestor `codegen-backend` configuration before
-running Kani. The explicit `KANI_PROBE_ROUTE=direct` route selects Kani
-0.67.0's matching LLVM SDK and child flags, retains compiler admission, and
-changes no ordinary Cargo file or executable source body. Installation and
-version checks still use the helper. `KANI_PROBE_ROUTE=helper` retains the
-preferred route for retesting that compatibility boundary.
+running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
+which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
+admission, and changes no ordinary Cargo file or executable source body. The
+script's own default is `helper`. Installation and version checks still use the
+helper. Set `KANI_PROBE_ROUTE=helper` to retest that compatibility boundary.
 
 The Verus archive does not bundle Z3. The probe's tool environment therefore
 uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
@@ -887,6 +887,8 @@ comparison sources in a rootless container without verifier installations. This
 local host's admission supervisor launches compilers outside the container
 namespace, so its result is explicitly inconclusive. The script refuses to
 remove the wrapper; the separate hosted observation job uses a fresh runner.
-Its first observation passed and is recorded in
+Its record is
 `tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
 the container build and probe logs in the adjacent `observations/` directory.
+The recorded observation must be recaptured whenever the build script changes,
+so the stored command and the code under test stay the same.
