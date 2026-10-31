@@ -383,6 +383,16 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   run. The milestone CLI review is rate-limited rather than clean (DL-32), so
   the hosted assessment is handed to `pr-babysitting`.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
+  - [x] (2026-10-31) Refactor first (commit `4df69a3`):
+    `tests/make_gate_order.rs` is 237 lines after moving its stage table and
+    command assertions to `tests/support/make_gate_order_commands.rs` and its
+    caller-environment assertions to
+    `tests/support/make_gate_order_caller_environment.rs`. The cases are moved
+    verbatim, all 20 pass, and all six gates passed on the uncommitted
+    candidate (`345` nextest cases, `442` unittest, `521` pytest + `687`
+    subtests).
+  - [ ] Boundary tests, workspace conversion, kernel and macro crates, package
+    policy, stub removal, and `make package`.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
