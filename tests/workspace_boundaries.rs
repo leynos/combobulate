@@ -6,7 +6,7 @@
 //! predicate over Cargo's own output, exercised against the live workspace and
 //! against canned fixtures that would otherwise let the rule pass vacuously.
 
-use std::{error::Error, process::Command};
+use std::{error::Error, process::Command, sync::OnceLock};
 
 use googletest::prelude::*;
 use rstest::rstest;
@@ -23,19 +23,65 @@ mod tree;
 
 use metadata::{FACADE, KERNEL, MACROS, Metadata};
 
+/// Builds a Cargo child with the caller's build selectors removed.
+///
+/// The live checks must describe the workspace, not the caller's shell. An
+/// inherited `CARGO_BUILD_TARGET` would silently resolve a different target
+/// than the one under test, and inherited flags would make the recorded graph
+/// depend on how the suite happened to be invoked.
+fn cargo_command(arguments: &[&str]) -> Command {
+    let mut command = Command::new(env!("CARGO"));
+    command
+        .args(arguments)
+        .current_dir(env!("CARGO_MANIFEST_DIR"));
+    for name in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
+        command.env_remove(name);
+    }
+    command
+}
+
+/// Builds the `cargo fetch` invocation that populates every target's packages.
+fn fetch_command() -> Command { cargo_command(&["fetch", "--locked"]) }
+
+/// Builds the `cargo tree` invocation for a package and edge selection.
+fn tree_command(arguments: &[&str]) -> Command {
+    let mut full = vec!["tree", "--prefix", "none", "--locked", "--offline"];
+    full.extend_from_slice(arguments);
+    cargo_command(&full)
+}
+
+/// Fetches every locked dependency once so the offline checks can resolve.
+///
+/// `cargo tree --target all` resolves platform-specific dependencies that a
+/// host build never downloads. Without the fetch, the check would depend on
+/// cache warmth rather than on the workspace, and a cold runner would fail.
+fn fetch_locked_dependencies_once() -> Result<(), Box<dyn Error>> {
+    static FETCH: OnceLock<Result<(), String>> = OnceLock::new();
+    FETCH
+        .get_or_init(|| match fetch_command().output() {
+            Ok(output) if output.status.success() => Ok(()),
+            Ok(output) => Err(format!(
+                "cargo fetch --locked must populate every target; exited with {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            )),
+            Err(error) => Err(format!("cargo fetch --locked could not start: {error}")),
+        })
+        .clone()
+        .map_err(Into::into)
+}
+
 /// Runs `cargo metadata --no-deps` against the live workspace.
 fn live_metadata() -> Result<Metadata, Box<dyn Error>> {
-    let output = Command::new(env!("CARGO"))
-        .args([
-            "metadata",
-            "--no-deps",
-            "--format-version",
-            "1",
-            "--locked",
-            "--offline",
-        ])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
+    let output = cargo_command(&[
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1",
+        "--locked",
+        "--offline",
+    ])
+    .output()?;
     if !output.status.success() {
         return Err(format!(
             "cargo metadata must describe the workspace; exited with {}: {}",
@@ -51,11 +97,8 @@ fn live_metadata() -> Result<Metadata, Box<dyn Error>> {
 
 /// Runs `cargo tree` with the given package and edge selection.
 fn live_tree(arguments: &[&str]) -> Result<String, Box<dyn Error>> {
-    let output = Command::new(env!("CARGO"))
-        .args(["tree", "--prefix", "none", "--locked", "--offline"])
-        .args(arguments)
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
+    fetch_locked_dependencies_once()?;
+    let output = tree_command(arguments).output()?;
     if !output.status.success() {
         return Err(format!(
             "cargo tree {arguments:?} must resolve; exited with {}: {}",
@@ -65,6 +108,50 @@ fn live_tree(arguments: &[&str]) -> Result<String, Box<dyn Error>> {
         .into());
     }
     Ok(String::from_utf8(output.stdout)?)
+}
+
+/// Contract: the live checks stay lockfile-pinned, offline, and flag-neutral.
+///
+/// The fetch runs first so the offline tree calls resolve every target, and no
+/// caller build selector survives into either child.
+#[test]
+fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
+    let tree = tree_command(&["-p", KERNEL, "--target", "all"]);
+    let tree_arguments: Vec<String> = tree
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect();
+    for expected in ["--locked", "--offline"] {
+        assert!(
+            tree_arguments.iter().any(|argument| argument == expected),
+            "the live tree check must pass {expected}: {tree_arguments:?}"
+        );
+    }
+
+    let fetch_arguments: Vec<String> = fetch_command()
+        .get_args()
+        .map(|argument| argument.to_string_lossy().into_owned())
+        .collect();
+    assert!(
+        fetch_arguments
+            .iter()
+            .any(|argument| argument == "--locked"),
+        "the dependency fetch must pin the lockfile: {fetch_arguments:?}"
+    );
+
+    for command in [tree, fetch_command()] {
+        let cleared: Vec<String> = command
+            .get_envs()
+            .filter(|(_, value)| value.is_none())
+            .map(|(name, _)| name.to_string_lossy().into_owned())
+            .collect();
+        for expected in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
+            assert!(
+                cleared.iter().any(|name| name == expected),
+                "{expected} must not reach the Cargo child: {cleared:?}"
+            );
+        }
+    }
 }
 
 /// VO-1: the kernel declares no backend and its resolved closure carries none.
