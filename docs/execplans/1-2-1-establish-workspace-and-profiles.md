@@ -460,6 +460,15 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     copy of the command while executing the real vector, and the Verus solver
     path is rewritten the same way. Both corpora were regenerated, and the
     developer guide states the convention.
+  - [x] (2026-10-31) Sixth review round (DL-40). The live dependency checks now
+    run `cargo fetch --locked` once before the offline `cargo tree` calls and
+    clear `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and `CARGO_BUILD_TARGET` from
+    every Cargo child, which restores the design's stated route.
+- [x] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
+  Round-5 gates passed on `403996e` (364 nextest cases, 1 skipped; 452
+  unittest; 531 pytest + 691 subtests; interrogate 100%; 38 Markdown files
+  clean; `make package` packaged 286 files and recompiled the facade from the
+  tarball).
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -580,6 +589,21 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-40 (2026-10-31). EP-M2 sixth review round. The review on head `403996e`
+  raised one concern: the live dependency checks ran `cargo tree --target all`
+  under `--offline` without the dependency fetch the approved design specifies,
+  so a cold cache could leave other platforms' packages unresolvable. Verified
+  against the design record, which requires `--locked --offline` *after*
+  `cargo fetch --locked` and removal of `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`,
+  and `CARGO_BUILD_TARGET` from the child environment; the implementation had
+  neither half. Both are now restored: a `OnceLock`-guarded
+  `cargo fetch --locked` populates every target before the first tree call, and
+  every live Cargo child clears the three selectors. A new contract test guards
+  the invocation shape. The cold-cache failure was not reproduced locally
+  because this host's cache was already warm, so the repair follows the
+  approved design rather than a reproduction. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt6.out`.
+  Date/Author: 2026-10-31, implementation agent.
 - DL-39 (2026-10-31). EP-M2 fifth review round. The review on head `890792e`
   completed with two concerns sharing one root cause: committed provenance
   recorded raw argument vectors and the resolved solver path, so the Kani and
@@ -2042,3 +2066,7 @@ user-guide scope statement and the string-form `typing.cast` calls (DL-38).
 2026-10-31, revision 13: recorded the fifth review round: portable paths in
 committed provenance, applied at the generators, with both corpora regenerated
 (DL-39).
+
+2026-10-31, revision 14: recorded the sixth review round, EP-M2 completion, and
+the round-5 gate evidence: the dependency fetch and build-override clearing the
+design specifies are restored in the live boundary checks (DL-40).
