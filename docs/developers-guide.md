@@ -815,11 +815,16 @@ preferred route for retesting that compatibility boundary.
 
 The Verus archive does not bundle Z3. The probe's tool environment therefore
 uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
-supplies its resolved path through `VERUS_Z3_PATH`. Single-root verification
-uses `prover-tools verus run`; crate comparisons use the pinned `cargo-verus`
-directly. Each selected function is rebuilt because `cargo-verus` does not
-fingerprint function-selection arguments. A successful capability must report
-exactly one verified function; its mutant must report one postcondition error.
+supplies its resolved path through `VERUS_Z3_PATH`. The default `z3` selection
+resolves that pinned distribution even when another `z3` appears on `PATH`; an
+explicitly named solver is used as given but must pass the same version check.
+The Kani provenance label and the Z3 distribution come from their pin files and
+named module constants rather than being restated at each call site.
+Single-root verification uses `prover-tools verus run`; crate comparisons use
+the pinned `cargo-verus` directly. Each selected function is rebuilt because
+`cargo-verus` does not fingerprint function-selection arguments. A successful
+capability must report exactly one verified function; its mutant must report
+one postcondition error.
 
 Kani harness inventory (all subjects are deliberately separate fixture bodies):
 

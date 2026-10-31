@@ -34,6 +34,8 @@ from verifier_probe_support import (
 )
 
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
+Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
+Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
 app = App()
 
 
@@ -121,7 +123,7 @@ def kani(
             ]
         )
         provenance = {
-            "tool": "Kani 0.67.0",
+            "tool": f"Kani {(ROOT / 'tools/kani/VERSION').read_text().strip()}",
             "route": route,
             "prover_tools_ref": reference,
             "stream_order": "captured stdout followed by captured stderr",
@@ -158,7 +160,7 @@ def verus(
     version = (ROOT / "tools/verus/VERSION").read_text().strip()
     binaries = verus_installation or ROOT / ".verus" / version / "verus"
     solver = shutil.which(z3)
-    if solver is None and z3 == "z3":
+    if z3 == "z3":
         selected = run_command(
             CommandSpec(
                 (
@@ -166,7 +168,7 @@ def verus(
                     "tool",
                     "run",
                     "--from",
-                    "z3-solver==4.16.0.0",
+                    Z3_DISTRIBUTION,
                     "python",
                     "-c",
                     "import shutil; print(shutil.which('z3') or '')",
@@ -181,7 +183,7 @@ def verus(
     identity = run_command(CommandSpec((str(z3_path), "--version")))
     if (
         identity.exit_code != 0
-        or identity.stdout.strip() != "Z3 version 4.16.0 - 64 bit"
+        or identity.stdout.strip() != Z3_VERSION_BANNER
     ):
         raise RuntimeError("the solver must report the calibrated Z3 4.16.0 release")
     environment = dict(os.environ)
@@ -243,7 +245,7 @@ def verus(
             {
                 "verus": version,
                 "z3": str(z3_path),
-                "z3_distribution": "z3-solver==4.16.0.0",
+                "z3_distribution": Z3_DISTRIBUTION,
                 "z3_version": identity.stdout.strip(),
                 "z3_sha256": digest(z3_path),
                 "observations": observations,

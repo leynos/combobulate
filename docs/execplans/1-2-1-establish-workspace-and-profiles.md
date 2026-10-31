@@ -195,7 +195,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
 - Scope: stop and escalate if one milestone needs more than 40 changed files or
   more than 1,800 net added lines, excluding committed verifier logs,
   `Cargo.lock`, and generated exports. The sponsor approved an EP-M1-only limit
-  of 1,825 lines on 2026-10-28 for count and pin-consistency fixes.
+  of 1,825 lines on 2026-10-28 for count and pin-consistency fixes, and raised
+  that EP-M1 limit to 3,600 lines on 2026-10-30 for the solver-selection fix,
+  its regression test, and the regenerated verifier logs.
 - Interface: stop if any public item beyond `BuildProfile` in the facade and
   `TargetFacts` in the kernel, and the two Cargo features named in
   `Interfaces and dependencies`, seems necessary.
@@ -348,6 +350,12 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
 - [x] (2026-10-28) Count regression: inflated positive and mutant summaries
   failed before the fix; the scratch correction passed all eleven contracts.
   Evidence: `/tmp/red-count-review-combobulate-epm1.out`.
+- [x] (2026-10-30) Solver selection: the default `z3` name now resolves the
+  pinned `z3-solver==4.16.0.0` distribution before any `PATH` discovery, while
+  an explicit solver name is still checked. `test_verifier_solver` failed
+  against the previous source (`/tmp/red-durable-solver-combobulate-epm1.out`)
+  and passes after the fix (`/tmp/green-durable-solver-combobulate-epm1.out`).
+  The regenerated corpus keeps matching source and log digests.
 - [ ] EP-M1 hosted costs and verifier-free isolation; publish the measurement
   workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
 - [ ] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
@@ -417,8 +425,15 @@ committed together with its Green change.
 
 ## Decision log
 
-- DL-27 (2026-10-28). Review fixes anchor exact Verus counts and derive pins.
-  Preserve literal command provenance: raw logs retain the same paths. The
+- DL-28 (2026-10-30). The sponsor raised the EP-M1 changed-line limit to 3,600
+  so the solver-selection fix, its durable regression test, and the regenerated
+  verifier logs can land in one gated commit. The fix resolves the pinned Z3
+  distribution whenever the default `z3` name is used and keeps version
+  checking for an explicitly named solver, which is the smallest change that
+  satisfies the review finding without weakening the calibrated-solver rule.
+  Date/Author: 2026-10-30, implementation agent at the sponsor's direction.
+- DL-27 (2026-10-28). Review fixes exact counts, pins, and solver selection.
+  Retain literal command provenance and the DL-21/VO-15 Kani preflight. The
   proposed complexity/NumPy rules have no repository instruction basis; retain
   existing interfaces. Duplicate findings share these dispositions.
 
