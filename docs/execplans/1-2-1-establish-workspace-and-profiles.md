@@ -479,6 +479,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     `/home/runner` paths in its command; they now use `<repo>` and `~`, the log
     and its digest are unchanged, and the provenance test scans every committed
     record for an account home.
+  - [x] (2026-11-01) Ninth review round (DL-43). The portability scan now
+    covers the Kani provenance record as well as the Verus fixtures and
+    collects the recorded solver path, so the documented claim is true of both
+    generators.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -599,6 +603,24 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-43 (2026-11-01). EP-M2 ninth review round. The review on head `aa80909`
+  completed in 505 s with four `trivial` findings in
+  `scripts/tests/test_verifier_probe_provenance.py`, resolving to two coverage
+  gaps. (a) The scan read only `tools/verifier-fixtures`, so the Kani record at
+  `scripts/tests/fixtures/kani_logs/provenance.json` was never checked, and the
+  developer-guide sentence written in revision 16 overstated what the test did.
+  (b) The walk collected `command` arrays only, so a solver path recorded in
+  `z3` would escape the same rule. Both are repaired: `_RECORD_ROOTS` names the
+  two generator roots and `_recorded_paths` collects `command` arrays and the
+  `z3` string, with a focused test for the solver branch. The discovery test
+  was observed red on the missing Kani record before the change and green after
+  it; the committed values themselves needed no edit because both generators
+  already rewrote them. The advisory `match`/`case` rewrite was declined: the
+  repository sets no such rule, the finding's own replacement would convert
+  non-string command values the current code deliberately ignores, and the
+  existing branches are clearer here. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt10.out`.
+  Date/Author: 2026-11-01, implementation agent.
 - DL-42 (2026-11-01). EP-M2 eighth review round. The review on head `d92cbee`
   raised one concern: `verifier-free-hosted.json` publishes twelve
   `/home/runner/...` paths in its `command` array, contrary to the DL-39 rule
@@ -2126,3 +2148,7 @@ duplicate `EP-M2` progress entry introduced by revision 14 is removed (DL-41).
 verifier-free record now names `<repo>` and `~` instead of the runner's account
 path, with its captured log and digest unchanged, and a committed-record test
 holds the convention (DL-42).
+
+2026-11-01, revision 17: recorded the ninth review round: the portability scan
+now reads both generator roots and the recorded solver path, matching the
+documented claim (DL-43).
