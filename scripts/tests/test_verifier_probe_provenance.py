@@ -136,12 +136,28 @@ def _committed_records() -> list[tuple[Path, list[str]]]:
     return [(path, _recorded_paths(record)) for path, record in _committed_record_documents()]
 
 
+def _record_documents(root: Path) -> list[tuple[Path, dict]]:
+    """Return each record document below ``root``, skipping build output.
+
+    The fixture crates sit outside the repository workspace, so Cargo builds
+    them in place and leaves a ``target`` directory inside the scanned tree.
+    Those files are build metadata, not records: the walked documents must be
+    JSON objects, while a build artefact may be an array, so parsing one would
+    fail this suite for a reason unrelated to provenance.
+    """
+    return [
+        (path, json.loads(path.read_text(encoding='utf-8')))
+        for path in sorted(root.rglob('*.json'))
+        if 'target' not in path.relative_to(root).parts
+    ]
+
+
 def _committed_record_documents() -> list[tuple[Path, dict]]:
     """Return each committed verifier record with its decoded document."""
     return [
-        (path, json.loads(path.read_text(encoding='utf-8')))
+        document
         for root in _RECORD_ROOTS
-        for path in sorted((ROOT / root).rglob('*.json'))
+        for document in _record_documents(ROOT / root)
     ]
 
 
@@ -213,6 +229,23 @@ class CommittedRecordTests(unittest.TestCase):
             offenders,
             [],
             'recorded paths must replace host roots with `<repo>` and `~`',
+        )
+
+    def test_build_output_is_not_read_as_a_record(self) -> None:
+        """A fixture crate's Cargo output must not be parsed as provenance."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'provenance.json').write_text('{"source_digests": {}}', encoding='utf-8')
+            build = root / 'candidate/target/debug'
+            build.mkdir(parents=True)
+            (build / 'metadata.json').write_text('[]', encoding='utf-8')
+
+            documents = _record_documents(root)
+
+        self.assertEqual(
+            [path.name for path, _ in documents],
+            ['provenance.json'],
+            'a Cargo target directory must stay out of the record scan',
         )
 
     def test_recorded_source_digests_match_the_working_tree(self) -> None:

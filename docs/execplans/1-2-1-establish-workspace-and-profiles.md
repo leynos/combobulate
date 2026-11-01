@@ -493,6 +493,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     documents its parameter and result, the record walk uses structural pattern
     matching, and the Kani provenance source digests were regenerated after the
     rename, with a test that fails on a stale digest.
+  - [x] (2026-11-01) Thirteenth review round (DL-47). The record scan skips a
+    fixture crate's Cargo `target` directory, so untracked build metadata is
+    neither parsed as provenance nor able to fail the digest test.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -613,6 +616,22 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-47 (2026-11-01). EP-M2 thirteenth review round, on the head produced by
+  the rebase onto `main`. The review completed with one finding, verified and
+  repaired. The record scan walked the working tree, and the fixture crates are
+  excluded from the repository workspace, so Cargo builds them in place and
+  leaves untracked `target` JSON under the scanned root. That output could slow
+  the suite, and a top-level array would raise on `record.get` for a reason
+  unrelated to provenance. The walk moved into `_record_documents(root)`, which
+  skips a path any component of which is `target`, and a regression test writes
+  a `target` array beside a real record and asserts only the record is
+  returned. Red was observed without the filter
+  (`['metadata.json', 'provenance.json']` against the expected single record),
+  then green across the ten provenance tests. Limiting the scan to
+  `git ls-files` was rejected: the suite must run without Git, and a component
+  filter expresses the intent directly. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt16.out`.
+  Date/Author: 2026-11-01, implementation agent.
 - DL-46 (2026-11-01). EP-M2 twelfth review round. The review on head
   `16a0353` completed with three findings, all verified and repaired. (a)
   `workspace_lint_tables` is a public name whose docstring carried only prose
@@ -2260,3 +2279,7 @@ regenerated after the rename, with a new test that fails on a stale digest
 2026-11-01, revision 21: recorded that the Outcomes gate counts describe
 `f0b1650`, the commit at which EP-M2 first became complete, and named the final
 counts and the evidence the later review rounds added.
+
+2026-11-01, revision 22: recorded the thirteenth review round, on the head
+produced by the rebase onto `main`: the record scan skips a fixture crate's
+Cargo `target` directory, with a regression test (DL-47).
