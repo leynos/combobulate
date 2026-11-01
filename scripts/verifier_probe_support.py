@@ -36,6 +36,16 @@ def workspace_lint_tables(manifest: str) -> str:
     yields tables named ``[workspace.lints.clippy]`` and
     ``[workspace.lints.rust]``.
 
+    Parameters
+    ----------
+    manifest
+        Text of the root ``Cargo.toml``.
+
+    Returns
+    -------
+    str
+        The concatenated ``[workspace.lints.<name>]`` tables.
+
     Raises
     ------
     RuntimeError

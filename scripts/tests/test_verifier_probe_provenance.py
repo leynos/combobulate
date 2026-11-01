@@ -5,6 +5,7 @@ the worktree layout, and it cannot be reproduced on another machine. The probe
 still executes the real argument vector; only the recorded copy is rewritten.
 """
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -106,19 +107,22 @@ def _recorded_paths(node: object) -> list[str]:
         _recorded_paths({'z3': '~/z3', 'observations': [{'command': ['kani']}]})
         # ['~/z3', 'kani']
     """
-    if isinstance(node, dict):
-        paths: list[str] = []
-        for key, value in node.items():
-            if key == 'command' and isinstance(value, list):
-                paths.extend(item for item in value if isinstance(item, str))
-            elif key == 'z3' and isinstance(value, str):
-                paths.append(value)
-            else:
-                paths.extend(_recorded_paths(value))
-        return paths
-    if isinstance(node, list):
-        return [item for child in node for item in _recorded_paths(child)]
-    return []
+    match node:
+        case dict():
+            paths: list[str] = []
+            for key, value in node.items():
+                match (key, value):
+                    case ('command', list()):
+                        paths.extend(item for item in value if isinstance(item, str))
+                    case ('z3', str()):
+                        paths.append(value)
+                    case _:
+                        paths.extend(_recorded_paths(value))
+            return paths
+        case list():
+            return [item for child in node for item in _recorded_paths(child)]
+        case _:
+            return []
 
 
 def _committed_records() -> list[tuple[Path, list[str]]]:
@@ -129,8 +133,13 @@ def _committed_records() -> list[tuple[Path, list[str]]]:
     fixture tree. Synthetic evidence fixtures are not observation records and
     stay out of scope.
     """
+    return [(path, _recorded_paths(record)) for path, record in _committed_record_documents()]
+
+
+def _committed_record_documents() -> list[tuple[Path, dict]]:
+    """Return each committed verifier record with its decoded document."""
     return [
-        (path, _recorded_paths(json.loads(path.read_text(encoding='utf-8'))))
+        (path, json.loads(path.read_text(encoding='utf-8')))
         for root in _RECORD_ROOTS
         for path in sorted((ROOT / root).rglob('*.json'))
     ]
@@ -205,6 +214,23 @@ class CommittedRecordTests(unittest.TestCase):
             [],
             'recorded paths must replace host roots with `<repo>` and `~`',
         )
+
+    def test_recorded_source_digests_match_the_working_tree(self) -> None:
+        """Fail when a recorded source changed after its record was written."""
+        checked = 0
+        for record_path, record in _committed_record_documents():
+            for relative, expected in record.get('source_digests', {}).items():
+                with self.subTest(record=str(record_path), source=relative):
+                    actual = hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+                    self.assertEqual(
+                        actual,
+                        expected,
+                        f'{relative} changed after {record_path.name} recorded it; '
+                        'regenerate the record with `make kani-log-corpus`',
+                    )
+                    checked += 1
+
+        self.assertGreater(checked, 0, 'a committed record must bind at least one source')
 
 
 class VerusProvenanceTests(unittest.TestCase):

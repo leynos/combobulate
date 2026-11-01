@@ -489,6 +489,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - [x] (2026-11-01) Eleventh review round (DL-45). Member publication follows
     the same release guard as the root, the guide's helper names match the code,
     and the remaining private-intent probe helpers carry private names.
+  - [x] (2026-11-01) Twelfth review round (DL-46). The public lint-table helper
+    documents its parameter and result, the record walk uses structural pattern
+    matching, and the Kani provenance source digests were regenerated after the
+    rename, with a test that fails on a stale digest.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -609,6 +613,26 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-46 (2026-11-01). EP-M2 twelfth review round. The review on head
+  `16a0353` completed with three findings, all verified and repaired. (a)
+  `workspace_lint_tables` is a public name whose docstring carried only prose
+  and a `Raises` section; it now documents its `manifest` parameter and the
+  returned tables, matching the rest of the support module. (b) The record walk
+  in the provenance test decomposed decoded JSON with `isinstance()` checks; it
+  now uses structural pattern matching, which six other Python modules in the
+  repository already use. This supersedes DL-43's decline of the same advisory
+  for that helper: the rewrite is behaviour-preserving and the standing
+  instruction is to action review requests unless they contradict the scope.
+  (c) The Kani provenance record still named the source digests from before the
+  round-11 rename, so three script digests no longer matched the files on disk;
+  `make kani-log-corpus` regenerated the record, all fourteen observation
+  statuses unchanged. The stale record also exposed a gap: no gate bound a
+  committed `source_digests` entry to the file it names, which is why the
+  400-line gate suite passed after the rename. A test now recomputes every
+  recorded digest and fails when a source changes without the record being
+  regenerated. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt14.out`.
+  Date/Author: 2026-11-01, implementation agent.
 - DL-45 (2026-11-01). EP-M2 eleventh review round. The review on head
   `7faada6` completed with four findings, three of them interface gaps, all
   verified and repaired. (a) `check_package_policy` passed every member to
@@ -2216,3 +2240,9 @@ the probe helpers the guide calls private now carry private names (DL-44).
 2026-11-01, revision 19: recorded the eleventh review round: member publication
 follows the root release guard, the guide's helper names match the code, and
 the remaining private-intent probe helpers were renamed (DL-45).
+
+2026-11-01, revision 20: recorded the twelfth review round: the public
+lint-table helper documents its parameter and result, the record walk uses
+structural pattern matching, and the Kani provenance source digests were
+regenerated after the rename, with a new test that fails on a stale digest
+(DL-46).
