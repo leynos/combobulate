@@ -211,7 +211,8 @@ def resolve_z3(selection: str) -> tuple[Path, str]:
     Raises
     ------
     RuntimeError
-        When no solver is available or its banner is not the calibrated one.
+        When the default selection cannot resolve the pinned distribution, no
+        solver is available, or its banner is not the calibrated one.
     """
     solver = shutil.which(selection)
     if selection == "z3":
@@ -229,8 +230,15 @@ def resolve_z3(selection: str) -> tuple[Path, str]:
                 )
             )
         )
-        if selected.exit_code == 0:
-            solver = selected.stdout.strip() or None
+        if selected.exit_code != 0:
+            # The record names the calibrated distribution, so a failed
+            # resolver must not fall back to whichever z3 sits on `PATH`:
+            # that binary would be recorded as the pin's own.
+            raise RuntimeError(
+                "the pinned z3-solver distribution could not be resolved: "
+                f"{selected.stderr.strip() or 'uv exited with an error'}"
+            )
+        solver = selected.stdout.strip() or None
     if solver is None:
         raise RuntimeError("the pinned Z3 executable is unavailable")
     z3_path = Path(solver).resolve()

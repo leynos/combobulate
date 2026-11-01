@@ -496,6 +496,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - [x] (2026-11-01) Thirteenth review round (DL-47). The record scan skips a
     fixture crate's Cargo `target` directory, so untracked build metadata is
     neither parsed as provenance nor able to fail the digest test.
+  - [x] (2026-11-01) Fourteenth review round (DL-48). The default solver
+    selection now fails when the pinned `z3-solver` distribution cannot be
+    resolved instead of silently recording a `PATH` solver as the pin.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -616,6 +619,20 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-48 (2026-11-01). EP-M2 fourteenth review round. The review completed with
+  one finding, verified and repaired. `resolve_z3` looked the pinned
+  `z3-solver==4.16.0.0` distribution up through `uv tool run` but ignored a
+  non-zero exit, leaving the `shutil.which("z3")` result in place. A system
+  solver that reported the calibrated banner would then be accepted, and
+  `_write_verus_provenance` would record `z3_distribution` as the pin for a
+  binary the pin did not supply. The default branch now raises instead of
+  falling back, and only an explicitly named solver skips the lookup. A test
+  supplies a failed resolver followed by a passing banner and asserts that the
+  run stops after the resolver; red was observed against the previous selection
+  logic (`RuntimeError not raised`), then green. The developers' guide records
+  the failure mode. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt17.out`.
+  Date/Author: 2026-11-01, implementation agent.
 - DL-47 (2026-11-01). EP-M2 thirteenth review round, on the head produced by
   the rebase onto `main`. The review completed with one finding, verified and
   repaired. The record scan walked the working tree, and the fixture crates are
@@ -2283,3 +2300,7 @@ counts and the evidence the later review rounds added.
 2026-11-01, revision 22: recorded the thirteenth review round, on the head
 produced by the rebase onto `main`: the record scan skips a fixture crate's
 Cargo `target` directory, with a regression test (DL-47).
+
+2026-11-01, revision 23: recorded the fourteenth review round: the default
+solver selection fails when the pinned `z3-solver` distribution cannot be
+resolved, instead of recording a `PATH` solver as the pin (DL-48).
