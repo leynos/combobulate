@@ -28,7 +28,7 @@ from probe_provenance import (
 # The container recipe contract test reads it from this module.
 from verifier_free_probe import run_verifier_free, verifier_free_containerfile
 from verifier_probe_support import (
-    ROOT, FIXTURES, OUTPUT, capture, kani_environment, native_workspace,
+    ROOT, FIXTURES, OUTPUT, _capture, _kani_environment, _native_workspace,
 )
 
 Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
@@ -80,19 +80,19 @@ def kani_prefix(
     if route == "direct":
         return (
             [str(installation / "bin/kani-driver"), "kani"],
-            kani_environment(installation, environment),
+            _kani_environment(installation, environment),
         )
     raise ValueError("route must be helper or direct")
 
 
-def kani_arguments(subject: dict, route: str) -> list[str]:
+def _kani_arguments(subject: dict, route: str) -> list[str]:
     """Return one harness subject's arguments for the selected route."""
     if route == "helper":
         return [f"--extra-arg={argument}" for argument in subject["arguments"]]
     return subject["arguments"]
 
 
-def kani_observations(
+def _kani_observations(
     definitions: dict,
     prefix: list[str],
     route: str,
@@ -106,14 +106,14 @@ def kani_observations(
     for subject in definitions["runs"]:
         if only is not None and subject["id"] != only:
             continue
-        command = [*prefix, *kani_arguments(subject, route)]
+        command = [*prefix, *_kani_arguments(subject, route)]
         if subject.get("external_timeout"):
             command = ["timeout", "--signal=TERM", "8s", *command]
         observations.append(
             {
                 "id": subject["id"],
                 "expected_exit": subject["expected_exit"],
-                **capture(
+                **_capture(
                     command, directory, output_dir / f"{subject['id']}.log", environment
                 ),
             }
@@ -121,7 +121,7 @@ def kani_observations(
     return observations
 
 
-def kani_in_place_observation(
+def _kani_in_place_observation(
     prefix: list[str],
     route: str,
     scratch: Path,
@@ -138,7 +138,7 @@ def kani_in_place_observation(
     return {
         "id": "in_place",
         "expected_exit": 0,
-        **capture(
+        **_capture(
             [*scratch_prefix, *arguments],
             scratch,
             output_dir / "in_place.log",
@@ -181,13 +181,13 @@ def kani(
         route, prover_tools, installation, directory, environment
     )
     definitions = json.loads((directory / "harnesses.json").read_text())
-    observations = kani_observations(
+    observations = _kani_observations(
         definitions, prefix, route, directory, output_dir, environment, only
     )
     if only is None:
         observations.append(
-            kani_in_place_observation(
-                prefix, route, native_workspace(), output_dir, environment
+            _kani_in_place_observation(
+                prefix, route, _native_workspace(), output_dir, environment
             )
         )
         write_kani_provenance(directory, route, reference, observations, output_dir)
@@ -240,7 +240,7 @@ def resolve_z3(selection: str) -> tuple[Path, str]:
     return z3_path, identity.stdout.strip()
 
 
-def verus_environment(z3_path: Path) -> dict[str, str]:
+def _verus_environment(z3_path: Path) -> dict[str, str]:
     """Return the child environment that binds the calibrated solver."""
     environment = dict(os.environ)
     environment.pop("RUSTUP_TOOLCHAIN", None)
@@ -262,7 +262,7 @@ def refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
     (directory / f"{candidate}.rs").touch()
 
 
-def verus_command(
+def _verus_command(
     binaries: Path,
     candidate: str,
     directory: Path,
@@ -293,7 +293,7 @@ def verus_command(
     return command + ["--", "--verify-root", selection]
 
 
-def qualified_candidates(output: Path, observations: list[dict]) -> list[str]:
+def _qualified_candidates(output: Path, observations: list[dict]) -> list[str]:
     """Return candidates whose positive and mutant logs show exact counts."""
     qualified = []
     for candidate in VERUS_CANDIDATES:
@@ -338,7 +338,7 @@ def verus(
     version = (ROOT / "tools/verus/VERSION").read_text().strip()
     binaries = verus_installation or ROOT / ".verus" / version / "verus"
     z3_path, banner = resolve_z3(z3)
-    environment = verus_environment(z3_path)
+    environment = _verus_environment(z3_path)
     output = output_dir or directory / "observations"
     observations = []
     for candidate in VERUS_CANDIDATES:
@@ -348,8 +348,8 @@ def verus(
                 {
                     "candidate": candidate,
                     "function": function,
-                    **capture(
-                        verus_command(
+                    **_capture(
+                        _verus_command(
                             binaries, candidate, directory, function, prover_tools
                         ),
                         directory,
@@ -362,7 +362,7 @@ def verus(
         output / "provenance.json" if output_dir else directory / "provenance.json"
     )
     write_verus_provenance(provenance_path, version, z3_path, banner, observations)
-    qualified = qualified_candidates(output, observations)
+    qualified = _qualified_candidates(output, observations)
     print("Qualified wiring candidates: " + ", ".join(qualified))
     if not qualified:
         raise RuntimeError(

@@ -727,14 +727,18 @@ tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
 Kani calibration artefacts.
 
-`check_manifest` in `scripts/docs_validation/package_policy.py` is an internal
-package-policy helper. `check_package_policy` is its only production caller and
-supplies the D04/D05 decision state. The checker runs after roadmap closure:
-publication remains disabled until an accepted D05 supersession and a
-successful task 4.3.3 closure result are both present. Unit tests may call the
-helpers directly to isolate those rules. Do not use them as general Cargo
-manifest APIs or from another checker composition; repository validation goes
-through `collect_checks`.
+`check_manifest` and `member_manifests` in
+`scripts/docs_validation/package_policy.py` are internal package-policy helpers.
+`check_package_policy` is their only production caller and supplies the
+D04/D05 decision state. `member_manifests` returns the manifests the root
+`members` globs select, and each selected member must carry the literal
+`license = "ISC"` and `publish = false`; a manifest under `crates/` that no
+glob selects fails the check rather than escaping it. The checker runs after
+roadmap closure: publication remains disabled until an accepted D05
+supersession and a successful task 4.3.3 closure result are both present. Unit
+tests may call the helpers directly to isolate those rules. Do not use them as
+general Cargo manifest or workspace APIs or from another checker composition;
+repository validation goes through `collect_checks`.
 
 Roadmap closure and frozen-register comparison keep repository access behind
 small reader callbacks. `ClosureInputs` receives an artefact resolver that

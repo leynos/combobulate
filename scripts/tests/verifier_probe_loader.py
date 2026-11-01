@@ -16,12 +16,12 @@ from unittest.mock import patch
 SCRIPTS = Path(__file__).resolve().parents[1]
 ROOT = SCRIPTS.parent
 SUPPORT_FUNCTIONS = (
-    'capture',
-    'digest',
-    'kani_environment',
-    'native_workspace',
+    '_capture',
+    '_digest',
+    '_kani_environment',
+    '_native_workspace',
     'portable_argument',
-    'require_command_statuses',
+    '_require_command_statuses',
 )
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from rust_prover_tools.commands import CommandSpec, run_command
 
-from verifier_probe_support import FIXTURES, ROOT, capture
+from verifier_probe_support import FIXTURES, ROOT, _capture
 
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
 # `set -e` does not abort on a failed `! command -v ...`, so each verifier check
@@ -134,7 +134,7 @@ def ensure_base_image(output: Path, environment: dict[str, str]) -> None:
     exists = run_command(CommandSpec(("podman", "image", "exists", BASE_IMAGE)))
     if exists.exit_code == 0:
         return
-    pulled = capture(
+    pulled = _capture(
         ["podman", "pull", BASE_IMAGE],
         ROOT,
         output / "container-pull.log",
@@ -241,7 +241,7 @@ def run_verifier_free() -> None:
     output = FIXTURES / "verus-wiring-probe/observations"
     image = "localhost/combobulate-epm1-verifier-free:20261028"
     ensure_base_image(output, environment)
-    built = capture(
+    built = _capture(
         ["podman", "build", "--pull=never", "-t", image, str(directory)],
         ROOT,
         output / "container-build.log",
@@ -254,7 +254,7 @@ def run_verifier_free() -> None:
         "channel"
     ]
     command = container_run_command(directory, image, home, channel)
-    observation = capture(command, ROOT, output / "verifier-free.log", environment)
+    observation = _capture(command, ROOT, output / "verifier-free.log", environment)
     if observation["exit_code"] != 0:
         raise RuntimeError("the ordinary build failed in the verifier-free container")
     record.write_text(json.dumps({"status": "pass", **observation}, indent=2) + "\n")

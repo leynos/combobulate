@@ -13,9 +13,9 @@ from pathlib import Path
 
 from verifier_probe_support import (
     ROOT,
-    digest,
+    _digest,
     portable_argument,
-    require_command_statuses,
+    _require_command_statuses,
 )
 
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
@@ -70,7 +70,7 @@ def write_kani_provenance(
         "route": route,
         "prover_tools_ref": reference,
         "stream_order": "captured stdout followed by captured stderr",
-        "source_digests": {str(path.relative_to(ROOT)): digest(path) for path in sources},
+        "source_digests": {str(path.relative_to(ROOT)): _digest(path) for path in sources},
         "observations": observations,
     }
     (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
@@ -111,7 +111,7 @@ def write_verus_provenance(
                 "z3": portable_argument(str(z3_path)),
                 "z3_distribution": Z3_DISTRIBUTION,
                 "z3_version": banner,
-                "z3_sha256": digest(z3_path),
+                "z3_sha256": _digest(z3_path),
                 "observations": observations,
             },
             indent=2,
@@ -149,4 +149,4 @@ def require_captured_output(observations: list[dict]) -> None:
         for item in observations
     ):
         raise RuntimeError("missing verifier output cannot qualify a corpus")
-    require_command_statuses(observations)
+    _require_command_statuses(observations)

@@ -73,7 +73,7 @@ class CaptureRecordTests(unittest.TestCase):
         real = [str(ROOT / 'tools/kani'), 'kani', '--version']
 
         with tempfile.TemporaryDirectory() as directory:
-            record = support.capture(real, ROOT, Path(directory) / 'probe.log', {})
+            record = support._capture(real, ROOT, Path(directory) / 'probe.log', {})
 
         self.assertEqual(
             record['command'],

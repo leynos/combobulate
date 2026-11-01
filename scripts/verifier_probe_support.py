@@ -50,7 +50,7 @@ def workspace_lint_tables(manifest: str) -> str:
     return "".join(tables)
 
 
-def digest(path: Path) -> str:
+def _digest(path: Path) -> str:
     """Return the SHA-256 digest of the exact observed bytes."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -81,7 +81,7 @@ def portable_argument(argument: str) -> str:
     return argument.replace(str(ROOT), "<repo>").replace(str(Path.home()), "~")
 
 
-def capture(
+def _capture(
     argv: list[str], cwd: Path, output: Path, environment: dict[str, str]
 ) -> dict:
     """Capture real streams, status and digest through the helper's Cuprum boundary."""
@@ -96,11 +96,11 @@ def capture(
         "log": str(output.relative_to(ROOT))
         if output.is_relative_to(ROOT)
         else str(output),
-        "sha256": digest(output),
+        "sha256": _digest(output),
     }
 
 
-def kani_environment(installation: Path, environment: dict[str, str]) -> dict[str, str]:
+def _kani_environment(installation: Path, environment: dict[str, str]) -> dict[str, str]:
     """Select the matching LLVM SDK child while retaining admission wrappers.
 
     The helper rejects ancestor backend keys. This explicit fallback leaves
@@ -135,7 +135,7 @@ def kani_environment(installation: Path, environment: dict[str, str]) -> dict[st
     return child
 
 
-def native_workspace() -> Path:
+def _native_workspace() -> Path:
     """Create the planned kernel/facade scratch shape with the repository's live lints."""
     directory = ROOT / "target/epm1-native-workspace"
     directory.mkdir(parents=True, exist_ok=True)
@@ -182,7 +182,7 @@ mod verification {
     return directory / "facade"
 
 
-def require_command_statuses(observations: list[dict]) -> None:
+def _require_command_statuses(observations: list[dict]) -> None:
     """Reject transport failures without deriving proof verdicts from exit codes."""
     for item in observations:
         if item["exit_code"] != item["expected_exit"]:

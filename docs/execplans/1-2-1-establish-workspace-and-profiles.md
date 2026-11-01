@@ -483,6 +483,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     covers the Kani provenance record as well as the Verus fixtures and
     collects the recorded solver path, so the documented claim is true of both
     generators.
+  - [x] (2026-11-01) Tenth review round (DL-44). The developers' guide documents
+    `member_manifests` and its per-member rule, and the eleven probe helpers the
+    guide calls private now carry private names.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -603,6 +606,26 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-44 (2026-11-01). EP-M2 tenth review round. The first request on head
+  `ae554c0` was rate-limited without a review, so the CLI backoff was applied
+  and the review completed on the retry with two `trivial` findings, both
+  verified against source and repaired. (a) `member_manifests` gained its
+  per-member rule in this milestone but the developers' guide still named only
+  `check_manifest` and `check_package_policy`; the package-policy paragraph now
+  documents the helper, the literal `license = "ISC"` and `publish = false`
+  requirement on every selected member, the failure for an unselected
+  `crates/*/Cargo.toml`, and the limit of its scope. (b) Six probe builders and
+  five support helpers had public names and one-line docstrings while the guide
+  describes them as private to the probe scripts. The finding's stated path
+  instruction has no repository basis (see the note above the Conformance
+  basis), and the offered alternative — the underscore rename — matches the
+  documented intent and adds no lines against the 400-line limit; all eleven
+  helpers, their importers, the loader tuple, and the provenance test were
+  updated together. The finding also named `test_verifier_solver.py`; a search
+  confirmed it holds no reference to any renamed helper. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt11.out`
+  (rate limit) and `…-attempt12.out` (review). Date/Author: 2026-11-01,
+  implementation agent.
 - DL-43 (2026-11-01). EP-M2 ninth review round. The review on head `aa80909`
   completed in 505 s with four `trivial` findings in
   `scripts/tests/test_verifier_probe_provenance.py`, resolving to two coverage
@@ -2152,3 +2175,7 @@ holds the convention (DL-42).
 2026-11-01, revision 17: recorded the ninth review round: the portability scan
 now reads both generator roots and the recorded solver path, matching the
 documented claim (DL-43).
+
+2026-11-01, revision 18: recorded the tenth review round: the developers' guide
+documents `member_manifests` and the per-member package rule it enforces, and
+the probe helpers the guide calls private now carry private names (DL-44).
