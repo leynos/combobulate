@@ -21,7 +21,7 @@ from verifier_probe_support import (
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
 
 
-def write_kani_provenance(
+def _write_kani_provenance(
     directory: Path,
     route: str,
     reference: str,
@@ -47,7 +47,7 @@ def write_kani_provenance(
     --------
     The writer derives each digest from the files it names::
 
-        write_kani_provenance(directory, 'direct', reference, observations, output)
+        _write_kani_provenance(directory, 'direct', reference, observations, output)
     """
     sources = [
         directory / name
@@ -76,7 +76,7 @@ def write_kani_provenance(
     (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
 
 
-def write_verus_provenance(
+def _write_verus_provenance(
     path: Path,
     version: str,
     z3_path: Path,
@@ -102,7 +102,7 @@ def write_verus_provenance(
     --------
     The record binds the solver digest as well as its reported version::
 
-        write_verus_provenance(path, version, z3_path, banner, observations)
+        _write_verus_provenance(path, version, z3_path, banner, observations)
     """
     path.write_text(
         json.dumps(

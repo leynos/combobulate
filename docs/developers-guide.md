@@ -732,13 +732,14 @@ Kani calibration artefacts.
 `check_package_policy` is their only production caller and supplies the
 D04/D05 decision state. `member_manifests` returns the manifests the root
 `members` globs select, and each selected member must carry the literal
-`license = "ISC"` and `publish = false`; a manifest under `crates/` that no
-glob selects fails the check rather than escaping it. The checker runs after
-roadmap closure: publication remains disabled until an accepted D05
-supersession and a successful task 4.3.3 closure result are both present. Unit
-tests may call the helpers directly to isolate those rules. Do not use them as
-general Cargo manifest or workspace APIs or from another checker composition;
-repository validation goes through `collect_checks`.
+`license = "ISC"`; publication follows the same D05 guard as the root, so an
+approved release lifts the member requirement with it. A manifest under
+`crates/` that no glob selects fails the check rather than escaping it. The
+checker runs after roadmap closure: publication remains disabled until an
+accepted D05 supersession and a successful task 4.3.3 closure result are both
+present. Unit tests may call the helpers directly to isolate those rules. Do
+not use them as general Cargo manifest or workspace APIs or from another
+checker composition; repository validation goes through `collect_checks`.
 
 Roadmap closure and frozen-register comparison keep repository access behind
 small reader callbacks. `ClosureInputs` receives an artefact resolver that
@@ -830,17 +831,17 @@ enter the evidence gate or product code. Recording fixtures and result-based
 expectations stay private to the prover command contracts. The runner reuses
 `rust-prover-tools`' Cuprum command boundary rather than another installer.
 
-The CLI's command builders — `kani_prefix`, `kani_arguments`,
-`kani_observations`, `kani_in_place_observation`, `resolve_z3`,
-`verus_environment`, `refresh_candidate_fingerprint`, `verus_command`, and
-`qualified_candidates` — stay beside the commands. The fingerprint refresh is a
-command, separate from `verus_command`, because cargo-verus does not
+The CLI's command builders — `kani_prefix`, `_kani_arguments`,
+`_kani_observations`, `_kani_in_place_observation`, `resolve_z3`,
+`_verus_environment`, `_refresh_candidate_fingerprint`, `_verus_command`, and
+`_qualified_candidates` — stay beside the commands. The fingerprint refresh is
+a command, separate from `_verus_command`, because cargo-verus does not
 fingerprint the function-selection arguments and the proof file must be touched
-immediately before each build. The provenance writers `write_kani_provenance`
-and `write_verus_provenance` and the guard `require_captured_output` live in
+immediately before each build. The provenance writers `_write_kani_provenance`
+and `_write_verus_provenance` and the guard `require_captured_output` live in
 `probe_provenance`. The verifier-free workflow lives in `verifier_free_probe` as
-`verifier_free_containerfile`, `write_inconclusive_record`,
-`stage_verifier_free_workspace`, `ensure_base_image`, `container_run_command`,
+`_verifier_free_containerfile`, `_write_inconclusive_record`,
+`_stage_verifier_free_workspace`, `ensure_base_image`, `container_run_command`,
 and `run_verifier_free`. These helpers are private to the probe scripts. They
 exist so each route step can be read and tested on its own. They are not a
 public API, must not be imported by the support module, the evidence gate, or
@@ -849,12 +850,12 @@ capture path.
 
 Committed metadata must not publish host detail. `capture` still executes the
 real argument vector but stores a portable copy, replacing the repository root
-with `<repo>` and the home directory with `~`; `write_verus_provenance` applies
-the same rewrite to the resolved solver path. Without it, a record would name
-the developer's account and worktree and could not be reproduced elsewhere.
-Captured observation logs stay verbatim: they are the tool's own output, and
-rewriting them would break the evidence the digest binds. The split is
-deliberate — metadata is rewritten, output is not. A record captured before
+with `<repo>` and the home directory with `~`; `_write_verus_provenance`
+applies the same rewrite to the resolved solver path. Without it, a record
+would name the developer's account and worktree and could not be reproduced
+elsewhere. Captured observation logs stay verbatim: they are the tool's own
+output, and rewriting them would break the evidence the digest binds. The split
+is deliberate — metadata is rewritten, output is not. A record captured before
 this rule keeps the path it ran under until it is rewritten in place; because
 the digest binds the log and not the metadata, that edit leaves the evidence
 valid. The provenance test scans every committed fixture record and fails on

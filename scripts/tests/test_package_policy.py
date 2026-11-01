@@ -160,6 +160,17 @@ class PackagePolicy(unittest.TestCase):
                     with self.assertRaisesRegex(AssertionError, expected_error):
                         check_package_policy(context)
 
+    def test_release_approval_lifts_the_member_publication_guard(self):
+        """Let published members through once the root release conditions pass."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_release_workspace_fixture(root)
+            context = ValidationContext(root)
+            self.add_validated_core_closure(context)
+            check_package_policy(context)
+            self.assertEqual(context.results[-1]['check'], 'package-policy',
+                             'an approved release must lift the member publication guard')
+
     def test_crate_manifest_outside_the_member_globs_fails(self):
         """Reject a crates/* manifest no workspace member glob selects."""
         with tempfile.TemporaryDirectory() as directory:
@@ -198,6 +209,27 @@ class PackagePolicy(unittest.TestCase):
             (crate_root / 'Cargo.toml').write_text(
                 f'[package]\nname = "{crate}"\nversion = "0.1.0"\n' + member_fields,
                 encoding='utf-8')
+
+    @staticmethod
+    def write_release_workspace_fixture(root: Path) -> None:
+        """Write a publishable workspace whose released members may publish."""
+        (root / 'spec').mkdir()
+        (root / 'Cargo.toml').write_text(
+            '[workspace]\nmembers = ["crates/*"]\n\n'
+            '[package]\nname = "policy-fixture"\nversion = "0.1.0"\n'
+            'license = "ISC"\npublish = true\n', encoding='utf-8')
+        decisions = [
+            {'id': 'D04', 'lifecycle': 'accepted'},
+            {'id': 'D05', 'lifecycle': 'superseded', 'superseded_by': 'D16'},
+            {'id': 'D16', 'lifecycle': 'accepted', 'supersedes': ['D05']},
+        ]
+        (root / 'spec/decisions.json').write_text(
+            json.dumps({'decisions': decisions}), encoding='utf-8')
+        crate = root / 'crates/member'
+        crate.mkdir(parents=True)
+        (crate / 'Cargo.toml').write_text(
+            '[package]\nname = "member"\nversion = "0.1.0"\n'
+            'license = "ISC"\npublish = true\n', encoding='utf-8')
 
     @staticmethod
     def write_release_fixture(root: Path, *, publish: bool, supersede_d05: bool = True) -> None:

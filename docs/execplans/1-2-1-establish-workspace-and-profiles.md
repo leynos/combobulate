@@ -486,6 +486,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - [x] (2026-11-01) Tenth review round (DL-44). The developers' guide documents
     `member_manifests` and its per-member rule, and the eleven probe helpers the
     guide calls private now carry private names.
+  - [x] (2026-11-01) Eleventh review round (DL-45). Member publication follows
+    the same release guard as the root, the guide's helper names match the code,
+    and the remaining private-intent probe helpers carry private names.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -606,6 +609,35 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-45 (2026-11-01). EP-M2 eleventh review round. The review on head
+  `7faada6` completed with four findings, three of them interface gaps, all
+  verified and repaired. (a) `check_package_policy` passed every member to
+  `check_manifest` with the default publication guard, so once the D05
+  supersession and task 4.3.3 closure lifted the root guard, a released facade
+  would still fail because its path dependencies were members; the member loop
+  now forwards `require_unpublished` while keeping the literal ISC requirement,
+  the docstring describes that split, and
+  `test_release_approval_lifts_the_member_publication_guard` was observed red
+  against the old call and green after it. (b) The developers' guide still
+  named six helpers as they were spelled before the DL-44 rename; the paragraph
+  now uses the private names. (c) `refresh_candidate_fingerprint` and
+  `verifier_free_containerfile` were public names for helpers the guide calls
+  private and carried prose-only docstrings; they and four siblings named by
+  the same paragraph (`_write_kani_provenance`, `_write_verus_provenance`,
+  `_write_inconclusive_record`, `_stage_verifier_free_workspace`) were renamed
+  with their importers and tests, so the paragraph and the code agree. That
+  rename in turn left six more guide entries stale (`kani_arguments`,
+  `kani_observations`, `kani_in_place_observation`, `verus_environment`,
+  `verus_command`, and `qualified_candidates`), which were corrected in the
+  same edit so the guide names each helper exactly once. (d) The fourth finding
+  asked for DL-41 and DL-44 to cite a repository NumPy rule. No tracked file
+  states one (no `.coderabbit` configuration exists and no document requires
+  NumPy sections); the quoted `**/*.py` path instruction is hosted reviewer
+  configuration, so DL-44 now names it as such and DL-41's repository-level
+  rationale stands. The interface gap the finding describes is removed by the
+  renames above. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt13.out`.
+  Date/Author: 2026-11-01, implementation agent.
 - DL-44 (2026-11-01). EP-M2 tenth review round. The first request on head
   `ae554c0` was rate-limited without a review, so the CLI backoff was applied
   and the review completed on the retry with two `trivial` findings, both
@@ -616,9 +648,10 @@ committed together with its Green change.
   requirement on every selected member, the failure for an unselected
   `crates/*/Cargo.toml`, and the limit of its scope. (b) Six probe builders and
   five support helpers had public names and one-line docstrings while the guide
-  describes them as private to the probe scripts. The finding's stated path
-  instruction has no repository basis (see the note above the Conformance
-  basis), and the offered alternative — the underscore rename — matches the
+  describes them as private to the probe scripts. The rule the finding cites is
+  its `**/*.py` path instruction — hosted reviewer configuration, not a
+  document tracked in this repository (see the note above the Conformance
+  basis) — and the offered alternative, the underscore rename, matches the
   documented intent and adds no lines against the 400-line limit; all eleven
   helpers, their importers, the loader tuple, and the provenance test were
   updated together. The finding also named `test_verifier_solver.py`; a search
@@ -2179,3 +2212,7 @@ documented claim (DL-43).
 2026-11-01, revision 18: recorded the tenth review round: the developers' guide
 documents `member_manifests` and the per-member package rule it enforces, and
 the probe helpers the guide calls private now carry private names (DL-44).
+
+2026-11-01, revision 19: recorded the eleventh review round: member publication
+follows the root release guard, the guide's helper names match the code, and
+the remaining private-intent probe helpers were renamed (DL-45).

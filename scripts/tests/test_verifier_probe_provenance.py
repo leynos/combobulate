@@ -221,7 +221,7 @@ class VerusProvenanceTests(unittest.TestCase):
             record_path = home / 'provenance.json'
 
             with patch.object(Path, 'home', return_value=home):
-                module.write_verus_provenance(
+                module._write_verus_provenance(
                     record_path,
                     '0.2026.09.06.8dea4a2',
                     solver,

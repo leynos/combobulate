@@ -22,11 +22,11 @@ from cyclopts import App
 from rust_prover_tools.commands import CommandSpec, run_command
 
 from probe_provenance import (
-    Z3_DISTRIBUTION, require_captured_output, write_kani_provenance,
-    write_verus_provenance,
+    Z3_DISTRIBUTION, require_captured_output, _write_kani_provenance,
+    _write_verus_provenance,
 )
 # The container recipe contract test reads it from this module.
-from verifier_free_probe import run_verifier_free, verifier_free_containerfile
+from verifier_free_probe import run_verifier_free, _verifier_free_containerfile
 from verifier_probe_support import (
     ROOT, FIXTURES, OUTPUT, _capture, _kani_environment, _native_workspace,
 )
@@ -190,7 +190,7 @@ def kani(
                 prefix, route, _native_workspace(), output_dir, environment
             )
         )
-        write_kani_provenance(directory, route, reference, observations, output_dir)
+        _write_kani_provenance(directory, route, reference, observations, output_dir)
     require_captured_output(observations)
 
 
@@ -253,7 +253,7 @@ def _verus_environment(z3_path: Path) -> dict[str, str]:
     return environment
 
 
-def refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
+def _refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
     """Touch the proof file before a build so cargo-verus reruns the selection.
 
     cargo-verus does not fingerprint the function-selection arguments, so a
@@ -343,7 +343,7 @@ def verus(
     observations = []
     for candidate in VERUS_CANDIDATES:
         for function in ("capability", "mutant"):
-            refresh_candidate_fingerprint(directory, candidate)
+            _refresh_candidate_fingerprint(directory, candidate)
             observations.append(
                 {
                     "candidate": candidate,
@@ -361,7 +361,7 @@ def verus(
     provenance_path = (
         output / "provenance.json" if output_dir else directory / "provenance.json"
     )
-    write_verus_provenance(provenance_path, version, z3_path, banner, observations)
+    _write_verus_provenance(provenance_path, version, z3_path, banner, observations)
     qualified = _qualified_candidates(output, observations)
     print("Qualified wiring candidates: " + ", ".join(qualified))
     if not qualified:

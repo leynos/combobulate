@@ -32,7 +32,7 @@ BUILD_SCRIPT = (
 )
 
 
-def verifier_free_containerfile() -> str:
+def _verifier_free_containerfile() -> str:
     """Build the verifier-free image recipe, including `mold`'s runtime library.
 
     For example, the returned recipe starts ``FROM`` the pinned Rocky base and
@@ -47,7 +47,7 @@ def verifier_free_containerfile() -> str:
     )
 
 
-def write_inconclusive_record(record: Path) -> None:
+def _write_inconclusive_record(record: Path) -> None:
     """Record why a host compiler wrapper prevents container isolation.
 
     Parameters
@@ -59,7 +59,7 @@ def write_inconclusive_record(record: Path) -> None:
     --------
     The record names the omitted log so the hosted job supplies the real one::
 
-        write_inconclusive_record(FIXTURES / "verus-wiring-probe/verifier-free.json")
+        _write_inconclusive_record(FIXTURES / "verus-wiring-probe/verifier-free.json")
     """
     record.write_text(
         json.dumps(
@@ -74,7 +74,7 @@ def write_inconclusive_record(record: Path) -> None:
     )
 
 
-def stage_verifier_free_workspace(directory: Path) -> None:
+def _stage_verifier_free_workspace(directory: Path) -> None:
     """Copy the probe fixture and pinned toolchain files into ``directory``.
 
     Parameters
@@ -86,7 +86,7 @@ def stage_verifier_free_workspace(directory: Path) -> None:
     --------
     Staging is idempotent, so a rerun refreshes the copied files::
 
-        stage_verifier_free_workspace(ROOT / 'target/epm1-verifier-free-workspace')
+        _stage_verifier_free_workspace(ROOT / 'target/epm1-verifier-free-workspace')
     """
     directory.mkdir(parents=True, exist_ok=True)
     shutil.copytree(
@@ -107,7 +107,7 @@ def stage_verifier_free_workspace(directory: Path) -> None:
         target = directory / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, target)
-    (directory / "Containerfile").write_text(verifier_free_containerfile())
+    (directory / "Containerfile").write_text(_verifier_free_containerfile())
 
 
 def ensure_base_image(output: Path, environment: dict[str, str]) -> None:
@@ -231,13 +231,13 @@ def run_verifier_free() -> None:
     environment = dict(os.environ)
     record = FIXTURES / "verus-wiring-probe/verifier-free.json"
     if environment.get("RUSTC_WRAPPER"):
-        write_inconclusive_record(record)
+        _write_inconclusive_record(record)
         raise RuntimeError(
             "verifier-free isolation needs a runner without a host-side compiler "
             "wrapper; admission must not be removed"
         )
     directory = ROOT / "target/epm1-verifier-free-workspace"
-    stage_verifier_free_workspace(directory)
+    _stage_verifier_free_workspace(directory)
     output = FIXTURES / "verus-wiring-probe/observations"
     image = "localhost/combobulate-epm1-verifier-free:20261028"
     ensure_base_image(output, environment)

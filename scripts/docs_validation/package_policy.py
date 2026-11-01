@@ -160,8 +160,9 @@ def check_package_policy(context: ValidationContext) -> None:
     """Apply accepted licence and publication decisions to every crate manifest.
 
     The root package follows the accepted decisions, while every member the
-    ``[workspace] members`` globs select must carry the literal ISC licence and
-    ``publish = false`` whatever the decisions say.
+    ``[workspace] members`` globs select must carry the literal ISC licence.
+    Publication follows the same guard as the root, so an approved release
+    lifts the member requirement along with the root one.
 
     Parameters
     ----------
@@ -200,7 +201,7 @@ def check_package_policy(context: ValidationContext) -> None:
             + ', '.join(str(path.relative_to(context.root)) for path in unlisted))
     for path in selected:
         member = cast('CargoManifest', tomllib.loads(path.read_text(encoding='utf-8')))
-        check_manifest(member)
+        check_manifest(member, require_unpublished=require_unpublished)
     rules = {
         'D04': ('the ISC licence', decisions.get('D04', {}).get('lifecycle') == 'accepted'),
         'D05': ('publish = false', require_unpublished),
