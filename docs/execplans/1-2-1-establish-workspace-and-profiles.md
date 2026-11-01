@@ -1207,6 +1207,16 @@ script, from measurement run `41227443972`, and the Kani corpus records the
 current producer digest. The workspace layout is published without claiming the
 array algebra or `comb!` notation, which remain unimplemented.
 
+The gate counts above describe `f0b1650`, the commit at which EP-M2 first
+became complete. The review rounds that followed tightened the evidence without
+changing that scope: the package policy forwards the release state to every
+selected member, the probe helpers that only the probe scripts use were made
+private, and the record tests gained a portability scan and a digest-binding
+check that fails when a recorded `source_digests` entry no longer matches its
+source. The final counts are 366 nextest cases with one skipped, 457 unittest
+cases, and 536 pytest cases plus 698 subtests. The gate evidence for the final
+candidate is held in the delivery ledger rather than duplicated here.
+
 ## Context and orientation
 
 Combobulate is a proposed Rust library for inspectable array and
@@ -2246,3 +2256,7 @@ lint-table helper documents its parameter and result, the record walk uses
 structural pattern matching, and the Kani provenance source digests were
 regenerated after the rename, with a new test that fails on a stale digest
 (DL-46).
+
+2026-11-01, revision 21: recorded that the Outcomes gate counts describe
+`f0b1650`, the commit at which EP-M2 first became complete, and named the final
+counts and the evidence the later review rounds added.
