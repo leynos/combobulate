@@ -61,6 +61,7 @@ def _write_kani_provenance(
     sources.extend(
         [
             ROOT / "scripts/run_verifier_probes.py",
+            ROOT / "scripts/kani_probe.py",
             ROOT / "scripts/verifier_probe_support.py",
             ROOT / "scripts/probe_provenance.py",
         ]

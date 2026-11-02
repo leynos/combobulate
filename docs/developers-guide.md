@@ -822,31 +822,33 @@ commit gates do not install or execute a verifier. `make kani` and
 `FORMAL_STRICT=1` rejects those placeholders.
 
 The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
-private `verifier_probe_support` module owns capture, digests, and scratch
-workspace construction; the private `probe_provenance` module owns the source
-digest records and the captured-output guard; and the private
+private `kani_probe` module owns the Kani route builders and their capture
+loops; the private `verifier_probe_support` module owns capture, digests, and
+scratch workspace construction; the private `probe_provenance` module owns the
+source digest records and the captured-output guard; and the private
 `verifier_free_probe` module owns the container workflow. Only the probe
 scripts may import them. These helpers are not an evidence parser and must not
 enter the evidence gate or product code. Recording fixtures and result-based
 expectations stay private to the prover command contracts. The runner reuses
 `rust-prover-tools`' Cuprum command boundary rather than another installer.
 
-The CLI's command builders — `kani_prefix`, `_kani_arguments`,
-`_kani_observations`, `_kani_in_place_observation`, `resolve_z3`,
-`_verus_environment`, `_refresh_candidate_fingerprint`, `_verus_command`, and
-`_qualified_candidates` — stay beside the commands. The fingerprint refresh is
-a command, separate from `_verus_command`, because cargo-verus does not
-fingerprint the function-selection arguments and the proof file must be touched
-immediately before each build. The provenance writers `_write_kani_provenance`
-and `_write_verus_provenance` and the guard `require_captured_output` live in
-`probe_provenance`. The verifier-free workflow lives in `verifier_free_probe` as
-`_verifier_free_containerfile`, `_write_inconclusive_record`,
-`_stage_verifier_free_workspace`, `ensure_base_image`, `container_run_command`,
-and `run_verifier_free`. These helpers are private to the probe scripts. They
-exist so each route step can be read and tested on its own. They are not a
-public API, must not be imported by the support module, the evidence gate, or
-product code, and a new probe route composes them instead of adding a parallel
-capture path.
+The Kani builders — `kani_prefix`, `_kani_arguments`, `_kani_observations`, and
+`_kani_in_place_observation` — live in `kani_probe`, so the CLI file stays
+within the repository's 400-line module limit. The remaining command builders —
+`resolve_z3`, `_verus_environment`, `_refresh_candidate_fingerprint`,
+`_verus_command`, and `_qualified_candidates` — stay beside the commands. The
+fingerprint refresh is a command, separate from `_verus_command`, because
+cargo-verus does not fingerprint the function-selection arguments and the proof
+file must be touched immediately before each build. The provenance writers
+`_write_kani_provenance` and `_write_verus_provenance` and the guard
+`require_captured_output` live in `probe_provenance`. The verifier-free
+workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
+`_write_inconclusive_record`, `_stage_verifier_free_workspace`,
+`ensure_base_image`, `container_run_command`, and `run_verifier_free`. These
+helpers are private to the probe scripts. They exist so each route step can be
+read and tested on its own. They are not a public API, must not be imported by
+the support module, the evidence gate, or product code, and a new probe route
+composes them instead of adding a parallel capture path.
 
 Committed metadata must not publish host detail. `capture` still executes the
 real argument vector but stores a portable copy, replacing the repository root

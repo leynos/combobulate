@@ -48,6 +48,7 @@ def _probe_dependencies(stubs: dict[str, object]) -> dict[str, object]:
     """Load the probe's private modules so the CLI's imports resolve."""
     return {
         **stubs,
+        'kani_probe': _load('kani_probe', SCRIPTS / 'kani_probe.py', stubs),
         'probe_provenance': _load(
             'probe_provenance', SCRIPTS / 'probe_provenance.py', stubs
         ),

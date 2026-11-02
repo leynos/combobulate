@@ -499,6 +499,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - [x] (2026-11-01) Fourteenth review round (DL-48). The default solver
     selection now fails when the pinned `z3-solver` distribution cannot be
     resolved instead of silently recording a `PATH` solver as the pin.
+  - [x] (2026-11-02) Fifteenth review round (DL-49). The Kani route builders
+    moved into a private `kani_probe` module, so the probe CLI is no longer
+    over the 400-line module limit, and the exact `vstd` pins in the three
+    Verus fixture manifests now state why a caret cannot express them.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -619,6 +623,22 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-49 (2026-11-02). EP-M2 fifteenth review round. The review completed with
+  two trivial findings, both verified and repaired. First,
+  `scripts/run_verifier_probes.py` had grown to 406 lines, over the
+  repository's 400-line module limit, so the Kani route builders (`kani_prefix`,
+  `_kani_arguments`, `_kani_observations`, and `_kani_in_place_observation`)
+  moved into a new private `kani_probe` module that only the probe scripts may
+  import. The test loader loads that module with the same stubs, the Kani
+  provenance source list now binds it, the developers' guide names it, and the
+  corpus is regenerated so the record re-binds its sources. Second, the exact
+  `=0.0.0-2026-09-06-0133` `vstd` pins in the attributes, companion, and macro
+  fixture manifests carried no rationale, so each now states that Verus rejects
+  a `vstd` that does not match the pinned verifier build and a caret
+  requirement cannot express that constraint. The CLI falls to 297 lines; both
+  focused suites and the full gates pass on the regenerated record. Evidence:
+  `/tmp/coderabbit-review-combobulate-1-2-1-establish-workspace-and-profiles-attempt18.out`.
+  Date/Author: 2026-11-02, implementation agent.
 - DL-48 (2026-11-01). EP-M2 fourteenth review round. The review completed with
   one finding, verified and repaired. `resolve_z3` looked the pinned
   `z3-solver==4.16.0.0` distribution up through `uv tool run` but ignored a
@@ -1251,7 +1271,7 @@ private, and the record tests gained a portability scan and a digest-binding
 check that fails when a recorded `source_digests` entry no longer matches its
 source. The counts measured on the candidate recorded in this revision are 366
 nextest cases with one skipped, 441 unittest cases, and 520 pytest cases plus
-696 subtests. They shrink relative to the pre-rebase figures because the target
+697 subtests. They shrink relative to the pre-rebase figures because the target
 branch retired preregistration cases, so the plan quotes the current
 measurement rather than the historical one. The gate evidence for the final
 candidate is held in the delivery ledger rather than duplicated here.
@@ -2312,3 +2332,10 @@ resolved, instead of recording a `PATH` solver as the pin (DL-48).
 replaced the pre-rebase Python suite counts with the measurement taken on the
 current candidate, because the target branch retired preregistration cases (366
 nextest with one skipped, 441 unittest, 520 pytest plus 696 subtests).
+
+2026-11-02, revision 25: recorded the fifteenth review round: the Kani route
+builders moved into a private `kani_probe` module so the probe CLI stays under
+the 400-line module limit, and the exact `vstd` pins state why a caret cannot
+express them (DL-49). The regenerated record and the full gate set were
+measured on this candidate: 366 nextest cases with one skipped, 441 unittest
+cases, and 520 pytest cases plus 697 subtests.
