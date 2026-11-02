@@ -1249,8 +1249,11 @@ changing that scope: the package policy forwards the release state to every
 selected member, the probe helpers that only the probe scripts use were made
 private, and the record tests gained a portability scan and a digest-binding
 check that fails when a recorded `source_digests` entry no longer matches its
-source. The final counts are 366 nextest cases with one skipped, 457 unittest
-cases, and 536 pytest cases plus 698 subtests. The gate evidence for the final
+source. The counts measured on the candidate recorded in this revision are 366
+nextest cases with one skipped, 441 unittest cases, and 520 pytest cases plus
+696 subtests. They shrink relative to the pre-rebase figures because the target
+branch retired preregistration cases, so the plan quotes the current
+measurement rather than the historical one. The gate evidence for the final
 candidate is held in the delivery ledger rather than duplicated here.
 
 ## Context and orientation
@@ -2304,3 +2307,8 @@ Cargo `target` directory, with a regression test (DL-47).
 2026-11-01, revision 23: recorded the fourteenth review round: the default
 solver selection fails when the pinned `z3-solver` distribution cannot be
 resolved, instead of recording a `PATH` solver as the pin (DL-48).
+
+2026-11-01, revision 24: recorded the fourteenth round's gate evidence and
+replaced the pre-rebase Python suite counts with the measurement taken on the
+current candidate, because the target branch retired preregistration cases (366
+nextest with one skipped, 441 unittest, 520 pytest plus 696 subtests).
