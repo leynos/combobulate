@@ -51,7 +51,10 @@ jobs:
       - name: Install the pinned build standard
         run: make install-build-tools
       - name: Install measurement tools
-        run: cargo binstall --no-confirm --locked cargo-nextest cargo-llvm-cov
+        # Pin the versions recorded by the accepted measurement runs
+        # (41163302274 and 41227443972). These timings feed pre-registered
+        # controls, so a tool release between runs must not change them.
+        run: cargo binstall --no-confirm --locked cargo-nextest@0.9.150 cargo-llvm-cov@0.9.1
       - uses: leynos/shared-actions/.github/actions/install-whitaker@6dea5677a84fec60ca51b07202570e3af12ffdb4
         with:
           # 0.2.9 ships cargo-dylint 6.0.1, whose driver build checks out

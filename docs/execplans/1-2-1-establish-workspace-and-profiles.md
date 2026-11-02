@@ -503,6 +503,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     moved into a private `kani_probe` module, so the probe CLI is no longer
     over the 400-line module limit, and the exact `vstd` pins in the three
     Verus fixture manifests now state why a caret cannot express them.
+  - [x] (2026-11-02) Sixteenth review round (DL-50). The measurement workflow
+    pins `cargo-nextest` 0.9.150 and `cargo-llvm-cov` 0.9.1, the versions the
+    accepted hosted runs recorded, so a tool release cannot change the
+    pre-registered timings between runs.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -623,6 +627,18 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-50 (2026-11-02). EP-M2 sixteenth review round. The review completed with
+  one trivial finding, verified and repaired. The measurement workflow installed
+  `cargo-nextest` and `cargo-llvm-cov` with `cargo binstall` and no version,
+  so a release between runs could change the timings that feed the
+  pre-registered acceptance controls. The workflow recorded each tool's
+  `--version` output but did not fix it. The accepted hosted runs `41163302274`
+  and `41227443972` both recorded `cargo-nextest 0.9.150` and
+  `cargo-llvm-cov 0.9.1` in their `nextest` and `llvm-cov` artefacts, so the
+  install step now pins those exact versions and states why. Evidence:
+  `/tmp/coderabbit-review-combobulate-1-2-1-establish-workspace-and-profiles-attempt19.out`
+  and the downloaded artefacts under `/tmp/measure-ver-*`. Date/Author:
+  2026-11-02, implementation agent.
 - DL-49 (2026-11-02). EP-M2 fifteenth review round. The review completed with
   two trivial findings, both verified and repaired. First,
   `scripts/run_verifier_probes.py` had grown to 406 lines, over the
@@ -2339,3 +2355,8 @@ the 400-line module limit, and the exact `vstd` pins state why a caret cannot
 express them (DL-49). The regenerated record and the full gate set were
 measured on this candidate: 366 nextest cases with one skipped, 441 unittest
 cases, and 520 pytest cases plus 697 subtests.
+
+2026-11-02, revision 26: recorded the sixteenth review round: the measurement
+workflow pins `cargo-nextest` 0.9.150 and `cargo-llvm-cov` 0.9.1, the versions
+the accepted hosted runs recorded, so a tool release cannot change the
+pre-registered timings between runs (DL-50).
