@@ -283,6 +283,24 @@ fn probe_targets_preserve_the_real_command_boundary(
         format_args!("{target} must forward selected arguments; got {calls:?}"),
     )?;
     if tool == "verus" {
+        let helper = vec![
+            "verus",
+            "run",
+            "--repo-root",
+            env!("CARGO_MANIFEST_DIR"),
+            "--proof-file",
+            proof_file.as_str(),
+            "--extra-arg=--crate-type=lib",
+            "--extra-arg=--verify-only-module=production",
+            "--extra-arg=--verify-function=increment",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+        check(
+            calls.contains(&helper),
+            format_args!("{target} must verify the shared helper body; got {calls:?}"),
+        )?;
         for count in ["1 verified", "0 verified"] {
             fixture.set_count_inflation(Some(count))?;
             let inflated = fixture.run_probe(target, false)?;
@@ -297,5 +315,29 @@ fn probe_targets_preserve_the_real_command_boundary(
     check(
         !failure.status.success(),
         format_args!("{target} must propagate failed execution"),
+    )
+}
+
+/// A mutant verdict must identify the seeded mutant, not merely fail somewhere.
+#[rstest]
+#[case("missing")]
+#[case("outside")]
+fn verus_qualification_requires_the_mutant_location(
+    prover: TestResult<ProverProbe>,
+    #[case] location: &str,
+) -> TestResult {
+    let fixture = prover?;
+    let output = fixture.run_probe_with_diagnostic("verus-probe", location)?;
+    check(
+        !output.status.success(),
+        format_args!("a mutant diagnostic with a {location} location must not qualify"),
+    )?;
+    check(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("no Verus candidate passed the exact count and located seeded mutant"),
+        format_args!(
+            "the failure must report the missing location evidence: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ),
     )
 }

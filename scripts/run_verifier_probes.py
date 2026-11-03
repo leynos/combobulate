@@ -13,30 +13,22 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
-import shlex
-import shutil
 
 from cyclopts import App
-from rust_prover_tools.commands import CommandSpec, run_command
 
+import verus_probe
 from kani_probe import (
     kani_prefix, _kani_arguments, _kani_in_place_observation, _kani_observations,
 )
 from probe_provenance import (
-    Z3_DISTRIBUTION, require_captured_output, _write_kani_provenance,
-    _write_verus_provenance,
+    require_captured_output, _write_kani_provenance, _write_verus_provenance,
 )
 # The container recipe contract test reads it from this module.
 from verifier_free_probe import run_verifier_free, _verifier_free_containerfile
 from verifier_probe_support import (
     ROOT, FIXTURES, OUTPUT, _capture, _native_workspace,
 )
-
-Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
-VERUS_CANDIDATES = ("macro", "attributes", "companion", "single-root")
-
 
 app = App()
 
@@ -85,133 +77,6 @@ def kani(
     require_captured_output(observations)
 
 
-def resolve_z3(selection: str) -> tuple[Path, str]:
-    """Resolve the calibrated solver and return its path and version banner.
-
-    Parameters
-    ----------
-    selection : str
-        A solver name or path. The default name first resolves the pinned
-        ``z3-solver`` distribution, while any explicit selection is checked.
-
-    Returns
-    -------
-    tuple[Path, str]
-        The resolved executable and the exact version banner it reported.
-
-    Raises
-    ------
-    RuntimeError
-        When the default selection cannot resolve the pinned distribution, no
-        solver is available, or its banner is not the calibrated one.
-    """
-    solver = shutil.which(selection)
-    if selection == "z3":
-        selected = run_command(
-            CommandSpec(
-                (
-                    "uv",
-                    "tool",
-                    "run",
-                    "--from",
-                    Z3_DISTRIBUTION,
-                    "python",
-                    "-c",
-                    "import shutil; print(shutil.which('z3') or '')",
-                )
-            )
-        )
-        if selected.exit_code != 0:
-            # The record names the calibrated distribution, so a failed
-            # resolver must not fall back to whichever z3 sits on `PATH`:
-            # that binary would be recorded as the pin's own.
-            raise RuntimeError(
-                "the pinned z3-solver distribution could not be resolved: "
-                f"{selected.stderr.strip() or 'uv exited with an error'}"
-            )
-        solver = selected.stdout.strip() or None
-    if solver is None:
-        raise RuntimeError("the pinned Z3 executable is unavailable")
-    z3_path = Path(solver).resolve()
-    identity = run_command(CommandSpec((str(z3_path), "--version")))
-    if identity.exit_code != 0 or identity.stdout.strip() != Z3_VERSION_BANNER:
-        raise RuntimeError("the solver must report the calibrated Z3 4.16.0 release")
-    return z3_path, identity.stdout.strip()
-
-
-def _verus_environment(z3_path: Path) -> dict[str, str]:
-    """Return the child environment that binds the calibrated solver."""
-    environment = dict(os.environ)
-    environment.pop("RUSTUP_TOOLCHAIN", None)
-    environment["VERUS_Z3_PATH"] = str(z3_path)
-    environment.update(
-        RUSTFLAGS="-D warnings",
-        CARGO_ENCODED_RUSTFLAGS="-D\x1fwarnings",
-        CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm",
-    )
-    return environment
-
-
-def _refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
-    """Touch the proof file before a build so cargo-verus reruns the selection.
-
-    cargo-verus does not fingerprint the function-selection arguments, so a
-    warm target directory would otherwise reuse another function's verdict.
-    """
-    (directory / f"{candidate}.rs").touch()
-
-
-def _verus_command(
-    binaries: Path,
-    candidate: str,
-    directory: Path,
-    function: str,
-    prover_tools: str,
-) -> list[str]:
-    """Return the verifier command for one candidate and one function."""
-    selection = f"--verify-function={function}"
-    if candidate == "single-root":
-        return [
-            *shlex.split(prover_tools),
-            "verus",
-            "run",
-            "--repo-root",
-            str(ROOT),
-            "--proof-file",
-            str(directory / "single-root.rs"),
-            "--extra-arg=--crate-type=lib",
-            "--extra-arg=--verify-root",
-            f"--extra-arg={selection}",
-        ]
-    command = [
-        str(binaries / "cargo-verus"), "verus", "focus",
-        "--manifest-path", str(directory / candidate / "Cargo.toml"),
-    ]
-    if candidate == "attributes":
-        command += ["--features", "verus"]
-    return command + ["--", "--verify-root", selection]
-
-
-def _qualified_candidates(output: Path, observations: list[dict]) -> list[str]:
-    """Return candidates whose positive and mutant logs show exact counts."""
-    qualified = []
-    for candidate in VERUS_CANDIDATES:
-        positive = (output / f"{candidate}-capability.log").read_text()
-        negative = (output / f"{candidate}-mutant.log").read_text()
-        statuses = [
-            item["exit_code"] for item in observations if item["candidate"] == candidate
-        ]
-        if (
-            statuses[0] == 0
-            and statuses[1] != 0
-            and re.search(r"(?m)^verification results:: 1 verified, 0 errors(?: \(|$)", positive)
-            and "postcondition not satisfied" in negative
-            and re.search(r"(?m)^verification results:: 0 verified, 1 errors(?: \(|$)", negative)
-        ):
-            qualified.append(candidate)
-    return qualified
-
-
 @app.command
 def verus(
     *,
@@ -236,19 +101,19 @@ def verus(
     directory = FIXTURES / "verus-wiring-probe"
     version = (ROOT / "tools/verus/VERSION").read_text().strip()
     binaries = verus_installation or ROOT / ".verus" / version / "verus"
-    z3_path, banner = resolve_z3(z3)
-    environment = _verus_environment(z3_path)
+    z3_path, banner, z3_distribution = verus_probe.resolve_z3(z3)
+    environment = verus_probe._verus_environment(z3_path)
     output = output_dir or directory / "observations"
     observations = []
-    for candidate in VERUS_CANDIDATES:
-        for function in ("capability", "mutant"):
-            _refresh_candidate_fingerprint(directory, candidate)
+    for candidate in verus_probe.VERUS_CANDIDATES:
+        for function in verus_probe.VERUS_FUNCTIONS[candidate]:
+            verus_probe._refresh_candidate_fingerprint(directory, candidate)
             observations.append(
                 {
                     "candidate": candidate,
                     "function": function,
                     **_capture(
-                        _verus_command(
+                        verus_probe._verus_command(
                             binaries, candidate, directory, function, prover_tools
                         ),
                         directory,
@@ -260,12 +125,14 @@ def verus(
     provenance_path = (
         output / "provenance.json" if output_dir else directory / "provenance.json"
     )
-    _write_verus_provenance(provenance_path, version, z3_path, banner, observations)
-    qualified = _qualified_candidates(output, observations)
+    _write_verus_provenance(
+        provenance_path, version, z3_path, banner, z3_distribution, observations
+    )
+    qualified = verus_probe._qualified_candidates(output, observations, directory)
     print("Qualified wiring candidates: " + ", ".join(qualified))
     if not qualified:
         raise RuntimeError(
-            "no Verus candidate passed both the exact count and seeded mutant"
+            "no Verus candidate passed the exact count and located seeded mutant"
         )
 
 

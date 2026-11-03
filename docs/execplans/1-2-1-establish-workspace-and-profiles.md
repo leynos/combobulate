@@ -513,6 +513,13 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     requirement.
   - [x] (2026-11-03) Eighteenth review round. The review of `3e10968` against
     `9fa10a1` completed with no findings, so no further repair was required.
+  - [x] (2026-11-03) Nineteenth assessment round (DL-52). The hosted
+    completeness and proof assessments raised four findings: the single-root
+    helper body was unverified, the Verus record bound no sources, mutant
+    qualification ignored the diagnostic location, and an explicit solver was
+    attributed to the pinned distribution. All four are repaired, the plan's
+    Kani invocation description now matches the direct route, and both corpora
+    are regenerated.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -633,6 +640,38 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-52 (2026-11-03). EP-M2 hosted ExecPlan completeness and proof assessment.
+  The completeness assessment (comment 6593903939) and the proof assessment
+  (comment 6593931093) raised four findings, all verified and repaired. First,
+  the single-root candidate verified only its root functions, so the shared
+  `production::increment` body was never discharged; the probe now records a
+  third `single-root` observation that runs
+  `--verify-only-module=production --verify-function=increment` and requires
+  the selected-functions note with one verified function and no errors. A
+  temporary helper-body mutant was detected by that run and not by the full
+  `--verify-root` run, so the observation is sensitive to the body it claims.
+  Second, the Verus provenance record carried no `source_digests`; it now binds
+  the four candidate proof files, the shared production source, the workspace
+  manifest, lockfile, and member manifests, plus the probe modules, and the
+  provenance test requires a non-empty digest map for every record. Third,
+  mutant qualification accepted any failing run; it now requires exactly one
+  `postcondition not satisfied` diagnostic, exactly one error and no verified
+  function, a diagnostic path that resolves to the candidate source, and a line
+  inside the seeded mutant declaration's region. Fourth, an explicitly selected
+  solver was attributed to the pinned `z3-solver` distribution even though only
+  the default resolver consults it; `resolve_z3` now returns the distribution
+  only for the default selection and records `None` otherwise. The completeness
+  assessment also noted that the plan described the corpus through
+  `prover-tools kani exec` although the accepted route is direct (DL-24); the
+  plan now names the direct driver invocation. The added Verus builders moved
+  into a private `verus_probe` module so the CLI stays within the 400-line
+  limit, and both corpora were regenerated so their records bind the changed
+  sources. Evidence:
+  `/tmp/verus-probe-2-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  `/tmp/kani-log-corpus-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  and
+  `/tmp/focused-contract-2-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-11-03, implementation agent.
 - DL-51 (2026-11-03). EP-M2 seventeenth review round. The review completed
   with one minor finding, verified and repaired. `check_package_policy` gated
   the root manifest's ISC requirement on D04 being accepted, but the member
@@ -1729,23 +1768,23 @@ milestones use them and are deleted otherwise. No shipped code changes.
 - Kani log corpus. Create `tools/verifier-fixtures/kani-corpus/`, a standalone
   crate with its own `[workspace]` table and a harness manifest. Its labelled
   subjects produce, through `make kani-log-corpus` (which runs
-  `make kani-check`, then
-  `prover-tools kani exec --cwd tools/verifier-fixtures/kani-corpus` with each
-  verifier argument passed as a separate `--extra-arg`), one log per class: a
-  claim that passes with a satisfied cover; a claim with a counterexample; a
-  claim whose success line hides an unreachable cover; a symbolic full-width
-  multiplication run with `-Z unstable-options --harness-timeout 5s`; a failed
-  unwinding check; a pure skip (`--harness X --exact`, with all run results
-  passing); a `--fail-fast` run mixing a counterexample with skipped harnesses;
-  a run killed from outside, leaving a truncated log; `kani::assume(false)`
-  before a cover; an undetermined or unsupported construct; a
-  `#[kani::should_panic]` claim; and control harnesses (seeded faults as
-  separate functions, no `cfg` body swaps) that fail their expected property.
-  Each log is stored under `scripts/tests/fixtures/kani_logs/` with
-  `cargo kani list --format json` output and a provenance file naming the
-  command, Kani version, digest, and whether `--verbose` output shows CBMC's
-  unwinding-assertion flag; if it does not, the unwinding-check capability is
-  recorded `inconclusive`.
+  `make kani-check`, then invokes the installed Kani 0.67.0 driver directly
+  with each verifier argument passed separately, because the helper's
+  `kani exec` route refuses the repository's backend configuration (DL-24)),
+  one log per class: a claim that passes with a satisfied cover; a claim with a
+  counterexample; a claim whose success line hides an unreachable cover; a
+  symbolic full-width multiplication run with
+  `-Z unstable-options --harness-timeout 5s`; a failed unwinding check; a pure
+  skip (`--harness X --exact`, with all run results passing); a `--fail-fast`
+  run mixing a counterexample with skipped harnesses; a run killed from
+  outside, leaving a truncated log; `kani::assume(false)` before a cover; an
+  undetermined or unsupported construct; a `#[kani::should_panic]` claim; and
+  control harnesses (seeded faults as separate functions, no `cfg` body swaps)
+  that fail their expected property. Each log is stored under
+  `scripts/tests/fixtures/kani_logs/` with `cargo kani list --format json`
+  output and a provenance file naming the command, Kani version, digest, and
+  whether `--verbose` output shows CBMC's unwinding-assertion flag; if it does
+  not, the unwinding-check capability is recorded `inconclusive`.
 - Verus wiring probe. Create `tools/verifier-fixtures/verus-wiring-probe/` with
   four candidates for the kernel's eventual proof profile, each a `#![no_std]`
   crate without `alloc`: (a) a non-optional `vstd` dependency
@@ -2390,3 +2429,11 @@ measured subtest count to 698; the other counts are unchanged.
 2026-11-03, revision 28: recorded the eighteenth review round: the review of
 candidate `3e10968` against `9fa10a1` reported no findings, so the candidate
 proceeds to delivery unchanged.
+
+2026-11-03, revision 29: recorded the nineteenth assessment round: the hosted
+completeness and proof assessments raised four findings, all repaired (DL-52).
+The single-root candidate now verifies the shared helper body, the Verus record
+binds its sources, mutant qualification requires the diagnostic to name the
+seeded mutant, and only the default solver resolver is attributed to the pinned
+distribution. The plan's Kani corpus description now names the direct driver
+invocation, and both corpora are regenerated.

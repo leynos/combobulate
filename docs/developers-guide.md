@@ -824,23 +824,25 @@ commit gates do not install or execute a verifier. `make kani` and
 
 The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
 private `kani_probe` module owns the Kani route builders and their capture
-loops; the private `verifier_probe_support` module owns capture, digests, and
-scratch workspace construction; the private `probe_provenance` module owns the
-source digest records and the captured-output guard; and the private
-`verifier_free_probe` module owns the container workflow. Only the probe
-scripts may import them. These helpers are not an evidence parser and must not
-enter the evidence gate or product code. Recording fixtures and result-based
-expectations stay private to the prover command contracts. The runner reuses
-`rust-prover-tools`' Cuprum command boundary rather than another installer.
+loops; the private `verus_probe` module owns solver resolution, the Verus
+command builders, and mutant qualification; the private
+`verifier_probe_support` module owns capture, digests, and scratch workspace
+construction; the private `probe_provenance` module owns the source digest
+records and the captured-output guard; and the private `verifier_free_probe`
+module owns the container workflow. Only the probe scripts may import them.
+These helpers are not an evidence parser and must not enter the evidence gate
+or product code. Recording fixtures and result-based expectations stay private
+to the prover command contracts. The runner reuses `rust-prover-tools`' Cuprum
+command boundary rather than another installer.
 
 The Kani builders — `kani_prefix`, `_kani_arguments`, `_kani_observations`, and
-`_kani_in_place_observation` — live in `kani_probe`, so the CLI file stays
-within the repository's 400-line module limit. The remaining command builders —
+`_kani_in_place_observation` — live in `kani_probe`, and the Verus builders —
 `resolve_z3`, `_verus_environment`, `_refresh_candidate_fingerprint`,
-`_verus_command`, and `_qualified_candidates` — stay beside the commands. The
-fingerprint refresh is a command, separate from `_verus_command`, because
-cargo-verus does not fingerprint the function-selection arguments and the proof
-file must be touched immediately before each build. The provenance writers
+`_verus_command`, and `_qualified_candidates` — live in `verus_probe`, so the
+CLI file stays within the repository's 400-line module limit. The fingerprint
+refresh is a command, separate from `_verus_command`, because cargo-verus does
+not fingerprint the function-selection arguments and the proof file must be
+touched immediately before each build. The provenance writers
 `_write_kani_provenance` and `_write_verus_provenance` and the guard
 `require_captured_output` live in `probe_provenance`. The verifier-free
 workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
@@ -864,6 +866,15 @@ the digest binds the log and not the metadata, that edit leaves the evidence
 valid. The provenance test scans every committed fixture record and fails on
 any remaining account home.
 
+Both provenance writers bind their inputs with `source_digests`. The Kani
+record covers the harness sources, the harness and listing inventories, and the
+probe modules that build and record the run. The Verus record covers the four
+candidate proof files, the shared production source, the workspace manifest,
+lockfile, and member manifests, plus the probe modules that generate and record
+the observations. The provenance test recomputes every recorded digest and
+requires each `provenance.json` to carry a non-empty digest map, so a Verus
+record cannot pass merely by omitting the field.
+
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
 which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
@@ -878,13 +889,20 @@ resolves that pinned distribution even when another `z3` appears on `PATH`, and
 fails rather than falling back to `PATH` when that resolution does not succeed,
 because the record would otherwise name the pin for a binary the pin did not
 supply. An explicitly named solver is used as given but must pass the same
-version check. The Kani provenance label and the Z3 distribution come from
-their pin files and named module constants rather than being restated at each
-call site. Single-root verification uses `prover-tools verus run`; crate
-comparisons use the pinned `cargo-verus` directly. Each selected function is
-rebuilt because `cargo-verus` does not fingerprint function-selection
-arguments. A successful capability must report exactly one verified function;
-its mutant must report one postcondition error.
+version check; the record keeps its path and digest and records no distribution
+attribution, because only the default resolver consults `z3-solver==4.16.0.0`.
+The Kani provenance label and the Z3 distribution come from their pin files and
+named module constants rather than being restated at each call site.
+Single-root verification uses `prover-tools verus run`; crate comparisons use
+the pinned `cargo-verus` directly. Each selected function is rebuilt because
+`cargo-verus` does not fingerprint function-selection arguments. A successful
+capability must report exactly one verified function, its mutant must report
+exactly one error and no verified function with one postcondition diagnostic
+located at the seeded mutant declaration, and the single-root route
+additionally verifies `production::increment` through
+`--verify-only-module=production`, because `--verify-root` selects only the
+root module's functions. A mutant verdict whose diagnostic names no location,
+another source, or a line outside the mutant declaration does not qualify.
 
 Kani harness inventory (all subjects are deliberately separate fixture bodies):
 

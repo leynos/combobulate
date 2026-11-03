@@ -20,6 +20,44 @@ from verifier_probe_support import (
 
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
 
+VERUS_FIXTURE = ROOT / "tools/verifier-fixtures/verus-wiring-probe"
+
+# The Verus record binds every input that can change a verdict: the proof and
+# helper sources, the manifests and lockfile that select dependencies, and the
+# probe modules that build and record the runs.
+_VERUS_SOURCES = (
+    "macro.rs",
+    "attributes.rs",
+    "companion.rs",
+    "single-root.rs",
+    "production.rs",
+    "Cargo.toml",
+    "Cargo.lock",
+    "macro/Cargo.toml",
+    "attributes/Cargo.toml",
+    "companion/Cargo.toml",
+    "production/Cargo.toml",
+)
+_VERUS_PROBE_SCRIPTS = (
+    ROOT / "scripts/run_verifier_probes.py",
+    ROOT / "scripts/verus_probe.py",
+    ROOT / "scripts/probe_provenance.py",
+    ROOT / "scripts/verifier_probe_support.py",
+)
+
+
+def _verus_sources() -> list[Path]:
+    """Return the fixture inputs and generating scripts a verdict depends on.
+
+    Examples
+    --------
+    The record names paths relative to the repository root::
+
+        _verus_sources()[0]
+        # PosixPath('.../tools/verifier-fixtures/verus-wiring-probe/macro.rs')
+    """
+    return [VERUS_FIXTURE / name for name in _VERUS_SOURCES] + list(_VERUS_PROBE_SCRIPTS)
+
 
 def _write_kani_provenance(
     directory: Path,
@@ -82,9 +120,10 @@ def _write_verus_provenance(
     version: str,
     z3_path: Path,
     banner: str,
+    z3_distribution: str | None,
     observations: list[dict],
 ) -> None:
-    """Record the Verus and solver identities behind the observations.
+    """Record the Verus, solver, and source identities behind the observations.
 
     Parameters
     ----------
@@ -96,23 +135,31 @@ def _write_verus_provenance(
         Resolved, calibrated solver executable.
     banner
         Exact version banner the solver reported.
+    z3_distribution
+        The pinned distribution when its resolver supplied the executable, or
+        ``None`` when the caller named the solver explicitly. The path and
+        digest identify that solver without attributing it to the pin.
     observations
         Captured candidate and function records.
 
     Examples
     --------
-    The record binds the solver digest as well as its reported version::
+    The record binds the solver digest, its sources, and the observations::
 
-        _write_verus_provenance(path, version, z3_path, banner, observations)
+        _write_verus_provenance(path, version, z3_path, banner, None, observations)
     """
     path.write_text(
         json.dumps(
             {
                 "verus": version,
                 "z3": portable_argument(str(z3_path)),
-                "z3_distribution": Z3_DISTRIBUTION,
+                "z3_distribution": z3_distribution,
                 "z3_version": banner,
                 "z3_sha256": _digest(z3_path),
+                "source_digests": {
+                    str(source.relative_to(ROOT)): _digest(source)
+                    for source in _verus_sources()
+                },
                 "observations": observations,
             },
             indent=2,

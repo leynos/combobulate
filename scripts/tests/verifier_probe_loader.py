@@ -46,14 +46,18 @@ def _load(name: str, path: Path, stubs: dict[str, object]) -> ModuleType:
 
 def _probe_dependencies(stubs: dict[str, object]) -> dict[str, object]:
     """Load the probe's private modules so the CLI's imports resolve."""
+    provenance = _load('probe_provenance', SCRIPTS / 'probe_provenance.py', stubs)
     return {
         **stubs,
         'kani_probe': _load('kani_probe', SCRIPTS / 'kani_probe.py', stubs),
-        'probe_provenance': _load(
-            'probe_provenance', SCRIPTS / 'probe_provenance.py', stubs
-        ),
+        'probe_provenance': provenance,
         'verifier_free_probe': _load(
             'verifier_free_probe', SCRIPTS / 'verifier_free_probe.py', stubs
+        ),
+        'verus_probe': _load(
+            'verus_probe',
+            SCRIPTS / 'verus_probe.py',
+            {**stubs, 'probe_provenance': provenance},
         ),
     }
 

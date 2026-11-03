@@ -42,39 +42,8 @@ impl ProverProbe {
         parent.create_dir(&name)?;
         let directory = parent.open_dir(&name)?;
         let repository = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())?;
-        directory.write("Makefile", repository.read("Makefile")?)?;
-        directory.create_dir_all("tools/rust-prover-tools")?;
-        directory.create_dir_all("tools/kani")?;
-        directory.write(
-            "tools/rust-prover-tools/REF",
-            repository.read("tools/rust-prover-tools/REF")?,
-        )?;
-        directory.write("tools/kani/VERSION", "0.67.0\n")?;
-        directory.write(
-            "prover",
-            concat!(
-                "#!/bin/bash\n",
-                "printf '%s\\0' \"$@\" >> \"$PROVER_LOG\"\n",
-                "printf '\\n' >> \"$PROVER_LOG\"\n",
-                "printf 'recording prover fixture\\n'\n",
-                "if [ \"${PROVER_EXECUTION_EXIT:-0}\" != 0 ] && ",
-                "[ \"${2-}\" != check-version ] && [ \"${2-}\" != --version ]; ",
-                "then exit \"$PROVER_EXECUTION_EXIT\"; fi\n",
-                "if [ \"${PROVER_EXIT:-0}\" != 0 ]; then exit \"$PROVER_EXIT\"; fi\n",
-                "case \"$*\" in\n",
-                "  *--version*) printf 'Kani Rust Verifier 0.67.0\\n' ;;\n",
-                "  *--verify-function=mutant*) printf 'postcondition not satisfied\\n",
-                "verification results:: 0 verified, 1 errors\\n'; exit 1 ;;\n",
-                "  *--verify-function=capability*) ",
-                "printf 'verification results:: 1 verified, 0 errors\\n' ;;\n",
-                "  *--harness-timeout*) printf 'CBMC timed out\\n'; exit 1 ;;\n",
-                "  *harnesses::multiplication_timeout*) sleep 9 ;;\n",
-                "  *harnesses::counterexample*|*harnesses::insufficient_unwind*|",
-                "*harnesses::unsupported*|*harnesses::seeded_wrapping_mutant*) exit 1 ;;\n",
-                "  *) printf 'recording prover fixture\\n' ;;\n",
-                "esac\n",
-            ),
-        )?;
+        copy_repository_pins(&directory, &repository)?;
+        directory.write("prover", PROVER_SCRIPT)?;
         directory.set_permissions("prover", Permissions::from_mode(0o755))?;
         directory.write(
             "z3",
@@ -93,7 +62,64 @@ impl ProverProbe {
             path: path.join(name),
         })
     }
+}
 
+/// Copies the pinned manifests every probe target parses before execution.
+fn copy_repository_pins(directory: &Dir, repository: &Dir) -> io::Result<()> {
+    directory.write("Makefile", repository.read("Makefile")?)?;
+    directory.create_dir_all("tools/rust-prover-tools")?;
+    directory.create_dir_all("tools/kani")?;
+    directory.write(
+        "tools/rust-prover-tools/REF",
+        repository.read("tools/rust-prover-tools/REF")?,
+    )?;
+    directory.write("tools/kani/VERSION", "0.67.0\n")
+}
+
+/// A recording prover whose answers are selected by the forwarded arguments.
+const PROVER_SCRIPT: &str = concat!(
+    "#!/bin/bash\n",
+    "printf '%s\\0' \"$@\" >> \"$PROVER_LOG\"\n",
+    "printf '\\n' >> \"$PROVER_LOG\"\n",
+    "printf 'recording prover fixture\\n'\n",
+    "if [ \"${PROVER_EXECUTION_EXIT:-0}\" != 0 ] && ",
+    "[ \"${2-}\" != check-version ] && [ \"${2-}\" != --version ]; ",
+    "then exit \"$PROVER_EXECUTION_EXIT\"; fi\n",
+    "if [ \"${PROVER_EXIT:-0}\" != 0 ]; then exit \"$PROVER_EXIT\"; fi\n",
+    "case \"$*\" in\n",
+    "  *--version*) printf 'Kani Rust Verifier 0.67.0\\n' ;;\n",
+    "  *--verify-function=mutant*) ",
+    "src=; previous=; ",
+    "for argument in \"$@\"; do ",
+    "if [ \"$previous\" = --manifest-path ]; then ",
+    "source_dir=\"$(dirname \"$argument\")\"; ",
+    "src=\"$source_dir/../$(basename \"$source_dir\").rs\"; fi; ",
+    "if [ \"$previous\" = --proof-file ]; then src=\"$argument\"; fi; ",
+    "previous=\"$argument\"; done; ",
+    "line=1; if [ -n \"$src\" ]; then ",
+    "line=\"$(grep -n 'fn mutant' \"$src\" | head -n 1 | cut -d: -f1)\"; ",
+    "[ -n \"$line\" ] || line=1; fi; ",
+    "case \"${PROVER_MUTANT_LOCATION:-located}\" in ",
+    "missing) printf 'error: postcondition not satisfied\\n' ;; ",
+    "outside) printf 'error: postcondition not satisfied\\n  --> %s:1:13\\n' ",
+    "\"$src\" ;; ",
+    "*) printf 'error: postcondition not satisfied\\n  --> %s:%s:13\\n' ",
+    "\"$src\" \"$line\" ;; ",
+    "esac; printf 'verification results:: 0 verified, 1 errors\\n'; exit 1 ;;\n",
+    "  *--verify-function=increment*) ",
+    "printf 'note: verifying module production (selected functions)\\n'; ",
+    "printf 'verification results:: 1 verified, 0 errors\\n' ;;\n",
+    "  *--verify-function=capability*) ",
+    "printf 'verification results:: 1 verified, 0 errors\\n' ;;\n",
+    "  *--harness-timeout*) printf 'CBMC timed out\\n'; exit 1 ;;\n",
+    "  *harnesses::multiplication_timeout*) sleep 9 ;;\n",
+    "  *harnesses::counterexample*|*harnesses::insufficient_unwind*|",
+    "*harnesses::unsupported*|*harnesses::seeded_wrapping_mutant*) exit 1 ;;\n",
+    "  *) printf 'recording prover fixture\\n' ;;\n",
+    "esac\n",
+);
+
+impl ProverProbe {
     /// Constructs a real Make command with child-only recording variables.
     pub(super) fn command(&self, target: &str) -> Command {
         let mut command = Command::new("make");
@@ -114,9 +140,10 @@ impl ProverProbe {
             .output()
     }
 
-    /// Runs actual probe orchestration with fake pinned executables and private outputs.
-    pub(super) fn run_probe(&self, target: &str, failure: bool) -> io::Result<Output> {
-        self.command(target)
+    /// Builds the probe invocation shared by the success and diagnostic cases.
+    fn probe_command(&self, target: &str, failure: bool) -> Command {
+        let mut command = self.command(target);
+        command
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .arg("PROVER_TOOLS_CONTRACT_TEST=1")
             .arg(format!("PROVER_TOOLS={}", self.path.join("prover")))
@@ -132,7 +159,23 @@ impl ProverProbe {
                 self.path.join("z3")
             ))
             .env("PROVER_EXIT", "0")
-            .env("PROVER_EXECUTION_EXIT", if failure { "19" } else { "0" })
+            .env("PROVER_EXECUTION_EXIT", if failure { "19" } else { "0" });
+        command
+    }
+
+    /// Runs actual probe orchestration with fake pinned executables and private outputs.
+    pub(super) fn run_probe(&self, target: &str, failure: bool) -> io::Result<Output> {
+        self.probe_command(target, failure).output()
+    }
+
+    /// Runs the probe with a chosen mutant diagnostic shape.
+    pub(super) fn run_probe_with_diagnostic(
+        &self,
+        target: &str,
+        location: &str,
+    ) -> io::Result<Output> {
+        self.probe_command(target, false)
+            .env("PROVER_MUTANT_LOCATION", location)
             .output()
     }
 
