@@ -507,6 +507,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     pins `cargo-nextest` 0.9.150 and `cargo-llvm-cov` 0.9.1, the versions the
     accepted hosted runs recorded, so a tool release cannot change the
     pre-registered timings between runs.
+  - [x] (2026-11-03) Seventeenth review round (DL-51). Member manifests now
+    follow the D04 licence guard as the root does, so a non-accepted D04
+    changes both together instead of leaving the members on the literal ISC
+    requirement.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -627,6 +631,20 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-51 (2026-11-03). EP-M2 seventeenth review round. The review completed
+  with one minor finding, verified and repaired. `check_package_policy` gated
+  the root manifest's ISC requirement on D04 being accepted, but the member
+  loop called `check_manifest` with the default `require_isc=True`. Had D04
+  been superseded or left proposed, the root could have changed licence while
+  every member still failed, which contradicts the checker's stated purpose of
+  applying the accepted decisions to every manifest. The D04 flag is now
+  computed once as `require_isc`, passed to the root and the member calls, and
+  reused when recording which rules were enforced. The docstring and the
+  developers' guide describe the shared licence guard, and
+  `test_every_member_carries_the_literal_policy` gained a proposed-D04 case
+  that admits a member with another licence. Evidence:
+  `/tmp/coderabbit-review-combobulate-1-2-1-establish-workspace-and-profiles-attempt20.out`.
+  Date/Author: 2026-11-03, implementation agent.
 - DL-50 (2026-11-02). EP-M2 sixteenth review round. The review completed with
   one trivial finding, verified and repaired. The measurement workflow installed
   `cargo-nextest` and `cargo-llvm-cov` with `cargo binstall` and no version,
@@ -711,8 +729,9 @@ committed together with its Green change.
   `check_manifest` with the default publication guard, so once the D05
   supersession and task 4.3.3 closure lifted the root guard, a released facade
   would still fail because its path dependencies were members; the member loop
-  now forwards `require_unpublished` while keeping the literal ISC requirement,
-  the docstring describes that split, and
+  now forwards `require_unpublished` (the literal ISC requirement it kept then
+  was later applied through the same D04 guard as the root in DL-51), the
+  docstring describes that split, and
   `test_release_approval_lifts_the_member_publication_guard` was observed red
   against the old call and green after it. (b) The developers' guide still
   named six helpers as they were spelled before the DL-44 rename; the paragraph
@@ -1287,7 +1306,7 @@ private, and the record tests gained a portability scan and a digest-binding
 check that fails when a recorded `source_digests` entry no longer matches its
 source. The counts measured on the candidate recorded in this revision are 366
 nextest cases with one skipped, 441 unittest cases, and 520 pytest cases plus
-697 subtests. They shrink relative to the pre-rebase figures because the target
+698 subtests. They shrink relative to the pre-rebase figures because the target
 branch retired preregistration cases, so the plan quotes the current
 measurement rather than the historical one. The gate evidence for the final
 candidate is held in the delivery ledger rather than duplicated here.
@@ -2360,3 +2379,8 @@ cases, and 520 pytest cases plus 697 subtests.
 workflow pins `cargo-nextest` 0.9.150 and `cargo-llvm-cov` 0.9.1, the versions
 the accepted hosted runs recorded, so a tool release cannot change the
 pre-registered timings between runs (DL-50).
+
+2026-11-03, revision 27: recorded the seventeenth review round: member
+manifests follow the D04 licence guard as the root does, so a non-accepted D04
+changes both together (DL-51). The added package-policy case raises the
+measured subtest count to 698; the other counts are unchanged.

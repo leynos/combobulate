@@ -159,10 +159,11 @@ def _has_validated_core_dossier(context: ValidationContext) -> bool:
 def check_package_policy(context: ValidationContext) -> None:
     """Apply accepted licence and publication decisions to every crate manifest.
 
-    The root package follows the accepted decisions, while every member the
-    ``[workspace] members`` globs select must carry the literal ISC licence.
-    Publication follows the same guard as the root, so an approved release
-    lifts the member requirement along with the root one.
+    The root package and every member the ``[workspace] members`` globs select
+    follow the same accepted decisions. The ISC licence is required while D04
+    is accepted, for the root and the members alike. Publication follows the
+    same D05 guard, so an approved release lifts the requirement from the root
+    and the members together.
 
     Parameters
     ----------
@@ -192,18 +193,18 @@ def check_package_policy(context: ValidationContext) -> None:
     release_conditions_met = (_has_accepted_d05_supersession(decisions)
                               and _has_validated_core_dossier(context))
     require_unpublished = not release_conditions_met
+    require_isc = decisions.get('D04', {}).get('lifecycle') == 'accepted'
     manifest = cast('CargoManifest', tomllib.loads((context.root / 'Cargo.toml').read_text(encoding='utf-8')))
-    check_manifest(manifest, require_isc=decisions.get('D04', {}).get('lifecycle') == 'accepted',
-                   require_unpublished=require_unpublished)
+    check_manifest(manifest, require_isc=require_isc, require_unpublished=require_unpublished)
     selected, unlisted = member_manifests(context.root, manifest.get('workspace', {}))
     require(not unlisted,
             'every crates/*/Cargo.toml must match a workspace member glob: '
             + ', '.join(str(path.relative_to(context.root)) for path in unlisted))
     for path in selected:
         member = cast('CargoManifest', tomllib.loads(path.read_text(encoding='utf-8')))
-        check_manifest(member, require_unpublished=require_unpublished)
+        check_manifest(member, require_isc=require_isc, require_unpublished=require_unpublished)
     rules = {
-        'D04': ('the ISC licence', decisions.get('D04', {}).get('lifecycle') == 'accepted'),
+        'D04': ('the ISC licence', require_isc),
         'D05': ('publish = false', require_unpublished),
     }
     enforced = {decision: rule for decision, (rule, is_required) in rules.items() if is_required}

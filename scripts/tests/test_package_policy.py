@@ -142,15 +142,20 @@ class PackagePolicy(unittest.TestCase):
     def test_every_member_carries_the_literal_policy(self):
         """Require ISC and publish = false in every crate the member globs select."""
         cases = (
-            ('valid members', 'license = "ISC"\npublish = false\n', None),
-            ('publishable member', 'license = "ISC"\npublish = true\n', 'publish = false'),
-            ('other licence', 'license = "MIT"\npublish = false\n', 'license = "ISC"'),
-            ('missing policy', '', 'license = "ISC"'),
+            ('valid members', 'accepted', 'license = "ISC"\npublish = false\n', None),
+            ('publishable member', 'accepted', 'license = "ISC"\npublish = true\n',
+             'publish = false'),
+            ('other licence', 'accepted', 'license = "MIT"\npublish = false\n',
+             'license = "ISC"'),
+            ('missing policy', 'accepted', '', 'license = "ISC"'),
+            ('proposed D04 permits another licence', 'proposed',
+             'license = "MIT"\npublish = false\n', None),
         )
-        for label, fields, expected_error in cases:
+        for label, d04_lifecycle, fields, expected_error in cases:
             with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                self.write_workspace_fixture(root, member_fields=fields)
+                self.write_workspace_fixture(root, member_fields=fields,
+                                             d04_lifecycle=d04_lifecycle)
                 context = ValidationContext(root)
                 if expected_error is None:
                     check_package_policy(context)
@@ -193,8 +198,9 @@ class PackagePolicy(unittest.TestCase):
     @staticmethod
     def write_workspace_fixture(root: Path, *, members: list[str] | None = None,
                                 member_fields: str = 'license = "ISC"\npublish = false\n',
-                                crates: tuple[str, ...] = ('member',)) -> None:
-        """Write a root workspace manifest, an empty register, and member crates."""
+                                crates: tuple[str, ...] = ('member',),
+                                d04_lifecycle: str = 'accepted') -> None:
+        """Write a root workspace manifest, a D04 register, and member crates."""
         (root / 'spec').mkdir()
         patterns = ['crates/*'] if members is None else members
         member_list = ', '.join(f'"{pattern}"' for pattern in patterns)
@@ -202,7 +208,9 @@ class PackagePolicy(unittest.TestCase):
             f'[workspace]\nmembers = [{member_list}]\n\n'
             '[package]\nname = "policy-fixture"\nversion = "0.1.0"\n'
             'license = "ISC"\npublish = false\n', encoding='utf-8')
-        (root / 'spec/decisions.json').write_text(json.dumps({'decisions': []}), encoding='utf-8')
+        decisions = [{'id': 'D04', 'lifecycle': d04_lifecycle}]
+        (root / 'spec/decisions.json').write_text(
+            json.dumps({'decisions': decisions}), encoding='utf-8')
         for crate in crates:
             crate_root = root / 'crates' / crate
             crate_root.mkdir(parents=True)

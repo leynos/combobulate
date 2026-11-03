@@ -731,9 +731,10 @@ Kani calibration artefacts.
 `scripts/docs_validation/package_policy.py` are internal package-policy helpers.
 `check_package_policy` is their only production caller and supplies the
 D04/D05 decision state. `member_manifests` returns the manifests the root
-`members` globs select, and each selected member must carry the literal
-`license = "ISC"`; publication follows the same D05 guard as the root, so an
-approved release lifts the member requirement with it. A manifest under
+`members` globs select. Each selected member follows the same D04 licence guard
+as the root, so the literal `license = "ISC"` is required while D04 is
+accepted; publication follows the same D05 guard too, so an approved release
+lifts both requirements from the root and the members together. A manifest under
 `crates/` that no glob selects fails the check rather than escaping it. The
 checker runs after roadmap closure: publication remains disabled until an
 accepted D05 supersession and a successful task 4.3.3 closure result are both
