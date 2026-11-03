@@ -511,6 +511,8 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     follow the D04 licence guard as the root does, so a non-accepted D04
     changes both together instead of leaving the members on the literal ISC
     requirement.
+  - [x] (2026-11-03) Eighteenth review round. The review of `3e10968` against
+    `9fa10a1` completed with no findings, so no further repair was required.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -2384,3 +2386,7 @@ pre-registered timings between runs (DL-50).
 manifests follow the D04 licence guard as the root does, so a non-accepted D04
 changes both together (DL-51). The added package-policy case raises the
 measured subtest count to 698; the other counts are unchanged.
+
+2026-11-03, revision 28: recorded the eighteenth review round: the review of
+candidate `3e10968` against `9fa10a1` reported no findings, so the candidate
+proceeds to delivery unchanged.
