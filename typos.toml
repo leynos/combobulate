@@ -67,6 +67,7 @@ extend-ignore-re = [
     "mold \\$installed",
     "mold \\$version",
     "mold at \\$resolved",
+    "mold pin files",
     "mold-<version>-<arch>-linux",
     "mold-\\$version-x86_64-linux\\.tar\\.gz",
     "selects mold only",

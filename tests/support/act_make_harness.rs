@@ -49,10 +49,23 @@ const ACT_PATH_SHIM: &str = concat!(
 );
 
 /// Cargo executor script that selects Cargo tests and can fail by stage.
+///
+/// `FAIL_CARGO_INVOCATION` counts only the test-bearing Cargo commands, so a
+/// preparation fetch or the gate build cannot shift the invocation numbering
+/// those failure cases assert. Preparation succeeds unconditionally: it is a
+/// network-shaped step whose failure the Make recipe reports itself, and this
+/// harness is about routing, not acquisition.
 const CARGO_SCRIPT: &str = concat!(
     "#!/bin/sh\n",
     include_str!("act_make_record.sh"),
     "record_invocation \"$@\"\n",
+    "if [ \"$1\" = fetch ]; then exit 0; fi\n",
+    "if [ \"$#\" -eq 6 ] && [ \"$1\" = test ] && [ \"$2\" = --no-run ] && \\\n",
+    "       [ \"$3\" = --manifest-path ] && \\\n",
+    "       [ \"$4\" = tools/gates/cardinality-ui/Cargo.toml ] && \\\n",
+    "       [ \"$5\" = --test ] && [ \"$6\" = cardinality_ui ]; then\n",
+    "  exit 0\n",
+    "fi\n",
     "if [ \"$#\" -eq 2 ] && [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n",
     "  if [ \"${NEXTTEST_AVAILABLE:-}\" = 1 ]; then\n",
     "    printf '%s\\n' 'cargo-nextest fixture 0.1'\n",

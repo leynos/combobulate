@@ -49,6 +49,7 @@ exist; the array algebra and build profiles in the
 | `tools/rust-prover-tools/`                   | Pinned `rust-prover-tools` revision that installs and runs both verifiers.                     |
 | `tools/verifier-fixtures/`                   | Non-member Kani corpus and Verus wiring fixtures with captured observations.                   |
 | `tools/probes/`                              | Recorded toolchain and Polars capability observations, plus the Polars profile probe.          |
+| `tools/gates/`                               | Standalone compile-fail gates; each is its own workspace with its own lockfile.                |
 | `tools/mold/`                                | Pinned native linker version and archive digest.                                               |
 | `Cargo.toml`, `Cargo.lock`                   | Package metadata, dependencies, lint policy, and lockfile.                                     |
 | `rust-toolchain.toml`                        | Pinned nightly and required components.                                                        |

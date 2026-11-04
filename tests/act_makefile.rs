@@ -16,9 +16,11 @@ mod records;
 use assertions::{
     assert_act_invocation_matches,
     assert_cargo_probe,
+    assert_gate_build_invocation,
     assert_invocations_use_repository_directory,
     assert_outer_invocations_are_ordered,
     assert_preflight_invocation,
+    assert_preparation_invocations,
     invocation_at,
     unwrap_test_result,
 };
@@ -29,6 +31,12 @@ use records::{EnvironmentValue, GitHubToken};
 const ACT_TOKEN: &str = "controlled-act-token";
 /// Runner image passed through the production Makefile option.
 const RUNNER_IMAGE: &str = "controlled/ubuntu:act-test";
+/// Commands recorded before the first test-bearing Cargo call.
+///
+/// The parse-time Nextest probe, the preflight, both fetches, and the gate
+/// build. Fixed by the Make route, so a failure case that shifts it should fail
+/// here rather than silently loosen the count.
+const PREPARATION_INVOCATIONS: usize = 5;
 
 /// Runs the normal outer tests without invoking Act when disabled.
 #[test]
@@ -46,8 +54,17 @@ fn with_act_disabled_runs_only_outer_cargo_commands() {
             .iter()
             .map(|invocation| invocation.executable.as_str())
             .collect::<Vec<_>>(),
-        vec!["cargo", "check-build-tools", "cargo", "cargo"],
-        "WITH_ACT=0 must probe Cargo, preflight, run tests, and run doctests"
+        vec![
+            "cargo",
+            "check-build-tools",
+            "cargo",
+            "cargo",
+            "cargo",
+            "cargo",
+            "cargo"
+        ],
+        "WITH_ACT=0 must probe, prepare dependencies, preflight, build the gate, run tests, and \
+         run doctests"
     );
     assert_cargo_probe(invocation_at(
         &invocations,
@@ -59,10 +76,15 @@ fn with_act_disabled_runs_only_outer_cargo_commands() {
         1,
         "build preflight must be recorded",
     ));
+    assert_gate_build_invocation(invocation_at(
+        &invocations,
+        4,
+        "the gate build must be recorded",
+    ));
     assert_outer_invocations_are_ordered(
         invocations
             .get(2..)
-            .expect("both repository Cargo commands must be recorded"),
+            .expect("preparation, gate build, and both test commands must be recorded"),
     );
     assert_invocations_use_repository_directory(&invocations);
 }
@@ -88,14 +110,14 @@ fn with_act_enabled_runs_outer_tests_then_configured_act() {
     assert!(output.status.success(), "make test WITH_ACT=1 must succeed");
     assert_eq!(
         invocations.len(),
-        6,
-        "recursive Make must probe Cargo again before invoking Act"
+        9,
+        "recursive Make must replay preparation, the gate build, and the probe before invoking Act"
     );
-    assert_cargo_probe(invocation_at(
-        &invocations,
-        0,
-        "Cargo probe must be recorded",
-    ));
+    assert_preparation_invocations(
+        invocations
+            .get(2..4)
+            .expect("both dependency preparation calls must be recorded"),
+    );
     assert_preflight_invocation(invocation_at(
         &invocations,
         1,
@@ -103,17 +125,17 @@ fn with_act_enabled_runs_outer_tests_then_configured_act() {
     ));
     assert_outer_invocations_are_ordered(
         invocations
-            .get(2..4)
-            .expect("both repository Cargo commands must be recorded"),
+            .get(2..7)
+            .expect("preparation, the gate build, and both test commands must be recorded"),
     );
     assert_invocations_use_repository_directory(&invocations);
     assert_cargo_probe(invocation_at(
         &invocations,
-        4,
+        7,
         "recursive Make must repeat the Cargo probe",
     ));
     assert_act_invocation_matches(
-        invocation_at(&invocations, 5, "Act invocation must be recorded"),
+        invocation_at(&invocations, 8, "Act invocation must be recorded"),
         &expected_common_directory,
     );
     assertions::assert_forwarded_environment(&invocations);
@@ -176,7 +198,15 @@ fn explicit_workflow_test_setting_prevents_nested_act_recursion() {
             .iter()
             .map(|invocation| invocation.executable.as_str())
             .collect::<Vec<_>>(),
-        vec!["cargo", "check-build-tools", "cargo", "cargo"],
+        vec![
+            "cargo",
+            "check-build-tools",
+            "cargo",
+            "cargo",
+            "cargo",
+            "cargo",
+            "cargo"
+        ],
         "workflow test execution must not start Act recursively"
     );
     assert_outer_invocations_are_ordered(
@@ -194,6 +224,11 @@ fn explicit_workflow_test_setting_prevents_nested_act_recursion() {
 }
 
 /// Proves failures in either outer Cargo phase prevent Act from running.
+///
+/// The harness numbers only test-bearing Cargo calls, so 1 is Nextest and 2 is
+/// the doctests. Both sit after the whole preparation phase now, so the
+/// recorded count is the preparation prefix plus the failure whichever one it
+/// is; the assertion that earns its keep is that no `act` was ever started.
 #[test]
 fn failed_outer_cargo_commands_prevent_act() {
     for failed_invocation in [1, 2] {
@@ -214,7 +249,7 @@ fn failed_outer_cargo_commands_prevent_act() {
         );
         assert_eq!(
             invocations.len(),
-            failed_invocation + 2,
+            PREPARATION_INVOCATIONS + failed_invocation,
             "Act must not run after outer Cargo invocation {failed_invocation} fails"
         );
         assert!(

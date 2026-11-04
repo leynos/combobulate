@@ -7,7 +7,7 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
-.PHONY: help all clean test act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
+.PHONY: help all clean test test-ui prepare-dependencies prepare-ui-gate act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker lint-python docstring-coverage check-python-sources fmt check-fmt markdownlint spelling nixie \
   audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
@@ -101,6 +101,12 @@ CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+# The cardinality compile-fail gate is its own workspace: `tools/` is excluded
+# from the root workspace, so it carries its own manifest, lockfile, and target
+# directory. `make prepare-dependencies` fetches it, and `make test-ui` runs it
+# directly; the root suite reaches it through `tests/cardinality_probe_ui.rs`.
+UI_GATE_MANIFEST ?= tools/gates/cardinality-ui/Cargo.toml
+UI_GATE_TEST ?= --test cardinality_ui
 WITH_ACT ?= 0
 ACT ?= act
 ACT_RUNNER_IMAGE ?= catthehacker/ubuntu:act-latest
@@ -134,10 +140,79 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
-test: check-build-tools ## Run tests with warnings treated as errors
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+BUILD_STANDARD_ENV = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)"
+
+test: prepare-ui-gate ## Run tests with warnings treated as errors
+	$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
+
+# Every Rust command a development route runs must compose the caller's
+# RUSTFLAGS with the standard flags, and only an assignment does that: without
+# one, Cargo falls back to `.cargo/config.toml` and silently drops the caller's
+# flags. The acquisition step below compiles nothing, so its commands carry no
+# assignment either way; the checks in `tests/build_standard_contract.rs` read
+# `make -n` output and fail on a bare Cargo command in a development route, so
+# any new command here needs the assignment too.
+#
+# Acquisition happens before any test body runs, and its failure names the
+# manifest and the likely cause: a cold cache, an unreachable registry, or a
+# lockfile that needs updating. `--locked` is deliberate, so a stale lockfile
+# fails here rather than silently resolving new versions.
+#
+# A plain `cargo fetch` covers every target. `--target` takes a triple, not
+# `all`, and Cargo resolves the entire lockfile graph for `fetch` regardless of
+# the host, which is what the boundary checks' `cargo tree --target all` needs.
+#
+# `lint` runs this too, and that is not redundant. The hosted lane runs
+# `make lint` before the coverage action and never runs `make test`, so this is
+# the only place a hosted runner can populate the cache before the boundary
+# tests execute inside the coverage action.
+prepare-dependencies: check-build-tools ## Acquire locked dependencies before any test body runs
+	@if ! $(BUILD_STANDARD_ENV) $(CARGO) fetch --locked; then \
+		printf '\n%s\n\n' \
+			"make prepare-dependencies could not acquire the workspace's dependencies." \
+			"Run it directly to read the full error. The workspace boundary checks fetch" \
+			"nothing themselves, so a cold or offline cache and a lockfile that needs" \
+			"regenerating all fail there instead, as an unrelated-looking test failure." >&2; \
+		exit 1; \
+	fi
+	@if ! $(BUILD_STANDARD_ENV) $(CARGO) fetch --locked --manifest-path '$(UI_GATE_MANIFEST)'; then \
+		printf '\n%s\n\n' \
+			"make prepare-dependencies could not acquire $(UI_GATE_MANIFEST)." \
+			"Run it directly to read the full error. That package is its own workspace," \
+			"so the workspace fetch above does not cover it." >&2; \
+		exit 1; \
+	fi
+
+# The gate lives in its own workspace so its nested `trybuild` build inherits
+# only the probe and `trybuild`. Running it from the root package would merge
+# every root dependency and dev-dependency into that generated crate; this
+# route keeps the diagnostic contract without making the nested build pay for
+# the root package's graph.
+#
+# `prepare-ui-gate` chains onto `prepare-dependencies` rather than sitting
+# beside it as a second prerequisite of `test`. Under `make -j` independent
+# prerequisites run in parallel, and measurement showed the gate build then
+# sometimes starting before the fetches that populate its own workspace: a
+# build racing the acquisition it needs. The chain also makes the whole
+# preparation phase linear, so the command contract has one order rather than
+# two acceptable ones.
+#
+# `make test` builds the gate's test binary here, before any test body runs, so
+# `tests/cardinality_probe_ui.rs` only has to locate and run it. Building inside
+# that test body is what the incident did: a nested Cargo build, of a generated
+# crate that inherited the root package's whole dev-dependency graph, under no
+# deadline of its own. The
+# build keeps `--no-run` so preparation cannot pass because the gate happened to
+# pass on a previous run; the root test is the one that asserts the diagnostic.
+prepare-ui-gate: prepare-dependencies ## Build the cardinality gate's test binary
+	$(BUILD_STANDARD_ENV) $(CARGO) test --no-run --manifest-path '$(UI_GATE_MANIFEST)' $(UI_GATE_TEST)
+
+# The direct route for a developer who wants only the gate. It builds and runs
+# the workspace in one command, which is also how CI's cold path exercises it.
+test-ui: prepare-dependencies ## Run the cardinality compile-fail gate outside the root workspace
+	$(BUILD_STANDARD_ENV) $(CARGO) test --manifest-path '$(UI_GATE_MANIFEST)' $(UI_GATE_TEST)
 
 act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 	@GITHUB_TOKEN="$(ACT_GITHUB_TOKEN)" $(ACT) pull_request --bind \
@@ -166,7 +241,13 @@ target/debug/$(TARGET): check-build-tools ## Build debug binary
 # encoded flags value would outrank RUSTFLAGS, so remove it explicitly.
 PRODUCTION_ENV = env -u CARGO_ENCODED_RUSTFLAGS CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm CARGO_PROFILE_RELEASE_CODEGEN_BACKEND=llvm RUSTFLAGS="$(RELEASE_RUST_FLAGS)"
 
-coverage: check-coverage-tools ## Generate lcov coverage with lld for llvm-tools compatibility
+# `prepare-ui-gate` is a prerequisite, not a trailing recipe line. `llvm-cov`
+# runs the workspace suite, and the root `cardinality_probe_ui` test now finds a
+# prebuilt gate binary rather than compiling one; without the prerequisite a
+# clean tree would fail that test before the trailing `test-ui` ever ran. Making
+# it a prerequisite also means the gate is no longer run twice, since the root
+# test already executes it under the coverage run.
+coverage: check-coverage-tools prepare-ui-gate ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
 	CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
 		CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm \
@@ -175,7 +256,13 @@ coverage: check-coverage-tools ## Generate lcov coverage with lld for llvm-tools
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(TEST_FLAGS)
 
-lint: ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
+# `prepare-dependencies` is here, not only on `test`. The hosted lane runs
+# `make lint` and then the coverage action, which runs `cargo llvm-cov nextest`
+# itself; it never runs `make test`. Without this prerequisite a hosted runner
+# reaches the workspace-boundary tests with whatever the action's own install
+# steps happened to cache, and the offline `cargo tree` checks fail there with
+# an unrelated-looking HTTP refusal.
+lint: prepare-dependencies ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
 	+$(MAKE) lint-clippy
 	+$(MAKE) lint-whitaker
 	+$(MAKE) lint-python

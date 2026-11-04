@@ -72,7 +72,76 @@ pub(super) fn invocation_at<'a>(
     invocation
 }
 
-/// Compares the recorded test and doctest commands with their required order.
+/// Checks the two preparation calls that precede every recorded test command.
+///
+/// Both are `fetch` forms, and their manifest distinguishes them: the root
+/// fetch takes no manifest, while the gate fetch names its separate workspace.
+/// Neither carries `RUSTFLAGS`, because acquisition does not read the build
+/// selectors.
+///
+/// The slice starts at the first fetch rather than at the start of the whole
+/// record. `make` evaluates `TEST_CMD`'s `$(shell cargo nextest --version)` at
+/// parse time, so on the Act route a probe precedes preparation; callers pass
+/// the slice already offset past whatever precedes it.
+pub(super) fn assert_preparation_invocations(preparation: &[Invocation]) {
+    let expected: [(&str, &[&str]); 2] = [
+        ("cargo", &["fetch", "--locked"]),
+        (
+            "cargo",
+            &[
+                "fetch",
+                "--locked",
+                "--manifest-path",
+                "tools/gates/cardinality-ui/Cargo.toml",
+            ],
+        ),
+    ];
+    for (offset, (executable, arguments)) in expected.iter().enumerate() {
+        let invocation = invocation_at(
+            preparation,
+            offset,
+            "each dependency preparation call must be recorded",
+        );
+        assert_eq!(
+            invocation.executable, *executable,
+            "dependency preparation must use the controlled Cargo executable"
+        );
+        assert_eq!(
+            invocation.arguments, *arguments,
+            "dependency preparation must pass the pinned fetch arguments"
+        );
+    }
+}
+
+/// Checks the gate build sits between preparation and the repository tests.
+///
+/// The gate must be built before the suite runs: the root UI test only
+/// locates and executes the binary, so a `--no-run` build here is what keeps
+/// the nested `trybuild` compile out of a test body.
+pub(super) fn assert_gate_build_invocation(invocation: &Invocation) {
+    assert_eq!(
+        invocation.executable, "cargo",
+        "the gate build must use the controlled Cargo executable"
+    );
+    assert_eq!(
+        invocation.arguments,
+        vec![
+            "test",
+            "--no-run",
+            "--manifest-path",
+            "tools/gates/cardinality-ui/Cargo.toml",
+            "--test",
+            "cardinality_ui",
+        ],
+        "the gate must be built, not run, before the suite starts"
+    );
+}
+
+/// Compares the recorded preparation, gate-build, test and doctest commands.
+///
+/// The slice covers everything the outer `make test` recipe runs after the
+/// preflight, so a preparation or gate build that drifts out of position, or a
+/// `trybuild` compile that reappears inside the test body, changes this list.
 pub(super) fn assert_outer_invocations_are_ordered(invocations: &[Invocation]) {
     let actual = invocations
         .iter()
@@ -88,10 +157,25 @@ pub(super) fn assert_outer_invocations_are_ordered(invocations: &[Invocation]) {
     assert_eq!(
         actual,
         vec![
+            vec!["fetch", "--locked"],
+            vec![
+                "fetch",
+                "--locked",
+                "--manifest-path",
+                "tools/gates/cardinality-ui/Cargo.toml",
+            ],
+            vec![
+                "test",
+                "--no-run",
+                "--manifest-path",
+                "tools/gates/cardinality-ui/Cargo.toml",
+                "--test",
+                "cardinality_ui",
+            ],
             vec!["test", "--all-targets", "--all-features"],
             vec!["test", "--doc", "--workspace", "--all-features"],
         ],
-        "unit and integration tests must precede documentation tests"
+        "acquisition and the gate build must precede unit and documentation tests"
     );
 }
 
@@ -140,14 +224,18 @@ pub(super) fn assert_act_invocation_matches(invocation: &Invocation, common_dire
 }
 
 /// Checks caller flags and selected Act settings at their intended child boundaries.
+///
+/// The indexes follow the measured `make test WITH_ACT=1` route: the parse-time
+/// Nextest probe, the preflight, both fetches, the gate build, Nextest, the
+/// doctests, the nested Make's own Nextest probe, and finally Act.
 pub(super) fn assert_forwarded_environment(invocations: &[Invocation]) {
     assert_eq!(
-        invocation_at(invocations, 5, "Act invocation must be recorded").github_token,
+        invocation_at(invocations, 8, "Act invocation must be recorded").github_token,
         GitHubToken::Present,
         "the configured token must reach the controlled Act process"
     );
     assert_eq!(
-        invocation_at(invocations, 5, "Act invocation must be recorded")
+        invocation_at(invocations, 8, "Act invocation must be recorded")
             .environment
             .get("WITH_ACT"),
         Some(&EnvironmentValue::Value("1".to_owned())),
@@ -160,7 +248,7 @@ pub(super) fn assert_forwarded_environment(invocations: &[Invocation]) {
         Some(&EnvironmentValue::Value("-C debuginfo=0".to_owned())),
         "supported caller flags must reach the child preflight unchanged"
     );
-    for index in 2..4 {
+    for index in [5, 6] {
         let cargo_invocation =
             invocation_at(invocations, index, "Cargo test invocation must exist");
         assert_development_flags_are_present(cargo_invocation);

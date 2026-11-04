@@ -34,6 +34,8 @@ ignore = [
   '\bmold (?:directory|installation|release|target|build route|link argument|linker argument|[0-9]+\.[0-9]+\.[0-9]+)\b',
   'selects mold only',
   'use mold at all',
+  # Prose describing the pinned linker release rather than an ordinary word.
+  'mold pin files',
   'mold at \$resolved',
   'mold \$installed',
   'mold \$version',

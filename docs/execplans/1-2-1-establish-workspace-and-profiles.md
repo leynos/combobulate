@@ -528,6 +528,25 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     patches, and the mutant-location rule lacked focused cases. All six are
     repaired and both corpora are regenerated; recapturing the hosted
     observation at the repaired candidate follows this repair commit.
+  - [x] (2026-11-04) Cardinality-gate incident repair (DL-54). The
+    `[>8160s]` entry was a test that compiled the root package's whole
+    dev-dependency graph inside a nested `trybuild` build with no deadline. The
+    gate now lives in `tools/gates/cardinality-ui`, its own workspace, and
+    `make prepare-ui-gate` builds it before any test body runs. The root test
+    only locates the built binary and runs it under `CommandDeadline` with
+    `CARGO_MANIFEST_DIR` scrubbed. Three gate failures on the first candidate
+    were repaired: `tests/cardinality_gate_scope.rs` now uses
+    `cap_std::fs_utf8::Dir` and `camino` as the Whitaker
+    `no_std_fs_operations` rule requires; the `test` and `lint` routes assign
+    `RUSTFLAGS` on every Cargo command including the fetch steps, so the
+    inherited-flags contract holds; and the held-out-target contract reads a
+    target's own commands with `--old-file` on the preparation targets, since
+    `coverage` now depends on a development build of the gate. A narrow
+    spelling exception covers the linker's fixed spelling. Non-vacuity was
+    checked by
+    injecting `-Zthreads=8` into `COVERAGE_RUST_FLAGS` and observing the
+    expected failure, and by adding a gate-only fixture and observing the
+    bidirectional comparison reject it.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -645,9 +664,82 @@ committed together with its Green change.
   provenance writers and captured-output guard moved to `probe_provenance` as
   well, which is a relocation rather than a decomposition of the Kani and Verus
   workflows.
+- Observation (2026-11-04): moving the `trybuild` gate into its own package did
+  put the gate's manifest under the gate, but the root test still made
+  `trybuild` compile the *root* package. `trybuild` reads `CARGO_MANIFEST_DIR`
+  from its own process environment to choose the package whose manifest it
+  copies, and Cargo sets that variable to the root package for every root test
+  process. Evidence: after the gate binary was run from the repository root,
+  the generated `target/tests/trybuild/combobulate/Cargo.toml` listed `camino`,
+  `cap-std`, `googletest`, `rstest`, `serde`, and `serde_yaml` — the whole root
+  dev-dependency graph the gate package was created to exclude — while a run
+  with the working directory set to the gate and the variable removed compiled
+  only `cardinality-probe`, `cardinality-ui-gate`, and
+  `cardinality-ui-gate-tests`, green in 124.09 s. Impact: the root test removes
+  the variable from the child environment and sets the working directory to the
+  gate, which is where `trybuild` falls back to looking; both facts are now
+  recorded in the test's module documentation.
+- Observation (2026-11-04): the root test's binary lookup assumed the older
+  `target/debug/deps/` directory, but this Cargo places the gate's test binary
+  under `target/debug/build/<package>/<hash>/out/` on the pinned nightly. A
+  single-depth `deps` scan therefore found nothing and the test always reported
+  the gate as unbuilt. Impact: the lookup walks `target/debug/build` and keeps
+  the newest hash-named match.
+- Observation (2026-11-04): once the root test required a prebuilt gate binary
+  instead of compiling one, `make coverage` had a latent ordering defect. Its
+  recipe ran `cargo llvm-cov` over the workspace — which includes the root
+  `cardinality_probe_ui` test — and only afterwards ran `make test-ui`. The
+  gate therefore had to exist before the coverage run started, and the trailing
+  step ran it a second time. Impact: `coverage` takes `prepare-ui-gate` as a
+  prerequisite and no longer ends with `test-ui`.
+- Observation (2026-11-04): the workspace denies `panic_in_result_fn` while
+  `clippy.toml` sets `allow-expect-in-tests`. Together those mean `expect` is
+  available exactly inside a `#[test]` body and nowhere else, and a
+  `Result`-returning helper may contain no `assert!`/`panic!`. Extracted test
+  helpers therefore have to be infallible assertion functions taking values the
+  `#[test]` body already unwrapped, or fallible functions with no assertions.
+  Choosing the wrong shape produced a cascade of lint failures during this
+  round. Impact: extracted helpers in `tests/make_gate_order.rs` take a small
+  struct of recorded evidence and are infallible; fixture constructors in
+  `tests/process_deadline.rs` return `Result` and only the test bodies expect.
 
 ## Decision log
 
+- DL-54 (2026-11-04). EP-M2 cardinality-gate incident repair. The reported
+  `SLOW [>8160.000s]` for
+  `combobulate::cardinality_probe_ui checked_cardinality_result_must_be_used`
+  was not a Polars defect or a Cargo deadlock.
+  `cargo tree -e dev --all-features` lists no `polars` for the root package,
+  and the probe's `polars` sits behind a non-default feature, so the nested
+  build never compiled it. What it did compile was `trybuild`, hosted in the
+  root package, merging every root dependency and development dependency into
+  the crate it generates: a compile-fail check compiling the root graph inside
+  a nested Cargo build that no test timeout could see. The gate moved to
+  `tools/gates/cardinality-ui`, its own workspace holding only the probe and
+  `trybuild`; `make prepare-ui-gate` builds its test binary before any test
+  body, and the root test locates that binary, scrubs `CARGO_MANIFEST_DIR`, and
+  runs it under `CommandDeadline`. `CommandDeadline` wraps a command in GNU
+  `timeout`, so a nested build can no longer outlive its test.
+  `.config/nextest.toml` sets a 60 s slow warning with `terminate-after = 5`,
+  and the gate's `trybuild` case gets `terminate-after = 10` from measured cold
+  and warm runs; there is deliberately no `global-timeout`. Dependency
+  acquisition left the test bodies for `make prepare-dependencies`, because
+  nextest gives each test its own process and a fetch inside one would repeat
+  per test. Three gate failures on the first candidate were repaired. Whitaker's
+  `no_std_fs_operations` rule rejected `std::fs` in the new scope test, which
+  now uses `cap_std::fs_utf8::Dir` and `camino` handles; the `test` and `lint`
+  routes ran Cargo commands with no `RUSTFLAGS` assignment, dropping the
+  caller's flags, so every Cargo command in them now carries the standard
+  assignment; and `coverage` gained `prepare-ui-gate` as a prerequisite because
+  `llvm-cov` runs the root test, which made the held-out-target contract read
+  preparation's development build. That contract now uses
+  `--old-file=prepare-…` so it checks the measured recipe's own commands rather
+  than its prerequisites'. `mold pin files` is a narrow spelling exception, not
+  a re-spelling. Evidence:
+  `/tmp/lint-1-2-1-establish-workspace-and-profiles.out`,
+  `/tmp/test-1-2-1-establish-workspace-and-profiles.out`, and
+  `/tmp/spelling-1-2-1-establish-workspace-and-profiles.out`. Date/Author:
+  2026-11-04, implementation agent.
 - DL-53 (2026-11-03). EP-M2 twentieth review round. The formal review of
   `c8db23e` raised six findings, all verified and repaired. First, the Kani
   provenance record bound neither the corpus manifest nor its lockfile; both

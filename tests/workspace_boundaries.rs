@@ -6,7 +6,7 @@
 //! predicate over Cargo's own output, exercised against the live workspace and
 //! against canned fixtures that would otherwise let the rule pass vacuously.
 
-use std::{error::Error, process::Command, sync::OnceLock};
+use std::{error::Error, process::Command};
 
 use googletest::prelude::*;
 use rstest::rstest;
@@ -14,9 +14,6 @@ use rstest::rstest;
 /// Dependency-direction predicates over Cargo's declared graph.
 #[path = "support/workspace_metadata.rs"]
 mod metadata;
-/// Source checks for the kernel's `no_std` and allocation boundary.
-#[path = "support/workspace_source.rs"]
-mod source;
 /// `cargo tree` parsing and dependency-prefix predicates.
 #[path = "support/workspace_tree.rs"]
 mod tree;
@@ -41,6 +38,14 @@ fn cargo_command(arguments: &[&str]) -> Command {
 }
 
 /// Builds the `cargo fetch` invocation that populates every target's packages.
+///
+/// The suite no longer runs this; `make prepare-dependencies` does. The
+/// contract below still pins its shape, so the preparation step and the
+/// offline checks cannot drift apart.
+///
+/// `--target` takes a target triple, not `all`, so it must not appear here:
+/// a plain `cargo fetch --locked` already resolves the whole lockfile graph,
+/// including the platform packages that `cargo tree --target all` reads.
 fn fetch_command() -> Command { cargo_command(&["fetch", "--locked"]) }
 
 /// Builds the `cargo tree` invocation for a package and edge selection.
@@ -50,25 +55,24 @@ fn tree_command(arguments: &[&str]) -> Command {
     cargo_command(&full)
 }
 
-/// Fetches every locked dependency once so the offline checks can resolve.
+/// Explains how to recover when the offline tree cannot resolve a package.
 ///
-/// `cargo tree --target all` resolves platform-specific dependencies that a
-/// host build never downloads. Without the fetch, the check would depend on
-/// cache warmth rather than on the workspace, and a cold runner would fail.
-fn fetch_locked_dependencies_once() -> Result<(), Box<dyn Error>> {
-    static FETCH: OnceLock<Result<(), String>> = OnceLock::new();
-    FETCH
-        .get_or_init(|| match fetch_command().output() {
-            Ok(output) if output.status.success() => Ok(()),
-            Ok(output) => Err(format!(
-                "cargo fetch --locked must populate every target; exited with {}: {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            )),
-            Err(error) => Err(format!("cargo fetch --locked could not start: {error}")),
-        })
-        .clone()
-        .map_err(Into::into)
+/// The fetch that populates every target's packages is `make
+/// prepare-dependencies`. It runs before this suite in every supported
+/// route, because nextest gives each test its own process and a fetch inside
+/// one would repeat per test. A direct `cargo test` bypasses that preparation,
+/// so the failure has to say what to run instead of reporting only Cargo's
+/// HTTP refusal.
+fn offline_recovery(detail: &str) -> String {
+    format!(
+        concat!(
+            "cargo tree --offline could not resolve every target's packages: {detail}\n",
+            "Run `make prepare-dependencies` first. It runs `cargo fetch --locked`, ",
+            "which acquires the platform crates in the lockfile that a host-only ",
+            "build never downloads."
+        ),
+        detail = detail
+    )
 }
 
 /// Runs `cargo metadata --no-deps` against the live workspace.
@@ -97,23 +101,23 @@ fn live_metadata() -> Result<Metadata, Box<dyn Error>> {
 
 /// Runs `cargo tree` with the given package and edge selection.
 fn live_tree(arguments: &[&str]) -> Result<String, Box<dyn Error>> {
-    fetch_locked_dependencies_once()?;
     let output = tree_command(arguments).output()?;
     if !output.status.success() {
-        return Err(format!(
-            "cargo tree {arguments:?} must resolve; exited with {}: {}",
+        let detail = format!(
+            "cargo tree {arguments:?} exited with {}: {}",
             output.status,
             String::from_utf8_lossy(&output.stderr)
-        )
-        .into());
+        );
+        return Err(offline_recovery(&detail).into());
     }
     Ok(String::from_utf8(output.stdout)?)
 }
 
 /// Contract: the live checks stay lockfile-pinned, offline, and flag-neutral.
 ///
-/// The fetch runs first so the offline tree calls resolve every target, and no
-/// caller build selector survives into either child.
+/// No caller build selector survives into either child, and the fetch that
+/// makes the offline tree calls resolvable is stated here so it cannot drift
+/// away from the Make preparation step that actually runs it.
 #[test]
 fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
     let tree = tree_command(&["-p", KERNEL, "--target", "all"]);
@@ -136,7 +140,14 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
         fetch_arguments
             .iter()
             .any(|argument| argument == "--locked"),
-        "the dependency fetch must pin the lockfile: {fetch_arguments:?}"
+        "the dependency fetch must pass --locked: {fetch_arguments:?}"
+    );
+    assert!(
+        !fetch_arguments
+            .iter()
+            .any(|argument| argument == "--target"),
+        "cargo fetch takes a target triple, not `all`; its plain form already resolves every \
+         target's packages: {fetch_arguments:?}"
     );
 
     for command in [tree, fetch_command()] {
@@ -151,6 +162,24 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
                 "{expected} must not reach the Cargo child: {cleared:?}"
             );
         }
+    }
+}
+
+/// A cold-cache failure must name the preparation step, not only Cargo's error.
+#[test]
+fn offline_tree_failures_name_the_preparation_step() {
+    let detail = "cargo tree exited with 101: failed to download `winapi-util v0.1.11`";
+    let message = offline_recovery(detail);
+    for expected in [
+        "make prepare-dependencies",
+        "cargo fetch --locked",
+        "host-only",
+        detail,
+    ] {
+        assert!(
+            message.contains(expected),
+            "the cold-cache diagnostic must contain {expected:?}: {message}"
+        );
     }
 }
 
@@ -278,115 +307,6 @@ fn verifier_leaks_are_reported() {
     assert_that!(reported, contains(eq("vstd")));
 }
 
-/// VO-6: the kernel keeps `#![no_std]` and its core-only lint boundary.
-#[test]
-fn kernel_keeps_the_no_std_boundary() -> Result<(), Box<dyn Error>> {
-    let source = source::kernel_source()?;
-    assert_that!(source::kernel_source_violations(&source), is_empty());
-    Ok(())
-}
-
-/// VO-6 non-vacuity: comments and literals cannot stand in for attributes.
-#[rstest]
-#[case::line_comment(concat!(
-    "// The crate is #![no_std] and denies clippy::std_instead_of_core.\n",
-    "//! The alloc lint is clippy::alloc_instead_of_core.\n",
-    "#![allow(dead_code)]\n"
-))]
-#[case::block_comment(concat!(
-    "/*\n#![no_std]\nclippy::std_instead_of_core\n",
-    "clippy::alloc_instead_of_core\n*/\n",
-    "#![allow(dead_code)]\n"
-))]
-#[case::string_literals(concat!(
-    "const DOC: &str = \"#![no_std] extern crate alloc\";\n",
-    "const RAW: &str = r#\"clippy::std_instead_of_core\"#;\n",
-    "const NESTED: &str = r##\"clippy::alloc_instead_of_core\"##;\n"
-))]
-fn comments_and_literals_cannot_satisfy_the_kernel_boundary(#[case] source: &str) {
-    let violations = source::kernel_source_violations(source).join("; ");
-    for expected in [
-        "must declare #![no_std]",
-        "must deny clippy::std_instead_of_core",
-        "must deny clippy::alloc_instead_of_core",
-    ] {
-        assert_that!(violations.as_str(), contains_substring(expected));
-    }
-    assert_that!(
-        violations.as_str(),
-        not(contains_substring("must not contain extern crate alloc"))
-    );
-}
-
-/// VO-6 non-vacuity: a lint name must sit in an effective `deny`.
-#[rstest]
-#[case::allow_only(
-    concat!(
-        "#![no_std]\n",
-        "#![allow(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
-    ),
-    "the kernel crate root must deny clippy::std_instead_of_core; the kernel crate root must deny clippy::alloc_instead_of_core"
-)]
-#[case::warn_only(
-    concat!(
-        "#![no_std]\n",
-        "#![warn(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
-    ),
-    "the kernel crate root must deny clippy::std_instead_of_core; the kernel crate root must deny clippy::alloc_instead_of_core"
-)]
-#[case::deny_then_allow(
-    concat!(
-        "#![no_std]\n",
-        "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n",
-        "#![allow(clippy::std_instead_of_core)]\n"
-    ),
-    "the kernel crate root must deny clippy::std_instead_of_core"
-)]
-fn lint_mentions_outside_a_deny_are_reported(#[case] source: &str, #[case] expected: &str) {
-    assert_eq!(
-        source::kernel_source_violations(source).join("; "),
-        expected,
-        "only a final deny or forbid may satisfy the kernel lint boundary"
-    );
-}
-
-/// VO-6 non-vacuity: a real allocation declaration is still reported.
-#[rstest]
-#[case::plain("extern crate alloc;")]
-#[case::interleaved_comment("extern /* keep */ crate alloc;")]
-fn real_alloc_declarations_are_reported(#[case] source: &str) {
-    assert_that!(
-        source::kernel_source_violations(source).join("; ").as_str(),
-        contains_substring("must not contain extern crate alloc")
-    );
-}
-
-/// VO-6 control: a content quote inside a raw string must not hide the root.
-///
-/// `r#"x""#` holds a bare `"` before its terminator. A scanner that consumed
-/// that quote while probing the terminator would swallow the crate attributes
-/// and report a valid kernel as missing its boundary.
-#[test]
-fn raw_string_content_quotes_do_not_hide_the_kernel_attributes() {
-    let source = concat!(
-        "#![doc = r#\"x\"\"#]\n",
-        "#![no_std]\n",
-        "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
-    );
-    assert_that!(
-        source::kernel_source_violations(source),
-        is_empty(),
-        "the crate root after a raw-string content quote must still be read"
-    );
-}
-
-/// VO-6 control: the real attribute set passes the code-only check.
-#[test]
-fn kernel_boundary_accepts_the_real_attribute_set() {
-    let source = concat!(
-        "//! Kernel crate root that mentions #![no_std] in prose.\n",
-        "#![no_std]\n",
-        "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
-    );
-    assert_that!(source::kernel_source_violations(source), is_empty());
-}
+// VO-6 cases live in `workspace_kernel_boundary.rs`. The source-boundary
+// subject is separate from the dependency-graph boundaries above, and keeping
+// it here pushed this file past the repository's 400-line limit.

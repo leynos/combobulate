@@ -5,9 +5,18 @@ use std::process::Command;
 use super::{probe::GateProbe, records::Invocation};
 
 /// Expected command stages for the complete ordered Make target.
+///
+/// `all` runs `lint` and `test` as separate recursive Make invocations, so the
+/// preparation stages appear twice. That is not redundancy to be removed: each
+/// recursive Make is a fresh process with its own prerequisite graph, and the
+/// second pair is what keeps `make test` self-sufficient when a developer runs
+/// it alone.
 pub(super) const ALL_STAGES: &[&str] = &[
     "fmt",
     "markdown-formatting",
+    "preflight",
+    "prepare-dependencies",
+    "prepare-ui-gate-dependencies",
     "preflight",
     "doc",
     "clippy",
@@ -15,67 +24,103 @@ pub(super) const ALL_STAGES: &[&str] = &[
     "whitaker",
     "interrogate",
     "preflight",
+    "prepare-dependencies",
+    "prepare-ui-gate-dependencies",
+    "prepare-ui-gate",
     "nextest",
     "doctest",
     "spelling",
+];
+
+/// The stage, executor, and arguments every Make run must record, in order.
+///
+/// Kept out of the assertion function so the table stays readable: the
+/// expectations are data, and the function that walks them is three lines.
+const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 13] = [
+    (
+        "prepare-dependencies",
+        "probe-cargo",
+        &["fetch", "--locked"],
+    ),
+    (
+        "prepare-ui-gate-dependencies",
+        "probe-cargo",
+        &[
+            "fetch",
+            "--locked",
+            "--manifest-path",
+            "tools/gates/cardinality-ui/Cargo.toml",
+        ],
+    ),
+    ("fmt", "probe-cargo", &["fmt", "--all", "--", "--check"]),
+    (
+        "markdown-formatting",
+        "probe-mdtablefix",
+        &[
+            "--check",
+            "--git",
+            "--include-untracked",
+            "--wrap",
+            "--renumber",
+            "--breaks",
+            "--ellipsis",
+            "--fences",
+        ],
+    ),
+    ("preflight", "probe-check", &[]),
+    ("doc", "probe-cargo", &["doc", "--no-deps"]),
+    (
+        "clippy",
+        "probe-cargo",
+        &[
+            "clippy",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings",
+        ],
+    ),
+    (
+        "whitaker",
+        "probe-whitaker",
+        &["--all", "--", "--all-targets", "--all-features"],
+    ),
+    (
+        "prepare-ui-gate",
+        "probe-cargo",
+        &[
+            "test",
+            "--no-run",
+            "--manifest-path",
+            "tools/gates/cardinality-ui/Cargo.toml",
+            "--test",
+            "cardinality_ui",
+        ],
+    ),
+    (
+        "nextest-version-probe",
+        "probe-cargo",
+        &["nextest", "--version"],
+    ),
+    (
+        "nextest",
+        "probe-cargo",
+        &["nextest", "run", "--all-targets", "--all-features"],
+    ),
+    (
+        "doctest",
+        "probe-cargo",
+        &["test", "--doc", "--workspace", "--all-features"],
+    ),
+    ("spelling", "probe-spelling", &["gate"]),
 ];
 
 /// Checks the real Make target and confirms every selected executor call.
 pub(super) fn assert_all_commands(
     invocations: &[Invocation],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    for (stage, executable, arguments) in [
-        ("fmt", "probe-cargo", &["fmt", "--all", "--", "--check"][..]),
-        (
-            "markdown-formatting",
-            "probe-mdtablefix",
-            &[
-                "--check",
-                "--git",
-                "--include-untracked",
-                "--wrap",
-                "--renumber",
-                "--breaks",
-                "--ellipsis",
-                "--fences",
-            ][..],
-        ),
-        ("preflight", "probe-check", &[][..]),
-        ("doc", "probe-cargo", &["doc", "--no-deps"][..]),
-        (
-            "clippy",
-            "probe-cargo",
-            &[
-                "clippy",
-                "--all-targets",
-                "--all-features",
-                "--",
-                "-D",
-                "warnings",
-            ][..],
-        ),
-        (
-            "whitaker",
-            "probe-whitaker",
-            &["--all", "--", "--all-targets", "--all-features"][..],
-        ),
-        (
-            "nextest-version-probe",
-            "probe-cargo",
-            &["nextest", "--version"][..],
-        ),
-        (
-            "nextest",
-            "probe-cargo",
-            &["nextest", "run", "--all-targets", "--all-features"][..],
-        ),
-        (
-            "doctest",
-            "probe-cargo",
-            &["test", "--doc", "--workspace", "--all-features"][..],
-        ),
-        ("spelling", "probe-spelling", &["gate"][..]),
-    ] {
+    for (stage, executable, arguments) in EXPECTED_COMMANDS {
         GateProbe::assert_command(invocations, stage, executable, arguments);
     }
     assert_interrogate_command(invocations, 1)

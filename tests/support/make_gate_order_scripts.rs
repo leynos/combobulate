@@ -1,9 +1,23 @@
 //! Shell executors used by the real Make gate harness.
 
 /// Cargo fixture that validates supported gate commands and nextest selection.
+///
+/// The two `fetch` forms are the preparation steps. Their manifests differ, so
+/// the fixture distinguishes them: the root fetch has no `--manifest-path`,
+/// while the gate fetch names the separate workspace it must populate. Any
+/// other `fetch` shape is unexpected, which keeps the preparation contract and
+/// the Make route from drifting apart silently.
 pub(super) const CARGO_SCRIPT: &str = r#"
 stage=unexpected-cargo
 case "$1" in
+  fetch)
+    if [ "$#" -eq 2 ] && [ "$2" = --locked ]; then
+      stage=prepare-dependencies
+    elif [ "$#" -eq 4 ] && [ "$2" = --locked ] && [ "$3" = --manifest-path ] &&
+        [ "$4" = tools/gates/cardinality-ui/Cargo.toml ]; then
+      stage=prepare-ui-gate-dependencies
+    else stage=unexpected-cargo; fi
+    ;;
   fmt)
     stage=fmt
     [ "$#" -eq 4 ] && [ "$2" = --all ] && [ "$3" = -- ] && [ "$4" = --check ] || stage=unexpected-cargo
@@ -26,9 +40,17 @@ case "$1" in
     else stage=unexpected-cargo; fi
     ;;
   test)
-    stage=doctest
-    [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
-      [ "$4" = --all-features ] || stage=unexpected-cargo
+    # The gate build runs before the suite and must not run the gate itself:
+    # the root UI test is what asserts the diagnostic, so preparation only
+    # produces the binary.
+    if [ "$#" -eq 6 ] && [ "$2" = --no-run ] && [ "$3" = --manifest-path ] &&
+        [ "$4" = tools/gates/cardinality-ui/Cargo.toml ] &&
+        [ "$5" = --test ] && [ "$6" = cardinality_ui ]; then
+      stage=prepare-ui-gate
+    elif [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
+        [ "$4" = --all-features ]; then
+      stage=doctest
+    else stage=unexpected-cargo; fi
     ;;
   *) stage=unexpected-cargo ;;
 esac

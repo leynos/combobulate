@@ -41,9 +41,12 @@ Dylint then checks the repository from its root and discovers
 `.cargo/config.toml`; that check uses the development backend and linker
 defaults. The recipe sends warnings-as-errors to the repository check through
 Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers `cargo nextest run` and
-falls back to `cargo test` when cargo-nextest is not available. It also runs
-the cardinality probe's `trybuild` UI test for its `#[must_use]` result
-contract. `make check-fmt` verifies Rust formatting with
+falls back to `cargo test` when cargo-nextest is not available. It prepares
+both workspaces' dependencies and builds the cardinality probe's `trybuild` UI
+gate before any test body runs, then the root test runs that binary for its
+`#[must_use]` result contract. `make test-ui` runs the same gate directly. See
+[Test timeouts](#test-timeouts) for why preparation sits outside the suite and
+what bounds each child process. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and
@@ -55,7 +58,8 @@ from the workspace root. PR CI skips `make audit` and the audit-only setup when
 blocking unrelated Dependabot PRs while human PRs retain the audit gate. The
 compensating control is `.github/workflows/audit.yml`, which runs weekly and
 can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
-`lld`.
+`lld` and prepares the gate before measuring; see
+[Test timeouts](#test-timeouts) for why preparation sits outside the suite.
 
 `make check-fmt` checks Git-tracked Markdown and untracked files Git does not
 ignore; files need not be staged. Markdown lint covers every matching file. The
@@ -150,6 +154,124 @@ automerge workflow merges using `GITHUB_TOKEN`, that merge fires no push-event
 workflow, so it publishes nothing until a dispatch from `main` or the next
 push. This scaffold does not include an automerge workflow.
 `tests/codescene_publisher.rs` holds the shape over the committed workflows.
+
+## Test timeouts
+
+A test that starts a child process owns a nested build, and a nested build is
+where this repository has already lost two and a quarter hours to a single
+test. Two deadlines bound that work, and they sit at different layers.
+
+`nextest` bounds the test process. `.config/nextest.toml` sets a 60 s slow
+warning with `terminate-after = 5`, so an ordinary test ends at 300 s. The
+cardinality gate's `trybuild` test has its own override at
+`terminate-after = 10`, because it compiles a generated crate; the comment
+there records the measurements the figure came from. Those numbers, the
+arithmetic behind them, and the reasons there is no `global-timeout` are
+policy, and they live in that file beside the values rather than here.
+
+`CommandDeadline` in `tests/support/process_deadline.rs` bounds one external
+command. It wraps the command in GNU `timeout`, which puts the child in its own
+process group, signals the whole group at the deadline, and kills whatever
+ignored `SIGTERM`. A run that overruns reports `exceeded_deadline()` and the
+output collected so far, so a timeout is diagnosed rather than merely failing.
+
+### Ownership and permitted callers
+
+`CommandDeadline` is test support for command lines the test suite builds
+itself. It is deliberately narrow: it does not wrap arbitrary process
+management, it does not own environment policy, and it must not grow into a
+second process API beside `std::process`. Extend it only when a test needs a
+deadline; do not route production code through it.
+
+It is compiled into more than one test binary, so it carries no default
+deadline. A default would be dead code in every binary that picks a different
+tier. Each caller declares its own:
+
+| Caller                          | Deadline | Why                                    |
+| ------------------------------- | -------- | -------------------------------------- |
+| `tests/cardinality_probe_ui.rs` | 900 s    | Runs the pre-built gate binary.        |
+| `tests/process_deadline.rs`     | 60 s     | Policy tests against fake executables. |
+
+The gate's tier sits deliberately above nextest's own termination point. If the
+inner deadline fired first, a build merely waiting in the shared compile queue
+would be reported as a wedged gate, hiding the real cause. The slower bound
+lets nextest's diagnosis reach the operator first.
+
+A new caller adds its tier to this table and to the test that measures it, in
+the same change.
+
+### Preparation happens outside test bodies
+
+No test body fetches packages or compiles a crate. The suite used to, and that
+is the shape of the incident: a nested Cargo build, of a crate whose
+dev-dependencies included the measurement probe, under a deadline that did not
+exist.
+
+`make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
+and for the cardinality gate's separate workspace. `make prepare-ui-gate`
+chains onto it and builds the gate's test binary with `--no-run`. Both run
+before any test body, and `tests/cardinality_probe_ui.rs` only locates the
+built binary and runs it under its deadline. `make test-ui` is the direct route
+that builds and runs the same gate in one command.
+
+The chain is deliberate. Under `make -j`, independent prerequisites run in
+parallel, and measurement showed the gate build sometimes starting before the
+fetches that populate its own workspace. Do not make `prepare-ui-gate` a
+sibling prerequisite of `prepare-dependencies`.
+
+### The gate runs with a scrubbed environment
+
+`trybuild` chooses the package whose manifest it copies by reading
+`CARGO_MANIFEST_DIR` from its own process environment, and Cargo sets that
+variable to the package under test for every test process it starts. Running
+the gate binary from the root suite therefore handed it the *root* package even
+though the binary lived in the gate's workspace: the generated crate listed
+`camino`, `cap-std`, `googletest`, `rstest`, `serde`, `serde_yaml`, and
+`trybuild`, which is the whole dev-dependency graph the gate package exists to
+exclude.
+
+`tests/cardinality_probe_ui.rs` starts the gate with `CARGO_MANIFEST_DIR`
+removed and the working directory set to the gate package. `trybuild` falls
+back to walking up from the current directory when the variable is absent, so
+it finds the gate's own manifest. Both halves are required: removing the
+variable is what keeps the nested build narrow, and the working directory is
+what gives `trybuild` a manifest to read once the variable is gone. Do not
+"helpfully" pass the variable through, and do not run the gate from the
+repository root.
+
+The gate's own test binary also sits under the new Cargo layout,
+`target/debug/build/<package>/<hash>/out/`, not `target/debug/deps/`. The root
+test walks `target/debug/build` and takes the newest hash-named match that is
+not a `.d` file, because the hash changes on every rebuild.
+
+`prepare-dependencies` also hangs off `make lint`, not only `make test`. The
+hosted lane runs `make lint` and then the coverage action, which runs
+`cargo llvm-cov nextest` itself; it never runs `make test`. Without that
+prerequisite a hosted runner reaches the offline `cargo tree` boundary checks
+with whatever the action's own install steps happened to cache. `make coverage`
+depends on `prepare-ui-gate` for the same reason: the coverage run executes the
+ordinary suite, including the root test that expects a prebuilt gate binary.
+
+Every Cargo command a development route runs composes the caller's `RUSTFLAGS`
+with the standard flags, because only an assignment displaces the
+configuration's `rustflags`. The preparation targets are development routes, so
+their `cargo fetch` commands carry the same assignment. The gate build they
+share is a development build, which is why `tests/build_standard_contract.rs`
+reads a held-out target's own commands with `--old-file` on the preparation
+targets: the flags that test excludes belong to the measured recipe, not to the
+preparation every route depends on.
+
+### Cold-cache diagnostics
+
+A failure here is reported where it happened, not inside a test. Both fetch
+steps print the manifest that failed and name the likely causes: a cold cache,
+an unreachable registry, or a lockfile that needs regenerating. `--locked` is
+deliberate, so a stale lockfile fails at preparation rather than silently
+resolving new versions.
+
+Plain `cargo fetch` covers every target. `--target` takes a target triple, not
+`all`, and Cargo resolves the whole lockfile graph for `fetch` regardless of
+host, which is what the boundary checks' `cargo tree --target all` needs.
 
 ## Tooling
 

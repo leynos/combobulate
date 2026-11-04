@@ -23,6 +23,17 @@ const DEVELOPMENT_TARGETS: [&str; 5] = ["test", "typecheck", "lint", "build", "a
 /// `RUSTFLAGS` and none carries a standard flag.
 pub(super) const HELD_OUT_TARGETS: [&str; 3] = ["coverage", "release", "package"];
 
+/// Make targets that prepare a run rather than perform it.
+///
+/// `coverage` depends on `prepare-ui-gate` so the root suite finds a prebuilt
+/// gate binary, and that prerequisite is a development build: it compiles the
+/// gate's separate workspace with the standard flags. Those commands belong to
+/// the preparation target, not to the measured recipe. `--old-file` treats a
+/// prerequisite as already built, which is what lets the held-out check below
+/// read one target's own commands without the shared preparation that any
+/// number of targets also run.
+const PREPARATION_TARGETS: [&str; 2] = ["prepare-dependencies", "prepare-ui-gate"];
+
 /// Development targets that must assign `RUSTFLAGS` in at least one command,
 /// so the restatement checks above cannot pass by finding nothing to check.
 pub(super) const ASSIGNING_TARGETS: [&str; 5] =
@@ -154,11 +165,21 @@ fn expanded(value: &str, inherited: Option<&str>) -> Read<Flags> {
 }
 
 /// Returns Make's commands, joining backslash-continued recipe lines.
-fn dry_run(target: &str, host: Host, inherited: Option<&str>) -> Read<String> {
+///
+/// `without_preparation` treats the preparation targets as already built, so
+/// the result holds only the requested target's own commands.
+fn dry_run(
+    target: &str,
+    host: Host,
+    inherited: Option<&str>,
+    without_preparation: bool,
+) -> Read<String> {
     let mut make = Command::new("make");
+    make.args(["-n", "-B"]);
+    if without_preparation {
+        make.args(PREPARATION_TARGETS.map(|name| format!("--old-file={name}")));
+    }
     make.args([
-        "-n",
-        "-B",
         &format!("BUILD_HOST_OS={}", host.uname()),
         &format!("BUILD_HOST_ARCH={}", host.arch()),
         &format!("BUILD_HOST_TRIPLE={}", host.triple()),
@@ -208,7 +229,17 @@ pub(super) fn make_rustflags(
     host: Host,
     inherited: Option<&str>,
 ) -> Read<Vec<Option<Flags>>> {
-    let commands = dry_run(target, host, inherited)?
+    make_rustflags_with_preparation(target, host, inherited, true)
+}
+
+/// Reads one target's own commands, optionally excluding shared preparation.
+pub(super) fn make_rustflags_with_preparation(
+    target: &str,
+    host: Host,
+    inherited: Option<&str>,
+    include_preparation: bool,
+) -> Read<Vec<Option<Flags>>> {
+    let commands = dry_run(target, host, inherited, !include_preparation)?
         .lines()
         .filter(|line| {
             line.split_whitespace()
@@ -224,7 +255,7 @@ pub(super) fn make_rustflags(
 
 /// Returns the evaluated Whitaker recipes so its separate Cargo route is tested directly.
 pub(super) fn make_whitaker_recipe(host: Host) -> Read<String> {
-    dry_run("lint-whitaker", host, None)
+    dry_run("lint-whitaker", host, None, false)
 }
 
 /// Describes missing standard flags in one assigned development command.
