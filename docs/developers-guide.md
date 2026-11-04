@@ -244,13 +244,18 @@ The gate's own test binary also sits under the new Cargo layout,
 test walks `target/debug/build` and takes the newest hash-named match that is
 not a `.d` file, because the hash changes on every rebuild.
 
-`prepare-dependencies` also hangs off `make lint`, not only `make test`. The
-hosted lane runs `make lint` and then the coverage action, which runs
-`cargo llvm-cov nextest` itself; it never runs `make test`. Without that
-prerequisite a hosted runner reaches the offline `cargo tree` boundary checks
-with whatever the action's own install steps happened to cache. `make coverage`
-depends on `prepare-ui-gate` for the same reason: the coverage run executes the
-ordinary suite, including the root test that expects a prebuilt gate binary.
+`prepare-dependencies` and `prepare-ui-gate` also hang off `make lint`, not only
+`make test`. The hosted lane runs `make lint` and then the coverage action,
+which runs `cargo llvm-cov nextest` itself; it never runs `make test`. Without
+the fetch a hosted runner reaches the offline `cargo tree` boundary checks with
+whatever the action's own install steps happened to cache, and without the gate
+build the root `cardinality_probe_ui` test finds no prebuilt binary.
+`make coverage` depends on `prepare-ui-gate` for the same reason: the coverage
+run executes the ordinary suite, including that root test.
+
+Anything the suite needs prepared must therefore hang off `lint`, or off a
+target the hosted lane runs before it. A prerequisite on `test` alone is
+invisible to CI however complete it looks locally.
 
 Every Cargo command a development route runs composes the caller's `RUSTFLAGS`
 with the standard flags, because only an assignment displaces the

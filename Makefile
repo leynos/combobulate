@@ -256,13 +256,16 @@ coverage: check-coverage-tools prepare-ui-gate ## Generate lcov coverage with ll
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(TEST_FLAGS)
 
-# `prepare-dependencies` is here, not only on `test`. The hosted lane runs
-# `make lint` and then the coverage action, which runs `cargo llvm-cov nextest`
-# itself; it never runs `make test`. Without this prerequisite a hosted runner
+# Preparation is here, not only on `test`. The hosted lane runs `make lint`
+# and then the coverage action, which runs `cargo llvm-cov nextest` itself; it
+# never runs `make test`. Without `prepare-dependencies` a hosted runner
 # reaches the workspace-boundary tests with whatever the action's own install
 # steps happened to cache, and the offline `cargo tree` checks fail there with
-# an unrelated-looking HTTP refusal.
-lint: prepare-dependencies ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
+# an unrelated-looking HTTP refusal. Without `prepare-ui-gate` the root
+# `cardinality_probe_ui` test finds no prebuilt gate binary and fails the lane.
+# Both must therefore run before the coverage action, and `make lint` is the
+# only Make target the hosted lane runs first.
+lint: prepare-dependencies prepare-ui-gate ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
 	+$(MAKE) lint-clippy
 	+$(MAKE) lint-whitaker
 	+$(MAKE) lint-python

@@ -747,6 +747,20 @@ committed together with its Green change.
   `/tmp/typecheck-final.out`, `/tmp/test-final.out`,
   `/tmp/check-fmt-final.out`, and `/tmp/spelling-final.out`. Date/Author:
   2026-11-04, implementation agent.
+
+  A hosted run of PR #22 then failed where no local gate could: `build-test`
+  reported `checked_cardinality_result_must_be_used` failing in 0.009 s with
+  `the cardinality gate test binary is not built`. The cause is that the hosted
+  lane runs `make lint` and then `leynos/shared-actions`'
+  `generate-coverage@dbe2e22c`, which invokes `cargo llvm-cov nextest` itself;
+  it never runs `make test`. `prepare-ui-gate` hung off `test` and `coverage`
+  only, so CI reached the root test with no prebuilt binary. `lint` now takes
+  both `prepare-dependencies` and `prepare-ui-gate`. The correction rule is
+  recorded in the developers' guide: a prerequisite on `test` alone is
+  invisible to CI however complete it looks locally. The gate-order contract
+  needed the extra stage in the `lint` route, and the developers' guide
+  paragraph was rewritten to match. Date/Author: 2026-11-05, implementation
+  agent.
 - DL-53 (2026-11-03). EP-M2 twentieth review round. The formal review of
   `c8db23e` raised six findings, all verified and repaired. First, the Kani
   provenance record bound neither the corpus manifest nor its lockfile; both

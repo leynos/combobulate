@@ -101,6 +101,7 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
             "preflight",
             "prepare-dependencies",
             "prepare-ui-gate-dependencies",
+            "prepare-ui-gate",
             "preflight",
             "doc",
             "clippy",
@@ -237,6 +238,7 @@ fn assert_contaminated_lint_run(
             "preflight",
             "prepare-dependencies",
             "prepare-ui-gate-dependencies",
+            "prepare-ui-gate",
             "preflight",
             "doc",
             "clippy",
@@ -297,6 +299,7 @@ fn parallel_lint_never_starts_whitaker_after_clippy_failure() {
             "preflight",
             "prepare-dependencies",
             "prepare-ui-gate-dependencies",
+            "prepare-ui-gate",
             "preflight",
             "doc",
             "clippy"

@@ -11,12 +11,19 @@ use super::{probe::GateProbe, records::Invocation};
 /// recursive Make is a fresh process with its own prerequisite graph, and the
 /// second pair is what keeps `make test` self-sufficient when a developer runs
 /// it alone.
+///
+/// Both invocations build the gate. `lint` gained `prepare-ui-gate` because the
+/// hosted lane runs `make lint` and then the coverage action, which invokes
+/// `cargo llvm-cov nextest` itself and never runs `make test`; without the
+/// prerequisite a hosted runner reaches the root gate test with no prebuilt
+/// binary.
 pub(super) const ALL_STAGES: &[&str] = &[
     "fmt",
     "markdown-formatting",
     "preflight",
     "prepare-dependencies",
     "prepare-ui-gate-dependencies",
+    "prepare-ui-gate",
     "preflight",
     "doc",
     "clippy",
