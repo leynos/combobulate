@@ -734,11 +734,18 @@ committed together with its Green change.
   `llvm-cov` runs the root test, which made the held-out-target contract read
   preparation's development build. That contract now uses
   `--old-file=prepare-…` so it checks the measured recipe's own commands rather
-  than its prerequisites'. `mold pin files` is a narrow spelling exception, not
-  a re-spelling. Evidence:
-  `/tmp/lint-1-2-1-establish-workspace-and-profiles.out`,
-  `/tmp/test-1-2-1-establish-workspace-and-profiles.out`, and
-  `/tmp/spelling-1-2-1-establish-workspace-and-profiles.out`. Date/Author:
+  than its prerequisites'. A narrow spelling exception covers the linker's
+  fixed spelling.
+
+  Measured on the committed candidate: the gate test passed in 195.232 s in a
+  warm full suite and in 443.24 s while 185 builds queued ahead. The gate's
+  `CommandDeadline` is therefore 15 minutes, deliberately above nextest's 600 s
+  termination point, so the queue cannot be misreported as a wedged gate. All
+  six local gates pass at `cd719c1`: `check-fmt`, `lint` (386 s), `typecheck`
+  (147 s), `test` (453 s; 383/383 nextest tests, 1 skipped, and doctests green),
+  `markdownlint`, and `spelling`. Evidence: `/tmp/lint-final.out`,
+  `/tmp/typecheck-final.out`, `/tmp/test-final.out`,
+  `/tmp/check-fmt-final.out`, and `/tmp/spelling-final.out`. Date/Author:
   2026-11-04, implementation agent.
 - DL-53 (2026-11-03). EP-M2 twentieth review round. The formal review of
   `c8db23e` raised six findings, all verified and repaired. First, the Kani
