@@ -520,6 +520,14 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     attributed to the pinned distribution. All four are repaired, the plan's
     Kani invocation description now matches the direct route, and both corpora
     are regenerated.
+  - [x] (2026-11-03) Twentieth review round (DL-53). The formal review of
+    `c8db23e` raised six findings: the Kani record bound neither its manifest
+    nor its lockfile and named no child toolchain, the verifier-free hosted
+    record did not bind the staged inputs, the source scanner misread a
+    character literal holding `"`, the package contract checked no local
+    patches, and the mutant-location rule lacked focused cases. All six are
+    repaired and both corpora are regenerated; recapturing the hosted
+    observation at the repaired candidate follows this repair commit.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
@@ -640,6 +648,35 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-53 (2026-11-03). EP-M2 twentieth review round. The formal review of
+  `c8db23e` raised six findings, all verified and repaired. First, the Kani
+  provenance record bound neither the corpus manifest nor its lockfile; both
+  are now digested, and the record names the child SDK toolchain through the new
+  `KANI_SDK_TOOLCHAIN` constant, which `_kani_environment` also uses so a pin
+  bump must move both values together. Second, the verifier-free hosted record
+  bound no staged inputs; `staged_sources()` now enumerates the fixture tree
+  minus evidence records and build output plus the root toolchain, linker,
+  build-tool, and mold pin files, and `run_verifier_free` records a digest for
+  each. Third, the source scanner treated `'` as an ordinary character, so a
+  character literal holding `"` started a string skip that swallowed the
+  following attributes or `extern crate alloc;`; a `skip_char_literal` helper
+  now distinguishes literals from lifetimes, with `rstest` cases for `'"'`,
+  `'\"'`, and a lifetime plus a control test in the support module, which keeps
+  the touched files within the 400-line limit. Fourth, the package contract
+  asserted only `-p combobulate`; it now requires both `patch.crates-io` keys.
+  Fifth, the mutant-location rule lacked focused cases;
+  `scripts/tests/test_verus_qualification.py` covers a diagnostic inside the
+  mutant, in the preceding function, in another file, a relative path, two
+  failures, and a source without a mutant, which must raise. The Kani binding
+  assertions moved to `scripts/tests/test_kani_provenance_binding.py` for the
+  same size limit. Sixth, the hosted record named a different head; it is
+  recaptured at the repaired candidate with the staged-input digests. Both
+  corpora were regenerated. Evidence:
+  `/tmp/kani-log-corpus-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  `/tmp/verus-probe-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  and
+  `/tmp/focused-round20-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-11-03, implementation agent.
 - DL-52 (2026-11-03). EP-M2 hosted ExecPlan completeness and proof assessment.
   The completeness assessment (comment 6593903939) and the proof assessment
   (comment 6593931093) raised four findings, all verified and repaired. First,

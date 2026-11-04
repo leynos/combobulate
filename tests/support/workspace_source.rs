@@ -190,6 +190,7 @@ fn strip_comments_and_literals(source: &str) -> String {
                 }
             }
             '"' => skip_quoted_string(&mut chars),
+            '\'' => skip_char_literal(&mut chars),
             _ => code.push(ch),
         }
     }
@@ -267,6 +268,40 @@ fn raw_string_closes(chars: &mut Peekable<Chars<'_>>, hashes: usize) -> bool {
     }
 }
 
+/// Skips a character literal while leaving a lifetime tick in the code.
+///
+/// A lifetime (`'a`, `'_`, `'static`) has no closing quote, so treating every
+/// `'` as a literal opener would swallow the rest of the file. A literal is
+/// recognised by its closing quote, including the escaped forms `'\''`,
+/// `'\\'`, `'\n'`, and `'\u{..}'`; a literal holding a double quote (`'"'`)
+/// must not start a string skip.
+fn skip_char_literal(chars: &mut Peekable<Chars<'_>>) {
+    let mut lookahead = chars.clone();
+    match lookahead.next() {
+        Some('\\') => {
+            match lookahead.next() {
+                Some('u') if lookahead.peek() == Some(&'{') => skip_unicode_escape(&mut lookahead),
+                Some(_) => {}
+                None => {
+                    *chars = lookahead;
+                    return;
+                }
+            }
+            if lookahead.next() == Some('\'') {
+                *chars = lookahead;
+            }
+        }
+        Some(_) if lookahead.peek() == Some(&'\'') => {
+            lookahead.next();
+            *chars = lookahead;
+        }
+        _ => {}
+    }
+}
+
+/// Consumes a `\u{..}` escape body, leaving the position after its brace.
+fn skip_unicode_escape(chars: &mut Peekable<Chars<'_>>) { chars.by_ref().any(|ch| ch == '}'); }
+
 /// Skips a quoted string, honouring backslash escapes.
 fn skip_quoted_string(chars: &mut Peekable<Chars<'_>>) {
     while let Some(ch) = chars.next() {
@@ -277,5 +312,53 @@ fn skip_quoted_string(chars: &mut Peekable<Chars<'_>>) {
             '"' => return,
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Literal-aware scanning contracts for the kernel boundary.
+    //!
+    //! The scanner reads Rust text with comments and literals stripped. A
+    //! character literal holding a double quote must not start a string skip,
+    //! and a lifetime tick must not be mistaken for a character literal.
+    //! Either mistake would hide the attributes or the allocation declaration
+    //! that follows.
+
+    use googletest::prelude::*;
+    use rstest::rstest;
+
+    use super::kernel_source_violations;
+
+    /// VO-6 non-vacuity: a literal before the declaration must not hide it.
+    #[rstest]
+    #[case::double_quote_literal(r#"const QUOTE: char = '"'; extern crate alloc;"#)]
+    #[case::escaped_double_quote_literal(r#"const QUOTE: char = '\"'; extern crate alloc;"#)]
+    #[case::lifetime(r"fn borrow<'a>(value: &'a str) -> &'a str { value } extern crate alloc;")]
+    fn character_literals_do_not_hide_alloc_declarations(#[case] source_text: &str) {
+        assert_that!(
+            kernel_source_violations(source_text).join("; ").as_str(),
+            contains_substring("must not contain extern crate alloc")
+        );
+    }
+
+    /// VO-6 control: a character literal must not hide the attributes after it.
+    ///
+    /// The literal `'"'` holds the same byte that opens a string. A scanner
+    /// that started a string skip at that quote would consume the crate
+    /// attributes and report a valid kernel as missing its boundary.
+    #[test]
+    fn character_literals_do_not_hide_the_kernel_attributes() {
+        let source_text = concat!(
+            "const QUOTE: char = '\"';\n",
+            "const ESCAPED: char = '\\'';\n",
+            "#![no_std]\n",
+            "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
+        );
+        assert_that!(
+            kernel_source_violations(source_text),
+            is_empty(),
+            "the crate attributes after a character literal must still be read"
+        );
     }
 }

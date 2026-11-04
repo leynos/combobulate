@@ -157,6 +157,64 @@ fn every_make_cargo_route_uses_the_selected_executable() {
     }
 }
 
+/// Patch entries `make package` must pass for the unpublished members.
+const PACKAGE_PATCHES: [&str; 2] = [
+    "patch.crates-io.combobulate-kernel.path=",
+    "patch.crates-io.combobulate-macros.path=",
+];
+
+/// Asserts that `make package` patches both unpublished workspace members.
+///
+/// The kernel and macro crates are unpublished, so packaging only resolves
+/// when both are patched to their workspace paths.
+fn assert_package_patches(target: &str, calls: &str) {
+    if target != "package" {
+        return;
+    }
+    for patch in PACKAGE_PATCHES {
+        assert!(
+            calls.contains(patch),
+            "make package must patch the local crate with {patch}: {calls}"
+        );
+    }
+}
+
+/// Asserts the production route selects LLVM and drops inherited dev settings.
+///
+/// The route must survive a caller that exports Cranelift, a foreign linker,
+/// and the development `RUSTFLAGS`; any of those leaking through would make a
+/// production artefact depend on how the shell happened to be configured.
+fn assert_production_environment(target: &str, environment: &str) {
+    for required in [
+        "CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm",
+        "CARGO_PROFILE_RELEASE_CODEGEN_BACKEND=llvm",
+        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang",
+    ] {
+        assert!(
+            environment.lines().any(|line| line == required),
+            "make {target} must select {required}: {environment}"
+        );
+    }
+    let rustflags = environment
+        .lines()
+        .find(|line| line.starts_with("RUSTFLAGS="))
+        .unwrap_or_default();
+    assert!(
+        !rustflags.is_empty(),
+        "make {target} must receive explicit RUSTFLAGS: {environment}"
+    );
+    assert!(
+        rustflags.contains("-D warnings")
+            && !rustflags.contains("-Zthreads=8")
+            && !rustflags.contains("-fuse-ld=mold"),
+        "make {target} must replace inherited development flags: {rustflags}"
+    );
+    assert!(
+        !environment.contains("CARGO_ENCODED_RUSTFLAGS="),
+        "make {target} must remove the encoded flags override: {environment}"
+    );
+}
+
 /// Production routes must replace even hostile inherited development settings.
 #[test]
 fn release_and_package_select_llvm_without_development_flags() {
@@ -194,34 +252,12 @@ fn release_and_package_select_llvm_without_development_flags() {
             calls.contains(expected_command),
             "make {target} must execute {expected_command}: {calls}"
         );
+        assert_package_patches(target, &calls);
         let environment = probe
             .directory
             .read_to_string("production.log")
             .expect("read the production Cargo environment");
-        for required in [
-            "CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm",
-            "CARGO_PROFILE_RELEASE_CODEGEN_BACKEND=llvm",
-            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang",
-        ] {
-            assert!(
-                environment.lines().any(|line| line == required),
-                "make {target} must select {required}: {environment}"
-            );
-        }
-        let rustflags = environment
-            .lines()
-            .find(|line| line.starts_with("RUSTFLAGS="))
-            .expect("production Cargo must receive explicit RUSTFLAGS");
-        assert!(
-            rustflags.contains("-D warnings")
-                && !rustflags.contains("-Zthreads=8")
-                && !rustflags.contains("-fuse-ld=mold"),
-            "make {target} must replace inherited development flags: {rustflags}"
-        );
-        assert!(
-            !environment.contains("CARGO_ENCODED_RUSTFLAGS="),
-            "make {target} must remove the encoded flags override: {environment}"
-        );
+        assert_production_environment(target, &environment);
         probe
             .directory
             .remove_file("cargo.log")

@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 from verifier_probe_support import (
+    KANI_SDK_TOOLCHAIN,
     ROOT,
     _digest,
     portable_argument,
@@ -90,6 +91,8 @@ def _write_kani_provenance(
     sources = [
         directory / name
         for name in (
+            "Cargo.toml",
+            "Cargo.lock",
             "src/lib.rs",
             "src/harnesses.rs",
             "harnesses.json",
@@ -106,6 +109,7 @@ def _write_kani_provenance(
     )
     provenance = {
         "tool": f"Kani {(ROOT / 'tools/kani/VERSION').read_text().strip()}",
+        "toolchain": KANI_SDK_TOOLCHAIN,
         "route": route,
         "prover_tools_ref": reference,
         "stream_order": "captured stdout followed by captured stderr",

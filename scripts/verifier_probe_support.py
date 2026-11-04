@@ -18,6 +18,12 @@ from rust_prover_tools.versions import parse_tool_version
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tools/verifier-fixtures"
 OUTPUT = ROOT / "scripts/tests/fixtures/kani_logs"
+
+# The LLVM SDK bundled with the Kani release pinned in tools/kani/VERSION.
+# The version check only compares the release, so the toolchain is named here
+# and recorded in the provenance: a pin bump must move both values together,
+# and the record then shows which SDK actually compiled the harnesses.
+KANI_SDK_TOOLCHAIN = "nightly-2025-11-21"
 LINT_TABLE = re.compile(
     r"(?m)^\[(?:workspace\.)?lints\.(?P<name>[A-Za-z0-9_-]+)\]\n"
     r"(?P<body>(?:(?!^\[)[^\n]*\n?)*)"
@@ -118,7 +124,7 @@ def _kani_environment(installation: Path, environment: dict[str, str]) -> dict[s
     """
     child = dict(environment)
     child.update(
-        RUSTUP_TOOLCHAIN="nightly-2025-11-21",
+        RUSTUP_TOOLCHAIN=KANI_SDK_TOOLCHAIN,
         RUSTFLAGS="-D warnings",
         CARGO_ENCODED_RUSTFLAGS="-D\x1fwarnings",
         CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm",

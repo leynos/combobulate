@@ -31,6 +31,7 @@ def _support_stub() -> SimpleNamespace:
         ROOT=ROOT,
         FIXTURES=ROOT / 'tools/verifier-fixtures',
         OUTPUT=ROOT,
+        KANI_SDK_TOOLCHAIN='nightly-2025-11-21',
         **dict.fromkeys(SUPPORT_FUNCTIONS),
     )
 

@@ -867,13 +867,14 @@ valid. The provenance test scans every committed fixture record and fails on
 any remaining account home.
 
 Both provenance writers bind their inputs with `source_digests`. The Kani
-record covers the harness sources, the harness and listing inventories, and the
-probe modules that build and record the run. The Verus record covers the four
-candidate proof files, the shared production source, the workspace manifest,
-lockfile, and member manifests, plus the probe modules that generate and record
-the observations. The provenance test recomputes every recorded digest and
-requires each `provenance.json` to carry a non-empty digest map, so a Verus
-record cannot pass merely by omitting the field.
+record covers the corpus manifest and lockfile, the harness sources, the
+harness and listing inventories, and the probe modules that build and record
+the run. The Verus record covers the four candidate proof files, the shared
+production source, the workspace manifest, lockfile, and member manifests, plus
+the probe modules that generate and record the observations. The provenance
+test recomputes every recorded digest and requires each `provenance.json` to
+carry a non-empty digest map, so a Verus record cannot pass merely by omitting
+the field.
 
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
@@ -881,6 +882,10 @@ which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
 admission, and changes no ordinary Cargo file or executable source body. The
 script's own default is `helper`. Installation and version checks still use the
 helper. Set `KANI_PROBE_ROUTE=helper` to retest that compatibility boundary.
+The child toolchain is the named `KANI_SDK_TOOLCHAIN` constant, and the
+provenance record names it: the version check compares only the Kani release,
+so the constant and the pin in `tools/kani/VERSION` must move together and the
+record shows which SDK compiled the harnesses.
 
 The Verus archive does not bundle Z3. The probe's tool environment therefore
 uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
@@ -931,5 +936,9 @@ remove the wrapper; the separate hosted observation job uses a fresh runner.
 Its record is
 `tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
 the container build and probe logs in the adjacent `observations/` directory.
-The recorded observation must be recaptured whenever the build script changes,
-so the stored command and the code under test stay the same.
+The record carries `source_digests` for every file the staging step copies: the
+fixture tree minus evidence records and build output, plus the root toolchain,
+linker, build-tool, and mold pin files. The hosted record is excluded from the
+staged set so it can bind the inputs without hashing itself. The recorded
+observation must be recaptured whenever the build script or a staged input
+changes, so the stored command, digests, and the code under test stay the same.

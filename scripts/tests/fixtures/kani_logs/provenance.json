@@ -1,17 +1,20 @@
 {
   "tool": "Kani 0.67.0",
+  "toolchain": "nightly-2025-11-21",
   "route": "direct",
   "prover_tools_ref": "9c4a27a86c678ceac1155404f45d95ee4a14a172",
   "stream_order": "captured stdout followed by captured stderr",
   "source_digests": {
+    "tools/verifier-fixtures/kani-corpus/Cargo.toml": "e940d56d4b821c09d727f1fdca72a5c9d8795ad58617d668efc4bba2cd550c2e",
+    "tools/verifier-fixtures/kani-corpus/Cargo.lock": "1add2528bb4deaedcca7f4ebf773d06c657be76ad2a1054f6be54915b439324b",
     "tools/verifier-fixtures/kani-corpus/src/lib.rs": "a732985c6ad4dafdd8dcaf525b71d1339a2778794708cb1dc7380ca5e7f3735e",
     "tools/verifier-fixtures/kani-corpus/src/harnesses.rs": "6a928eabe2a87634235daeaec0fb9a368ab6f00643e48a8d92f9de30fd6761f8",
     "tools/verifier-fixtures/kani-corpus/harnesses.json": "70db201bb2bba3f39a6a58fec624f83960d694c487a8aa1bdedfb6174002acbd",
     "tools/verifier-fixtures/kani-corpus/kani-list.json": "8d3f6132d9c9444b4028cca8642bbc1dcbe67c6c901303a521902dd388be34c1",
     "scripts/run_verifier_probes.py": "7092414b16fc3e64b77f47e738366135efef5b3002def11ff20e2ff7e001f225",
     "scripts/kani_probe.py": "dc2a8735a585c03fbeab28ee232ca67060a2e9b1be07f3e6b0d0132147aeba5b",
-    "scripts/verifier_probe_support.py": "ea9f945309903a3f715a2047d2734e96b7193fe301111ba68bd6c7fcdcb59b07",
-    "scripts/probe_provenance.py": "bca7705bed45452cdba28cd07e1360e7ec7ce52fbb74635f91f026ac67886d14"
+    "scripts/verifier_probe_support.py": "c780dfac59d99623b75720f433ef0ac2d3335d8adb8f5fe71eb0807e3f1beebc",
+    "scripts/probe_provenance.py": "079885ba8d6de60b93e071a7448ed92e1a45ca937988155d22a025a836fcc862"
   },
   "observations": [
     {
@@ -28,7 +31,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/verified.log",
-      "sha256": "9e806ae0c5cb3ebda08560a35f36c3fd9ac3b51412d9270ddc9cf14cd92a4697"
+      "sha256": "8cb7d44f1f205e53c5ecf751ce356478d25e4c6c6eb9d9e0ef76b79143eb48e0"
     },
     {
       "id": "counterexample",
@@ -44,7 +47,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/counterexample.log",
-      "sha256": "38896e70a104b67a67a72e0b7f04d4fe739963cf6880e646db7b64d7f94226c3"
+      "sha256": "15ca2bb7db74ba8f688fb31736c31ac7619b57c8362906b57e08850f30d2d286"
     },
     {
       "id": "unsatisfied_cover",
@@ -60,7 +63,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/unsatisfied_cover.log",
-      "sha256": "a370ca646c7d33872679804d2d5ec4350584a00af4ae2be95c17bd15e6858a57"
+      "sha256": "e5d6fec6349ee6452a4a34b16af732294e8c02fd906243a25d8314ad5749e98b"
     },
     {
       "id": "multiplication_timeout",
@@ -80,7 +83,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/multiplication_timeout.log",
-      "sha256": "79e419a847ccc69d86d9ed320d25ba59d7368469b526e3d3110d33b0ff72cf57"
+      "sha256": "3794d56c1b6bf221f036c3528e28004e2ec70046c87df1909836b04f69f80777"
     },
     {
       "id": "insufficient_unwind",
@@ -96,7 +99,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/insufficient_unwind.log",
-      "sha256": "09e7a53c0db2f0cd913531af4a50dcdf4f0c263b51803de3053427893bc5f693"
+      "sha256": "6b2e62110672b84777e73d676045e7754398060aff1bf14f6988b9e1c42747ba"
     },
     {
       "id": "vacuous_assumption",
@@ -112,7 +115,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/vacuous_assumption.log",
-      "sha256": "5d6b3766c2d9ebab8dcf91994413ffe3d87892fe0994bb19dab7c92598d9ba29"
+      "sha256": "fd4818c7a7e8e30d57f85c8ff58d88d1fa859675c364c69d7da8545c5f3ee523"
     },
     {
       "id": "unsupported",
@@ -128,7 +131,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/unsupported.log",
-      "sha256": "fcb6064ae22c62240b9ed7343f1d232ba64dcafb046d58f3e8a52cf76f057453"
+      "sha256": "558d0bdc632f354e496d9ec58fecdf67339db0d35768b1dce063397673d0581b"
     },
     {
       "id": "expected_panic",
@@ -144,7 +147,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/expected_panic.log",
-      "sha256": "55e21480ab41655786fd4fa92e6dd0b424ba1937c4025ccf70ec1cc4dc8df4f3"
+      "sha256": "99784fcff75b14424e6e4140f65b746cc54604570c21b23e727d28a7b8aa22a8"
     },
     {
       "id": "seeded_wrapping_mutant",
@@ -160,7 +163,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/seeded_wrapping_mutant.log",
-      "sha256": "6570a681593e45e9a3b56e865f6c4010044f661841c48772040e68b7769010b9"
+      "sha256": "628ae293c45147ca214b9f0d82c548858ee0b841cfa721422cb2de0ff15ce3ff"
     },
     {
       "id": "selected_harness",
@@ -176,7 +179,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/selected_harness.log",
-      "sha256": "561841f49439a868d636676bd3481d1626c1c84cbef9e57772796e9eb2084bbb"
+      "sha256": "acdc561f744a381c2dc607cdba57dc89881179e2057a02f36de6a5c88145cbc1"
     },
     {
       "id": "fail_fast",
@@ -197,7 +200,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 1,
       "log": "scripts/tests/fixtures/kani_logs/fail_fast.log",
-      "sha256": "ec75607233ee18f13b7166a4b393692ee5cef7acaa1571f588ec8b4573bdda23"
+      "sha256": "2c3e0b6e3e13d57fe255fc0c0ba25cb6a975fc639e00a5c9658271231777126f"
     },
     {
       "id": "truncated",
@@ -231,7 +234,7 @@
       "cwd": "tools/verifier-fixtures/kani-corpus",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/list.log",
-      "sha256": "38b143273b5732b388fc338ba662a742048db5340235a885bfdeeac8264fb264"
+      "sha256": "32f21124990ce8f41c68888323458ed827ea2b1d33a23a06403938c086266ad1"
     },
     {
       "id": "in_place",
@@ -247,7 +250,7 @@
       "cwd": "target/epm1-native-workspace/facade",
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/in_place.log",
-      "sha256": "d225197ef15da8f773104a27a2b099b173e80b337ca3d83f14b46c519c2cd920"
+      "sha256": "0b99669d2e589cc19d460f64e9a2d7c3b7cabfe79c079f2495612153143d794a"
     }
   ]
 }

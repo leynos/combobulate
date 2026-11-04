@@ -16,9 +16,28 @@ from pathlib import Path
 
 from rust_prover_tools.commands import CommandSpec, run_command
 
-from verifier_probe_support import FIXTURES, ROOT, _capture
+from verifier_probe_support import FIXTURES, ROOT, _capture, _digest
 
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
+
+# Repository files copied beside the fixture so the container build uses the
+# same toolchain, linker, and mold pins as the host.
+STAGING_FILES = (
+    ".cargo/config.toml",
+    "scripts/native-clang-linker.sh",
+    "scripts/build-tools-common.sh",
+    "tools/mold/VERSION",
+    "rust-toolchain.toml",
+)
+# Evidence records and build output are not build inputs. The hosted record is
+# excluded so it can bind the staged set without hashing itself.
+STAGING_IGNORES = (
+    "target",
+    "observations",
+    "provenance.json",
+    "verifier-free.json",
+    "verifier-free-hosted.json",
+)
 # `set -e` does not abort on a failed `! command -v ...`, so each verifier check
 # is an explicit branch whose failure status the shell acts on.
 BUILD_SCRIPT = (
@@ -74,6 +93,30 @@ def _write_inconclusive_record(record: Path) -> None:
     )
 
 
+def staged_sources() -> list[Path]:
+    """Return every repository file the verifier-free build stages.
+
+    The list is the fixture tree minus evidence records and build output, plus
+    the toolchain and linker files copied beside it. Recording a digest for
+    each entry binds the hosted observation to the exact inputs it built.
+
+    Examples
+    --------
+    The fixture sources and the root toolchain file are both included::
+
+        staged_sources()
+        # [PosixPath('.../verus-wiring-probe/Cargo.toml'), ..., PosixPath('.../rust-toolchain.toml')]
+    """
+    fixture = FIXTURES / "verus-wiring-probe"
+    copied = [
+        path
+        for path in sorted(fixture.rglob("*"))
+        if path.is_file()
+        and not any(part in STAGING_IGNORES for part in path.relative_to(fixture).parts)
+    ]
+    return copied + [ROOT / name for name in STAGING_FILES]
+
+
 def _stage_verifier_free_workspace(directory: Path) -> None:
     """Copy the probe fixture and pinned toolchain files into ``directory``.
 
@@ -93,17 +136,9 @@ def _stage_verifier_free_workspace(directory: Path) -> None:
         FIXTURES / "verus-wiring-probe",
         directory / "probe",
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(
-            "target", "observations", "provenance.json", "verifier-free.json"
-        ),
+        ignore=shutil.ignore_patterns(*STAGING_IGNORES),
     )
-    for name in (
-        ".cargo/config.toml",
-        "scripts/native-clang-linker.sh",
-        "scripts/build-tools-common.sh",
-        "tools/mold/VERSION",
-        "rust-toolchain.toml",
-    ):
+    for name in STAGING_FILES:
         target = directory / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, target)
@@ -238,6 +273,9 @@ def run_verifier_free() -> None:
         )
     directory = ROOT / "target/epm1-verifier-free-workspace"
     _stage_verifier_free_workspace(directory)
+    source_digests = {
+        str(path.relative_to(ROOT)): _digest(path) for path in staged_sources()
+    }
     output = FIXTURES / "verus-wiring-probe/observations"
     image = "localhost/combobulate-epm1-verifier-free:20261028"
     ensure_base_image(output, environment)
@@ -257,4 +295,10 @@ def run_verifier_free() -> None:
     observation = _capture(command, ROOT, output / "verifier-free.log", environment)
     if observation["exit_code"] != 0:
         raise RuntimeError("the ordinary build failed in the verifier-free container")
-    record.write_text(json.dumps({"status": "pass", **observation}, indent=2) + "\n")
+    record.write_text(
+        json.dumps(
+            {"status": "pass", "source_digests": source_digests, **observation},
+            indent=2,
+        )
+        + "\n"
+    )
