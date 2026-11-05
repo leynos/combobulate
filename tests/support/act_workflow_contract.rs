@@ -2,6 +2,9 @@
 
 use serde_yaml::Value;
 
+/// The mdtablefix version shared by the hosted and manual workflows.
+#[path = "act_workflow_mdtablefix.rs"]
+pub(crate) mod mdtablefix;
 /// Exact conditions, environment, and source scripts for the known CI steps.
 #[path = "act_workflow_policy.rs"]
 mod policy;
@@ -42,7 +45,7 @@ pub(super) const ACTIONS: &[ActionContract] = &[
     (
         "leynos/shared-actions/.github/actions/install-mdtablefix",
         "Install mdtablefix",
-        &[("version", "0.6.1")],
+        &[("version", ANY_VALUE)],
     ),
     (
         "DavidAnson/markdownlint-cli2-action",
@@ -174,13 +177,17 @@ fn matches_hosted_action(item: &Value, expected: &ActionContract) -> bool {
 
 /// Matches scalar input values and count, retaining absent non-mapping semantics.
 fn action_inputs_match(item: &Value, expected: &[(&str, &str)]) -> bool {
-    expected
-        .iter()
-        .all(|(key, value)| action_input(item, key).as_deref() == Some(*value))
-        && at(item, &["with"])
-            .and_then(Value::as_mapping)
-            .map_or(0, serde_yaml::Mapping::len)
-            == expected.len()
+    expected.iter().all(|(key, value)| {
+        let actual = action_input(item, key);
+        if *value == ANY_VALUE {
+            actual.is_some_and(|text| !text.is_empty())
+        } else {
+            actual.as_deref() == Some(*value)
+        }
+    }) && at(item, &["with"])
+        .and_then(Value::as_mapping)
+        .map_or(0, serde_yaml::Mapping::len)
+        == expected.len()
 }
 
 /// Checks the hosted suite path, step order, guards, and failure semantics.
@@ -342,7 +349,11 @@ pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> bool {
         && valid_actions(&ci)
         && valid_ci_route(&ci)
         && valid_manual_act_route(&act)
+        && mdtablefix::versions_agree(&ci, &act)
 }
+
+/// Marks an input whose value is checked elsewhere rather than restated here.
+const ANY_VALUE: &str = "<any>";
 
 /// Pins the three provisioning actions before the manual full Act command.
 fn valid_manual_action_prefix(steps: &[Value]) -> bool {
@@ -351,7 +362,7 @@ fn valid_manual_action_prefix(steps: &[Value]) -> bool {
         (
             "leynos/shared-actions/.github/actions/install-mdtablefix",
             "version",
-            "0.6.1",
+            ANY_VALUE,
         ),
         (
             "leynos/shared-actions/.github/actions/setup-rust@\
