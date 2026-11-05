@@ -40,14 +40,12 @@ case "$1" in
     else stage=unexpected-cargo; fi
     ;;
   test)
-    # The gate build runs before the suite and must not run the gate itself:
-    # the root UI test is what asserts the diagnostic, so preparation only
-    # produces the binary.
-    if [ "$#" -eq 6 ] && [ "$2" = --no-run ] && [ "$3" = --manifest-path ] &&
-        [ "$4" = tools/gates/cardinality-ui/Cargo.toml ] &&
-        [ "$5" = --test ] && [ "$6" = cardinality_ui ]; then
-      stage=prepare-ui-gate
-    elif [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
+    # There is deliberately no gate-build form here. The gate is built through
+    # `scripts/cardinality_ui_gate.py prepare`, which records the executable
+    # path Cargo reported; a recipe that reached Cargo directly would bypass
+    # that record and leave the root UI test without a path to run. Accepting
+    # the old shape would let that regression pass the contract silently.
+    if [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
         [ "$4" = --all-features ]; then
       stage=doctest
     else stage=unexpected-cargo; fi
@@ -58,6 +56,24 @@ record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
 case "$stage" in unexpected-*) exit 64 ;; esac
 if [ "${GATE_FAIL_AT-}" = "$stage" ]; then exit 1; fi
 if [ "$stage" = nextest-version-probe ]; then printf '%s\n' 'cargo-nextest 0.9.0'; fi
+"#;
+
+/// Gate recipe fixture validates the exact prepare/run boundary.
+///
+/// The script owns both halves of the gate route: `prepare` builds and records
+/// the binary, and `run` executes that record under a deadline. A recipe that
+/// slips back to invoking Cargo directly, or that reaches Cargo without the
+/// gate's environment, is a different command and therefore unexpected here.
+pub(super) const GATE_SCRIPT: &str = r#"
+stage=unexpected-gate
+if [ "$#" -eq 2 ] && [ "$1" = scripts/cardinality_ui_gate.py ]; then
+  case "$2" in
+    prepare|run) stage=prepare-ui-gate ;;
+  esac
+fi
+record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
+case "$stage" in unexpected-*) exit 64 ;; esac
+[ "${GATE_FAIL_AT-}" != "$stage" ]
 "#;
 
 /// Interrogate fixture validates the pinned tool invocation and injects failure.

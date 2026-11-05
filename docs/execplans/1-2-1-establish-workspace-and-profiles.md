@@ -705,6 +705,49 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-55 (2026-11-05). EP-M1/EP-M2 residual assurance gaps. A review of the
+  EP-M1/EP-M2 closure evidence raised five gaps, all now repaired. First, gate
+  preparation selected its binary by scanning
+  `tools/gates/cardinality-ui/target/debug/build` and taking the newest
+  modification time. That is not a binding to the build that just completed: an
+  inherited `CARGO_TARGET_DIR` redirects the output elsewhere, and a populated
+  tree can offer a stale binary. `scripts/cardinality_ui_gate.py` now reads the
+  executable from Cargo's own `compiler-artifact` JSON and records it, and the
+  root test runs exactly that path; clean-tree, redirected-target, and
+  stale-artifact cases pin the selection. Second, the bounded-execution
+  boundary did not cover every supported route: `make test-ui` ran the gate
+  through plain `cargo test`, with neither the root deadline nor nextest's
+  termination, and `tests/workspace_boundaries.rs` still had unbounded
+  `.output()` calls. `make test-ui` now runs the same recorded binary under the
+  same `timeout` shape, and the boundary reads go through `run_bounded`.
+
+  Third, escalation was misclassified. The predicate recognised only exit code
+  124, and the first repair replaced it with 137 on the theory that
+  `--kill-after` produces it. A direct probe of GNU `timeout` 9.5 disproved
+  that: without `--foreground` — which this helper must not use, because
+  `--foreground` signals the child alone instead of its process group —
+  `timeout` mirrors the child's ending signal by killing *itself*, so an
+  escalated run has **no exit status at all**. `subprocess` reports it as `-9`
+  and Rust exposes it through `ExitStatus::signal() == Some(9)`. Exit 137
+  appears only under `--foreground`. Both the Rust helper and the Python gate
+  now classify on signal 9 plus the verbose `sending signal KILL to command`
+  announcement, so an unrelated `SIGKILL` is not claimed as a timeout. This is
+  recorded because the wrong model was written into both code and the
+  developers' guide, and only a live probe distinguished them.
+
+  Fourth, `require_captured_output` documented `RuntimeError` while `.stat()`
+  leaked `FileNotFoundError`/`OSError`, and `resolve_z3` launched `uv tool run`
+  from inside a pure-looking resolver. The log path is now resolved once and
+  the `OSError` is chained into the documented boundary error, and the resolver
+  takes an injected discovery/execution seam so its command-side effect is
+  explicit at the call site. Fifth, focused contract tests now cover the
+  measurement workflow's route matrix and labels, verifier-free staging and
+  orchestration (with fake process and filesystem dependencies), the captured
+  output boundary, and the Kani route builders, none of which require an
+  installed verifier. The developers' guide's lint-baseline text, its
+  mtime-discovery description, and the escalation paragraph were corrected to
+  match. Date/Author: 2026-11-05, implementation agent.
+
 - DL-54 (2026-11-04). EP-M2 cardinality-gate incident repair. The reported
   `SLOW [>8160.000s]` for
   `combobulate::cardinality_probe_ui checked_cardinality_result_must_be_used`

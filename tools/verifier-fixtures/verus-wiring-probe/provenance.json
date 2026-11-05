@@ -17,8 +17,8 @@
     "tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml": "172ccd7edafdee90925b14789a6c6d544fe2763af0c2fed1e9ac18dd37b1620b",
     "tools/verifier-fixtures/verus-wiring-probe/production/Cargo.toml": "163493ee2c1d29682edd358b60ceff1a12dc4be0c66ecf4baab79993da71920a",
     "scripts/run_verifier_probes.py": "7092414b16fc3e64b77f47e738366135efef5b3002def11ff20e2ff7e001f225",
-    "scripts/verus_probe.py": "1f71b4a0c7417c7d7dbffef8013934c39070370652323d488971f78ec80d4c7a",
-    "scripts/probe_provenance.py": "079885ba8d6de60b93e071a7448ed92e1a45ca937988155d22a025a836fcc862",
+    "scripts/verus_probe.py": "9cf0be4b474f7bae064464ac7f683ffeabace2b76a3de7d72adaed4581edba1d",
+    "scripts/probe_provenance.py": "251ecd28bca35e5573fa3ea8c492d18ca98ed1d49a275d3e1ec0d4bb5ad97b78",
     "scripts/verifier_probe_support.py": "c780dfac59d99623b75720f433ef0ac2d3335d8adb8f5fe71eb0807e3f1beebc"
   },
   "observations": [

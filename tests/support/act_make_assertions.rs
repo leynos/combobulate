@@ -113,31 +113,27 @@ pub(super) fn assert_preparation_invocations(preparation: &[Invocation]) {
     }
 }
 
-/// Checks the gate build sits between preparation and the repository tests.
+/// Checks the gate preparation sits between acquisition and the repository tests.
 ///
-/// The gate must be built before the suite runs: the root UI test only
-/// locates and executes the binary, so a `--no-run` build here is what keeps
-/// the nested `trybuild` compile out of a test body.
-pub(super) fn assert_gate_build_invocation(invocation: &Invocation) {
+/// The gate must be built before the suite runs: the root UI test only reads
+/// the recorded executable path and runs it, so the build here is what keeps
+/// the nested `trybuild` compile out of a test body. The recipe delegates both
+/// halves to `scripts/cardinality_ui_gate.py`, which is the only component that
+/// knows the path Cargo reported, so reaching Cargo directly from Make would
+/// break the record the root test depends on.
+pub(super) fn assert_gate_preparation_invocation(invocation: &Invocation) {
     assert_eq!(
-        invocation.executable, "cargo",
-        "the gate build must use the controlled Cargo executable"
+        invocation.executable, "python",
+        "the gate preparation must use the controlled Python executable"
     );
     assert_eq!(
         invocation.arguments,
-        vec![
-            "test",
-            "--no-run",
-            "--manifest-path",
-            "tools/gates/cardinality-ui/Cargo.toml",
-            "--test",
-            "cardinality_ui",
-        ],
-        "the gate must be built, not run, before the suite starts"
+        vec!["scripts/cardinality_ui_gate.py", "prepare"],
+        "the gate must be built through the recipe that records its executable"
     );
 }
 
-/// Compares the recorded preparation, gate-build, test and doctest commands.
+/// Compares the recorded preparation, gate build, test and doctest commands.
 ///
 /// The slice covers everything the outer `make test` recipe runs after the
 /// preflight, so a preparation or gate build that drifts out of position, or a
@@ -164,14 +160,7 @@ pub(super) fn assert_outer_invocations_are_ordered(invocations: &[Invocation]) {
                 "--manifest-path",
                 "tools/gates/cardinality-ui/Cargo.toml",
             ],
-            vec![
-                "test",
-                "--no-run",
-                "--manifest-path",
-                "tools/gates/cardinality-ui/Cargo.toml",
-                "--test",
-                "cardinality_ui",
-            ],
+            vec!["scripts/cardinality_ui_gate.py", "prepare"],
             vec!["test", "--all-targets", "--all-features"],
             vec!["test", "--doc", "--workspace", "--all-features"],
         ],

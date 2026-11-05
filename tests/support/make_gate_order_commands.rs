@@ -1,8 +1,20 @@
 //! Expected Make gate stages and the executor calls they must produce.
 
-use std::process::Command;
+use std::time::Duration;
+
+#[path = "process_deadline.rs"]
+mod deadline;
+
+use deadline::CommandDeadline;
 
 use super::{probe::GateProbe, records::Invocation};
+
+/// How long Git's Python inventory may take before the contract is wedged.
+///
+/// `git ls-files` walks the index of a single checkout and starts no build. A
+/// minute is generous for a large repository and still ends a child that never
+/// returns, so the contract cannot hold the suite open.
+const INVENTORY_DEADLINE: Duration = Duration::from_secs(60);
 
 /// Expected command stages for the complete ordered Make target.
 ///
@@ -95,15 +107,8 @@ const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 13] = [
     ),
     (
         "prepare-ui-gate",
-        "probe-cargo",
-        &[
-            "test",
-            "--no-run",
-            "--manifest-path",
-            "tools/gates/cardinality-ui/Cargo.toml",
-            "--test",
-            "cardinality_ui",
-        ],
+        "probe-python",
+        &["scripts/cardinality_ui_gate.py", "prepare"],
     ),
     (
         "nextest-version-probe",
@@ -171,7 +176,9 @@ pub(super) fn assert_interrogate_command(
 
 /// Reads the tracked and non-ignored untracked Python paths selected by Make.
 fn python_sources_from_git() -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let output = Command::new("git")
+    let mut command = CommandDeadline::with_deadline("git", INVENTORY_DEADLINE);
+    command
+        .command()
         .args([
             "ls-files",
             "--cached",
@@ -181,16 +188,27 @@ fn python_sources_from_git() -> Result<Vec<String>, Box<dyn std::error::Error>> 
             "*.py",
             "*.pyi",
         ])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
-    if !output.status.success() {
+        .current_dir(env!("CARGO_MANIFEST_DIR"));
+    let observed = command.output()?;
+    if observed.exceeded_deadline() {
         return Err(format!(
-            "Git must enumerate the Python sources used by the Make contract; exited with {}",
-            output.status
+            "Git did not enumerate the Python sources inside {INVENTORY_DEADLINE:?}: {:?} after \
+             {:?} for `{}`",
+            observed.outcome(),
+            observed.duration(),
+            observed.line()
         )
         .into());
     }
-    Ok(String::from_utf8(output.stdout)?
+    if !observed.status().success() {
+        return Err(format!(
+            "Git must enumerate the Python sources used by the Make contract; exited with {}: {}",
+            observed.status(),
+            String::from_utf8_lossy(observed.stderr())
+        )
+        .into());
+    }
+    Ok(String::from_utf8(observed.stdout().to_vec())?
         .lines()
         .map(str::to_owned)
         .collect())

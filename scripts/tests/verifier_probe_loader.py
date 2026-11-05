@@ -98,6 +98,34 @@ def load_verifier_free_probe() -> ModuleType:
     )
 
 
+def load_kani_probe() -> ModuleType:
+    """Load ``kani_probe.py`` with the real support helpers and no prover helper.
+
+    The CLI imports the route builders by name, so it never exposes the module
+    they came from. A suite that checks the builders loads them here instead of
+    reaching through the CLI's namespace, and the real support module is used
+    because ``kani_prefix`` calls ``_kani_environment`` rather than merely
+    forwarding it.
+    """
+    support = load_verifier_probe_support()
+    # `_kani_environment` verifies the selected SDK against the repository pin,
+    # which would otherwise spawn the installed Kani driver. The version check
+    # is covered by its own suite; here the route builders need only a support
+    # module whose identity probe succeeds without a verifier installation.
+    support.CommandSpec = lambda argv, **kwargs: argv
+    support.run_command = lambda *args, **kwargs: SimpleNamespace(
+        exit_code=0, stdout='', stderr=''
+    )
+    support.parse_tool_version = lambda *args, **kwargs: (
+        ROOT / 'tools/kani/VERSION'
+    ).read_text().strip()
+    return _load(
+        'kani_probe_under_test',
+        SCRIPTS / 'kani_probe.py',
+        {'verifier_probe_support': support},
+    )
+
+
 def load_probe_provenance() -> ModuleType:
     """Load ``probe_provenance.py`` with the real support helpers available."""
     stubs = {'verifier_probe_support': load_verifier_probe_support()}

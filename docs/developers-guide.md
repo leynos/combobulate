@@ -43,8 +43,9 @@ defaults. The recipe sends warnings-as-errors to the repository check through
 Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers `cargo nextest run` and
 falls back to `cargo test` when cargo-nextest is not available. It prepares
 both workspaces' dependencies and builds the cardinality probe's `trybuild` UI
-gate before any test body runs, then the root test runs that binary for its
-`#[must_use]` result contract. `make test-ui` runs the same gate directly. See
+gate before any test body runs, then the root test runs the binary Cargo
+reported for its `#[must_use]` result contract. `make test-ui` prepares and
+runs the same gate directly, under the same deadline. See
 [Test timeouts](#test-timeouts) for why preparation sits outside the suite and
 what bounds each child process. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
@@ -187,10 +188,17 @@ It is compiled into more than one test binary, so it carries no default
 deadline. A default would be dead code in every binary that picks a different
 tier. Each caller declares its own:
 
-| Caller                          | Deadline | Why                                    |
-| ------------------------------- | -------- | -------------------------------------- |
-| `tests/cardinality_probe_ui.rs` | 900 s    | Runs the pre-built gate binary.        |
-| `tests/process_deadline.rs`     | 60 s     | Policy tests against fake executables. |
+| Caller                                      | Deadline | Why                                                   |
+| ------------------------------------------- | -------- | ----------------------------------------------------- |
+| `tests/cardinality_probe_ui.rs`             | 900 s    | Runs the pre-built gate binary.                       |
+| `tests/workspace_boundaries.rs`             | 120 s    | Live `cargo metadata` and offline `cargo tree` reads. |
+| `tests/support/make_gate_order_commands.rs` | 60 s     | Enumerates the Python sources with Git.               |
+| `tests/process_deadline.rs`                 | 60 s     | Policy tests against fake executables.                |
+| `scripts/cardinality_ui_gate.py run`        | 600 s    | `make test-ui`, with no nextest behind the child.     |
+
+The Python gate runner is not a `CommandDeadline` caller: it invokes the same
+GNU `timeout` shape directly, and classifies the result the same way. It is
+listed because a reader checking "what bounds this route" needs the whole set.
 
 The gate's tier sits deliberately above nextest's own termination point. If the
 inner deadline fired first, a build merely waiting in the shared compile queue
@@ -200,19 +208,55 @@ lets nextest's diagnosis reach the operator first.
 A new caller adds its tier to this table and to the test that measures it, in
 the same change.
 
+`make test-ui` is the one supported route outside the root suite, and nothing
+there runs under nextest: the standalone `cargo test --test cardinality_ui`
+invocation inside the gate package has neither the root deadline nor nextest's
+`terminate-after`. That is why the recipe runs the recorded binary itself under
+`timeout` rather than letting Cargo run the test; the binary's own bounded
+execution is the only thing standing between a wedged `trybuild` child and an
+unbounded route.
+
+Escalation is reported explicitly, and the status is subtler than "124 or 137".
+GNU `timeout` returns 124 when the child exits after `SIGTERM`. When the child
+ignores `SIGTERM` and `--kill-after` has to send `SIGKILL`, `timeout` does not
+exit 137: because it runs the child in its own process group — which is what
+lets the signal reach the child's descendants — it mirrors the ending signal by
+killing *itself* with it. The run then has no exit status at all, and only the
+signal (9) records what happened. Exit status 137 appears only under
+`--foreground`, and `--foreground` is unusable here because it would signal the
+child alone. A child that kills itself, or one killed by the out-of-memory
+killer, ends the same way, with signal 9 and an empty standard error.
+
+The wrapper therefore runs `timeout --verbose` and treats a signal-9 death as
+an escalation only when the announcement `sending signal KILL to command` is
+present. Anything else is propagated unchanged and diagnosed by its own output,
+never reported as a deadline the wrapper enforced. `CommandDeadline` reports
+the three cases as `DeadlineOutcome::{Completed, Terminated, Escalated}`;
+`scripts/cardinality_ui_gate.py` makes the same distinction on `subprocess`'s
+`-9` return code and normalises it to the shell's `128 + N` convention before
+returning it as the process status.
+
 ### Preparation happens outside test bodies
 
-No test body fetches packages or compiles a crate. The suite used to, and that
-is the shape of the incident: a nested Cargo build, of a crate whose
+No test body fetches packages or compiles the repository. The suite used to,
+and that is the shape of the incident: a nested Cargo build, of a crate whose
 dev-dependencies included the measurement probe, under a deadline that did not
 exist.
 
+Two narrow readings remain, and neither is the incident's shape. The live
+workspace reads in `tests/workspace_boundaries.rs` run `cargo metadata` and
+`cargo tree --offline --locked`; they resolve the lockfile, compile nothing,
+and are bounded by that file's 120 s tier. The gate preparation itself is a
+Cargo command, but it is a Make recipe that runs before any test body, not
+something a test body starts.
+
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
-chains onto it and builds the gate's test binary with `--no-run`. Both run
-before any test body, and `tests/cardinality_probe_ui.rs` only locates the
-built binary and runs it under its deadline. `make test-ui` is the direct route
-that builds and runs the same gate in one command.
+chains onto it and builds the gate's test binary with `--no-run`.
+`tests/cardinality_probe_ui.rs` then reads the recorded executable path and
+runs that binary under its deadline; it does not search a build directory.
+`make test-ui` is the direct route that prepares and runs the same gate in one
+command.
 
 The chain is deliberate. Under `make -j`, independent prerequisites run in
 parallel, and measurement showed the gate build sometimes starting before the
@@ -239,10 +283,22 @@ what gives `trybuild` a manifest to read once the variable is gone. Do not
 "helpfully" pass the variable through, and do not run the gate from the
 repository root.
 
-The gate's own test binary also sits under the new Cargo layout,
-`target/debug/build/<package>/<hash>/out/`, not `target/debug/deps/`. The root
-test walks `target/debug/build` and takes the newest hash-named match that is
-not a `.d` file, because the hash changes on every rebuild.
+The gate's test binary does not live at a stable path. It sits under
+`target/debug/build/<package>/<hash>/out/` in the ordinary layout, and Cargo
+puts it somewhere else entirely when `CARGO_TARGET_DIR`, `CARGO_BUILD_TARGET`,
+or a profile override redirects the build. Preparation therefore asks Cargo
+where it wrote the binary, by reading the `compiler-artifact` record from
+`--message-format=json`, and `scripts/cardinality_ui_gate.py` records that path
+under the gate workspace. The root test reads the record and runs exactly the
+binary the preparation built.
+
+Nothing searches for a newest file. A modification-time search answers a
+different question from the one being asked: on a clean tree with a redirected
+target directory it finds nothing and reports the binary missing, and on a
+populated tree it can select a stale artefact left by an earlier build and
+report a pass for code that was never compiled. Recording Cargo's own answer
+binds execution to the build that just completed, and the preparation removes
+the redirecting variables so the recorded path and the run cannot disagree.
 
 `prepare-dependencies` and `prepare-ui-gate` also hang off `make lint`, not only
 `make test`. The hosted lane runs `make lint` and then the coverage action,
@@ -339,8 +395,10 @@ rejects `--target` and `--target=<triple>` while allowing `--target-dir`.
 
 ## Lint baseline
 
-The single-crate lint tables live in the root `Cargo.toml`; new packages in a
-future workspace must inherit the workspace lint tables. `clippy.toml` sets
+The lint tables live in `[workspace.lints]` in the root `Cargo.toml`, and every
+member manifest opts in with `[lints] workspace = true`. A new package must
+carry that stanza; a member without it compiles clean under Clippy and fails
+nothing, which makes an omission look like a passing crate. `clippy.toml` sets
 cognitive complexity to 9, argument count to 4, function length to 70 lines,
 and nesting depth to 4. Fix findings at their source. Keep exceptions narrow,
 documented, and reasoned; do not use lint allowances to defer work. Code that
@@ -500,6 +558,87 @@ operating system sandbox, simulate every composite step, or prove the behaviour
 of nested actions or the real installer binary. Installer archive integrity
 remains anchored by the approved upstream digest manifest. Acquisition has
 per-file size and time limits; the CI gate has a three-minute timeout.
+
+## Profile measurements
+
+`.github/workflows/profile-measurements.yml` measures the standalone Polars
+probe crate rather than the workspace, and its numbers feed the pre-registered
+acceptance controls. It is not part of `ci.yml`, and none of its jobs is named
+`build-test`, so it neither gates a pull request nor contributes to AC-07.
+
+A run starts in one of two ways: `workflow_dispatch`, or a `pull_request` event
+whose action is `labeled` and whose label is exactly `measure-profiles`. The
+job guard restates that condition, so labelling a pull request for any other
+reason leaves both jobs skipped rather than spending a runner. Applying the
+same label again starts a fresh run; that is the supported way to recapture an
+observation after the measured sources change.
+
+The concurrency group is
+`profile-measurements-<pull request number or ref>-<label name or manual>`, and
+`cancel-in-progress` is false. The label name is part of the group on purpose:
+two different measurement labels on one pull request queue independently
+instead of one waiting on the other. A repeated appearance of the same label
+shares a group, so the earlier run finishes and keeps its artefacts complete.
+
+`measure-profile` runs a six-route matrix — `rustdoc`, `clippy`, `whitaker`,
+`nextest`, `coverage`, and `ui` — with `fail-fast` disabled, so one broken
+route still reports the other five. Every route measures the same crate,
+`tools/probes/polars-profile/Cargo.toml`. The job carries five environment
+settings: `CARGO_BUILD_JOBS=4` fixes the parallelism each route sees,
+`CARGO_INCREMENTAL=0` keeps incremental state out of the measurement,
+`CARGO_TERM_COLOR=never` keeps logs diffable, `RUSTDOCFLAGS=-D warnings` makes
+a documentation warning fail the rustdoc route, and `SCCACHE_RECACHE=1` forces
+recompilation so a warm local cache cannot shorten a cold measurement.
+
+Tool identities are pinned in the workflow rather than resolved from a moving
+release:
+
+| Tool     | Pin                                           |
+| -------- | --------------------------------------------- |
+| nextest  | `cargo-nextest@0.9.150`                       |
+| coverage | `cargo-llvm-cov@0.9.1`                        |
+| Whitaker | installer `0.2.11`, sha256 `a32a665d…5410236` |
+
+Those are the versions behind the accepted measurement runs 41163302274 and
+41227443972. A tool release between runs would move the timings the controls
+record, so the workflow names the versions instead of tracking the newest
+release. Unlike a Dependabot-owned action SHA, a bump here is a deliberate
+recalibration, which is why the comment beside the install step says so.
+
+Each route runs three times cold. Every run exports its own
+`CARGO_TARGET_DIR="$PWD/profile-target-$run"` and
+`DYLINT_DRIVER_PATH="$CARGO_TARGET_DIR/whitaker-driver"`, so run two cannot
+inherit run one's objects, and each route owns a driver directory it can
+discard. Runs one and two are deleted afterwards; run three survives as the
+candidate for the cache save. Per run the workflow records the expanded
+command, the `/usr/bin/time -v` report, `du -sb` of the target directory, and
+the cgroup memory peak. The `rustdoc` route adds a Clippy run against the
+rustdoc-warm target, which is the observation that answers whether the two
+routes share dependency metadata.
+
+Cache saving happens only on `main`. When `github.ref` is `refs/heads/main` the
+workflow saves `profile-target-3` under `profile-measurement-<route>-<run id>`;
+otherwise the always-running evidence step writes the line
+`not measured: caches are saved only on main`. The key includes the run id
+because the measurement exists to record a cold build, and a restored cache
+from an earlier run would quietly turn the next observation warm.
+
+Artefacts are uploaded with `if: always()`, so a route that fails still
+delivers its logs, timings, and sizes. An artefact uploaded only on success
+would discard exactly the evidence a failing route needs. The `verifier-free`
+job uploads the same way, publishing its observations directory and the
+generated `verifier-free.json` even when the container build fails.
+
+`verifier-free` is the second job, with a thirty-minute timeout. It first
+asserts `test -z "${RUSTC_WRAPPER-}"`, because a hosted runner must not carry
+the local admission wrapper across the container boundary, then installs a
+compiler with no verifier present and runs
+`uv run --script scripts/run_verifier_probes.py verifier-free`. That is the
+same command documented for local use above; on a fresh runner it produces a
+passing observation where the local one is explicitly inconclusive. Promoting
+that output to the committed `verifier-free-hosted.json` record is a manual
+step that must carry the run identity and the staged-input digests together
+with the captured logs.
 
 ## Markdown formatting
 

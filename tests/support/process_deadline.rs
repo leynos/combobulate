@@ -13,6 +13,12 @@
 //! builds itself and it deliberately does not grow into a second process API
 //! beside `std::process`.
 //!
+//! Escalation is reported, not inferred from the exit status alone. A child
+//! that ignores `SIGTERM` is killed after `--kill-after`, and the status it
+//! then reports is the same one any other `SIGKILL` produces. [`DeadlineOutcome`]
+//! separates those cases using the announcement `timeout` writes in verbose
+//! mode, so a stray kill is not misreported as a deadline the wrapper enforced.
+//!
 //! Ownership, permitted callers, and the deadline tiers are recorded in
 //! "Test timeouts" in `docs/developers-guide.md`; change that section with
 //! this file.
@@ -21,6 +27,7 @@ use std::{
     ffi::OsStr,
     fmt::Display,
     io,
+    os::unix::process::ExitStatusExt,
     process::{Command, ExitStatus},
     time::{Duration, Instant},
 };
@@ -70,6 +77,7 @@ impl CommandDeadline {
             .output()
             .map_err(|source| self.spawn_error(source))?;
         Ok(Observed {
+            outcome: DeadlineOutcome::classify(output.status, &output.stderr),
             status: output.status,
             stdout: output.stdout,
             stderr: output.stderr,
@@ -135,8 +143,15 @@ impl CommandDeadline {
 /// default, and `--kill-after` turns a child that ignores `SIGTERM` into one
 /// that receives `SIGKILL` two seconds later. Together they make the deadline a
 /// guarantee rather than a request.
-fn timeout_options(deadline: Duration) -> [String; 3] {
+///
+/// `--verbose` is what makes escalation observable. GNU `timeout` announces
+/// each signal it sends on standard error only in verbose mode, and that
+/// announcement is the difference between a kill this wrapper ordered and a
+/// child that died some other way. Both leave the run dead of `SIGKILL`, so the
+/// status alone cannot tell them apart.
+fn timeout_options(deadline: Duration) -> [String; 4] {
     [
+        "--verbose".to_owned(),
         "--signal=TERM".to_owned(),
         format!("--kill-after={KILL_GRACE}"),
         format!("{}", deadline.as_secs_f64().max(MINIMUM_SECONDS)),
@@ -152,8 +167,70 @@ const MINIMUM_SECONDS: f64 = 0.001;
 /// Exit status 124, which `timeout` uses to report that the deadline expired.
 const TIMEOUT_EXIT: i32 = 124;
 
+/// `SIGKILL`, which `timeout` re-raises on itself after enforcing `--kill-after`.
+///
+/// It is *not* observed as exit status 137. `timeout` runs the child in its own
+/// process group so that a signal reaches the child's descendants, and in that
+/// mode it mirrors the signal that ended the child by killing itself with it.
+/// The wrapper therefore exits without a status at all, and only
+/// [`ExitStatus::signal`] reports what ended it. Exit status 137 appears only
+/// under `--foreground`, which would send signals to the child alone and so
+/// cannot be used here.
+const KILL_SIGNAL: i32 = 9;
+
+/// The verbose announcement `timeout` writes when it escalates to `SIGKILL`.
+///
+/// Matched as a substring because coreutils quotes the command name with
+/// locale-dependent curly quotes around it.
+const KILL_MARKER: &str = "sending signal KILL to command";
+
+/// How a bounded run ended, when it was not an ordinary child exit.
+///
+/// The distinction exists because a status cannot carry it. GNU `timeout`
+/// reports a deadline it enforced as 124, but a child that ignored `SIGTERM` is
+/// killed after `--kill-after` and the wrapper then dies of the same signal, so
+/// the run has no exit status. A child that kills itself, or that the
+/// out-of-memory killer ends, dies of `SIGKILL` in exactly the same way and
+/// with no word on standard error. Only the wrapper's verbose announcement
+/// separates the two, so classification requires both the signal and the
+/// announcement rather than treating a kill as a timeout.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum DeadlineOutcome {
+    /// The child ran to its own end, whether successfully or not.
+    Completed,
+    /// The deadline expired and `SIGTERM` ended the child.
+    Terminated,
+    /// The deadline expired, the child ignored `SIGTERM`, and `SIGKILL` followed.
+    Escalated,
+}
+
+impl DeadlineOutcome {
+    /// Classifies a run from its exit status and the wrapper's own diagnostics.
+    ///
+    /// Only a `SIGKILL` the wrapper announced is an escalation. An unannounced
+    /// kill is reported as a completed run whose status carries the signal,
+    /// because the deadline did not cause it and naming it as a timeout would
+    /// hide the real cause from the operator.
+    fn classify(status: ExitStatus, stderr: &[u8]) -> Self {
+        let announced_kill = String::from_utf8_lossy(stderr).contains(KILL_MARKER);
+        if status.code() == Some(TIMEOUT_EXIT) {
+            return Self::Terminated;
+        }
+        if announced_kill && status.signal() == Some(KILL_SIGNAL) {
+            return Self::Escalated;
+        }
+        Self::Completed
+    }
+
+    /// Reports whether the deadline, rather than the child, ended the run.
+    const fn is_deadline(self) -> bool {
+        matches!(self, Self::Terminated | Self::Escalated)
+    }
+}
+
 /// A finished command together with what the run itself cost.
 pub(crate) struct Observed {
+    outcome: DeadlineOutcome,
     status: ExitStatus,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
@@ -162,6 +239,9 @@ pub(crate) struct Observed {
 }
 
 impl Observed {
+    /// Returns how the run ended, distinguishing a timeout from a stray kill.
+    pub(crate) const fn outcome(&self) -> DeadlineOutcome { self.outcome }
+
     /// Returns the exit status the child or its wrapper reported.
     pub(crate) const fn status(&self) -> ExitStatus { self.status }
 
@@ -178,7 +258,11 @@ impl Observed {
     pub(crate) const fn duration(&self) -> Duration { self.duration }
 
     /// Reports whether the run ended because its deadline expired.
-    pub(crate) fn exceeded_deadline(&self) -> bool { self.status.code() == Some(TIMEOUT_EXIT) }
+    ///
+    /// True for both ways a deadline can end a run: the `SIGTERM` that
+    /// normally suffices, and the `SIGKILL` that follows a child which ignored
+    /// it. A kill the wrapper did not announce is not a timeout.
+    pub(crate) fn exceeded_deadline(&self) -> bool { self.outcome.is_deadline() }
 }
 
 /// A command line rendered for an error message.

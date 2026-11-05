@@ -6,11 +6,18 @@
 //! predicate over Cargo's own output, exercised against the live workspace and
 //! against canned fixtures that would otherwise let the rule pass vacuously.
 
-use std::{error::Error, process::Command};
+use std::{
+    error::Error,
+    process::Command,
+    time::Duration,
+};
 
 use googletest::prelude::*;
 use rstest::rstest;
 
+/// Bounded execution for the live Cargo reads this test starts.
+#[path = "support/process_deadline.rs"]
+mod deadline;
 /// Dependency-direction predicates over Cargo's declared graph.
 #[path = "support/workspace_metadata.rs"]
 mod metadata;
@@ -18,22 +25,36 @@ mod metadata;
 #[path = "support/workspace_tree.rs"]
 mod tree;
 
+use deadline::{CommandDeadline, Observed};
 use metadata::{FACADE, KERNEL, MACROS, Metadata};
 
-/// Builds a Cargo child with the caller's build selectors removed.
+/// How long a live Cargo read may take before it is treated as wedged.
+///
+/// Neither `cargo metadata` nor `cargo tree --offline` compiles anything: they
+/// resolve the already-fetched lockfile. Two minutes clears a cold
+/// `--target all` resolution on a loaded host while still ending a child that
+/// never returns. The tier is repeated in "Test timeouts" in
+/// `docs/developers-guide.md`.
+const READ_DEADLINE: Duration = Duration::from_secs(120);
+
+/// Applies the caller-independent routing every live Cargo read requires.
 ///
 /// The live checks must describe the workspace, not the caller's shell. An
 /// inherited `CARGO_BUILD_TARGET` would silently resolve a different target
 /// than the one under test, and inherited flags would make the recorded graph
 /// depend on how the suite happened to be invoked.
-fn cargo_command(arguments: &[&str]) -> Command {
-    let mut command = Command::new(env!("CARGO"));
-    command
-        .args(arguments)
-        .current_dir(env!("CARGO_MANIFEST_DIR"));
+fn configure_cargo(command: &mut Command) {
+    command.current_dir(env!("CARGO_MANIFEST_DIR"));
     for name in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
         command.env_remove(name);
     }
+}
+
+/// Builds a Cargo child with the caller's build selectors removed.
+fn cargo_command(arguments: &[&str]) -> Command {
+    let mut command = Command::new(env!("CARGO"));
+    command.args(arguments);
+    configure_cargo(&mut command);
     command
 }
 
@@ -48,12 +69,18 @@ fn cargo_command(arguments: &[&str]) -> Command {
 /// including the platform packages that `cargo tree --target all` reads.
 fn fetch_command() -> Command { cargo_command(&["fetch", "--locked"]) }
 
-/// Builds the `cargo tree` invocation for a package and edge selection.
-fn tree_command(arguments: &[&str]) -> Command {
+/// Returns the `cargo tree` argv for a package and edge selection.
+///
+/// The prefix is the one source of truth for both the introspected command in
+/// the routing contract and the command the live check actually runs.
+fn tree_arguments<'a>(arguments: &'a [&'a str]) -> Vec<&'a str> {
     let mut full = vec!["tree", "--prefix", "none", "--locked", "--offline"];
     full.extend_from_slice(arguments);
-    cargo_command(&full)
+    full
 }
+
+/// Builds the `cargo tree` invocation for a package and edge selection.
+fn tree_command(arguments: &[&str]) -> Command { cargo_command(&tree_arguments(arguments)) }
 
 /// Explains how to recover when the offline tree cannot resolve a package.
 ///
@@ -75,42 +102,64 @@ fn offline_recovery(detail: &str) -> String {
     )
 }
 
+/// Runs a live Cargo read bounded by [`READ_DEADLINE`].
+///
+/// The metadata and tree reads resolve the fetched lockfile and never compile,
+/// but they still start a child. A read that overruns is reported as a deadline
+/// rather than left to hold the suite open, matching every other external
+/// command this suite starts.
+fn run_bounded(arguments: &[&str]) -> Result<Observed, Box<dyn Error>> {
+    let mut bounded = CommandDeadline::with_deadline(env!("CARGO"), READ_DEADLINE);
+    bounded.command().args(arguments);
+    configure_cargo(bounded.command());
+    let observed = bounded.output()?;
+    if observed.exceeded_deadline() {
+        return Err(format!(
+            "`{}` did not finish inside {READ_DEADLINE:?}: {:?} after {:?}",
+            observed.line(),
+            observed.outcome(),
+            observed.duration()
+        )
+        .into());
+    }
+    Ok(observed)
+}
+
 /// Runs `cargo metadata --no-deps` against the live workspace.
 fn live_metadata() -> Result<Metadata, Box<dyn Error>> {
-    let output = cargo_command(&[
+    let observed = run_bounded(&[
         "metadata",
         "--no-deps",
         "--format-version",
         "1",
         "--locked",
         "--offline",
-    ])
-    .output()?;
-    if !output.status.success() {
+    ])?;
+    if !observed.status().success() {
         return Err(format!(
             "cargo metadata must describe the workspace; exited with {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
+            observed.status(),
+            String::from_utf8_lossy(observed.stderr())
         )
         .into());
     }
     Ok(metadata::parse_metadata(&String::from_utf8(
-        output.stdout,
+        observed.stdout().to_vec(),
     )?)?)
 }
 
 /// Runs `cargo tree` with the given package and edge selection.
 fn live_tree(arguments: &[&str]) -> Result<String, Box<dyn Error>> {
-    let output = tree_command(arguments).output()?;
-    if !output.status.success() {
+    let observed = run_bounded(&tree_arguments(arguments))?;
+    if !observed.status().success() {
         let detail = format!(
             "cargo tree {arguments:?} exited with {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
+            observed.status(),
+            String::from_utf8_lossy(observed.stderr())
         );
         return Err(offline_recovery(&detail).into());
     }
-    Ok(String::from_utf8(output.stdout)?)
+    Ok(String::from_utf8(observed.stdout().to_vec())?)
 }
 
 /// Contract: the live checks stay lockfile-pinned, offline, and flag-neutral.

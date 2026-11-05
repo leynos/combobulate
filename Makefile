@@ -103,10 +103,15 @@ TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
 # The cardinality compile-fail gate is its own workspace: `tools/` is excluded
 # from the root workspace, so it carries its own manifest, lockfile, and target
-# directory. `make prepare-dependencies` fetches it, and `make test-ui` runs it
-# directly; the root suite reaches it through `tests/cardinality_probe_ui.rs`.
+# directory. `make prepare-dependencies` fetches it; the preparation and direct
+# routes below share one script that records the built binary and runs it. The
+# root suite reaches the same record through `tests/cardinality_probe_ui.rs`.
 UI_GATE_MANIFEST ?= tools/gates/cardinality-ui/Cargo.toml
-UI_GATE_TEST ?= --test cardinality_ui
+UI_GATE_SCRIPT ?= scripts/cardinality_ui_gate.py
+# The script composes RUSTFLAGS from these flags, so they are passed by value.
+# An assigned RUSTFLAGS here would replace the caller's value instead.
+UI_GATE_ENVIRONMENT = DEV_RUST_FLAGS="$(DEV_RUST_FLAGS)"
+PYTHON ?= python3
 WITH_ACT ?= 0
 ACT ?= act
 ACT_RUNNER_IMAGE ?= catthehacker/ubuntu:act-latest
@@ -195,24 +200,29 @@ prepare-dependencies: check-build-tools ## Acquire locked dependencies before an
 # beside it as a second prerequisite of `test`. Under `make -j` independent
 # prerequisites run in parallel, and measurement showed the gate build then
 # sometimes starting before the fetches that populate its own workspace: a
-# build racing the acquisition it needs. The chain also makes the whole
-# preparation phase linear, so the command contract has one order rather than
-# two acceptable ones.
+# build racing the acquisition it needs.
 #
 # `make test` builds the gate's test binary here, before any test body runs, so
-# `tests/cardinality_probe_ui.rs` only has to locate and run it. Building inside
+# `tests/cardinality_probe_ui.rs` only has to read and run it. Building inside
 # that test body is what the incident did: a nested Cargo build, of a generated
 # crate that inherited the root package's whole dev-dependency graph, under no
-# deadline of its own. The
-# build keeps `--no-run` so preparation cannot pass because the gate happened to
-# pass on a previous run; the root test is the one that asserts the diagnostic.
+# deadline of its own. The build keeps `--no-run` so preparation cannot pass
+# because the gate happened to pass on a previous run.
+#
+# The script records the executable Cargo reports rather than leaving the test
+# to search the build directory. Cargo chooses its own output directory, so an
+# inherited `CARGO_TARGET_DIR` would put the binary where a search never looks,
+# and a newest-mtime search binds the run to whatever was written last. The
+# script also removes those redirecting variables, so preparation and the run
+# that follows it agree on one build.
 prepare-ui-gate: prepare-dependencies ## Build the cardinality gate's test binary
-	$(BUILD_STANDARD_ENV) $(CARGO) test --no-run --manifest-path '$(UI_GATE_MANIFEST)' $(UI_GATE_TEST)
+	$(UI_GATE_ENVIRONMENT) $(PYTHON) $(UI_GATE_SCRIPT) prepare
 
-# The direct route for a developer who wants only the gate. It builds and runs
-# the workspace in one command, which is also how CI's cold path exercises it.
-test-ui: prepare-dependencies ## Run the cardinality compile-fail gate outside the root workspace
-	$(BUILD_STANDARD_ENV) $(CARGO) test --manifest-path '$(UI_GATE_MANIFEST)' $(UI_GATE_TEST)
+# The direct route for a developer who wants only the gate. It builds through
+# the same recipe and then runs the recorded binary under the same deadline the
+# root test applies, so this route is bounded on the same terms.
+test-ui: prepare-ui-gate ## Run the cardinality compile-fail gate outside the root workspace
+	$(UI_GATE_ENVIRONMENT) $(PYTHON) $(UI_GATE_SCRIPT) run
 
 act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 	@GITHUB_TOKEN="$(ACT_GITHUB_TOKEN)" $(ACT) pull_request --bind \
@@ -378,8 +388,6 @@ help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
 	awk 'BEGIN {FS=":"; printf "Available targets:\n"} {printf "  %-20s %s\n", $$1, $$2}'
 
-
-PYTHON ?= python3
 # Date-dependent design checks use the HEAD commit date, never the wall clock.
 AS_OF ?= $(shell git log -1 --format=%cs)
 # Set BASE_REV (for example to the merge base) to reject edits to frozen registers.

@@ -14,7 +14,7 @@
     "scripts/run_verifier_probes.py": "7092414b16fc3e64b77f47e738366135efef5b3002def11ff20e2ff7e001f225",
     "scripts/kani_probe.py": "dc2a8735a585c03fbeab28ee232ca67060a2e9b1be07f3e6b0d0132147aeba5b",
     "scripts/verifier_probe_support.py": "c780dfac59d99623b75720f433ef0ac2d3335d8adb8f5fe71eb0807e3f1beebc",
-    "scripts/probe_provenance.py": "079885ba8d6de60b93e071a7448ed92e1a45ca937988155d22a025a836fcc862"
+    "scripts/probe_provenance.py": "251ecd28bca35e5573fa3ea8c492d18ca98ed1d49a275d3e1ec0d4bb5ad97b78"
   },
   "observations": [
     {

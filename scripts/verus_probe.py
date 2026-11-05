@@ -7,6 +7,7 @@ within the repository's module-size limit, and it is not an evidence parser.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import os
 from pathlib import Path
 import re
@@ -28,14 +29,78 @@ VERUS_FUNCTIONS = {
 }
 
 
-def resolve_z3(selection: str) -> tuple[Path, str, str | None]:
+def _pinned_solver_executable() -> str | None:
+    """Ask the pinned distribution where it installed the solver.
+
+    This is the one command-side effect in solver resolution, and it is named
+    here so it is visible rather than buried in ``resolve_z3``: ``uv tool run``
+    may consult a package index and unpack ``z3-solver`` into uv's cache. It is
+    therefore never reached from a test; a caller that only needs the selection
+    policy injects a resolver instead.
+
+    Returns
+    -------
+    str | None
+        The executable ``uv`` reported, or ``None`` when it reported nothing.
+
+    Raises
+    ------
+    RuntimeError
+        When the pinned distribution could not be resolved. The record names
+        the calibrated distribution, so a failed resolver must not fall back to
+        whichever ``z3`` sits on ``PATH``: that binary would be recorded as the
+        pin's own.
+    """
+    selected = run_command(
+        CommandSpec(
+            (
+                "uv",
+                "tool",
+                "run",
+                "--from",
+                Z3_DISTRIBUTION,
+                "python",
+                "-c",
+                "import shutil; print(shutil.which('z3') or '')",
+            )
+        )
+    )
+    if selected.exit_code != 0:
+        raise RuntimeError(
+            "the pinned z3-solver distribution could not be resolved: "
+            f"{selected.stderr.strip() or 'uv exited with an error'}"
+        )
+    return selected.stdout.strip() or None
+
+
+def resolve_z3(
+    selection: str,
+    *,
+    resolver: Callable[[], str | None] | None = None,
+    discovery: Callable[[str], str | None] | None = None,
+    execute: Callable[..., object] | None = None,
+) -> tuple[Path, str, str | None]:
     """Resolve the calibrated solver with the identity of its source.
+
+    The three boundaries are injected so both the command-side effect and the
+    process execution can be replaced without a real ``uv`` or solver: the
+    default route is exactly the pinned resolver, an explicit selection is
+    looked up by name, and the version banner is always checked by executing
+    the resolved path.
 
     Parameters
     ----------
     selection : str
-        A solver name or path. The default name first resolves the pinned
-        ``z3-solver`` distribution, while any explicit selection is checked.
+        A solver name or path. The default name resolves the pinned
+        ``z3-solver`` distribution, while any explicit selection is looked up
+        as given. ``PATH`` is never consulted for the default: doing so would
+        silently substitute an uncalibrated solver.
+    resolver : Callable[[], str | None] | None
+        Overrides the pinned-distribution resolver.
+    discovery : Callable[[str], str | None] | None
+        Overrides the lookup used for an explicit selection.
+    execute : Callable[..., object] | None
+        Overrides the process execution used to read the version banner.
 
     Returns
     -------
@@ -51,39 +116,28 @@ def resolve_z3(selection: str) -> tuple[Path, str, str | None]:
     RuntimeError
         When the default selection cannot resolve the pinned distribution, no
         solver is available, or its banner is not the calibrated one.
+
+    Examples
+    --------
+    The default route names the pin, and an explicit path does not::
+
+        resolve_z3('z3')  # (".../bin/z3", "Z3 version 4.16.0 - 64 bit", "z3-solver==4.16.0.0")
+        resolve_z3('/opt/z3')  # ("/opt/z3", "Z3 version 4.16.0 - 64 bit", None)
     """
-    solver = shutil.which(selection)
+    discover = discovery or shutil.which
+    run = execute or run_command
     if selection == "z3":
-        selected = run_command(
-            CommandSpec(
-                (
-                    "uv",
-                    "tool",
-                    "run",
-                    "--from",
-                    Z3_DISTRIBUTION,
-                    "python",
-                    "-c",
-                    "import shutil; print(shutil.which('z3') or '')",
-                )
-            )
-        )
-        if selected.exit_code != 0:
-            # The record names the calibrated distribution, so a failed
-            # resolver must not fall back to whichever z3 sits on `PATH`:
-            # that binary would be recorded as the pin's own.
-            raise RuntimeError(
-                "the pinned z3-solver distribution could not be resolved: "
-                f"{selected.stderr.strip() or 'uv exited with an error'}"
-            )
-        solver = selected.stdout.strip() or None
+        solver = (resolver or _pinned_solver_executable)()
+        distribution = Z3_DISTRIBUTION
+    else:
+        solver = discover(selection)
+        distribution = None
     if solver is None:
         raise RuntimeError("the pinned Z3 executable is unavailable")
     z3_path = Path(solver).resolve()
-    identity = run_command(CommandSpec((str(z3_path), "--version")))
+    identity = run(CommandSpec((str(z3_path), "--version")))
     if identity.exit_code != 0 or identity.stdout.strip() != Z3_VERSION_BANNER:
         raise RuntimeError("the solver must report the calibrated Z3 4.16.0 release")
-    distribution = Z3_DISTRIBUTION if selection == "z3" else None
     return z3_path, identity.stdout.strip(), distribution
 
 

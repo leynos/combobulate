@@ -15,96 +15,20 @@
 //! `expect`, so the fixture type propagates its errors instead.
 
 use std::{
-    error::Error,
-    io,
-    sync::atomic::{AtomicUsize, Ordering},
+    os::unix::process::ExitStatusExt,
     time::{Duration, Instant},
-};
-
-use camino::Utf8PathBuf;
-use cap_std::{
-    ambient_authority,
-    fs::{Permissions, PermissionsExt},
-    fs_utf8::Dir,
 };
 
 #[path = "support/process_deadline.rs"]
 mod deadline;
+#[path = "support/process_deadline_fixture.rs"]
+mod fixture;
 
-use deadline::CommandDeadline;
-
-/// Shorthand for the fallible fixture construction the tests unwrap.
-type Read<T> = Result<T, Box<dyn Error>>;
-
-/// Supplies unique fixture names when tests run concurrently.
-static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+use deadline::{CommandDeadline, DeadlineOutcome};
+use fixture::{SHORT_DEADLINE, Scratch, is_reaped};
 
 /// A deadline short enough to prove termination without a slow suite.
 const ONE_SECOND: Duration = Duration::from_secs(1);
-
-/// Default period given to a test-owned command in this suite's fixtures.
-///
-/// A test-owned command here is a fake executor, a `kill -0` probe, or a shell
-/// fixture that sleeps. None compiles anything, so a minute is a generous
-/// ceiling that still fails a wedged child quickly.
-const SHORT_DEADLINE: Duration = Duration::from_secs(60);
-
-/// How long a terminated descendant may take to be reaped by its new parent.
-const REAP_BUDGET: Duration = Duration::from_secs(10);
-
-/// A private directory of deterministic fake executables.
-struct Scratch {
-    /// Ambient parent directory used only to remove the private fixture.
-    parent: Dir,
-    /// Capability handle for the private fixture directory.
-    directory: Dir,
-    /// Unique directory component beneath the system temporary directory.
-    name: String,
-    /// Absolute UTF-8 path handed to the command boundary.
-    path: Utf8PathBuf,
-}
-
-impl Scratch {
-    /// Creates an empty private fixture directory.
-    fn new() -> Read<Self> {
-        let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir()).map_err(|path| {
-            io::Error::other(format!(
-                "the system temporary directory must be UTF-8 for shell fixtures: {}",
-                path.display()
-            ))
-        })?;
-        let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
-        let name = format!(
-            "combobulate-deadline-{}-{}",
-            std::process::id(),
-            NEXT_ID.fetch_add(1, Ordering::Relaxed)
-        );
-        parent.create_dir(&name)?;
-        let directory = parent.open_dir(&name)?;
-        Ok(Self {
-            parent,
-            directory,
-            name: name.clone(),
-            path: parent_path.join(name),
-        })
-    }
-
-    /// Writes an executable shell fixture and returns its absolute path.
-    fn script(&self, name: &str, body: &str) -> Read<Utf8PathBuf> {
-        self.directory.write(name, format!("#!/bin/sh\n{body}\n"))?;
-        self.directory
-            .set_permissions(name, Permissions::from_mode(0o700))?;
-        Ok(self.path.join(name))
-    }
-
-    /// Reads a file the fixture wrote.
-    fn read(&self, name: &str) -> Read<String> { Ok(self.directory.read_to_string(name)?) }
-}
-
-impl Drop for Scratch {
-    /// Removes only this fixture's private directory.
-    fn drop(&mut self) { drop(self.parent.remove_dir_all(&self.name)); }
-}
 
 /// A completed command reports what it wrote, what it cost, and what it ran.
 #[test]
@@ -228,6 +152,123 @@ fn a_descendant_of_a_timed_out_command_does_not_survive() {
     );
 }
 
+/// A child that ignores `SIGTERM` still ends, and reports the escalation.
+///
+/// This is the case the plain `124` predicate missed. GNU `timeout` runs out
+/// of patience after `--kill-after` and sends `SIGKILL`; because the child runs
+/// in its own process group, `timeout` then kills itself with the same signal,
+/// so the run ends with no exit status rather than with 137. The older check
+/// read that as "not a timeout". The wrapper's verbose announcement is what
+/// identifies it.
+#[test]
+fn a_term_resistant_child_is_killed_and_reported_as_an_escalation() {
+    let scratch = Scratch::new().expect("the fixture directory must be creatable");
+    let script = scratch
+        .script("stubborn.sh", "trap '' TERM\nexec sleep 30")
+        .expect("the fixture script must be writable and executable");
+    let mut command = CommandDeadline::with_deadline(&script, ONE_SECOND);
+    let started = Instant::now();
+    let observed = command.output().expect("the stubborn fixture must start");
+
+    assert_eq!(
+        observed.outcome(),
+        DeadlineOutcome::Escalated,
+        "a child that ignored SIGTERM must be reported as an escalated deadline, got {:?} with \
+         status {:?} and stderr {}",
+        observed.outcome(),
+        observed.status(),
+        String::from_utf8_lossy(observed.stderr())
+    );
+    assert!(
+        observed.exceeded_deadline(),
+        "an escalated kill is still a deadline the wrapper enforced"
+    );
+    assert!(
+        started.elapsed() < Duration::from_secs(20),
+        "the kill grace must bound the run: {:?}",
+        observed.duration()
+    );
+}
+
+/// A descendant of a `SIGTERM`-resistant child does not survive either.
+///
+/// The child traps `SIGTERM`, so the group signal only reaches it; the
+/// descendant is still in that group and receives the `SIGKILL` that follows.
+/// Without that, a wedged shell could leave a build running after the deadline
+/// the wrapper reported.
+#[test]
+fn a_descendant_of_a_term_resistant_child_does_not_survive() {
+    let scratch = Scratch::new().expect("the fixture directory must be creatable");
+    let pid_file = scratch.path.join("stubborn-descendant.pid");
+    let script = scratch
+        .script(
+            "stubborn-family.sh",
+            &format!(
+                "trap '' TERM\nsleep 30 &\nprintf '%s' \"$!\" > '{pid_file}'\nwhile :; do sleep 1; \
+                 done"
+            ),
+        )
+        .expect("the fixture script must be writable and executable");
+    let mut command = CommandDeadline::with_deadline(&script, ONE_SECOND);
+    let observed = command.output().expect("the stubborn family fixture must start");
+
+    assert_eq!(
+        observed.outcome(),
+        DeadlineOutcome::Escalated,
+        "the trapping parent must be killed rather than terminating cleanly, status {:?}, stderr \
+         {}",
+        observed.status(),
+        String::from_utf8_lossy(observed.stderr())
+    );
+    let recorded = scratch
+        .read("stubborn-descendant.pid")
+        .expect("the fixture must have recorded its descendant");
+    let pid: u32 = recorded
+        .trim()
+        .parse()
+        .expect("the fixture must record a numeric descendant pid");
+    assert!(
+        is_reaped(pid),
+        "the descendant {pid} must be killed with the process group, not left running"
+    );
+}
+
+/// A kill the wrapper did not announce is not a timeout.
+///
+/// A child can die of `SIGKILL` for reasons that have nothing to do with the
+/// deadline — an out-of-memory killer, or another process signalling it. The
+/// run then ends of signal 9 with an empty standard error, which is
+/// indistinguishable from an announced escalation except for the announcement
+/// itself. The older predicate would have called it an overrun and hidden the
+/// real cause.
+#[test]
+fn an_unannounced_kill_is_not_a_deadline_overrun() {
+    let scratch = Scratch::new().expect("the fixture directory must be creatable");
+    let script = scratch
+        .script("selfkill.sh", "kill -KILL $$")
+        .expect("the fixture script must be writable and executable");
+    let mut command = CommandDeadline::with_deadline(&script, SHORT_DEADLINE);
+    let observed = command.output().expect("the self-killing fixture must start");
+
+    assert_eq!(
+        observed.status().signal(),
+        Some(9),
+        "the fixture must report the signal that ended it"
+    );
+    assert!(
+        observed.stderr().is_empty(),
+        "an unannounced kill must leave the wrapper with nothing to report: {}",
+        String::from_utf8_lossy(observed.stderr())
+    );
+    assert!(
+        !observed.exceeded_deadline(),
+        "a SIGKILL the wrapper never announced must not be reported as a deadline: status {:?}, \
+         stderr {}",
+        observed.status(),
+        String::from_utf8_lossy(observed.stderr())
+    );
+}
+
 /// Output larger than a pipe buffer is drained rather than deadlocked.
 #[test]
 fn output_larger_than_a_pipe_buffer_is_drained_completely() {
@@ -309,23 +350,3 @@ fn a_missing_program_is_reported_by_the_wrapper() {
     );
 }
 
-/// Reports whether a descendant has been reaped, waiting out reparenting.
-fn is_reaped(pid: u32) -> bool {
-    let deadline = Instant::now() + REAP_BUDGET;
-    while Instant::now() < deadline {
-        if !is_running(pid) {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    false
-}
-
-/// Reports whether a signal could still be delivered to the descendant.
-fn is_running(pid: u32) -> bool {
-    let mut probe = CommandDeadline::with_deadline("kill", SHORT_DEADLINE);
-    probe.command().args(["-0", &pid.to_string()]);
-    probe
-        .output()
-        .is_ok_and(|observed| observed.status().success())
-}

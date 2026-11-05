@@ -16,7 +16,7 @@ mod records;
 use assertions::{
     assert_act_invocation_matches,
     assert_cargo_probe,
-    assert_gate_build_invocation,
+    assert_gate_preparation_invocation,
     assert_invocations_use_repository_directory,
     assert_outer_invocations_are_ordered,
     assert_preflight_invocation,
@@ -59,7 +59,7 @@ fn with_act_disabled_runs_only_outer_cargo_commands() {
             "check-build-tools",
             "cargo",
             "cargo",
-            "cargo",
+            "python",
             "cargo",
             "cargo"
         ],
@@ -76,10 +76,10 @@ fn with_act_disabled_runs_only_outer_cargo_commands() {
         1,
         "build preflight must be recorded",
     ));
-    assert_gate_build_invocation(invocation_at(
+    assert_gate_preparation_invocation(invocation_at(
         &invocations,
         4,
-        "the gate build must be recorded",
+        "the gate preparation must be recorded",
     ));
     assert_outer_invocations_are_ordered(
         invocations
@@ -203,7 +203,7 @@ fn explicit_workflow_test_setting_prevents_nested_act_recursion() {
             "check-build-tools",
             "cargo",
             "cargo",
-            "cargo",
+            "python",
             "cargo",
             "cargo"
         ],

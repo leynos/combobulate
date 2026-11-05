@@ -184,7 +184,10 @@ def require_captured_output(observations: list[dict]) -> None:
     ------
     RuntimeError
         If a record has no log or its log is empty, or if any captured exit
-        status disagrees with the recorded expectation.
+        status disagrees with the recorded expectation. An unreadable log —
+        missing, or present but not statable — is reported through this same
+        boundary, with the operating-system error chained so the original
+        cause survives for diagnosis.
 
     Examples
     --------
@@ -192,13 +195,28 @@ def require_captured_output(observations: list[dict]) -> None:
 
         require_captured_output(observations)
     """
-    if not observations or any(
-        not (
-            Path(item["log"]) if Path(item["log"]).is_absolute() else ROOT / item["log"]
-        )
-        .stat()
-        .st_size
-        for item in observations
-    ):
+    if not observations:
         raise RuntimeError("missing verifier output cannot qualify a corpus")
+    for item in observations:
+        log = _captured_log(item)
+        try:
+            size = log.stat().st_size
+        except OSError as error:
+            raise RuntimeError(
+                f"the captured output {log} could not be read: {error}"
+            ) from error
+        if not size:
+            raise RuntimeError(f"the captured output {log} is empty")
     _require_command_statuses(observations)
+
+
+def _captured_log(item: dict) -> Path:
+    """Resolve one observation's log path exactly once.
+
+    A recorded log is usually repository-relative, but an operator-supplied
+    ``--output-dir`` can put it anywhere, so an absolute path is taken as
+    given. Resolving in one place keeps the check and the diagnostic naming the
+    same file.
+    """
+    log = Path(item["log"])
+    return log if log.is_absolute() else ROOT / log
