@@ -100,12 +100,12 @@ fn checked_cardinality_result_must_be_used() {
     let record = gate.join(GATE_BINARY_RECORD);
     let binary = recorded_gate_binary(&record).unwrap_or_else(|| {
         panic!(
-            "the cardinality gate test binary is not built, or its build record is unreadable.\n\
-             Run `make prepare-ui-gate` (or `make test-ui`) first. The gate is a separate \
-             workspace, so the root build never produces it, and building it from inside this \
-             test would put a nested Cargo build under a test deadline for the root package's \
-             whole dependency graph.\nExpected the absolute path of the built test binary in \
-             {record}"
+            "the cardinality gate test binary is not built, or its build record is \
+             unreadable.\nRun `make prepare-ui-gate` (or `make test-ui`) first. The gate is a \
+             separate workspace, so the root build never produces it, and building it from inside \
+             this test would put a nested Cargo build under a test deadline for the root \
+             package's whole dependency graph.\nExpected the absolute path of the built test \
+             binary in {record}"
         )
     });
 

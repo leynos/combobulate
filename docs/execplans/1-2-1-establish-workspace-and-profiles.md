@@ -737,8 +737,8 @@ committed together with its Green change.
 
   Fourth, `require_captured_output` documented `RuntimeError` while `.stat()`
   leaked `FileNotFoundError`/`OSError`, and `resolve_z3` launched `uv tool run`
-  from inside a pure-looking resolver. The log path is now resolved once and
-  the `OSError` is chained into the documented boundary error, and the resolver
+  from inside a pure-looking resolver. The log path is now resolved once and the
+  `OSError` is chained into the documented boundary error, and the resolver
   takes an injected discovery/execution seam so its command-side effect is
   explicit at the call site. Fifth, focused contract tests now cover the
   measurement workflow's route matrix and labels, verifier-free staging and

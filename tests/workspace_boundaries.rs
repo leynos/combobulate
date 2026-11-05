@@ -6,11 +6,7 @@
 //! predicate over Cargo's own output, exercised against the live workspace and
 //! against canned fixtures that would otherwise let the rule pass vacuously.
 
-use std::{
-    error::Error,
-    process::Command,
-    time::Duration,
-};
+use std::{error::Error, process::Command, time::Duration};
 
 use googletest::prelude::*;
 use rstest::rstest;

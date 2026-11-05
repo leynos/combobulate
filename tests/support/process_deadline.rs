@@ -223,9 +223,7 @@ impl DeadlineOutcome {
     }
 
     /// Reports whether the deadline, rather than the child, ended the run.
-    const fn is_deadline(self) -> bool {
-        matches!(self, Self::Terminated | Self::Escalated)
-    }
+    const fn is_deadline(self) -> bool { matches!(self, Self::Terminated | Self::Escalated) }
 }
 
 /// A finished command together with what the run itself cost.

@@ -204,13 +204,15 @@ fn a_descendant_of_a_term_resistant_child_does_not_survive() {
         .script(
             "stubborn-family.sh",
             &format!(
-                "trap '' TERM\nsleep 30 &\nprintf '%s' \"$!\" > '{pid_file}'\nwhile :; do sleep 1; \
-                 done"
+                "trap '' TERM\nsleep 30 &\nprintf '%s' \"$!\" > '{pid_file}'\nwhile :; do sleep \
+                 1; done"
             ),
         )
         .expect("the fixture script must be writable and executable");
     let mut command = CommandDeadline::with_deadline(&script, ONE_SECOND);
-    let observed = command.output().expect("the stubborn family fixture must start");
+    let observed = command
+        .output()
+        .expect("the stubborn family fixture must start");
 
     assert_eq!(
         observed.outcome(),
@@ -248,7 +250,9 @@ fn an_unannounced_kill_is_not_a_deadline_overrun() {
         .script("selfkill.sh", "kill -KILL $$")
         .expect("the fixture script must be writable and executable");
     let mut command = CommandDeadline::with_deadline(&script, SHORT_DEADLINE);
-    let observed = command.output().expect("the self-killing fixture must start");
+    let observed = command
+        .output()
+        .expect("the self-killing fixture must start");
 
     assert_eq!(
         observed.status().signal(),
@@ -349,4 +353,3 @@ fn a_missing_program_is_reported_by_the_wrapper() {
         observed.line()
     );
 }
-
