@@ -761,6 +761,17 @@ committed together with its Green change.
   needed the extra stage in the `lint` route, and the developers' guide
   paragraph was rewritten to match. Date/Author: 2026-11-05, implementation
   agent.
+
+  Confirmed on `6848ed1`. Locally all seven gates pass: `check-fmt` 3 s, `lint`
+  331 s, `typecheck` 118 s, `test` 410 s (383/383, 1 skipped, doctests green),
+  `markdownlint` 16 s, `spelling` 46 s, `nixie` 2 s. On the hosted `build-test`
+  job the gate build ran inside `Lint` and took 5 s, because the action's
+  install steps already warm the Cargo cache, and
+  `checked_cardinality_result_must_be_used` then passed in 0.714 s, replacing
+  the 0.009 s failure. The job finished green in 3 m 22 s of its 8-minute AC-07
+  budget, with `design-check` green in 10 m 32 s. Evidence:
+  `/tmp/{check-fmt,lint,typecheck,test,markdownlint,spelling,nixie}-combobulate-1-2-1-establish-workspace-and-profiles.out`
+  and hosted jobs `126948077073` / `126948077338`.
 - DL-53 (2026-11-03). EP-M2 twentieth review round. The formal review of
   `c8db23e` raised six findings, all verified and repaired. First, the Kani
   provenance record bound neither the corpus manifest nor its lockfile; both
