@@ -353,7 +353,7 @@ pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> bool {
 }
 
 /// Marks an input whose value is checked elsewhere rather than restated here.
-const ANY_VALUE: &str = "<any>";
+pub(crate) const ANY_VALUE: &str = "<any>";
 
 /// Pins the three provisioning actions before the manual full Act command.
 fn valid_manual_action_prefix(steps: &[Value]) -> bool {
