@@ -16,6 +16,17 @@ use cap_std::{
 /// Distinguishes private directories created concurrently within one test binary.
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// The SDK toolchain the fake Kani release reports it was built from.
+///
+/// A real release records this beside its driver, and the probe reads it to
+/// select the bundled LLVM toolchain instead of assuming the constant. The
+/// probe rejects a release whose record names a different nightly, so the
+/// fixture has to stage the value the pinned release actually ships. It
+/// mirrors `KANI_SDK_TOOLCHAIN` in `scripts/verifier_probe_support.py`; that
+/// test asserts the prefix, the Rust fixture supplies the target triple a real
+/// record carries.
+const KANI_SDK_TOOLCHAIN: &str = "nightly-2025-11-21-x86_64-unknown-linux-gnu";
+
 /// A private Makefile, pin, and executable permit shell-boundary observations.
 pub(super) struct ProverProbe {
     /// Capability used to clean up only this fixture.
@@ -55,6 +66,9 @@ impl ProverProbe {
             directory.write(executable_name, directory.read("prover")?)?;
             directory.set_permissions(executable_name, Permissions::from_mode(0o755))?;
         }
+        // A real release records the SDK it bundled; the probe reads this to
+        // select that toolchain rather than assuming it.
+        directory.write("rust-toolchain-version", format!("{KANI_SDK_TOOLCHAIN}\n"))?;
         Ok(Self {
             parent,
             directory,
