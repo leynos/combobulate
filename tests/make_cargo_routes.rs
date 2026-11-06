@@ -241,7 +241,9 @@ fn assert_cargo_follows_preflight(target: &str, log: &str) {
         "make {target} must check tools before compilation: {log}"
     );
     assert!(
-        calls.iter().any(|call| !call.starts_with("probe-python") && *call != "preflight"),
+        calls
+            .iter()
+            .any(|call| !call.starts_with("probe-python") && *call != "preflight"),
         "make {target} must reach Cargo after preflight: {log}"
     );
 }
