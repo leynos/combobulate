@@ -65,6 +65,10 @@ jobs:
           installer-sha256: a32a665d01c4a2eb03a87c584d57329fc72a3aac421c8c2b15bbdb19e5410236
           cranelift: 'true'
       - name: Fetch dependencies and record identities
+        env:
+          # `cargo llvm-cov --version` builds nothing, but the instrumented
+          # route is always LLVM.
+          CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
         run: |
           cargo fetch --locked --manifest-path tools/probes/polars-profile/Cargo.toml
           rustc -vV > profile-results/rustc
