@@ -1,3 +1,4 @@
+# nested-cargo-allow: manifest a measurement probe: its pins feed pre-registered timing controls, so Dependabot must not move them
 [package]
 name = "polars-profile"
 version = "0.1.0"
