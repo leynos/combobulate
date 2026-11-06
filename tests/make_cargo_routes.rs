@@ -217,21 +217,33 @@ fn pinned_tool_preflight_precedes_development_cargo() {
             .directory
             .read_to_string("cargo.log")
             .expect("read executed tool order");
-        let calls: Vec<_> = log.lines().collect();
-        assert_eq!(
-            calls.first().copied(),
-            Some("preflight"),
-            "make {target} must check tools before compilation: {log}"
-        );
-        assert!(
-            calls.len() > 1,
-            "make {target} must reach Cargo after preflight: {log}"
-        );
+        assert_cargo_follows_preflight(target, &log);
         probe
             .directory
             .remove_file("cargo.log")
             .expect("reset the command log");
     }
+}
+
+/// Asserts the tool check runs first and that Cargo is reached at all.
+///
+/// The claim is about the *preflight*, not about which command follows it
+/// immediately. Some targets build the cardinality gate first, and that recipe
+/// legitimately runs before Cargo; requiring Cargo second would pin an ordering
+/// detail that the preparation chain owns and `tests/make_gate_order.rs`
+/// already checks exactly. What this test protects is that the check is not
+/// skipped and does not stop the route before compilation.
+fn assert_cargo_follows_preflight(target: &str, log: &str) {
+    let calls: Vec<_> = log.lines().collect();
+    assert_eq!(
+        calls.first().copied(),
+        Some("preflight"),
+        "make {target} must check tools before compilation: {log}"
+    );
+    assert!(
+        calls.iter().any(|call| !call.starts_with("probe-python") && *call != "preflight"),
+        "make {target} must reach Cargo after preflight: {log}"
+    );
 }
 
 #[test]

@@ -39,6 +39,16 @@ ignore = [
   'mold at \$resolved',
   'mold \$installed',
   'mold \$version',
+  # Cargo's message field, quoted in prose wherever its JSON is parsed. The
+  # en-GB spelling does not apply: `compiler-artifact` is the literal value
+  # `reason` carries, and renaming it in documentation would be wrong.
+  '`compiler-artifact`',
+  '\bcompiler-artifact\b',
+  # Cargo's terminal-colour control, named in prose and in workflow contracts.
+  '\bCARGO_TERM_COLOR\b',
+  # GitHub's pull-request event action, fixed by the webhook payload name.
+  '`labeled`',
+  '\baction is `labeled`\b',
 ]
 
 [files]

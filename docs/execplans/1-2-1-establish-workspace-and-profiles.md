@@ -714,14 +714,14 @@ committed together with its Green change.
   tree can offer a stale binary. `scripts/cardinality_ui_gate.py` now reads the
   executable from Cargo's own `compiler-artifact` JSON and records it, and the
   root test runs exactly that path; clean-tree, redirected-target, and
-  stale-artifact cases pin the selection. Second, the bounded-execution
+  stale-artefact cases pin the selection. Second, the bounded-execution
   boundary did not cover every supported route: `make test-ui` ran the gate
   through plain `cargo test`, with neither the root deadline nor nextest's
   termination, and `tests/workspace_boundaries.rs` still had unbounded
   `.output()` calls. `make test-ui` now runs the same recorded binary under the
   same `timeout` shape, and the boundary reads go through `run_bounded`.
 
-  Third, escalation was misclassified. The predicate recognised only exit code
+  Third, escalation was misclassified. The predicate recognized only exit code
   124, and the first repair replaced it with 137 on the theory that
   `--kill-after` produces it. A direct probe of GNU `timeout` 9.5 disproved
   that: without `--foreground` — which this helper must not use, because

@@ -9,6 +9,17 @@
 //! exercises both the Nextest-present and Nextest-absent branches without
 //! depending on what the host happens to have installed. Every other
 //! invocation is appended to `cargo.log` for the caller to read back.
+//!
+//! `PYTHON` is substituted for the same reason. Several targets now build the
+//! cardinality gate before running anything, and that recipe runs
+//! `scripts/cardinality_ui_gate.py`. Letting the real script see a fake Cargo
+//! would fail preparation — correctly, since a fake cannot report an
+//! executable — and, worse, a fake that *could* satisfy it would overwrite the
+//! gate's build record with a path no real build produced, breaking the root
+//! cardinality test that shares this workspace. The stub therefore records the
+//! call and does nothing, which is all these tests claim about it; the exact
+//! argv and the real preparation are pinned by `tests/make_gate_order.rs` and
+//! `scripts/tests/test_cardinality_ui_gate.py`.
 
 use std::{
     error::Error,
@@ -84,6 +95,11 @@ impl CargoProbe {
             "#!/bin/sh\nprintf '%s\\n' preflight >> \"$CARGO_LOG\"\n",
         )?;
         directory.set_permissions("preflight", Permissions::from_mode(0o700))?;
+        directory.write(
+            "probe-python",
+            "#!/bin/sh\nprintf '%s\\n' \"probe-python $*\" >> \"$CARGO_LOG\"\n",
+        )?;
+        directory.set_permissions("probe-python", Permissions::from_mode(0o700))?;
         Ok(Self {
             parent,
             directory,
@@ -102,6 +118,7 @@ impl CargoProbe {
         command
             .arg(target)
             .arg(format!("CARGO={}", self.path.join("probe-cargo")))
+            .arg(format!("PYTHON={}", self.path.join("probe-python")))
             .arg(format!("CHECK_BUILD_TOOLS={}", options.check))
             .arg("WHITAKER=true")
             .arg(format!("WITH_ACT={}", u8::from(options.with_act)))

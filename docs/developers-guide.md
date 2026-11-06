@@ -233,7 +233,7 @@ present. Anything else is propagated unchanged and diagnosed by its own output,
 never reported as a deadline the wrapper enforced. `CommandDeadline` reports
 the three cases as `DeadlineOutcome::{Completed, Terminated, Escalated}`;
 `scripts/cardinality_ui_gate.py` makes the same distinction on `subprocess`'s
-`-9` return code and normalises it to the shell's `128 + N` convention before
+`-9` return code and normalizes it to the shell's `128 + N` convention before
 returning it as the process status.
 
 ### Preparation happens outside test bodies

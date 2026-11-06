@@ -260,7 +260,7 @@ impl Observed {
     /// True for both ways a deadline can end a run: the `SIGTERM` that
     /// normally suffices, and the `SIGKILL` that follows a child which ignored
     /// it. A kill the wrapper did not announce is not a timeout.
-    pub(crate) fn exceeded_deadline(&self) -> bool { self.outcome.is_deadline() }
+    pub(crate) const fn exceeded_deadline(&self) -> bool { self.outcome.is_deadline() }
 }
 
 /// A command line rendered for an error message.
