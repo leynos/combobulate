@@ -705,6 +705,52 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-58 (2026-11-06). Fresh pre-merge assessments at head `3914065`, and the
+  one plan correction they earned. Both assessments echoed their
+  `Assessment-ID` and assessed base/head and came back clear within the
+  accepted EP-M1/EP-M2 scope: the completeness reply found no remaining
+  in-scope implementation gap after inspecting the withdrawal, the two new
+  regression cases, the gate-formatting contract, and the current-head package
+  result; the proof reply accepted the Verus and Kani fixtures as substantive
+  EP-M1 capability checks with no new in-scope defect, after independently
+  recomputing the recorded digests (Kani 11/11 sources and 14/14 logs, Verus
+  15/15 and 9/9). Neither reply starts a formal review or changes approval
+  status, and both retain EP-M3 through EP-M6 as outstanding.
+
+  The proof reply made four numbered corrections, of which only the second is a
+  plan defect. Corrections 1, 3, and 4 were defects in my *request* rather than
+  in the repository, so no tracked text changed for them: the plan never names
+  `proofs/verus/` or `proofs/kani/` (the fixtures live under
+  `tools/verifier-fixtures/`); its only `proptest` mention is DL-13's statement
+  that proptest establishes nothing here; and correction 4 (trusted basis) is
+  handled below. Those three are recorded in the reply to the assessment.
+
+  Correction 2 named the Kani invocation precisely and had two parts. For the
+  observations the plan was already right: DL-24 and DL-52 record the direct
+  driver route, the route is `KANI_PROBE_ROUTE ?= direct`, and the committed
+  provenance record's `route` field reads `direct` with all fourteen
+  observations invoking `kani-driver kani`. For the corpus listing it was
+  wrong, and that is the one plan change in this round: the Kani corpus
+  paragraph named `cargo kani list --format json` while the captured list
+  observation runs `kani-driver kani list --format json` through the same
+  direct route. The paragraph now names the driver and cites DL-24.
+
+  The trusted-basis correction is not recorded as a plan change because the
+  plan already carries it. AXIOM-02 admits "Kani 0.67.0 with its bundled CBMC
+  and CaDiCaL", AXIOM-03 admits "Verus 0.2026.09.06.8dea4a2 with Z3 4.16.0 and
+  the matching `vstd`" plus "`vstd`'s specifications and any `external` items
+  it uses", and EP-M4 requires `spec/toolchain-profiles.json` to record "each
+  tool's trusted computing base, including the rustup toolchains, the crates.io
+  `kani-verifier` crate, the unverified Kani bundle download, and
+  `rust-prover-tools` at its pinned commit". My request's phrase "no trusted
+  boundaries beyond the fixtures' own scaffolding" was the over-claim, and the
+  reply's correction matches what the plan already states.
+
+  The proof reply also reported that the comparison base was unavailable in its
+  checkout. The object is present here (`git cat-file -t 9fa10a1` → `commit`),
+  so introduction history remains inspectable by anyone with a normal clone;
+  the limitation is in the assessment environment, not the repository.
+
 - DL-57 (2026-11-06). Two follow-ups from the fresh pre-merge assessments.
   The completeness assessment found one residual gate defect and two validation
   omissions, and the proof assessment accepted the fixtures as capability
@@ -2093,10 +2139,12 @@ milestones use them and are deleted otherwise. No shipped code changes.
   undetermined or unsupported construct; a `#[kani::should_panic]` claim; and
   control harnesses (seeded faults as separate functions, no `cfg` body swaps)
   that fail their expected property. Each log is stored under
-  `scripts/tests/fixtures/kani_logs/` with `cargo kani list --format json`
-  output and a provenance file naming the command, Kani version, digest, and
-  whether `--verbose` output shows CBMC's unwinding-assertion flag; if it does
-  not, the unwinding-check capability is recorded `inconclusive`.
+  `scripts/tests/fixtures/kani_logs/` with
+  `kani-driver kani list --format json` output, taken through the same direct
+  route as the observations (DL-24), and a provenance file naming the command,
+  Kani version, digest, and whether `--verbose` output shows CBMC's
+  unwinding-assertion flag; if it does not, the unwinding-check capability is
+  recorded `inconclusive`.
 - Verus wiring probe. Create `tools/verifier-fixtures/verus-wiring-probe/` with
   four candidates for the kernel's eventual proof profile, each a `#![no_std]`
   crate without `alloc`: (a) a non-optional `vstd` dependency
