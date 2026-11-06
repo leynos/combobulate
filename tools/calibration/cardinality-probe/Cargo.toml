@@ -19,4 +19,5 @@ polars = ["dep:polars"]
 polars = { version = "0.55.2", optional = true, default-features = false, features = ["lazy"] }
 
 [lints.rust]
+missing_docs = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
