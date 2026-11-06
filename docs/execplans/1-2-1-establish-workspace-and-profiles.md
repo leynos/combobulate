@@ -746,7 +746,43 @@ committed together with its Green change.
   output boundary, and the Kani route builders, none of which require an
   installed verifier. The developers' guide's lint-baseline text, its
   mtime-discovery description, and the escalation paragraph were corrected to
-  match. Date/Author: 2026-11-05, implementation agent.
+  match.
+
+  The hosted record did not yet carry that evidence. It had been promoted from
+  a run whose generator predated `source_digests`, so it cited head `833ef0c5`
+  and run `41227443972` while binding none of the inputs it built, and
+  `test_verifier_record_digests` rejected it: `design-check` failed on the
+  previous head with an empty digest map. Removing and re-adding the
+  `measure-profiles` label fired `pull_request/labeled` against head `167aa82`,
+  and run `42170378137` passed both `verifier-free` and all six
+  `measure-profile` routes. The promoted record now names seventeen
+  `source_digests` covering everything `_stage_verifier_free_workspace` copies
+  — including `rust-toolchain.toml`, `.cargo/config.toml`,
+  `scripts/native-clang-linker.sh`, `scripts/build-tools-common.sh`, and
+  `tools/mold/VERSION` — together with the run identity, runner image, and
+  capture date. All seventeen were checked against the working tree, and the
+  record's `sha256` matches the committed log byte for byte. No path rewriting
+  was needed, because the generator already applies `portable_argument` at
+  capture time.
+
+  Making the gate a prerequisite of `make test`, `make lint`, and
+  `make coverage` exposed a harness defect. `tests/support/cargo_probe.rs`
+  substituted `CARGO` but left `PYTHON` reaching the real
+  `scripts/cardinality_ui_gate.py`, so preparation failed under a fake Cargo.
+  Teaching the fake to satisfy preparation was not an option: it would have
+  written a non-existent executable into the same build record that
+  `tests/cardinality_probe_ui.rs` reads, letting a fake route satisfy the real
+  gate. Substituting `PYTHON` with a recording stub removes both problems.
+
+  Two limits remain stated rather than closed. The bounded-execution boundary
+  covers the routes the review named, but sixty-five `.output()`, `.status()`,
+  and `.wait()` sites across twenty-five test files still run without a
+  deadline; they are short-lived fake-tool and `make` invocations, and widening
+  the boundary to all of them is follow-on work, not a claim made here. Also,
+  `tools/gates/cardinality-ui` is its own workspace with its own `rustfmt`
+  settings, so `make check-fmt`'s `cargo fmt --all` does not reach it; that
+  workspace carries pre-existing formatting drift. Date/Author: 2026-11-05,
+  implementation agent.
 
 - DL-54 (2026-11-04). EP-M2 cardinality-gate incident repair. The reported
   `SLOW [>8160.000s]` for
