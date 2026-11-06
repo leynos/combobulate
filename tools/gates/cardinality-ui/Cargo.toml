@@ -20,6 +20,9 @@ edition = "2024"
 publish = false
 license = "ISC"
 
+[lints.rust]
+missing_docs = "deny"
+
 [workspace]
 
 [dev-dependencies]
