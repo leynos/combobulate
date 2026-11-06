@@ -1134,13 +1134,19 @@ any remaining account home.
 
 Both provenance writers bind their inputs with `source_digests`. The Kani
 record covers the corpus manifest and lockfile, the harness sources, the
-harness and listing inventories, and the probe modules that build and record
-the run. The Verus record covers the four candidate proof files, the shared
-production source, the workspace manifest, lockfile, and member manifests, plus
-the probe modules that generate and record the observations. The provenance
-test recomputes every recorded digest and requires each `provenance.json` to
-carry a non-empty digest map, so a Verus record cannot pass merely by omitting
-the field.
+harness and listing inventories, the probe modules that build and record the
+run, and `.cargo/config.toml`, because Cargo reads the repository's profile and
+target configuration during the corpus build. It additionally records
+`lint_tables_sha256`, the digest of the `[workspace.lints.*]` tables the
+`in_place` route copies into its scratch workspace. Binding the extracted
+tables rather than the whole root manifest keeps an unrelated dependency edit
+from forcing a recapture while still covering the lints the run applied. The
+Verus record covers the four candidate proof files, the shared production
+source, the workspace manifest, lockfile, and member manifests, plus the probe
+modules that generate and record the observations. The provenance test
+recomputes every recorded digest and requires each `provenance.json` to carry a
+non-empty digest map, so a Verus record cannot pass merely by omitting the
+field.
 
 The pinned helper rejects ancestor `codegen-backend` configuration before
 running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
@@ -1148,10 +1154,13 @@ which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
 admission, and changes no ordinary Cargo file or executable source body. The
 script's own default is `helper`. Installation and version checks still use the
 helper. Set `KANI_PROBE_ROUTE=helper` to retest that compatibility boundary.
-The child toolchain is the named `KANI_SDK_TOOLCHAIN` constant, and the
-provenance record names it: the version check compares only the Kani release,
-so the constant and the pin in `tools/kani/VERSION` must move together and the
-record shows which SDK compiled the harnesses.
+The child toolchain is read from the installed release's own
+`rust-toolchain-version` record and checked against `KANI_SDK_TOOLCHAIN`. The
+record names the observed toolchain and the constant it was checked against
+(`toolchain` and `expected_toolchain_prefix`). A pin bump that lands a release
+bundling a different nightly therefore fails the check or changes the record,
+rather than leaving a constant that merely agreed with the environment at the
+time it was written.
 
 The Verus archive does not bundle Z3. The probe's tool environment therefore
 uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and

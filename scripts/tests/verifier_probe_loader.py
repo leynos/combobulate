@@ -18,10 +18,13 @@ ROOT = SCRIPTS.parent
 SUPPORT_FUNCTIONS = (
     '_capture',
     '_digest',
+    '_digest_text',
+    '_installation_toolchain',
     '_kani_environment',
     '_native_workspace',
     'portable_argument',
     '_require_command_statuses',
+    'workspace_lint_tables',
 )
 
 

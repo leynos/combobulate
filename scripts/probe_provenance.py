@@ -15,8 +15,11 @@ from verifier_probe_support import (
     KANI_SDK_TOOLCHAIN,
     ROOT,
     _digest,
+    _digest_text,
+    _installation_toolchain,
     portable_argument,
     _require_command_statuses,
+    workspace_lint_tables,
 )
 
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
@@ -66,6 +69,7 @@ def _write_kani_provenance(
     reference: str,
     observations: list[dict],
     output_dir: Path,
+    installation: Path,
 ) -> None:
     """Record the tool, route, sources, and observations behind the corpus.
 
@@ -81,12 +85,14 @@ def _write_kani_provenance(
         Captured subject records, including their expected exits.
     output_dir
         Directory receiving ``provenance.json``.
+    installation
+        Installed Kani release whose bundled toolchain is recorded.
 
     Examples
     --------
     The writer derives each digest from the files it names::
 
-        _write_kani_provenance(directory, 'direct', reference, observations, output)
+        _write_kani_provenance(directory, 'direct', reference, observations, output, install)
     """
     sources = [
         directory / name
@@ -105,15 +111,29 @@ def _write_kani_provenance(
             ROOT / "scripts/kani_probe.py",
             ROOT / "scripts/verifier_probe_support.py",
             ROOT / "scripts/probe_provenance.py",
+            # Cargo reads the repository configuration during the corpus build,
+            # so a profile or target setting there can change what was built.
+            ROOT / ".cargo/config.toml",
         ]
     )
     provenance = {
         "tool": f"Kani {(ROOT / 'tools/kani/VERSION').read_text().strip()}",
-        "toolchain": KANI_SDK_TOOLCHAIN,
+        # The installed release's own record, not the constant the environment
+        # was built from: a release bundling a different nightly then shows up
+        # as a provenance change rather than passing on a stale claim.
+        "toolchain": _installation_toolchain(installation),
+        "expected_toolchain_prefix": KANI_SDK_TOOLCHAIN,
         "route": route,
         "prover_tools_ref": reference,
         "stream_order": "captured stdout followed by captured stderr",
         "source_digests": {str(path.relative_to(ROOT)): _digest(path) for path in sources},
+        # The ``in_place`` route copies the repository's lint tables into a
+        # scratch manifest. Binding the extracted tables rather than the whole
+        # root manifest keeps an unrelated dependency edit from forcing a
+        # recapture while still covering the lints the probe actually applied.
+        "lint_tables_sha256": _digest_text(
+            workspace_lint_tables((ROOT / "Cargo.toml").read_text())
+        ),
         "observations": observations,
     }
     (output_dir / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")

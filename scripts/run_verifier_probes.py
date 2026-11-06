@@ -73,7 +73,9 @@ def kani(
                 prefix, route, _native_workspace(), output_dir, environment
             )
         )
-        _write_kani_provenance(directory, route, reference, observations, output_dir)
+        _write_kani_provenance(
+            directory, route, reference, observations, output_dir, installation
+        )
     require_captured_output(observations)
 
 

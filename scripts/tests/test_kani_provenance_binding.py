@@ -6,6 +6,7 @@ scripts, and to record the child toolchain that compiled the harnesses, so a
 premature record cannot pass as bound evidence.
 """
 
+import hashlib
 import json
 import unittest
 
@@ -29,10 +30,19 @@ class KaniSourceBindingTests(unittest.TestCase):
         'scripts/kani_probe.py',
         'scripts/verifier_probe_support.py',
         'scripts/probe_provenance.py',
+        # Cargo discovers this file during the corpus build, so a profile or
+        # target setting in it changes what the harnesses were compiled with.
+        '.cargo/config.toml',
     })
 
     def test_kani_record_binds_its_build_inputs_and_toolchain(self) -> None:
-        """A harness verdict must name the manifest, lockfile, and SDK it used."""
+        """A harness verdict must name the manifest, lockfile, and SDK it used.
+
+        The recorded toolchain is read from the installation, so it carries the
+        target triple the module constant does not. Requiring the prefix keeps
+        a pin bump from landing a release that bundles a different nightly
+        without the record showing it.
+        """
         support = load_verifier_probe_support()
         path = ROOT / 'scripts/tests/fixtures/kani_logs/provenance.json'
         record = json.loads(path.read_text(encoding='utf-8'))
@@ -43,7 +53,31 @@ class KaniSourceBindingTests(unittest.TestCase):
             'the Kani record must bind the corpus manifest, lockfile, and generators',
         )
         self.assertEqual(
-            record.get('toolchain'),
+            record.get('expected_toolchain_prefix'),
             support.KANI_SDK_TOOLCHAIN,
-            'the record must name the SDK toolchain that built the harnesses',
+            'the record must name the repository pin the SDK was checked against',
+        )
+        self.assertTrue(
+            record.get('toolchain', '').startswith(f"{support.KANI_SDK_TOOLCHAIN}-"),
+            'the recorded toolchain must be an observed SDK of the pinned nightly',
+        )
+
+    def test_kani_record_binds_the_lint_tables_the_in_place_route_applied(self) -> None:
+        """The scratch workspace inherits lint tables from the root manifest.
+
+        Only the extracted tables reach the scratch workspace, so binding the
+        whole root manifest would force a recapture on an unrelated dependency
+        edit. The digest still has to follow the tables themselves, or a
+        weakened lint could pass while the record keeps describing the old
+        boundary.
+        """
+        support = load_verifier_probe_support()
+        path = ROOT / 'scripts/tests/fixtures/kani_logs/provenance.json'
+        record = json.loads(path.read_text(encoding='utf-8'))
+        tables = support.workspace_lint_tables((ROOT / 'Cargo.toml').read_text())
+
+        self.assertEqual(
+            record.get('lint_tables_sha256'),
+            hashlib.sha256(tables.encode('utf-8')).hexdigest(),
+            'the record must bind the lint tables the scratch workspace applied',
         )

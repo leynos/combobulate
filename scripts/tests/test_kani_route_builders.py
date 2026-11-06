@@ -9,19 +9,36 @@ spawning a verifier.
 
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from verifier_probe_loader import load_kani_probe
+from verifier_probe_loader import ROOT, load_kani_probe
 
+# Only the in-place tests fabricate a prefix directly; they never build one
+# through ``kani_prefix``, so they need no toolchain record beside the path.
 INSTALLATION = Path('/opt/kani')
 DIRECTORY = Path('/repo/tools/verifier-fixtures/kani-corpus')
 SCRATCH = Path('/repo/target/epm1-native-workspace')
 OUTPUT = Path('/repo/tools/verifier-fixtures/kani-corpus/observations')
 ENVIRONMENT = {'PATH': '/usr/bin'}
+TOOLCHAIN = 'nightly-2025-11-21-x86_64-unknown-linux-gnu'
 
 SUBJECT = {'id': 'verified', 'arguments': ['--harness', 'verification::verified'], 'expected_exit': 0}
+
+
+def _staged_installation(directory: Path, toolchain: str = TOOLCHAIN) -> Path:
+    """Return a stand-in release that records the toolchain it was built from.
+
+    ``_kani_environment`` reads the SDK toolchain from the installation rather
+    than assuming the constant, so the stand-in has to carry that record. The
+    record is a parameter so a test can stage a release that bundles a
+    different nightly.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / 'rust-toolchain-version').write_text(f'{toolchain}\n')
+    return directory
 
 
 def _kani():
@@ -42,10 +59,19 @@ def _kani():
 class PrefixTests(unittest.TestCase):
     """Keep each route's prefix and environment distinct."""
 
+    def setUp(self) -> None:
+        """Provide a release directory that records its bundled toolchain."""
+        self._temporary = tempfile.TemporaryDirectory()
+        self.installation = _staged_installation(Path(self._temporary.name) / 'kani')
+
+    def tearDown(self) -> None:
+        """Remove the stand-in installation."""
+        self._temporary.cleanup()
+
     def test_helper_route_names_the_installation_and_working_directory(self) -> None:
         """The helper must be told which release to use and where to build."""
         prefix, environment = _kani().kani_prefix(
-            'helper', 'prover-tools', INSTALLATION, DIRECTORY, ENVIRONMENT
+            'helper', 'prover-tools', self.installation, DIRECTORY, ENVIRONMENT
         )
 
         self.assertEqual(
@@ -60,7 +86,7 @@ class PrefixTests(unittest.TestCase):
         )
         self.assertEqual(
             prefix[prefix.index('--installation') + 1],
-            str(INSTALLATION),
+            str(self.installation),
             'the installation path must follow its flag',
         )
         self.assertEqual(
@@ -77,19 +103,19 @@ class PrefixTests(unittest.TestCase):
     def test_direct_route_runs_the_installation_driver(self) -> None:
         """The direct route must bypass the helper and use the SDK driver."""
         prefix, _ = _kani().kani_prefix(
-            'direct', 'prover-tools', INSTALLATION, DIRECTORY, ENVIRONMENT
+            'direct', 'prover-tools', self.installation, DIRECTORY, ENVIRONMENT
         )
 
         self.assertEqual(
             prefix,
-            [str(INSTALLATION / 'bin/kani-driver'), 'kani'],
+            [str(self.installation / 'bin/kani-driver'), 'kani'],
             'the direct route must run the installed driver',
         )
 
     def test_direct_route_selects_the_matching_sdk_environment(self) -> None:
         """The helper rejects ancestor backend keys, so the direct route sets its own."""
         _, environment = _kani().kani_prefix(
-            'direct', 'prover-tools', INSTALLATION, DIRECTORY, ENVIRONMENT
+            'direct', 'prover-tools', self.installation, DIRECTORY, ENVIRONMENT
         )
 
         self.assertEqual(
@@ -103,7 +129,7 @@ class PrefixTests(unittest.TestCase):
             'the direct route must deny warnings',
         )
         self.assertIn(
-            str(INSTALLATION / 'toolchain/bin'),
+            str(self.installation / 'toolchain/bin'),
             environment['PATH'],
             'the SDK toolchain must lead PATH',
         )
@@ -116,7 +142,29 @@ class PrefixTests(unittest.TestCase):
     def test_an_unknown_route_is_rejected_by_name(self) -> None:
         """A typo must fail rather than silently select a route."""
         with self.assertRaisesRegex(ValueError, 'helper or direct'):
-            _kani().kani_prefix('expected', 'prover-tools', INSTALLATION, DIRECTORY, ENVIRONMENT)
+            _kani().kani_prefix('expected', 'prover-tools', self.installation, DIRECTORY, ENVIRONMENT)
+
+    def test_a_release_bundling_another_nightly_is_rejected(self) -> None:
+        """A pin bump that lands a different nightly must fail, not be recorded.
+
+        ``tools/kani/VERSION`` names a release, and the release carries its own
+        toolchain. Continuing here would compile the harnesses with an SDK the
+        constant does not describe.
+        """
+        other = _staged_installation(
+            Path(self._temporary.name) / 'other', 'nightly-2026-01-01-x86_64-unknown-linux-gnu'
+        )
+
+        with self.assertRaisesRegex(RuntimeError, 'not nightly-2025-11-21'):
+            _kani().kani_prefix('direct', 'prover-tools', other, DIRECTORY, ENVIRONMENT)
+
+    def test_a_release_without_a_toolchain_record_is_rejected(self) -> None:
+        """Reporting the constant would restore the claim the check exists to avoid."""
+        bare = Path(self._temporary.name) / 'bare'
+        bare.mkdir()
+
+        with self.assertRaisesRegex(RuntimeError, 'records no toolchain'):
+            _kani().kani_prefix('direct', 'prover-tools', bare, DIRECTORY, ENVIRONMENT)
 
 
 class ArgumentWrappingTests(unittest.TestCase):

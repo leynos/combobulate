@@ -190,7 +190,14 @@ fn strip_comments_and_literals(source: &str) -> String {
                 }
             }
             '"' => skip_quoted_string(&mut chars),
-            '\'' => skip_char_literal(&mut chars),
+            // A tick that opens no literal is a lifetime, and dropping it would
+            // leave `&'a str` reading as `&a str`. Keeping it leaves the code
+            // faithful for every check that follows.
+            '\'' => {
+                if !skip_char_literal(&mut chars) {
+                    code.push(ch);
+                }
+            }
             _ => code.push(ch),
         }
     }
@@ -268,34 +275,60 @@ fn raw_string_closes(chars: &mut Peekable<Chars<'_>>, hashes: usize) -> bool {
     }
 }
 
-/// Skips a character literal while leaving a lifetime tick in the code.
+/// Skips a character literal and reports whether one was consumed.
 ///
 /// A lifetime (`'a`, `'_`, `'static`) has no closing quote, so treating every
 /// `'` as a literal opener would swallow the rest of the file. A literal is
-/// recognised by its closing quote, including the escaped forms `'\''`,
-/// `'\\'`, `'\n'`, and `'\u{..}'`; a literal holding a double quote (`'"'`)
-/// must not start a string skip.
-fn skip_char_literal(chars: &mut Peekable<Chars<'_>>) {
+/// recognised by its closing quote, and every escaped form has to be consumed
+/// before that quote is sought: `'\''`, `'\\'`, `'\n'`, `'\u{..}'`, and the
+/// fixed-width hexadecimal escape `'\x22'` (which also covers the byte literal
+/// form `b'\x22'`, since the `b` is already in the code stream). Consuming only
+/// the backslash and the escape letter leaves the hex digits behind, so the
+/// closing quote is never reached and the literal stays in the stream — where
+/// the very quote it holds can start a string skip. A literal holding a double
+/// quote (`'"'`) must not start that skip.
+///
+/// ```text
+/// strip_comments_and_literals("'\"' extern crate alloc;")
+/// // consumes the literal and keeps the declaration
+/// strip_comments_and_literals("&'a str")
+/// // consumes nothing, so the lifetime tick stays in the code
+/// ```
+fn skip_char_literal(chars: &mut Peekable<Chars<'_>>) -> bool {
     let mut lookahead = chars.clone();
-    match lookahead.next() {
+    let closes = match lookahead.next() {
         Some('\\') => {
             match lookahead.next() {
                 Some('u') if lookahead.peek() == Some(&'{') => skip_unicode_escape(&mut lookahead),
+                // `\x` is the only fixed-width escape that carries payload
+                // digits; every other simple escape is one character.
+                Some('x') => skip_fixed_width_escape(&mut lookahead, 2),
                 Some(_) => {}
-                None => {
-                    *chars = lookahead;
-                    return;
-                }
+                None => return false,
             }
-            if lookahead.next() == Some('\'') {
-                *chars = lookahead;
+            lookahead.next() == Some('\'')
+        }
+        Some(_) => {
+            let closes = lookahead.peek() == Some(&'\'');
+            if closes {
+                lookahead.next();
             }
+            closes
         }
-        Some(_) if lookahead.peek() == Some(&'\'') => {
-            lookahead.next();
-            *chars = lookahead;
+        None => false,
+    };
+    if closes {
+        *chars = lookahead;
+    }
+    closes
+}
+
+/// Consumes the fixed number of payload digits a `\x`-style escape carries.
+fn skip_fixed_width_escape(chars: &mut Peekable<Chars<'_>>, digits: usize) {
+    for _ in 0..digits {
+        if chars.peek().is_some_and(char::is_ascii_hexdigit) {
+            chars.next();
         }
-        _ => {}
     }
 }
 
@@ -328,12 +361,15 @@ mod tests {
     use googletest::prelude::*;
     use rstest::rstest;
 
-    use super::kernel_source_violations;
+    use super::{kernel_source_violations, strip_comments_and_literals};
 
     /// VO-6 non-vacuity: a literal before the declaration must not hide it.
     #[rstest]
     #[case::double_quote_literal(r#"const QUOTE: char = '"'; extern crate alloc;"#)]
     #[case::escaped_double_quote_literal(r#"const QUOTE: char = '\"'; extern crate alloc;"#)]
+    #[case::hexadecimal_double_quote_literal(r"const QUOTE: char = '\x22'; extern crate alloc;")]
+    #[case::hexadecimal_byte_literal(r"const QUOTE: u8 = b'\x22'; extern crate alloc;")]
+    #[case::adjacent_literals(r#"const CHECK: bool = '\x22'<'"'; extern crate alloc;"#)]
     #[case::lifetime(r"fn borrow<'a>(value: &'a str) -> &'a str { value } extern crate alloc;")]
     fn character_literals_do_not_hide_alloc_declarations(#[case] source_text: &str) {
         assert_that!(
@@ -352,6 +388,7 @@ mod tests {
         let source_text = concat!(
             "const QUOTE: char = '\"';\n",
             "const ESCAPED: char = '\\'';\n",
+            "const HEXADECIMAL: char = '\\x22';\n",
             "#![no_std]\n",
             "#![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]\n"
         );
@@ -359,6 +396,24 @@ mod tests {
             kernel_source_violations(source_text),
             is_empty(),
             "the crate attributes after a character literal must still be read"
+        );
+    }
+
+    /// VO-6 control: a lifetime tick must survive into the scanned code.
+    ///
+    /// Consuming nothing while dropping the apostrophe would leave the code
+    /// readable but altered, so the token check has to see the tick. Lifetimes
+    /// are the only construct where a `'` closes no literal, so they are the
+    /// one place a silent edit would go unnoticed by the violation checks.
+    #[rstest]
+    #[case::borrowed_parameter(r"fn borrow<'a>(value: &'a str) {}")]
+    #[case::static_bound(r"fn boxed() -> Box<dyn Send + 'static> { todo!() }")]
+    #[case::placeholder(r"let _: &'_ str = value;")]
+    fn lifetime_ticks_survive_the_literal_scan(#[case] source_text: &str) {
+        assert_that!(
+            strip_comments_and_literals(source_text).as_str(),
+            contains_substring("'"),
+            "a lifetime tick must not be dropped from the scanned code"
         );
     }
 }

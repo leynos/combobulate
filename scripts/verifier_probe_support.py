@@ -71,6 +71,57 @@ def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _installation_toolchain(installation: Path) -> str:
+    """Return the SDK toolchain the installed Kani release ships with.
+
+    The pin is a release, not a toolchain. ``tools/kani/VERSION`` can be bumped
+    with a release that bundles a different nightly, and a separately installed
+    SDK under the same version directory would otherwise pass unnoticed. The
+    installation records the toolchain it was built from, so reading it binds
+    the record to the compiler that actually ran rather than to a constant that
+    merely agreed with the environment at the time it was written.
+
+    Parameters
+    ----------
+    installation
+        Installed Kani release directory.
+
+    Returns
+    -------
+    str
+        The bundled toolchain name, for example
+        ``nightly-2025-11-21-x86_64-unknown-linux-gnu``.
+
+    Raises
+    ------
+    RuntimeError
+        If the installation carries no toolchain record. Reporting the constant
+        instead would restore exactly the claim this check exists to avoid.
+
+    Examples
+    --------
+    A record captured from a real installation names the bundled toolchain::
+
+        _installation_toolchain(Path.home() / '.kani/kani-0.67.0')
+        # 'nightly-2025-11-21-x86_64-unknown-linux-gnu'
+    """
+    recorded = installation / "rust-toolchain-version"
+    try:
+        toolchain = recorded.read_text().strip()
+    except OSError as error:
+        raise RuntimeError(
+            f"the installed Kani release records no toolchain at {recorded}: {error}"
+        ) from error
+    if not toolchain:
+        raise RuntimeError(f"the installed Kani release records an empty {recorded}")
+    return toolchain
+
+
+def _digest_text(content: str) -> str:
+    """Return the SHA-256 digest of text that is not stored as its own file."""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
 def portable_argument(argument: str) -> str:
     """Replace host-specific roots so a recorded command stays reproducible.
 
@@ -121,10 +172,20 @@ def _kani_environment(installation: Path, environment: dict[str, str]) -> dict[s
 
     The helper rejects ancestor backend keys. This explicit fallback leaves
     ordinary Cargo files intact and does not replace any executable Rust body.
+
+    The selected toolchain is the one the installed release ships, checked
+    against the module constant so a pin bump that lands a release bundling a
+    different nightly fails here rather than recording a constant the run did
+    not use.
     """
+    toolchain = _installation_toolchain(installation)
+    if not toolchain.startswith(f"{KANI_SDK_TOOLCHAIN}-"):
+        raise RuntimeError(
+            f"the installed Kani release bundles {toolchain}, not {KANI_SDK_TOOLCHAIN}"
+        )
     child = dict(environment)
     child.update(
-        RUSTUP_TOOLCHAIN=KANI_SDK_TOOLCHAIN,
+        RUSTUP_TOOLCHAIN=toolchain,
         RUSTFLAGS="-D warnings",
         CARGO_ENCODED_RUSTFLAGS="-D\x1fwarnings",
         CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm",
