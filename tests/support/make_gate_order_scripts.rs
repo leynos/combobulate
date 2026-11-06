@@ -7,6 +7,13 @@
 /// while the gate fetch names the separate workspace it must populate. Any
 /// other `fetch` shape is unexpected, which keeps the preparation contract and
 /// the Make route from drifting apart silently.
+///
+/// The two `fmt --check` forms are reported as distinct stages for the same
+/// reason. `tools/gates/cardinality-ui` is its own workspace, so the root
+/// `cargo fmt --all` cannot reach it and the recipe must run a second pass with
+/// `--manifest-path`. Giving that pass its own stage makes it visible in the
+/// order evidence: collapsing both onto `fmt` would hide a dropped gate pass
+/// behind a still-green root one.
 pub(super) const CARGO_SCRIPT: &str = r#"
 stage=unexpected-cargo
 case "$1" in
@@ -19,8 +26,13 @@ case "$1" in
     else stage=unexpected-cargo; fi
     ;;
   fmt)
-    stage=fmt
-    [ "$#" -eq 4 ] && [ "$2" = --all ] && [ "$3" = -- ] && [ "$4" = --check ] || stage=unexpected-cargo
+    if [ "$#" -eq 4 ] && [ "$2" = --all ] && [ "$3" = -- ] && [ "$4" = --check ]; then
+      stage=fmt
+    elif [ "$#" -eq 6 ] && [ "$2" = --manifest-path ] &&
+        [ "$3" = tools/gates/cardinality-ui/Cargo.toml ] && [ "$4" = --all ] &&
+        [ "$5" = -- ] && [ "$6" = --check ]; then
+      stage=gate-formatting
+    else stage=unexpected-cargo; fi
     ;;
   doc)
     stage=doc

@@ -705,6 +705,47 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-57 (2026-11-06). Two follow-ups from the fresh pre-merge assessments.
+  The completeness assessment found one residual gate defect and two validation
+  omissions, and the proof assessment accepted the fixtures as capability
+  evidence while correcting an inventory claim.
+
+  The gate defect was real. `prepare()` wrote `RECORD` only after a successful
+  build, so a preparation that failed left the previous record usable and a
+  later `run` could execute a binary from an older build. `prepare()` now
+  withdraws the record before it starts and publishes a replacement only once
+  Cargo has named an executable; both failure shapes — non-zero Cargo, and a
+  successful Cargo naming no executable — were already covered from an empty
+  start, and each now also starts from a populated record and requires it to be
+  gone. The old regression cases could not have caught this: they began with no
+  record, which is the one state in which the bug is invisible.
+
+  The validation omissions are closed rather than argued. The gate package is a
+  separate workspace, so `make check-fmt` never reached it; it held an
+  unformatted assertion, and `make check-fmt` and `make fmt` now run
+  `cargo fmt --manifest-path tools/gates/cardinality-ui/Cargo.toml --all`
+  alongside the root pass. `tests/make_gate_order.rs` records that second pass
+  as its own `gate-formatting` stage, so the order contract fails when the
+  recipe drops it rather than passing on the strength of the root pass. The
+  first gate run after this change proved the point the hard way: the new
+  `cargo fmt` shape classified as `unexpected-cargo` and failed three order
+  tests, which is the contract doing its job. `make package` runs against the
+  committed candidate rather than this working tree, because `cargo package`
+  refuses a dirty tree and so cannot produce meaningful evidence before the
+  commit that makes it meaningful; the result is reported with the gate
+  evidence for the head.
+
+  The proof inventory was corrected in the assessment reply, not in the
+  fixtures: the Verus candidates check `result == value + 1` under
+  `value < 254`, not cardinality, and `_native_workspace()` writes a scratch
+  `probe-kernel` rather than importing the shipped one. Both are compiler and
+  wiring compatibility observations. The plan's EP-M1 scope does not require a
+  product-proof claim, and none is made.
+
+  The deadline-classification cases moved to
+  `scripts/tests/test_cardinality_ui_deadline.py` so the preparation module
+  stays under the 400-line limit as the new cases were added.
+
 - DL-56 (2026-11-06). EP-M1/EP-M2 residual assurance gaps, second round. The
   reviewer confirmed the recaptured records and raised three narrower gaps, all
   now repaired. First, the hosted record's digest test named four inputs

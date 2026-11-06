@@ -29,8 +29,13 @@ const INVENTORY_DEADLINE: Duration = Duration::from_secs(60);
 /// `cargo llvm-cov nextest` itself and never runs `make test`; without the
 /// prerequisite a hosted runner reaches the root gate test with no prebuilt
 /// binary.
+///
+/// `gate-formatting` follows `fmt` for the same reason: the gate is a separate
+/// workspace, so the root `cargo fmt --all` cannot reach it and `check-fmt`
+/// must run a second `cargo fmt --manifest-path` over it.
 pub(super) const ALL_STAGES: &[&str] = &[
     "fmt",
+    "gate-formatting",
     "markdown-formatting",
     "preflight",
     "prepare-dependencies",
@@ -55,7 +60,7 @@ pub(super) const ALL_STAGES: &[&str] = &[
 ///
 /// Kept out of the assertion function so the table stays readable: the
 /// expectations are data, and the function that walks them is three lines.
-const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 13] = [
+const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 14] = [
     (
         "prepare-dependencies",
         "probe-cargo",
@@ -72,6 +77,18 @@ const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 13] = [
         ],
     ),
     ("fmt", "probe-cargo", &["fmt", "--all", "--", "--check"]),
+    (
+        "gate-formatting",
+        "probe-cargo",
+        &[
+            "fmt",
+            "--manifest-path",
+            "tools/gates/cardinality-ui/Cargo.toml",
+            "--all",
+            "--",
+            "--check",
+        ],
+    ),
     (
         "markdown-formatting",
         "probe-mdtablefix",

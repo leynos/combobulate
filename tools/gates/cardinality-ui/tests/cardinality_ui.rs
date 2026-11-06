@@ -90,10 +90,9 @@ fn gate_declares_only_the_probe_and_trybuild() {
     for excluded in EXCLUDED_DEPENDENCIES {
         assert!(
             !metadata.contains(&format!("\"{excluded}\"")),
-            "the gate must not depend on {excluded}: trybuild copies the host \
-             package's dependencies into its generated crate, so reaching it \
-             would put the root graph or the measurement stack inside a \
-             compile check"
+            "the gate must not depend on {excluded}: trybuild copies the host package's \
+             dependencies into its generated crate, so reaching it would put the root graph or \
+             the measurement stack inside a compile check"
         );
     }
     for required in ["cardinality-probe", "trybuild"] {

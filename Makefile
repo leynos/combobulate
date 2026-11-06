@@ -336,11 +336,14 @@ check-coverage-tools: ## Check coverage linker prerequisites
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
+	$(CARGO) fmt --manifest-path $(UI_GATE_MANIFEST) --all
 	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 	$(MDLINT) --fix "**/*.md"
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
+	# The gate is its own workspace, so the root `cargo fmt --all` cannot reach it.
+	$(CARGO) fmt --manifest-path $(UI_GATE_MANIFEST) --all -- --check
 	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
 markdownlint: ## Lint Markdown files

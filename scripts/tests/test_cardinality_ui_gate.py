@@ -6,10 +6,8 @@ from the default layout. These cases drive the selector with Cargo-shaped JSON
 and a private target directory, which is the condition an inherited
 ``CARGO_TARGET_DIR`` produces.
 
-Execution is bounded by GNU ``timeout``, and a child that ignores ``SIGTERM``
-ends through ``SIGKILL``. Both a stray kill and an enforced escalation report
-the same status, so the announcement ``timeout`` writes is what distinguishes
-them. The cases below pin that classification without running a real build.
+Execution is bounded by GNU ``timeout``. How a bounded child's ending is
+classified lives with its own cases in ``test_cardinality_ui_deadline``.
 """
 
 from __future__ import annotations
@@ -183,6 +181,70 @@ class PrepareTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'no executable'):
                     cardinality_ui_gate.prepare()
 
+    def test_a_failed_build_withdraws_the_previous_record(self) -> None:
+        """A record from an earlier preparation must not survive a failed rebuild.
+
+        Starting from no record proves only that preparation writes nothing on
+        failure. What a later ``run`` would actually pick up is the record the
+        previous successful preparation left, so the case starts from one and
+        requires it to be gone.
+        """
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            record = Path(temporary_directory) / 'record'
+            record.write_text('/stale/target/debug/deps/cardinality_ui-old\n')
+            completed = subprocess.CompletedProcess(
+                args=[], returncode=101, stdout='', stderr='error: could not compile'
+            )
+            with (
+                patch.object(cardinality_ui_gate, 'RECORD', record),
+                patch.object(cardinality_ui_gate.subprocess, 'run', return_value=completed),
+            ):
+                with self.assertRaisesRegex(RuntimeError, 'could not be built'):
+                    cardinality_ui_gate.prepare()
+
+            self.assertFalse(
+                record.exists(),
+                'a failed rebuild must withdraw the record it replaced',
+            )
+            with (
+                patch.object(cardinality_ui_gate, 'RECORD', record),
+                self.assertRaisesRegex(RuntimeError, 'unreadable'),
+            ):
+                cardinality_ui_gate.recorded_binary()
+
+    def test_a_build_without_an_executable_withdraws_the_previous_record(self) -> None:
+        """A successful Cargo run that names no binary is still a failed preparation.
+
+        This is the harder half of the same contract: Cargo exits zero, so only
+        the missing artifact distinguishes it from a real preparation. The
+        record it replaced has to go either way.
+        """
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            record = Path(temporary_directory) / 'record'
+            record.write_text('/stale/target/debug/deps/cardinality_ui-old\n')
+            completed = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=json.dumps({'reason': 'build-finished', 'success': True}),
+                stderr='',
+            )
+            with (
+                patch.object(cardinality_ui_gate, 'RECORD', record),
+                patch.object(cardinality_ui_gate.subprocess, 'run', return_value=completed),
+            ):
+                with self.assertRaisesRegex(RuntimeError, 'no executable'):
+                    cardinality_ui_gate.prepare()
+
+            self.assertFalse(
+                record.exists(),
+                'a build that named no binary must withdraw the record it replaced',
+            )
+            with (
+                patch.object(cardinality_ui_gate, 'RECORD', record),
+                self.assertRaisesRegex(RuntimeError, 'unreadable'),
+            ):
+                cardinality_ui_gate.recorded_binary()
+
     def test_preparation_clears_the_redirecting_variables(self) -> None:
         """A parent target directory must not change where Cargo writes output."""
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -222,112 +284,6 @@ class PrepareTests(unittest.TestCase):
             )
             self.assertIn('--message-format=json', captured['arguments'])
             self.assertIn('--no-run', captured['arguments'])
-
-
-class RunClassificationTests(unittest.TestCase):
-    """Report a deadline the recipe enforced, and only that deadline."""
-
-    def run_with(self, completed: subprocess.CompletedProcess) -> tuple[int, str]:
-        """Run the recorded binary with a stubbed child and captured diagnostics."""
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            binary = Path(temporary_directory) / 'cardinality_ui'
-            binary.write_text('#!/bin/sh\n')
-            record = Path(temporary_directory) / 'record'
-            record.write_text(f'{binary}\n')
-            with (
-                patch.object(cardinality_ui_gate, 'RECORD', record),
-                patch.object(cardinality_ui_gate.subprocess, 'run', return_value=completed),
-                patch.object(cardinality_ui_gate.sys, 'stderr') as diagnostics,
-            ):
-                status = cardinality_ui_gate.run()
-            return status, ''.join(call.args[0] for call in diagnostics.write.call_args_list)
-
-    def test_a_sigterm_defeat_reports_the_deadline(self) -> None:
-        """Status 124 is GNU timeout's own report that the deadline expired."""
-        status, diagnostics = self.run_with(
-            subprocess.CompletedProcess(
-                args=[],
-                returncode=124,
-                stdout='',
-                stderr='timeout: sending signal TERM to command ‘cardinality_ui’\n',
-            )
-        )
-        self.assertEqual(status, 124)
-        self.assertIn('exceeded its 600s deadline', diagnostics)
-
-    def test_an_announced_kill_reports_the_escalation(self) -> None:
-        """A trapped SIGTERM ends through SIGKILL, which is still a deadline.
-
-        ``timeout`` re-raises the signal on itself rather than exiting with it,
-        so ``subprocess`` reports the child as ``-9`` and this module reports
-        the shell equivalent. The assertion checks both halves of the contract.
-        """
-        status, diagnostics = self.run_with(
-            subprocess.CompletedProcess(
-                args=[],
-                returncode=-9,
-                stdout='',
-                stderr=(
-                    'timeout: sending signal TERM to command ‘cardinality_ui’\n'
-                    'timeout: sending signal KILL to command ‘cardinality_ui’\n'
-                ),
-            )
-        )
-        self.assertEqual(status, 137)
-        self.assertIn('ignored SIGTERM', diagnostics)
-
-    def test_an_unannounced_kill_is_not_a_deadline(self) -> None:
-        """A stray SIGKILL must surface its status, not a guessed cause."""
-        status, diagnostics = self.run_with(
-            subprocess.CompletedProcess(args=[], returncode=-9, stdout='', stderr='')
-        )
-        self.assertEqual(status, 137)
-        self.assertNotIn('deadline', diagnostics)
-        self.assertNotIn('ignored SIGTERM', diagnostics)
-
-    def test_an_ordered_exit_status_is_propagated_unchanged(self) -> None:
-        """An ordinary failing child must not be rewritten as a signal death."""
-        status, diagnostics = self.run_with(
-            subprocess.CompletedProcess(args=[], returncode=101, stdout='', stderr='')
-        )
-        self.assertEqual(status, 101)
-        self.assertEqual(diagnostics, '')
-
-    def test_the_run_bounds_the_child_and_scrubs_the_manifest_variable(self) -> None:
-        """The child runs under timeout with trybuild's variable removed."""
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            binary = Path(temporary_directory) / 'cardinality_ui'
-            binary.write_text('#!/bin/sh\n')
-            record = Path(temporary_directory) / 'record'
-            record.write_text(f'{binary}\n')
-            captured: dict[str, object] = {}
-
-            def run_child(arguments, **options):
-                """Capture the bounded invocation and report a clean exit."""
-                captured['arguments'] = arguments
-                captured['options'] = options
-                return subprocess.CompletedProcess(
-                    args=arguments, returncode=0, stdout='', stderr=''
-                )
-
-            with (
-                patch.object(cardinality_ui_gate, 'RECORD', record),
-                patch.object(cardinality_ui_gate.subprocess, 'run', run_child),
-                patch.dict(os.environ, {'CARGO_MANIFEST_DIR': '/root/package'}, clear=True),
-            ):
-                self.assertEqual(cardinality_ui_gate.run(), 0)
-
-            self.assertEqual(
-                captured['arguments'][:5],
-                ['timeout', '--verbose', '--signal=TERM', '--kill-after=2s', '600'],
-            )
-            self.assertEqual(captured['arguments'][5], str(binary))
-            self.assertNotIn('CARGO_MANIFEST_DIR', captured['options']['env'])
-            self.assertEqual(
-                captured['options']['cwd'],
-                cardinality_ui_gate.GATE_DIRECTORY,
-                'trybuild needs the gate package as its working directory',
-            )
 
 
 class EntrypointTests(unittest.TestCase):

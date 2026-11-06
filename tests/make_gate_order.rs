@@ -118,6 +118,7 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
 fn parallel_all_stops_after_the_first_failing_gate() {
     for failure in [
         "fmt",
+        "gate-formatting",
         "markdown-formatting",
         "preflight",
         "clippy",

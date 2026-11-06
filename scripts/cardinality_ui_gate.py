@@ -129,6 +129,12 @@ def _artifact_executable(stream: str) -> str | None:
 def prepare() -> Path:
     """Build the gate's test binary and record the executable Cargo reports.
 
+    The previous record is withdrawn before the build starts, so a preparation
+    that fails leaves nothing runnable behind. Keeping the old path would let a
+    later ``run`` execute a binary from a build that no longer describes the
+    tree, and a failure observed through Make cannot be relied on to stop every
+    later invocation.
+
     Returns
     -------
     Path
@@ -138,8 +144,9 @@ def prepare() -> Path:
     ------
     RuntimeError
         When Cargo fails, or when its output names no executable for the gate
-        test target.
+        test target. Neither case leaves a usable record.
     """
+    _withdraw_record()
     environment = _base_environment()
     for variable in REDIRECTING_VARIABLES:
         environment.pop(variable, None)
@@ -166,6 +173,24 @@ def prepare() -> Path:
     RECORD.parent.mkdir(parents=True, exist_ok=True)
     RECORD.write_text(f'{executable}\n')
     return Path(executable)
+
+
+def _withdraw_record() -> None:
+    """Remove any record left by an earlier preparation.
+
+    A missing record is the normal cold-checkout state, so this is not an
+    error. Any other removal failure is reported: continuing would leave a
+    stale path available to a later ``run``.
+    """
+    try:
+        RECORD.unlink()
+    except FileNotFoundError:
+        return
+    except OSError as error:
+        raise RuntimeError(
+            f'the previous cardinality gate build record could not be removed: '
+            f'{RECORD}: {error}'
+        ) from error
 
 
 def recorded_binary() -> Path:

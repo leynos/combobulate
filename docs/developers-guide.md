@@ -258,6 +258,22 @@ runs that binary under its deadline; it does not search a build directory.
 `make test-ui` is the direct route that prepares and runs the same gate in one
 command.
 
+The record is withdrawn before a preparation starts and published only once
+Cargo has named its executable, so a failed build leaves nothing runnable
+behind. Keeping the previous path would let a later `run` execute a binary from
+a build that no longer describes the tree, and a preparation failure observed
+through Make cannot be relied on to stop every later invocation. Both failure
+shapes — a non-zero Cargo, and a successful Cargo that names no executable —
+leave no usable record.
+
+The gate is a separate workspace, so the root `cargo fmt --all` does not reach
+it. `make check-fmt` and `make fmt` therefore also run
+`cargo fmt --manifest-path tools/gates/cardinality-ui/Cargo.toml --all`,
+otherwise a formatting failure in the gate package would pass the root check.
+`tests/make_gate_order.rs` records that pass as its own `gate-formatting`
+stage, so dropping it fails the order contract instead of hiding behind a still
+green root pass.
+
 The chain is deliberate. Under `make -j`, independent prerequisites run in
 parallel, and measurement showed the gate build sometimes starting before the
 fetches that populate its own workspace. Do not make `prepare-ui-gate` a
