@@ -31,7 +31,7 @@ combobulate-macros = { path = "crates/combobulate-macros", version = "0.1.0" }
 [dev-dependencies]
 cardinality-probe = { path = "tools/calibration/cardinality-probe" }
 camino = "1.2.0"
-cap-std = { version = "3.4.6", features = ["fs_utf8"] }
+cap-std = { version = "4.0.3", features = ["fs_utf8"] }
 googletest = "0.14.3"
 rstest = { version = "0.27.0", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
