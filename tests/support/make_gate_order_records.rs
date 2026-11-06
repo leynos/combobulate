@@ -222,6 +222,8 @@ const ENVIRONMENT_NAMES: &[&str] = &[
     "CURDIR",
     "GATE_FAIL_AT",
     "CARGO",
+    "PYTHON",
+    "DEV_RUST_FLAGS",
     "CHECK_BUILD_TOOLS",
     "WHITAKER",
     "MDTABLEFIX",

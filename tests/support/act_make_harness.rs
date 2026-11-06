@@ -49,10 +49,17 @@ const ACT_PATH_SHIM: &str = concat!(
 );
 
 /// Cargo executor script that selects Cargo tests and can fail by stage.
+///
+/// `FAIL_CARGO_INVOCATION` counts only the test-bearing Cargo commands, so a
+/// preparation fetch or the gate build cannot shift the invocation numbering
+/// those failure cases assert. Preparation succeeds unconditionally: it is a
+/// network-shaped step whose failure the Make recipe reports itself, and this
+/// harness is about routing, not acquisition.
 const CARGO_SCRIPT: &str = concat!(
     "#!/bin/sh\n",
     include_str!("act_make_record.sh"),
     "record_invocation \"$@\"\n",
+    "if [ \"$1\" = fetch ]; then exit 0; fi\n",
     "if [ \"$#\" -eq 2 ] && [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n",
     "  if [ \"${NEXTTEST_AVAILABLE:-}\" = 1 ]; then\n",
     "    printf '%s\\n' 'cargo-nextest fixture 0.1'\n",
@@ -78,6 +85,21 @@ const CARGO_SCRIPT: &str = concat!(
     "count=$((count + 1))\n",
     "printf '%s' \"$count\" > \"$CARGO_COUNT\"\n",
     "[ \"${FAIL_CARGO_INVOCATION:-}\" != \"$count\" ] || exit 23\n",
+);
+
+/// Gate recipe executor script that accepts only preparation and execution.
+///
+/// The Makefile runs both halves through `scripts/cardinality_ui_gate.py`: the
+/// script builds the binary and records the path Cargo reported, and the same
+/// script runs that recorded path under a deadline. Cargo itself must not be
+/// asked to build the gate from the recipe, because the root test depends on
+/// the recorded path rather than on a directory search.
+const PYTHON_SCRIPT: &str = concat!(
+    "#!/bin/sh\n",
+    include_str!("act_make_record.sh"),
+    "record_invocation \"$@\"\n",
+    "[ \"$#\" -eq 2 ] && [ \"$1\" = scripts/cardinality_ui_gate.py ] || exit 64\n",
+    "case \"$2\" in prepare|run) : ;; *) exit 64 ;; esac\n",
 );
 
 /// PATH fallback that rejects Make recipes which bypass the injected Cargo.
@@ -221,6 +243,7 @@ impl MakeHarness {
             .arg(format!("WITH_ACT={}", u8::from(options.with_act)))
             .arg(format!("CARGO={}", self.directory_path.join("cargo")))
             .arg(format!("ACT={}", self.directory_path.join("act")))
+            .arg(format!("PYTHON={}", self.directory_path.join("python")))
             .arg(format!(
                 "CHECK_BUILD_TOOLS={}",
                 self.directory_path.join("check-build-tools")
@@ -301,6 +324,7 @@ impl MakeHarness {
     fn write_command_stubs(&self) -> io::Result<()> {
         write_executable(&self.directory, "cargo", CARGO_SCRIPT)?;
         write_executable(&self.directory, "act", ACT_SCRIPT)?;
+        write_executable(&self.directory, "python", PYTHON_SCRIPT)?;
         write_executable(&self.directory, "check-build-tools", PREFLIGHT_SCRIPT)?;
         write_executable(&self.directory, "record-only", RECORD_PROBE_SCRIPT)?;
         self.write_path_shims()

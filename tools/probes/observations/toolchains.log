@@ -1,0 +1,38 @@
+
+Toolchain: nightly-2026-08-27
+rustc 1.100.0-nightly (bff8e12ff 2026-08-26)
+binary: rustc
+commit-hash: bff8e12ff5e6bcd53dfb1dbccdcec80a60a856ed
+commit-date: 2026-08-26
+host: x86_64-unknown-linux-gnu
+release: 1.100.0-nightly
+LLVM version: 23.1.0
+cargo 1.100.0-nightly (e8cb624d5 2026-08-22)
+
+Toolchain: nightly-2025-11-21
+rustc 1.93.0-nightly (53732d5e0 2025-11-20)
+binary: rustc
+commit-hash: 53732d5e076329a62f71d3c6901886ce8a71e812
+commit-date: 2025-11-20
+host: x86_64-unknown-linux-gnu
+release: 1.93.0-nightly
+LLVM version: 21.1.5
+warning: unused config key `unstable.embed-metadata` in `/home/leynos/.lody/repos/github---leynos---combobulate/worktrees/9cc8f59f-14a7-4470-9239-a0dae798e739/.cargo/config.toml`
+cargo 1.93.0-nightly (5c0343317 2025-11-18)
+
+Toolchain: 1.98.0
+rustc 1.98.0 (88d9e12ae 2026-08-18)
+binary: rustc
+commit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea
+commit-date: 2026-08-18
+host: x86_64-unknown-linux-gnu
+release: 1.98.0
+LLVM version: 22.1.8
+cargo 1.98.0 (797e8a9bc 2026-08-05)
+Verus
+  Version: 0.2026.09.06.8dea4a2
+  Profile: release
+  Platform: linux_x86_64
+  Toolchain: 1.98.0-x86_64-unknown-linux-gnu (overridden by environment variable RUSTUP_TOOLCHAIN)
+
+6.8.0 (cbmc-6.8.0)

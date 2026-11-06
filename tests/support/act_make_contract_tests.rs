@@ -34,7 +34,7 @@ fn available_nextest_selects_the_nextest_run_branch() {
         Some(vec!["nextest", "--version"]),
         "the first Cargo call must probe Nextest"
     );
-    let test_arguments = invocations.get(2).map(|call| {
+    let test_arguments = invocations.get(5).map(|call| {
         call.arguments
             .iter()
             .map(String::as_str)
@@ -45,7 +45,7 @@ fn available_nextest_selects_the_nextest_run_branch() {
         Some(vec!["nextest", "run", "--all-targets", "--all-features"]),
         "a successful Nextest probe must select its run command"
     );
-    let doctest_arguments = invocations.get(3).map(|call| {
+    let doctest_arguments = invocations.get(6).map(|call| {
         call.arguments
             .iter()
             .map(String::as_str)

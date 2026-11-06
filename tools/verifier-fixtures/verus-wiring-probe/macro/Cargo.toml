@@ -1,0 +1,20 @@
+[package]
+name = "wiring-macro"
+version = "0.1.0"
+edition = "2024"
+license = "ISC"
+publish = false
+
+[lib]
+path = "../macro.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "deny", check-cfg = ["cfg(verus_keep_ghost)"] }
+
+[package.metadata.verus]
+verify = true
+
+[dependencies]
+# Exact pin: Verus rejects a `vstd` that does not match the pinned verifier
+# build (tools/verus/VERSION), so a caret requirement cannot express it.
+vstd = { version = "=0.0.0-2026-09-06-0133", default-features = false }

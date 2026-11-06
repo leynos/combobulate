@@ -1,0 +1,19 @@
+{
+  "packages": [
+    {
+      "name": "combobulate-kernel",
+      "targets": [
+        {
+          "kind": ["lib"]
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "glam",
+          "kind": null,
+          "target": "cfg(target_arch = \"x86_64\")"
+        }
+      ]
+    }
+  ]
+}

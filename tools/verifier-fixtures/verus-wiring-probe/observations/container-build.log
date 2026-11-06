@@ -1,0 +1,7 @@
+STEP 1/2: FROM quay.io/rockylinux/rockylinux:10
+STEP 2/2: RUN dnf install -y --setopt=install_weak_deps=False clang gcc-c++ make && dnf clean all
+--> Using cache 042d66005ca421ead706b2b0ad8a85b8b397979df1bdfaa825c9a0f5925889b6
+COMMIT localhost/combobulate-epm1-verifier-free:20261028
+--> 042d66005ca4
+Successfully tagged localhost/combobulate-epm1-verifier-free:20261028
+042d66005ca421ead706b2b0ad8a85b8b397979df1bdfaa825c9a0f5925889b6

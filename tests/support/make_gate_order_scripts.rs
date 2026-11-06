@@ -1,12 +1,38 @@
 //! Shell executors used by the real Make gate harness.
 
 /// Cargo fixture that validates supported gate commands and nextest selection.
+///
+/// The two `fetch` forms are the preparation steps. Their manifests differ, so
+/// the fixture distinguishes them: the root fetch has no `--manifest-path`,
+/// while the gate fetch names the separate workspace it must populate. Any
+/// other `fetch` shape is unexpected, which keeps the preparation contract and
+/// the Make route from drifting apart silently.
+///
+/// The two `fmt --check` forms are reported as distinct stages for the same
+/// reason. `tools/gates/cardinality-ui` is its own workspace, so the root
+/// `cargo fmt --all` cannot reach it and the recipe must run a second pass with
+/// `--manifest-path`. Giving that pass its own stage makes it visible in the
+/// order evidence: collapsing both onto `fmt` would hide a dropped gate pass
+/// behind a still-green root one.
 pub(super) const CARGO_SCRIPT: &str = r#"
 stage=unexpected-cargo
 case "$1" in
+  fetch)
+    if [ "$#" -eq 2 ] && [ "$2" = --locked ]; then
+      stage=prepare-dependencies
+    elif [ "$#" -eq 4 ] && [ "$2" = --locked ] && [ "$3" = --manifest-path ] &&
+        [ "$4" = tools/gates/cardinality-ui/Cargo.toml ]; then
+      stage=prepare-ui-gate-dependencies
+    else stage=unexpected-cargo; fi
+    ;;
   fmt)
-    stage=fmt
-    [ "$#" -eq 4 ] && [ "$2" = --all ] && [ "$3" = -- ] && [ "$4" = --check ] || stage=unexpected-cargo
+    if [ "$#" -eq 4 ] && [ "$2" = --all ] && [ "$3" = -- ] && [ "$4" = --check ]; then
+      stage=fmt
+    elif [ "$#" -eq 6 ] && [ "$2" = --manifest-path ] &&
+        [ "$3" = tools/gates/cardinality-ui/Cargo.toml ] && [ "$4" = --all ] &&
+        [ "$5" = -- ] && [ "$6" = --check ]; then
+      stage=gate-formatting
+    else stage=unexpected-cargo; fi
     ;;
   doc)
     stage=doc
@@ -26,9 +52,15 @@ case "$1" in
     else stage=unexpected-cargo; fi
     ;;
   test)
-    stage=doctest
-    [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
-      [ "$4" = --all-features ] || stage=unexpected-cargo
+    # There is deliberately no gate-build form here. The gate is built through
+    # `scripts/cardinality_ui_gate.py prepare`, which records the executable
+    # path Cargo reported; a recipe that reached Cargo directly would bypass
+    # that record and leave the root UI test without a path to run. Accepting
+    # the old shape would let that regression pass the contract silently.
+    if [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
+        [ "$4" = --all-features ]; then
+      stage=doctest
+    else stage=unexpected-cargo; fi
     ;;
   *) stage=unexpected-cargo ;;
 esac
@@ -36,6 +68,24 @@ record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
 case "$stage" in unexpected-*) exit 64 ;; esac
 if [ "${GATE_FAIL_AT-}" = "$stage" ]; then exit 1; fi
 if [ "$stage" = nextest-version-probe ]; then printf '%s\n' 'cargo-nextest 0.9.0'; fi
+"#;
+
+/// Gate recipe fixture validates the exact prepare/run boundary.
+///
+/// The script owns both halves of the gate route: `prepare` builds and records
+/// the binary, and `run` executes that record under a deadline. A recipe that
+/// slips back to invoking Cargo directly, or that reaches Cargo without the
+/// gate's environment, is a different command and therefore unexpected here.
+pub(super) const GATE_SCRIPT: &str = r#"
+stage=unexpected-gate
+if [ "$#" -eq 2 ] && [ "$1" = scripts/cardinality_ui_gate.py ]; then
+  case "$2" in
+    prepare|run) stage=prepare-ui-gate ;;
+  esac
+fi
+record_invocation "$GATE_LOG" "$stage" "${0##*/}" none none '' "$@"
+case "$stage" in unexpected-*) exit 64 ;; esac
+[ "${GATE_FAIL_AT-}" != "$stage" ]
 "#;
 
 /// Interrogate fixture validates the pinned tool invocation and injects failure.

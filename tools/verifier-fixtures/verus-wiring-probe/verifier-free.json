@@ -1,0 +1,5 @@
+{
+  "status": "inconclusive",
+  "reason": "Host-side admission/cache compilers do not preserve the container mount namespace.",
+  "log": "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free.log"
+}

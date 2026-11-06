@@ -34,6 +34,7 @@ use support::{
     THREADS_FLAG,
     check_development_targets,
     make_rustflags,
+    make_rustflags_with_preparation,
     make_whitaker_recipe,
     sources,
 };
@@ -222,10 +223,18 @@ fn make_does_not_inject_mold_for_a_musl_host() {
 /// Coverage measures and release/packaging ship, so they stay on production flags.
 /// Every command must assign `RUSTFLAGS`, since only an assignment displaces
 /// the configuration's sources.
+///
+/// The target's own commands are read without its prerequisites. `coverage`
+/// depends on `prepare-ui-gate`, which is a development build of the gate's
+/// separate workspace and therefore does carry the standard flags; those
+/// commands belong to preparation, not to the measured recipe. Excluding them
+/// tests the claim this contract makes rather than one it does not.
 #[test]
 fn coverage_release_and_package_take_neither_flag() {
     for target in HELD_OUT_TARGETS {
-        for assigned in make_rustflags(target, Host::Linux, None).expect("read `make -n` output") {
+        for assigned in make_rustflags_with_preparation(target, Host::Linux, None, false)
+            .expect("read `make -n` output")
+        {
             let flags = assigned.unwrap_or_else(|| {
                 panic!("`make {target}` runs a command that takes the configuration's flags")
             });

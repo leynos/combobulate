@@ -2,6 +2,12 @@
 
 use std::process::Command;
 
+/// Caller-environment assertions for the recorded gate invocations.
+#[path = "support/make_gate_order_caller_environment.rs"]
+mod caller_environment;
+/// Expected Make stages and the executor calls they must produce.
+#[path = "support/make_gate_order_commands.rs"]
+mod commands;
 /// Cold and failing paths for the dedicated Whitaker integration target.
 #[path = "support/make_gate_order_driver_target.rs"]
 mod driver_target;
@@ -15,24 +21,19 @@ mod records;
 #[path = "support/make_gate_order_whitaker.rs"]
 mod whitaker;
 
+use caller_environment::{
+    assert_clean_caller,
+    assert_coverage_contamination,
+    assert_secret_values_redacted,
+    assert_target_rustflags_isolated,
+};
+use commands::{
+    ALL_STAGES,
+    assert_all_commands,
+    assert_interrogate_command,
+    expected_stages_through,
+};
 use probe::{CallerEnvironment, GateProbe};
-use records::{EnvironmentValue, Invocation};
-
-/// Expected command stages for the complete ordered Make target.
-const ALL_STAGES: &[&str] = &[
-    "fmt",
-    "markdown-formatting",
-    "preflight",
-    "doc",
-    "clippy",
-    "preflight",
-    "whitaker",
-    "interrogate",
-    "preflight",
-    "nextest",
-    "doctest",
-    "spelling",
-];
 
 /// Proves the parallel composite invokes each required command in order.
 #[test]
@@ -56,128 +57,6 @@ fn parallel_all_runs_each_gate_in_order() {
         "all gates must pass: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-}
-
-/// Checks the real Make target and confirms every selected executor call.
-fn assert_all_commands(invocations: &[Invocation]) -> Result<(), Box<dyn std::error::Error>> {
-    for (stage, executable, arguments) in [
-        ("fmt", "probe-cargo", &["fmt", "--all", "--", "--check"][..]),
-        (
-            "markdown-formatting",
-            "probe-mdtablefix",
-            &[
-                "--check",
-                "--git",
-                "--include-untracked",
-                "--wrap",
-                "--renumber",
-                "--breaks",
-                "--ellipsis",
-                "--fences",
-            ][..],
-        ),
-        ("preflight", "probe-check", &[][..]),
-        ("doc", "probe-cargo", &["doc", "--no-deps"][..]),
-        (
-            "clippy",
-            "probe-cargo",
-            &[
-                "clippy",
-                "--all-targets",
-                "--all-features",
-                "--",
-                "-D",
-                "warnings",
-            ][..],
-        ),
-        (
-            "whitaker",
-            "probe-whitaker",
-            &["--all", "--", "--all-targets", "--all-features"][..],
-        ),
-        (
-            "nextest-version-probe",
-            "probe-cargo",
-            &["nextest", "--version"][..],
-        ),
-        (
-            "nextest",
-            "probe-cargo",
-            &["nextest", "run", "--all-targets", "--all-features"][..],
-        ),
-        (
-            "doctest",
-            "probe-cargo",
-            &["test", "--doc", "--workspace", "--all-features"][..],
-        ),
-        ("spelling", "probe-spelling", &["gate"][..]),
-    ] {
-        GateProbe::assert_command(invocations, stage, executable, arguments);
-    }
-    assert_interrogate_command(invocations, 1)
-}
-
-/// Confirms Interrogate receives its pinned command and Git's complete Python inventory.
-fn assert_interrogate_command(
-    invocations: &[Invocation],
-    expected_count: usize,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let interrogate_invocations = invocations
-        .iter()
-        .filter(|invocation| invocation.stage == "interrogate")
-        .collect::<Vec<_>>();
-    if interrogate_invocations.len() != expected_count {
-        return Err(format!(
-            "each lint run must record {expected_count} Interrogate invocation(s); found {}",
-            interrogate_invocations.len()
-        )
-        .into());
-    }
-
-    let python_sources = python_sources_from_git()?;
-    let expected_arguments = [
-        "tool",
-        "run",
-        "--python",
-        "3.14",
-        "--from",
-        "interrogate==1.7.0",
-        "interrogate",
-        "--fail-under",
-        "100",
-    ]
-    .into_iter()
-    .chain(python_sources.iter().map(String::as_str))
-    .collect::<Vec<_>>();
-    GateProbe::assert_command(invocations, "interrogate", "probe-uv", &expected_arguments);
-    Ok(())
-}
-
-/// Reads the tracked and non-ignored untracked Python paths selected by Make.
-fn python_sources_from_git() -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let output = Command::new("git")
-        .args([
-            "ls-files",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "--",
-            "*.py",
-            "*.pyi",
-        ])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
-    if !output.status.success() {
-        return Err(format!(
-            "Git must enumerate the Python sources used by the Make contract; exited with {}",
-            output.status
-        )
-        .into());
-    }
-    Ok(String::from_utf8(output.stdout)?
-        .lines()
-        .map(str::to_owned)
-        .collect())
 }
 
 /// Confirms nested Make clears inherited Act mode before running the composite.
@@ -217,8 +96,12 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
         "a failing Interrogate gate must fail make lint"
     );
     assert_eq!(
-        probe.stages().expect("read lint order"),
+        probe.stages().expect("read lint stage order"),
         [
+            "preflight",
+            "prepare-dependencies",
+            "prepare-ui-gate-dependencies",
+            "prepare-ui-gate",
             "preflight",
             "doc",
             "clippy",
@@ -235,6 +118,7 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
 fn parallel_all_stops_after_the_first_failing_gate() {
     for failure in [
         "fmt",
+        "gate-formatting",
         "markdown-formatting",
         "preflight",
         "clippy",
@@ -261,83 +145,53 @@ fn parallel_all_stops_after_the_first_failing_gate() {
     }
 }
 
-/// Returns the composite stages through the selected failure boundary.
-fn expected_stages_through(failure: &str) -> Vec<String> {
-    ALL_STAGES
-        .iter()
-        .take_while(|stage| **stage != failure)
-        .copied()
-        .chain(std::iter::once(failure))
-        .map(str::to_owned)
-        .collect()
-}
-
 /// Proves caller contamination is cleared for Whitaker while Cargo reads repo config.
 #[test]
 fn parallel_lint_preserves_repository_route_for_clean_and_coverage_callers() {
     let probe = GateProbe::new().expect("create private gate probes");
-    let output = probe.run("lint", None).expect("execute parallel Make lint");
-    assert!(
-        output.status.success(),
-        "lint stages must pass: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert_eq!(
-        probe.stages().expect("read lint order"),
-        [
-            "preflight",
-            "doc",
-            "clippy",
-            "preflight",
-            "whitaker",
-            "interrogate"
-        ],
-        "make -j lint must finish Whitaker before Interrogate"
-    );
+    let contaminated = probe.run("lint", None).expect("execute parallel Make lint");
+    let stages = probe.stages().expect("read lint stage order");
     let first_invocations = probe.invocations().expect("parse coverage caller records");
-    assert_interrogate_command(&first_invocations, 1)
-        .expect("assert Interrogate invocation and Python source inventory");
-    assert_coverage_contamination(&first_invocations);
     let cold_config_invocations = records::parse_invocations(
         &probe
             .whitaker_records()
             .expect("read cold-cache Cargo config records"),
     )
     .expect("parse cold-cache Cargo config records");
-    whitaker::assert_repository_route(
-        &first_invocations,
-        &cold_config_invocations,
-        &["cold"],
-        probe.executable("dylint-drivers").as_str(),
+    assert_interrogate_command(&first_invocations, 1)
+        .expect("assert Interrogate invocation and Python source inventory");
+    assert_contaminated_lint_run(
+        &probe,
+        &contaminated,
+        &FirstLintRun {
+            stages: &stages,
+            invocations: &first_invocations,
+            config_invocations: &cold_config_invocations,
+        },
     );
 
-    let clean_output = probe
+    let clean = probe
         .run_with_environment("lint", None, CallerEnvironment::Clean)
         .expect("execute Make lint from a clean caller environment");
-    assert!(
-        clean_output.status.success(),
-        "lint must pass with a clean caller environment: {}",
-        String::from_utf8_lossy(&clean_output.stderr)
-    );
     let all_invocations = probe
         .invocations()
         .expect("parse clean and coverage records");
-    assert_interrogate_command(&all_invocations, 2)
-        .expect("assert both Interrogate invocations and Python source inventories");
     let all_config_invocations = records::parse_invocations(
         &probe
             .whitaker_records()
             .expect("read cold- and warm-cache Cargo config records"),
     )
     .expect("parse cold- and warm-cache Cargo config records");
-    whitaker::assert_repository_route(
-        &all_invocations,
-        &all_config_invocations,
-        &["cold", "warm"],
-        probe.executable("dylint-drivers").as_str(),
+    assert_interrogate_command(&all_invocations, 2)
+        .expect("assert both Interrogate invocations and Python source inventories");
+    assert_clean_lint_run(
+        &probe,
+        &clean,
+        &SecondLintRun {
+            invocations: &all_invocations,
+            config_invocations: &all_config_invocations,
+        },
     );
-    assert_target_rustflags_isolated(&all_invocations);
-    assert_clean_caller(&all_invocations);
     assert_secret_values_redacted(
         &probe.gate_records().expect("read NUL-framed gate records"),
         &probe
@@ -346,116 +200,87 @@ fn parallel_lint_preserves_repository_route_for_clean_and_coverage_callers() {
     );
 }
 
-/// Checks coverage-only caller values reached Clippy before Whitaker isolation.
-fn assert_coverage_contamination(invocations: &[Invocation]) {
-    for invocation in invocations
-        .iter()
-        .filter(|invocation| matches!(invocation.stage.as_str(), "doc" | "clippy"))
-    {
-        assert_env_value(
-            invocation,
-            "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-            "llvm",
-            "coverage test setup must contaminate the caller child process",
-        );
-        assert_env_value(
-            invocation,
-            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
-            "clang",
-            "coverage test setup must retain its linker override before Whitaker",
-        );
-        assert_env_value(
-            invocation,
-            "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
-            "-C link-arg=-fuse-ld=lld",
-            "coverage setup must contaminate the child with target-specific lld flags",
-        );
-        assert_env_value(
-            invocation,
-            "CARGO_ENCODED_RUSTFLAGS",
-            "-D\u{1f}warnings\u{1f}-C\u{1f}link-arg=-fuse-ld=lld",
-            "coverage flags must reach the caller child process for the contract probe",
-        );
-    }
+/// What the first lint run recorded, gathered for the assertions below.
+struct FirstLintRun<'a> {
+    /// Ordered stage names Make executed.
+    stages: &'a [String],
+    /// Every command the gate executors received.
+    invocations: &'a [records::Invocation],
+    /// The Cargo configuration Whitaker read on its cold cache.
+    config_invocations: &'a [records::Invocation],
 }
 
-/// Confirms target-specific lld flags stop at the repository build boundary.
-fn assert_target_rustflags_isolated(invocations: &[Invocation]) {
-    let checks = invocations
-        .iter()
-        .filter(|invocation| invocation.stage == "whitaker")
-        .collect::<Vec<_>>();
-    assert_eq!(
-        checks.len(),
-        2,
-        "cold and warm Whitaker runs must both be recorded"
-    );
-    for invocation in checks {
-        assert_eq!(
-            invocation
-                .environment
-                .get("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS"),
-            Some(&EnvironmentValue::Unset),
-            "Whitaker must not inherit target-specific lld flags after preflight"
-        );
-    }
+/// What the two lint runs recorded together, for the second run's assertions.
+struct SecondLintRun<'a> {
+    /// Every command both runs produced.
+    invocations: &'a [records::Invocation],
+    /// The Cargo configuration Whitaker read across both caches.
+    config_invocations: &'a [records::Invocation],
 }
 
-/// Confirms an empty inherited flag value stays distinct from an unset route.
-fn assert_clean_caller(invocations: &[Invocation]) {
-    for stage in ["doc", "clippy"] {
-        let matching = invocations
-            .iter()
-            .filter(|invocation| invocation.stage == stage)
-            .collect::<Vec<_>>();
-        assert_eq!(
-            matching.len(),
-            2,
-            "the coverage and clean caller must each execute {stage} once"
-        );
-        for clean in matching.into_iter().skip(1) {
-            assert_eq!(
-                clean.environment.get("CARGO_ENCODED_RUSTFLAGS"),
-                Some(&EnvironmentValue::Empty),
-                "the clean caller's explicitly empty encoded flags must remain observable"
-            );
-            for variable in [
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND",
-                "CARGO_BUILD_TARGET",
-                "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER",
-            ] {
-                assert_eq!(
-                    clean.environment.get(variable),
-                    Some(&EnvironmentValue::Unset),
-                    "clean caller routing variable {variable} must remain unset"
-                );
-            }
-        }
-    }
-}
-
-/// Checks a recorded environment value with its stage in the failure message.
-fn assert_env_value(invocation: &Invocation, name: &str, value: &str, reason: &str) {
-    assert_eq!(
-        invocation.environment.get(name),
-        Some(&EnvironmentValue::Value(value.to_owned())),
-        "{reason}; stage {}",
-        invocation.stage
-    );
-}
-
-/// Confirms records retain only secret presence, never the supplied values.
-fn assert_secret_values_redacted(gate_records: &[u8], whitaker_records: &[u8]) {
-    let record_bytes = [gate_records, whitaker_records].concat();
-    let records = String::from_utf8_lossy(&record_bytes);
+/// Checks the first lint run, made from the coverage-contaminated caller.
+///
+/// Takes the recorded values rather than fetching them: the caller is a test
+/// body, which may report a read failure with `expect`, while this helper is
+/// outside one and must neither expect nor assert in a fallible signature.
+fn assert_contaminated_lint_run(
+    probe: &GateProbe,
+    output: &std::process::Output,
+    run: &FirstLintRun<'_>,
+) {
     assert!(
-        !records.contains("gate-probe-secret-must-not-be-logged"),
-        "coverage tokens must never be written to probe records"
+        output.status.success(),
+        "lint stages must pass: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
+    assert_eq!(
+        run.stages,
+        [
+            "preflight",
+            "prepare-dependencies",
+            "prepare-ui-gate-dependencies",
+            "prepare-ui-gate",
+            "preflight",
+            "doc",
+            "clippy",
+            "preflight",
+            "whitaker",
+            "interrogate"
+        ]
+        .map(str::to_owned),
+        "make -j lint must finish Whitaker before Interrogate"
+    );
+    assert_coverage_contamination(run.invocations);
+    whitaker::assert_repository_route(
+        run.invocations,
+        run.config_invocations,
+        &["cold"],
+        probe.executable("dylint-drivers").as_str(),
+    );
+}
+
+/// Checks the second lint run, made from a clean caller, against the first.
+///
+/// The accumulated records cover both runs, which is why the expected
+/// Interrogate count is two.
+fn assert_clean_lint_run(
+    probe: &GateProbe,
+    clean_output: &std::process::Output,
+    run: &SecondLintRun<'_>,
+) {
     assert!(
-        !records.contains("gate-probe-github-secret-must-not-be-logged"),
-        "GitHub tokens must never be written to probe records"
+        clean_output.status.success(),
+        "lint must pass with a clean caller environment: {}",
+        String::from_utf8_lossy(&clean_output.stderr)
     );
+    whitaker::assert_repository_route(
+        run.invocations,
+        run.config_invocations,
+        &["cold", "warm"],
+        probe.executable("dylint-drivers").as_str(),
+    );
+    assert_target_rustflags_isolated(run.invocations);
+    assert_clean_caller(run.invocations);
 }
 
 /// Confirms no later lint stage runs after a Clippy failure.
@@ -470,8 +295,16 @@ fn parallel_lint_never_starts_whitaker_after_clippy_failure() {
         "Clippy failure must fail make lint"
     );
     assert_eq!(
-        probe.stages().expect("read lint order"),
-        ["preflight", "doc", "clippy"],
+        probe.stages().expect("read lint stage order"),
+        [
+            "preflight",
+            "prepare-dependencies",
+            "prepare-ui-gate-dependencies",
+            "prepare-ui-gate",
+            "preflight",
+            "doc",
+            "clippy"
+        ],
         "Whitaker must not start after Clippy fails"
     );
     assert!(

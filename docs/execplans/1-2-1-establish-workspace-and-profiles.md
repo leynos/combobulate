@@ -1,0 +1,2814 @@
+# Establish the workspace and pinned profiles (roadmap 1.2.1)
+
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & discoveries`, `Decision log`,
+`Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
+be kept up to date as work proceeds.
+
+Status: APPROVED. The sponsor approved execution on 2026-10-27 and directed
+that Q3 join `in_scope_questions`, with its decision based on implementation
+findings. The 2026-10-22 sponsor decisions remain subject to the final-text
+approval checkpoints for the amendments, D16, and ADR-0010.
+
+## Purpose / big picture
+
+Roadmap task 1.2.1 turns the single scaffold crate into the package arrangement
+that the technical design proposes: a facade library, a procedural-macro crate,
+and a small internal semantic kernel. It also pins every compiler, verifier,
+solver, and backend revision that later proof and backend work will rely on,
+and it records what each pinned tool can and cannot do before any claim depends
+on it.
+
+The roadmap phase idea is that one small executable semantic kernel can serve
+ordinary Rust, constant evaluation, Kani, and Verus. Task 1.2.1 does not test
+that idea; task 1.2.4 does. Task 1.2.1 builds the ground on which that test can
+be run honestly: a kernel crate that cannot import Polars or glam, profiles
+whose features and toolchains are recorded exactly, and an evidence gate that
+can at last admit a verifier verdict, because a verifier log parser exists, has
+been tested against real logs, and is bound to an independently re-derived
+trust audit.
+
+After this work a reviewer can do the following, none of which is possible
+today:
+
+1. Build the external fixture `tools/fixtures/native-consumer/`, which depends
+   on the facade by path with `default-features = false`, and run it. Its
+   dependency graph contains no Polars, glam, Kani, or Verus package, and it
+   prints a profile line that reports no Polars backend.
+2. Build the default profile, which enables the `macros` and `polars` features
+   and compiles a crate-private Polars module against the pinned Rust Polars
+   0.55.2 release, chosen independently of the Python Polars 2 version label.
+3. Ask Cargo for the kernel's dependency graph under every feature selection,
+   every target, and every edge kind, and find no Polars or glam package; in
+   this task the kernel declares no dependency at all.
+4. Read `spec/toolchain-profiles.json`, which records the exact Rust nightly,
+   Kani, CBMC, Verus, Z3, `vstd`, Polars, and target revisions, the rustup
+   toolchains each verifier fetches, each profile's crates, features, and
+   commands, every probed tool capability with a status of documented, tested,
+   unsupported, or inconclusive, and each tool's trusted computing base.
+   `make design-check` fails when any other pin in the repository disagrees
+   with that record.
+5. Run `make install-kani` and `make install-verus`, which delegate to the
+   `prover-tools` command from `leynos/rust-prover-tools` at the commit pinned
+   in `tools/rust-prover-tools/REF`, to install the Kani and Verus releases
+   pinned in `tools/kani/VERSION` and `tools/verus/VERSION`. The Verus archive
+   is checked against `tools/verus/SHA256SUMS`. `make kani-check` confirms that
+   the running Kani matches its pin. Ordinary builds and every ordinary Make
+   gate continue to pass on a host with neither tool installed.
+6. Run `python3 scripts/check_evidence.py` over a fixture evidence record that
+   cites a committed Kani log and harness manifest, and see the gate re-derive
+   the verdict through the registered `kani` parser and the trust audit through
+   the scanner. A timeout, an unsatisfied cover, a skipped harness, a truncated
+   log, and a fabricated trust audit each produce their own rejection, using
+   logs that the pinned Kani actually emitted.
+7. Run `python3 scripts/trust_audit.py` over the workspace and see every
+   ADR-0009 trusted item in code position reported, while the same words in
+   comments, string literals, and ordinary Rust such as the standard
+   `#[should_panic]` test attribute are not.
+
+Compile-only evidence is not a theorem. Nothing in this task claims a proved
+property of Combobulate itself. The capability records say what the tools did
+on probe fixtures; the profile builds say what compiled; the parser and scanner
+are tested gate components. Task 1.2.4 makes the first proof claim.
+
+## Sponsor decisions
+
+The sponsor (`leynos`, the D01 authority) was asked to settle these before
+implementation begins. On 2026-10-22 the sponsor accepted the recommended
+option for all eight, in this session. Items 2, 3, 4, and 7 are accepted in
+direction; their final texts are approved at the checkpoints named. The sponsor
+directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
+`Decision log`.
+
+1. CI shape for the Polars-enabled profile (DL-03). Recommended: the
+   `build-test` job keeps the native-only profile; parallel Polars-enabled lint
+   and test jobs are added, each sized from hosted measurements so that its
+   slowest observed cold run plus fixed overhead stays within 6 minutes. This
+   edits the frozen `.github/workflows/ci.yml`, so it needs the AC-07 amendment
+   in item 2.
+2. AC-07 amendment (DL-14). Recommended content: the workload becomes every
+   required pull-request job in `ci.yml`; per workflow run the statistic is the
+   longest required job; nearest-rank p90 over the 20 most recent runs, with
+   any failed, timed-out, cancelled, or missing job failing the control; the
+   window restarts empty on the new shape, so AC-07 is inconclusive when task
+   1.2.1 is ticked. The sponsor approves the final text, with measured job
+   sizes, at the EP-M3 checkpoint and before the first attempt on the new shape.
+3. AC-04 amendment (DL-15). AC-04 registers "the 1.2.1 foundational probe in
+   its three feature profiles" with the calibration probe's manifest as its
+   only source. Recommended: rebind its sources to the workspace manifests and
+   map its three profiles to native-only, proof-capable Kani codegen, and
+   Polars-enabled, keeping every threshold unchanged. Approved at EP-M4.
+4. ADR-0009 amendment (DL-16). Recommended: the gate maps `trust` to
+   `unaudited` unless the I/O shell supplies a scanner-derived audit whose
+   items equal the record's; the vocabulary's matching rule is stated (DL-17);
+   the 1.2.1 Kani parser always derives `partial` bounds. The rule table,
+   levels, and properties P1-P6 are unchanged. Approved at EP-M5.
+5. The empty macro crate (DL-05). Recommended: create `combobulate-macros` now
+   with no exported macro and no dependency, wired through a default `macros`
+   feature that the users' guide describes as reserved until task 2.3.1.
+6. Which verifier parser task 1.2.1 registers (DL-07). Recommended: register
+   only the Kani parser; the Verus parser stays with task 1.2.4.
+7. Decision D16 and ADR-0010 (DL-02). Recommended: D16 accepts ADR-0010, which
+   records the crate boundary, dependency direction, feature profiles, gate
+   feature lists, and the supported-toolchain set that answers ToR Q3 in place
+   of one MSRV. The sponsor accepts D16 after EP-M4 publishes ADR-0010; the
+   approval reference is committed before the tick. Q3 joins
+   `in_scope_questions` when D16 is proposed, informed by the probe findings.
+8. PR title numbering (DL-12). The request asked for `(1.1)` in the title, but
+   this task is roadmap item 1.2.1. The draft PR uses `(1.2.1)`; the sponsor
+   may ask for the literal `(1.1)` instead.
+
+## Constraints
+
+- The semantic kernel `combobulate-kernel` must import neither Polars nor glam
+  under any feature, target, or dependency-edge selection (technical design §3,
+  roadmap 1.2.1).
+- The kernel must never be compiled for the host as part of a target build:
+  it may not appear in any build-dependency edge or in any procedural-macro
+  crate's dependency closure (technical design §18.1, DL-06).
+- Ordinary consumers must not need Kani, Verus, Z3, or any verifier
+  installation to build, test, or use any ordinary profile (ToR line 152,
+  technical design §§3, 17.7). Ordinary Make gates name their features
+  explicitly; none uses `--all-features`, so a future proof feature cannot
+  enter an ordinary route (DL-18).
+- The Polars dependency is selected by its Rust crate release and tested
+  public interface, never by the Python Polars 2 version number (technical
+  design §19.1, context.md line 230, ToR Q9). Polars paths appear only in the
+  facade's crate-private Polars module (VO-14).
+- Proof support must not use `cfg(kani)` or a proof feature to replace a
+  production body with a different implementation (technical design §17.7).
+- Kani and Verus are preferably installed, version-checked, and run through
+  `prover-tools` from `leynos/rust-prover-tools`, pinned by commit in
+  `tools/rust-prover-tools/REF` and invoked through `uv tool run --from` that
+  pinned Git source. No repository-owned installer script is written. Make
+  recipes contain none of `cargo install`, `cargo kani setup`, `curl`, `unzip`,
+  `sha256sum`, or `rustup toolchain install`, and route through an
+  `override`-locked `$(PROVER_TOOLS)` variable whose only substitution seam is
+  the contract-test pair `PROVER_TOOLS_CONTRACT_TEST=1 PROVER_TOOLS=<fake>`
+  given on the `make` command line (the `kani` skill's project on-ramp). A
+  probe that needs a capability unavailable through `prover-tools` may invoke
+  the pinned tool directly, with the reason and invocation recorded.
+- The pinned Kani 0.67.0, Verus 0.2026.09.06.8dea4a2, and Z3 4.16.0 revisions
+  are part of the pre-registered environment of controls AC-01, AC-02, AC-04,
+  and AC-07. Changing any of them requires a sponsor-approved control amendment
+  under ADR-0008; newer releases (for example Kani 0.68.0) are not adopted by
+  this task.
+- `.github/workflows/ci.yml` is a frozen AC-07 source (sha256 `a7df0545…`).
+  It must not change until the AC-07 amendment is sponsor-approved, and the
+  amendment and the change land in one commit.
+- Every hosted `build-test` attempt counts towards AC-07, and any failed,
+  timed-out, or cancelled attempt fails it. No push may add the Polars
+  dependency to the facade until the approved CI shape lands in the same push.
+  No push may change any required job without a hosted measurement predicting
+  that its slowest cold run fits within 6 minutes including fixed overhead.
+- `tools/calibration/cardinality-probe/` is frozen by AC-01, AC-02, and AC-04
+  and must not change.
+- The repository remains unpublished: every workspace member states
+  `publish = false` and `license = "ISC"` literally in its own manifest (D04,
+  D05, ADR-0004); these fields are not inherited from `[workspace.package]`,
+  because the package-policy checker reads them literally.
+- Pre-1.0 policy (D06, ADR-0005): no aliases, deprecated entry points, or
+  shims. The disposable `greet()` stub is removed rather than preserved.
+- A verifier log parser may be registered in
+  `spec/evidence-reason-codes.json` only after its tests over real logs,
+  including a timeout, an unsatisfied cover, and a skipped harness, pass
+  (roadmap 1.2.1 detail, D15).
+- The evidence gate stays pure: `AdmissionContext` receives parsed log results
+  and scanner-derived audits from an I/O shell and never reads files, the
+  clock, or the environment (technical design §17.2, ADR-0009).
+- Production code must not read environment variables outside a composition
+  root; `clippy.toml` disallows the `std::env` accessors. Tests that spawn
+  Cargo use `env!("CARGO")` and `Command::env_remove`, never in-process
+  environment mutation (AGENTS.md).
+- No `assume`, `admit`, `external_body`, Kani stub, or equivalent may appear in
+  shipped crates. Probe fixtures may contain them only as labelled scanner or
+  parser test subjects.
+- No code file may exceed 400 lines. `tests/make_gate_order.rs` is already 481
+  lines and must be split in a separate refactor commit before it is extended.
+  Markdown wraps at 80 columns; prose uses en-GB-oxendict spelling (AGENTS.md).
+- Completed ExecPlans, including
+  `docs/execplans/1-1-resolve-acceptance-control-decisions.md`, are historical
+  and must not be edited.
+
+## Tolerances (exception triggers)
+
+- Scope: stop and escalate if one milestone needs more than 40 changed files or
+  more than 1,800 net added lines, excluding committed verifier logs,
+  `Cargo.lock`, and generated exports. The sponsor approved an EP-M1-only limit
+  of 1,825 lines on 2026-10-28 for count and pin-consistency fixes, and raised
+  that EP-M1 limit to 3,600 lines on 2026-10-30 for the solver-selection fix,
+  its regression test, and the regenerated verifier logs.
+- Interface: stop if any public item beyond `BuildProfile` in the facade and
+  `TargetFacts` in the kernel, and the two Cargo features named in
+  `Interfaces and dependencies`, seems necessary.
+- Dependencies: stop before adding any dependency not listed in
+  `Interfaces and dependencies`, or a version other than the one listed.
+- Toolchain capability: stop if Kani or Verus cannot process the probe
+  arrangement under the repository's Cargo configuration without a change that
+  weakens the ordinary build standard or a substitute body. That outcome is a
+  B01 falsifier candidate and needs a representation decision, not a workaround.
+- Budgets: stop if a hosted measurement predicts that a required job would
+  exceed 6 minutes cold, if the AC-04 acceptance measurement fails a ceiling,
+  if a probe exceeds its AC-01 or AC-02 budget, or if a hosted route exceeds 12
+  GiB of peak memory or the runner's free disk.
+- Upstream tooling: prefer `rust-prover-tools`; when a probe cannot use its
+  interface, record the limitation and use the pinned tool directly.
+- Iterations: stop if a gate still fails after three fix attempts on the same
+  cause.
+- Ambiguity: stop and present options when a choice materially changes a
+  public interface, a trust boundary, an accepted ADR, or a pre-registered
+  control.
+
+## Risks
+
+- Risk: cold Polars builds push a hosted job past its 8-minute hard timeout,
+  failing AC-07. Locally a cold Cranelift build took a 163-second median, but
+  382 seconds at worst; hosted runners set `CARGO_INCREMENTAL=0`, cache only
+  `target/debug`, and today's job already spends about 75 seconds on setup and
+  45 seconds on a cold Whitaker driver build. Polars would be compiled by
+  rustdoc, Clippy, Whitaker (its own toolchain), Cranelift tests, and LLVM
+  coverage. Severity: high. Likelihood: high. Mitigation: hosted measurement in
+  EP-M1 using the slowest run, not the median; the DL-03 job split; GitHub
+  Actions sccache enabled; caches saved only on `main`; no push before the
+  prediction fits.
+- Risk: cache thrash. Dependabot updates `Cargo.lock` often, each update mints
+  new multi-gigabyte cache keys, eviction removes `main`'s cache, and a cold
+  run times out. Severity: high. Likelihood: medium. Mitigation: jobs are sized
+  for cold runs; caches saved only on `main`; every job logs its cache hit
+  state; the Verus archive is never placed in the Actions cache.
+- Risk: Polars pin churn. A grouped Dependabot update moves Polars to 0.55.3 or
+  0.56, which fails VO-7 or the build inside the AC-07 window. Severity:
+  medium. Likelihood: high. Mitigation: a Dependabot `ignore` entry for
+  `polars*`, and a documented rule that the Polars pin moves only through a
+  control amendment and a profile-record update.
+- Risk: the runner exhausts memory or disk building Polars with LLVM under
+  `-Zthreads=8` and four jobs on a 4 vCPU, 16 GB runner. Severity: medium.
+  Likelihood: medium. Mitigation: EP-M1 records peak memory and `target/` size;
+  jobs delete intermediate target directories; a hosted `-Zthreads=4` override
+  is evaluated if memory exceeds the 12 GiB cap.
+- Risk: the Verus driver, built on Rust 1.98.0, rejects the repository's
+  nightly-only Cargo configuration (`[unstable] codegen-backend`, Cranelift in
+  `[profile.dev]`, `-Zthreads=8`, the `mold` linker wrapper). Severity: high.
+  Likelihood: medium. Mitigation: EP-M1 probes `cargo verus` in place; any
+  override is scoped to the verifier route and leaves ordinary gates unchanged,
+  or the tolerance triggers.
+- Risk: the three compilers that must accept the kernel differ: the repository
+  nightly (1.100.0-nightly, 2026-08-26), Kani 0.67.0's nightly-2025-11-21, and
+  Verus's Rust 1.98.0. Severity: medium. Likelihood: medium. Mitigation: EP-M1
+  records `rustc -vV` for each; the kernel restricts itself to their
+  intersection; workspace `[lints.rust]` entries are checked against each
+  toolchain because `unknown_lints = "deny"` turns a newer lint into an error.
+- Risk: `make package` breaks once path dependencies exist, and its contract
+  test uses a stub Cargo, so nothing notices. Severity: medium. Likelihood:
+  high. Mitigation: path dependencies carry `version = "0.1.0"`; EP-M2 runs the
+  real `make package` and decides whether the route becomes `-p combobulate`.
+  Outcome 2026-10-31: the default route fails during tarball preparation, so
+  the route is now `-p combobulate` with two local `[patch.crates-io]` config
+  arguments that keep verification working (DL-33).
+- Risk: `trybuild` in `tests/cardinality_probe_ui.rs` builds a generated crate
+  in its own target directory with the current features, compiling Polars
+  again. Severity: medium. Likelihood: medium. Mitigation: EP-M1 measures it;
+  the UI test runs only in the native-only test route.
+- Risk: repository contract tests assert exact Cargo argument vectors and
+  break when routes change. Severity: medium. Likelihood: certain. Mitigation:
+  route changes and their contract assertions land in one commit; the oversized
+  `tests/make_gate_order.rs` is split first.
+- Risk: the real Kani output format for a timeout, a skipped harness, or an
+  undetermined result differs from the parser design. Severity: medium.
+  Likelihood: medium. Mitigation: the corpus is captured first (EP-M1) and the
+  extractor is written against it (EP-M5); unknown structure fails closed as
+  `tool-error`.
+- Risk: a text scanner cannot see identifiers that macros construct, so the
+  trust audit could miss an item. Severity: medium. Likelihood: low.
+  Mitigation: the scanner fails closed on `include!`, out-of-tree `#[path]`,
+  `paste!`, and `concat_idents!`, and in procedural-macro crates it also
+  reports vocabulary inside string literals.
+- Risk: `trust_audit.py` and `kani_log.py` grow past 400 lines. Severity: low.
+  Likelihood: high. Mitigation: planned module split (lexer, matcher, command;
+  extractor, decision function, shell adapter).
+- Risk: `rstest-bdd` 0.6.0 or `googletest` 0.14.3 requires an `rstest` release
+  newer than the pinned 0.27.0. Severity: low. Likelihood: medium. Mitigation:
+  checked in EP-M3; a bump to 0.28.0 is pre-authorized, anything larger
+  escalates.
+- Risk: the Verus archive omits Z3, leaving an uncontrolled solver selection.
+  Severity: medium. Likelihood: observed. Mitigation: the probe selects
+  `z3-solver==4.16.0.0`, checks Z3 4.16.0, and records its binary digest.
+  Hosted installation remains unconfirmed until the measurement workflow runs.
+- Risk: `prover-tools kani install` runs
+  `cargo install --locked kani-verifier --version 0.67.0` and
+  `cargo kani setup`, which downloads the Kani bundle without a repository-side
+  digest check. Severity: medium. Likelihood: certain. Mitigation: the trusted
+  computing base records the crates.io `kani-verifier` source and the
+  unverified bundle download, with the release asset digest kept for reference
+  in the profile record; a verified bundle option is proposed upstream to
+  `rust-prover-tools`.
+- Risk: `prover-tools` has no `cargo verus` route; `prover-tools verus run`
+  verifies a single proof root. Severity: medium. Likelihood: certain.
+  Mitigation: the EP-M1 wiring probe includes the estate's single-root pattern
+  (DL-22); a crate-based wiring is selected only if it is decisively better,
+  and then its `cargo verus` route is proposed upstream before task 1.2.4.
+- Risk: `prover-tools verus install` unpacks about 456 MB into
+  `.verus/<version>/` in each worktree, where Markdown, spelling, and Whitaker
+  scans could find it. Severity: low. Likelihood: certain. Mitigation: ignore
+  `.verus/` in `.gitignore` and in the Markdown lint configuration, and record
+  the per-worktree disk cost in `docs/developers-guide.md`.
+- Risk: the AC-04 hosted measurement fails a ceiling, most plausibly the
+  10-minute Polars cold build. Severity: medium. Likelihood: low to medium.
+  Mitigation: none by extension (AC-04 forbids it); a failure stops the task
+  for a scope or implementation decision under technical design §17.8.
+
+## Progress
+
+- [x] (2026-10-22) Rename the branch to
+  `1-2-1-establish-workspace-and-profiles` with upstream
+  `origin/1-2-1-establish-workspace-and-profiles`.
+- [x] (2026-10-22) Reconnaissance with a Wyvern team: tooling and Make routes,
+  bets and decisions, documentation conventions.
+- [x] (2026-10-22) External research: Verus release assets and `vstd`
+  versions, Kani 0.67.0 assets and options, Polars 0.55.2 features, current
+  crate versions.
+- [x] (2026-10-22) Draft this ExecPlan (commit `d2361d6`).
+- [x] (2026-10-22) Community-of-experts review by four reviewers; findings
+  applied in this revision (see `Design review record`).
+- [x] (2026-10-22) Sponsor accepted the recommended option for all eight
+  sponsor decisions.
+- [x] (2026-10-27) Sponsor approved the plan and directed Q3 to join
+  `in_scope_questions`, with the decision based on implementation findings.
+- [x] (2026-10-28) EP-M1 in progress. Red prover-wiring contracts failed as
+  expected (`/tmp/red-prover-tools-combobulate-epm1.out`): missing pins,
+  targets, and explicit formal placeholders. Prototype: toolchain, profile, and
+  hosted-cost probes.
+- [x] (2026-10-28) EP-M1 local probes: repeated installs, 14 Kani observations
+  with matching source/log digests, and exact positive/mutant Verus counts.
+  `make kani-log-corpus` and `make verus-probe` passed; logs are under
+  `/tmp/kani-corpus-combobulate-epm1.out` and
+  `/tmp/verus-probe-combobulate-epm1.out`.
+- [x] (2026-10-28) Polars 0.55.2 with only `lazy` passed its library, doctest,
+  and UI checks. Eleven prover command contracts passed after Red evidence in
+  `/tmp/red-prover-execution-status-combobulate-epm1.out` exposed a swallowed
+  execution failure. Source and stderr copies retain the existing UI oracle.
+- [x] (2026-10-28) Existing Python Make fixtures now copy the prover pin;
+  `/tmp/green-docstring-fixture-combobulate-epm1.out` passes all three tests
+  after design-check exposed their missing temporary-directory resource.
+- [x] (2026-10-28) Count regression: inflated positive and mutant summaries
+  failed before the fix; the scratch correction passed all eleven contracts.
+  Evidence: `/tmp/red-count-review-combobulate-epm1.out`.
+- [x] (2026-10-30) Solver selection: the default `z3` name now resolves the
+  pinned `z3-solver==4.16.0.0` distribution before any `PATH` discovery, while
+  an explicit solver name is still checked. `test_verifier_solver` failed
+  against the previous source (`/tmp/red-durable-solver-combobulate-epm1.out`)
+  and passes after the fix (`/tmp/green-durable-solver-combobulate-epm1.out`).
+  The regenerated corpus keeps matching source and log digests.
+- [x] (2026-10-31) Hosted measurement run `41148253840` measured rustdoc,
+  clippy, nextest, coverage, and UI cold runs; its whitaker and verifier-free
+  jobs failed on environment defects. The verifier-free image now installs
+  `libatomic` (reproduced Red at `/tmp/epm1-verifier-free-red.log`; guarded by
+  `scripts/tests/test_verifier_free_container.py`), and the measurement
+  workflow pins `whitaker-installer` 0.2.11 so the dylint 6.0.1 driver is not
+  built (DL-29). A replacement run is required before the go/no-go decision.
+- [x] (2026-10-31) Hosted measurement run `41163302274` passed all seven jobs on
+  head `4d4f031`: six routes cold three times each, plus verifier-free
+  isolation. The go/no-go rule passes (DL-30); per-route timings, memory, and
+  target sizes are recorded in `Artefacts and notes`.
+- [x] EP-M1 hosted costs and verifier-free isolation; publish the measurement
+  workflow, collect its artefacts, and apply the go/no-go rule before EP-M2.
+- [x] (2026-10-31) EP-M1 milestone review repairs (DL-31): split the verifier
+  command builders, add NumPy-style CLI parameter sections, pin the Make
+  default goal, scope the measurement concurrency group by label, and keep
+  every lint table in the scratch workspace. The Python suites passed before
+  the Rust gates (`pytest`: 521 passed, 687 subtests; `unittest`: 442 tests).
+  `make kani-log-corpus` then regenerated all fourteen observations (thirteen
+  labelled subjects plus the in-place run) with every status unchanged (exit 0
+  overall); the log diff is limited to timings, the Cargo dirty note, and the
+  compile-admission queue line, and `provenance.json` recorded the then-current
+  script digests (`7ae6aaa1…` and `e68f9147…`, since superseded by DL-35).
+- [x] (2026-10-31) EP-M1 close published as `242f03a` with a clean local gate
+  run. The milestone CLI review is rate-limited rather than clean (DL-32), so
+  the hosted assessment is handed to `pr-babysitting`.
+- [x] EP-M2. Workspace, crate boundaries, and dependency-direction checks.
+  - [x] (2026-10-31) Refactor first (commit `4df69a3`):
+    `tests/make_gate_order.rs` is 237 lines after moving its stage table and
+    command assertions to `tests/support/make_gate_order_commands.rs` and its
+    caller-environment assertions to
+    `tests/support/make_gate_order_caller_environment.rs`. The cases are moved
+    verbatim, all 20 pass, and all six gates passed on the uncommitted
+    candidate (`345` nextest cases, `442` unittest, `521` pytest + `687`
+    subtests).
+  - [x] (2026-10-31) Boundary contracts. Red at
+    `/tmp/red-workspace-boundaries-combobulate-1-2-1-establish-workspace-and-profiles.out`:
+    four live-workspace rules failed because neither member crate existed, while
+    the six fixture non-vacuity cases passed. Green at
+    `/tmp/green-workspace-boundaries-combobulate-1-2-1-establish-workspace-and-profiles.out`:
+    11/11 pass, and `cargo tree -p combobulate-kernel --all-features --target
+    all -e all --prefix none` prints only the kernel. The eleventh case is a
+    positive control: `workspace-valid.json` reports no direction violation,
+    so the rules do not reject a correctly directed graph.
+  - [x] (2026-10-31) Workspace conversion: `Cargo.toml` is the workspace root
+    with `members = ["crates/*"]`, `default-members` for the three crates,
+    `exclude = ["tools"]`, `resolver = "3"`, and `[workspace.lints]` including
+    `unexpected_cfgs` for `cfg(kani)` and `cfg(verus_keep_ghost)`. The new
+    `crates/combobulate-kernel` is `#![no_std]` with `TargetFacts`, one unit
+    test, and one doctest; `crates/combobulate-macros` is a `proc-macro` crate
+    with documentation only. The facade depends on both by path with
+    `version = "0.1.0"`; `greet()` and `tests/stub.rs` are removed.
+  - [x] (2026-10-31) Package policy now checks every member selected by the root
+    `members` globs for literal `license = "ISC"` and `publish = false`, and
+    rejects a `crates/*/Cargo.toml` no glob selects. All 16 policy tests pass.
+    `make package` verified through the route recorded in DL-33, using
+    `--allow-dirty` before the commit.
+  - [x] (2026-10-31) Milestone review repairs (DL-35). VO-6 now inspects code
+    with comments and string literals removed, so the kernel's own
+    documentation cannot satisfy `#![no_std]`; three new rstest cases cover
+    line comments, block comments, and plain and raw string literals, and a
+    control case proves the real attribute set passes. The contents index,
+    repository layout, `Conformance basis`, `Outcomes & retrospective`, and
+    revision notes are current. `scripts/run_verifier_probes.py` is 400 lines:
+    the verifier-free workflow moved to `scripts/verifier_free_probe.py` and
+    the shared provenance writers to `scripts/probe_provenance.py`.
+    `make kani-log-corpus` regenerated the corpus after the producer digest
+    changed: all fourteen statuses are unchanged (exit 0 overall), and
+    `provenance.json` records
+    `9b086e48…` (entry script), `952d6c62…` (support), and `ae38573c…`
+    (provenance writers). The gate run covered this commit's content, and
+    `make package` verified the clean tree at `1f09c18`.
+  - [x] (2026-10-31) Milestone-close CLI review repairs (DL-36). The review
+    completed on `8e1d7fa` with three distinct defects: a vacuous verifier
+    absence check under `set -e`, a lint check that accepted `allow`/`warn`,
+    and a command builder that touched a file. All three are repaired, the
+    developer guide names the new helper, and the focused suites pass
+    (20 boundary cases; 8 verifier cases plus 2 subtests).
+  - [x] (2026-10-31) Confirmation review repairs (DL-37). The confirmation
+    review on `833ef0c` raised five findings. The recorded hosted
+    verifier-free observation still embedded the pre-repair build script, so
+    the measurement workflow was dispatched on `833ef0c`; run `41227443972`
+    passed all seven jobs, and the record, both logs, and the digest were
+    replaced together. `make kani-log-corpus` then refreshed the stale entry
+    digest (`795f4ef4…`) with every observation status unchanged. The
+    `direct`-route description now names both defaults (the `Makefile`
+    defaults to `direct`, the script to `helper`), and two comments use
+    oxendict spellings. All six commit gates and `make package` passed
+    sequentially on the resulting commit `f0b1650` (364 nextest cases passed
+    and one skipped; 447 unittest cases; 526 pytest cases plus 691 subtests;
+    285 files packaged and the facade recompiled from the tarball).
+  - [x] (2026-10-31) Fourth review round (DL-38). The user guide now names the
+    facade as empty and the kernel's `TargetFacts` as its only public type,
+    because the earlier "no public API" wording was inaccurate. Both
+    `typing.cast` calls in the package policy pass their annotation as a
+    string.
+  - [x] (2026-10-31) Fifth review round (DL-39). Committed provenance no longer
+    publishes the account name or worktree path: `capture` records a portable
+    copy of the command while executing the real vector, and the Verus solver
+    path is rewritten the same way. Both corpora were regenerated, and the
+    developer guide states the convention.
+  - [x] (2026-10-31) Sixth review round (DL-40). The live dependency checks now
+    run `cargo fetch --locked` once before the offline `cargo tree` calls and
+    clear `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`, and `CARGO_BUILD_TARGET` from
+    every Cargo child, which restores the design's stated route.
+  - [x] (2026-10-31) Milestone close. The round-5 gates passed on `403996e`
+    (364 nextest cases, 1 skipped; 452 unittest; 531 pytest + 691 subtests;
+    interrogate 100%; 38 Markdown files clean) and `make package` packaged 286
+    files. The round-6 repair (DL-40) then passed the six gates on the
+    committed candidate (365 nextest cases) and `make package` on the clean
+    tree at `5e517d4`.
+  - [x] (2026-10-31) Seventh review round (DL-41). `raw_string_closes` no
+    longer consumes the character it probes, so a content quote inside a raw
+    string cannot hide the crate attributes; the manifest projection marks
+    `workspace` as `NotRequired`; and the repository layout names `.verus/`.
+  - [x] (2026-11-01) Eighth review round (DL-42). The hosted verifier-free
+    record predates the DL-39 rewrite and still published twelve
+    `/home/runner` paths in its command; they now use `<repo>` and `~`, the log
+    and its digest are unchanged, and the provenance test scans every committed
+    record for an account home.
+  - [x] (2026-11-01) Ninth review round (DL-43). The portability scan now
+    covers the Kani provenance record as well as the Verus fixtures and
+    collects the recorded solver path, so the documented claim is true of both
+    generators.
+  - [x] (2026-11-01) Tenth review round (DL-44). The developers' guide documents
+    `member_manifests` and its per-member rule, and the eleven probe helpers the
+    guide calls private now carry private names.
+  - [x] (2026-11-01) Eleventh review round (DL-45). Member publication follows
+    the same release guard as the root, the guide's helper names match the code,
+    and the remaining private-intent probe helpers carry private names.
+  - [x] (2026-11-01) Twelfth review round (DL-46). The public lint-table helper
+    documents its parameter and result, the record walk uses structural pattern
+    matching, and the Kani provenance source digests were regenerated after the
+    rename, with a test that fails on a stale digest.
+  - [x] (2026-11-01) Thirteenth review round (DL-47). The record scan skips a
+    fixture crate's Cargo `target` directory, so untracked build metadata is
+    neither parsed as provenance nor able to fail the digest test.
+  - [x] (2026-11-01) Fourteenth review round (DL-48). The default solver
+    selection now fails when the pinned `z3-solver` distribution cannot be
+    resolved instead of silently recording a `PATH` solver as the pin.
+  - [x] (2026-11-02) Fifteenth review round (DL-49). The Kani route builders
+    moved into a private `kani_probe` module, so the probe CLI is no longer
+    over the 400-line module limit, and the exact `vstd` pins in the three
+    Verus fixture manifests now state why a caret cannot express them.
+  - [x] (2026-11-02) Sixteenth review round (DL-50). The measurement workflow
+    pins `cargo-nextest` 0.9.150 and `cargo-llvm-cov` 0.9.1, the versions the
+    accepted hosted runs recorded, so a tool release cannot change the
+    pre-registered timings between runs.
+  - [x] (2026-11-03) Seventeenth review round (DL-51). Member manifests now
+    follow the D04 licence guard as the root does, so a non-accepted D04
+    changes both together instead of leaving the members on the literal ISC
+    requirement.
+  - [x] (2026-11-03) Eighteenth review round. The review of `3e10968` against
+    `9fa10a1` completed with no findings, so no further repair was required.
+  - [x] (2026-11-03) Nineteenth assessment round (DL-52). The hosted
+    completeness and proof assessments raised four findings: the single-root
+    helper body was unverified, the Verus record bound no sources, mutant
+    qualification ignored the diagnostic location, and an explicit solver was
+    attributed to the pinned distribution. All four are repaired, the plan's
+    Kani invocation description now matches the direct route, and both corpora
+    are regenerated.
+  - [x] (2026-11-03) Twentieth review round (DL-53). The formal review of
+    `c8db23e` raised six findings: the Kani record bound neither its manifest
+    nor its lockfile and named no child toolchain, the verifier-free hosted
+    record did not bind the staged inputs, the source scanner misread a
+    character literal holding `"`, the package contract checked no local
+    patches, and the mutant-location rule lacked focused cases. All six are
+    repaired and both corpora are regenerated; recapturing the hosted
+    observation at the repaired candidate follows this repair commit.
+  - [x] (2026-11-04) Cardinality-gate incident repair (DL-54). The
+    `[>8160s]` entry was a test that compiled the root package's whole
+    dev-dependency graph inside a nested `trybuild` build with no deadline. The
+    gate now lives in `tools/gates/cardinality-ui`, its own workspace, and
+    `make prepare-ui-gate` builds it before any test body runs. The root test
+    only locates the built binary and runs it under `CommandDeadline` with
+    `CARGO_MANIFEST_DIR` scrubbed. Three gate failures on the first candidate
+    were repaired: `tests/cardinality_gate_scope.rs` now uses
+    `cap_std::fs_utf8::Dir` and `camino` as the Whitaker
+    `no_std_fs_operations` rule requires; the `test` and `lint` routes assign
+    `RUSTFLAGS` on every Cargo command including the fetch steps, so the
+    inherited-flags contract holds; and the held-out-target contract reads a
+    target's own commands with `--old-file` on the preparation targets, since
+    `coverage` now depends on a development build of the gate. A narrow
+    spelling exception covers the linker's fixed spelling. Non-vacuity was
+    checked by
+    injecting `-Zthreads=8` into `COVERAGE_RUST_FLAGS` and observing the
+    expected failure, and by adding a gate-only fixture and observing the
+    bidirectional comparison reject it.
+- [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
+- [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
+- [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
+- [ ] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
+
+Each Red step records its log path and the names of the failing tests here. A
+Red state is never committed on its own, because it fails `make test`; it is
+committed together with its Green change.
+
+## Surprises & discoveries
+
+- EP-M1 observations (2026-10-28): `DataFrame::new` in Rust Polars 0.55.2
+  requires an explicit height. The `lazy` feature alone supports the required
+  Int64 and lazy-collection path. Kani can return zero with an unsatisfied
+  cover; statuses therefore remain transport checks, not proof verdicts. Its
+  verbose CBMC command omits an explicit unwinding-assertion flag, so that
+  capability remains inconclusive despite the observed failed unwind check.
+
+- Observation: Kani 0.68.0 and newer `vstd` releases exist, but the
+  pre-registered controls name Kani 0.67.0 and Verus 0.2026.09.06.8dea4a2.
+  Evidence: `cargo search kani-verifier` reports 0.68.0; the AC-01, AC-02,
+  AC-04, and AC-07 environments list the older pins. Impact: the pins stay.
+- Observation: Kani's `--harness-timeout` exists in 0.67.0 but is experimental
+  and requires `-Z unstable-options`. Evidence: `cargo kani --help`. Impact:
+  the timeout corpus case uses that flag, and the capability record marks it
+  `tested` with an experimental qualifier.
+- Observation: the Verus binary used for calibration is a local source build
+  under `~/.local/share/cuprum-verus-0.2026.09.06.8dea4a2`, and no Z3 binary is
+  installed outside `/tmp`. Evidence: `verus --version` and a filesystem
+  search. Impact: proof-tool installation must be scripted from release assets.
+- Observation: the published `vstd` release dated 2026-09-06
+  (`0.0.0-2026-09-06-0133`) is the candidate match for Verus
+  0.2026.09.06.8dea4a2, but date proximity is not identity. Evidence: crates.io
+  version list. Impact: EP-M1 confirms the match from the release contents.
+- Observation: Polars 0.55.2 is the newest Rust release and declares no
+  `rust-version`. Evidence: `cargo info polars@0.55.2`. Impact: its supported
+  compilers are established only by building it in each profile.
+- Observation: control AC-07 freezes `.github/workflows/ci.yml` by digest, and
+  the checker accepts exactly one `ci-build-test` workload and reads only the
+  `build-test` job's runner and timeout. Evidence:
+  `scripts/docs_validation/acceptance_registration.py`,
+  `scripts/docs_validation/ci_controls.py`,
+  `scripts/docs_validation/preregistration.py`. Impact: any CI change needs an
+  amendment and checker changes (DL-14).
+- Observation: hosted CI never runs `make test`; its test step is the shared
+  `generate-coverage` action with default features. Evidence:
+  `.github/workflows/ci.yml` lines 105-126. Impact: profile checks need their
+  own hosted steps, and coverage features must be set explicitly.
+- Observation: `leynos/rust-prover-tools` (at
+  `9c4a27a86c678ceac1155404f45d95ee4a14a172`, no tagged release) already
+  provides `prover-tools kani install`, `kani check-version`, `kani exec`,
+  `verus install`, and `verus run`. `kani exec` qualifies Kani 0.67.0 on Linux
+  x86_64 for repositories like this one: it strips the Cranelift backend, the
+  `mold` linker selection, and frontend threads from the child, keeps
+  `RUSTC_WRAPPER` admission wrappers, and supports a `cargo-llvm-cov` parent.
+  Evidence: its README and users' guide. Impact: the plan drops its own
+  installer and the in-place Kani risk largely dissolves; EP-M1 still records
+  the observed behaviour (DL-21).
+- Observation: the trust audit is read from the record itself, and
+  `VerifiedLogResult` carries no trust facts. Evidence:
+  `scripts/docs_validation/evidence_gate.py` lines 73-98, 192-199, 303. Impact:
+  registering a parser without binding the audit would let a fabricated audit
+  reach `bounded` (DL-16).
+- Observation (2026-10-31): hosted measurement run `41148253840` passed five of
+  seven jobs. `measure-profile (whitaker)` failed because
+  `dylint_driver v6.0.1` builds its driver by checking out `master` in
+  `rust-lang/rust-clippy`, whose default branch was renamed to `main` on
+  2026-10-28. `whitaker-installer` 0.2.9, the shared action's default and the
+  pin the frozen `ci.yml` uses, ships cargo-dylint 6.0.1; 0.2.11 ships 6.3.0,
+  whose `dylint_internal` no longer checks out `master`. Evidence: the run log,
+  `Cargo.lock` at both whitaker tags, and the two `dylint_internal` sources.
+  Impact: the frozen `ci.yml` whitaker route is broken upstream for reasons
+  unrelated to this candidate; the measurement workflow pins installer 0.2.11
+  with an independently verified digest, and the `ci.yml` bump belongs to the
+  AC-07 amendment at EP-M3 (DL-29). Local `make lint` passes because the local
+  driver is cargo-dylint 6.3.0.
+- Observation (2026-10-31): the same run's `verifier-free` job failed before
+  compiling the probe. The pinned `mold` binary is dynamically linked against
+  `libatomic.so.1`, which Rocky's clang package does not install, so every
+  container link exited 127 with "cannot open shared object file". Reproduced
+  locally against the committed image recipe
+  (`/tmp/epm1-verifier-free-red.log`); adding `libatomic` to the recipe makes
+  the wrapper link and run (`LINK_AND_RUN_OK`). Impact: the recipe installs
+  `libatomic` and a regression test guards the package list.
+- Observation (2026-10-31): after both repairs, hosted run `41163302274` passed
+  all seven jobs. Every route completed three cold runs; Whitaker's first run
+  paid a 34 s driver build (57.71 s against 23.10 s and 27.23 s warm), setup
+  took 61-80 s per job, and Clippy after rustdoc took 13.08 s, confirming that
+  those routes share dependency metadata. The verifier-free job reported
+  `status: pass` with exit 0 after proving `verus`, `cargo-kani`, and `~/.kani`
+  absent inside the container. Impact: the go/no-go rule is satisfied and the
+  milestone proceeds to EP-M2.
+- Observation (2026-10-31): the milestone review found that the new `Makefile`
+  declares its prover targets first, so a bare `make` adopted `install-kani` as
+  its default goal and would install a verifier instead of building. A dry run
+  without the fix prints exactly one recipe line,
+  `prover-tools kani install --repo-root .`. Impact: `.DEFAULT_GOAL := build`
+  pins the ordinary build and `tests/make_default_goal.rs` guards it.
+- Observation (2026-10-31): the review's suggested scratch-manifest split kept
+  only the `[lints.clippy]` table. Applying it literally would drop
+  `[lints.rust]` and `[lints.rustdoc]` from the in-place Kani workspace, so the
+  probe would compile under weaker rules than the crate. Impact: the repair
+  renames every lint table and stops at the next non-lint table, which keeps
+  the rules and still excludes `[dev-dependencies]`.
+- Observation (2026-10-31): VO-6's raw `contains` check was satisfied by the
+  kernel's own module documentation, so deleting the real `#![no_std]`
+  attribute still passed. Evidence: `crates/combobulate-kernel/src/lib.rs` line
+  3 names the attribute. Impact: the check now strips line comments, nested
+  block comments, and plain and raw string literals before matching, and the
+  new comment-only and literal-only cases fail against the previous
+  implementation.
+- Observation (2026-10-31): the review's remedy for the 575-line probe script
+  claimed that extracting only the verifier-free workflow leaves both modules
+  under 400 lines; the remaining script is about 460 lines. Impact: the shared
+  provenance writers and captured-output guard moved to `probe_provenance` as
+  well, which is a relocation rather than a decomposition of the Kani and Verus
+  workflows.
+- Observation (2026-11-04): moving the `trybuild` gate into its own package did
+  put the gate's manifest under the gate, but the root test still made
+  `trybuild` compile the *root* package. `trybuild` reads `CARGO_MANIFEST_DIR`
+  from its own process environment to choose the package whose manifest it
+  copies, and Cargo sets that variable to the root package for every root test
+  process. Evidence: after the gate binary was run from the repository root,
+  the generated `target/tests/trybuild/combobulate/Cargo.toml` listed `camino`,
+  `cap-std`, `googletest`, `rstest`, `serde`, and `serde_yaml` — the whole root
+  dev-dependency graph the gate package was created to exclude — while a run
+  with the working directory set to the gate and the variable removed compiled
+  only `cardinality-probe`, `cardinality-ui-gate`, and
+  `cardinality-ui-gate-tests`, green in 124.09 s. Impact: the root test removes
+  the variable from the child environment and sets the working directory to the
+  gate, which is where `trybuild` falls back to looking; both facts are now
+  recorded in the test's module documentation.
+- Observation (2026-11-04): the root test's binary lookup assumed the older
+  `target/debug/deps/` directory, but this Cargo places the gate's test binary
+  under `target/debug/build/<package>/<hash>/out/` on the pinned nightly. A
+  single-depth `deps` scan therefore found nothing and the test always reported
+  the gate as unbuilt. Impact: the lookup walks `target/debug/build` and keeps
+  the newest hash-named match.
+- Observation (2026-11-04): once the root test required a prebuilt gate binary
+  instead of compiling one, `make coverage` had a latent ordering defect. Its
+  recipe ran `cargo llvm-cov` over the workspace — which includes the root
+  `cardinality_probe_ui` test — and only afterwards ran `make test-ui`. The
+  gate therefore had to exist before the coverage run started, and the trailing
+  step ran it a second time. Impact: `coverage` takes `prepare-ui-gate` as a
+  prerequisite and no longer ends with `test-ui`.
+- Observation (2026-11-04): the workspace denies `panic_in_result_fn` while
+  `clippy.toml` sets `allow-expect-in-tests`. Together those mean `expect` is
+  available exactly inside a `#[test]` body and nowhere else, and a
+  `Result`-returning helper may contain no `assert!`/`panic!`. Extracted test
+  helpers therefore have to be infallible assertion functions taking values the
+  `#[test]` body already unwrapped, or fallible functions with no assertions.
+  Choosing the wrong shape produced a cascade of lint failures during this
+  round. Impact: extracted helpers in `tests/make_gate_order.rs` take a small
+  struct of recorded evidence and are infallible; fixture constructors in
+  `tests/process_deadline.rs` return `Result` and only the test bodies expect.
+
+## Decision log
+
+- DL-58 (2026-11-06). Fresh pre-merge assessments at head `3914065`, and the
+  one plan correction they earned. Both assessments echoed their
+  `Assessment-ID` and assessed base/head and came back clear within the
+  accepted EP-M1/EP-M2 scope: the completeness reply found no remaining
+  in-scope implementation gap after inspecting the withdrawal, the two new
+  regression cases, the gate-formatting contract, and the current-head package
+  result; the proof reply accepted the Verus and Kani fixtures as substantive
+  EP-M1 capability checks with no new in-scope defect, after independently
+  recomputing the recorded digests (Kani 11/11 sources and 14/14 logs, Verus
+  15/15 and 9/9). Neither reply starts a formal review or changes approval
+  status, and both retain EP-M3 through EP-M6 as outstanding.
+
+  The proof reply made four numbered corrections, of which only the second is a
+  plan defect. Corrections 1, 3, and 4 were defects in my *request* rather than
+  in the repository, so no tracked text changed for them: the plan never names
+  `proofs/verus/` or `proofs/kani/` (the fixtures live under
+  `tools/verifier-fixtures/`); its only `proptest` mention is DL-13's statement
+  that proptest establishes nothing here; and correction 4 (trusted basis) is
+  handled below. Those three are recorded in the reply to the assessment.
+
+  Correction 2 named the Kani invocation precisely and had two parts. For the
+  observations the plan was already right: DL-24 and DL-52 record the direct
+  driver route, the route is `KANI_PROBE_ROUTE ?= direct`, and the committed
+  provenance record's `route` field reads `direct` with all fourteen
+  observations invoking `kani-driver kani`. For the corpus listing it was
+  wrong, and that is the one plan change in this round: the Kani corpus
+  paragraph named `cargo kani list --format json` while the captured list
+  observation runs `kani-driver kani list --format json` through the same
+  direct route. The paragraph now names the driver and cites DL-24.
+
+  The trusted-basis correction is not recorded as a plan change because the
+  plan already carries it. AXIOM-02 admits "Kani 0.67.0 with its bundled CBMC
+  and CaDiCaL", AXIOM-03 admits "Verus 0.2026.09.06.8dea4a2 with Z3 4.16.0 and
+  the matching `vstd`" plus "`vstd`'s specifications and any `external` items
+  it uses", and EP-M4 requires `spec/toolchain-profiles.json` to record "each
+  tool's trusted computing base, including the rustup toolchains, the crates.io
+  `kani-verifier` crate, the unverified Kani bundle download, and
+  `rust-prover-tools` at its pinned commit". My request's phrase "no trusted
+  boundaries beyond the fixtures' own scaffolding" was the over-claim, and the
+  reply's correction matches what the plan already states.
+
+  The proof reply also reported that the comparison base was unavailable in its
+  checkout. The object is present here (`git cat-file -t 9fa10a1` → `commit`),
+  so introduction history remains inspectable by anyone with a normal clone;
+  the limitation is in the assessment environment, not the repository.
+
+- DL-57 (2026-11-06). Two follow-ups from the fresh pre-merge assessments.
+  The completeness assessment found one residual gate defect and two validation
+  omissions, and the proof assessment accepted the fixtures as capability
+  evidence while correcting an inventory claim.
+
+  The gate defect was real. `prepare()` wrote `RECORD` only after a successful
+  build, so a preparation that failed left the previous record usable and a
+  later `run` could execute a binary from an older build. `prepare()` now
+  withdraws the record before it starts and publishes a replacement only once
+  Cargo has named an executable; both failure shapes — non-zero Cargo, and a
+  successful Cargo naming no executable — were already covered from an empty
+  start, and each now also starts from a populated record and requires it to be
+  gone. The old regression cases could not have caught this: they began with no
+  record, which is the one state in which the bug is invisible.
+
+  The validation omissions are closed rather than argued. The gate package is a
+  separate workspace, so `make check-fmt` never reached it; it held an
+  unformatted assertion, and `make check-fmt` and `make fmt` now run
+  `cargo fmt --manifest-path tools/gates/cardinality-ui/Cargo.toml --all`
+  alongside the root pass. `tests/make_gate_order.rs` records that second pass
+  as its own `gate-formatting` stage, so the order contract fails when the
+  recipe drops it rather than passing on the strength of the root pass. The
+  first gate run after this change proved the point the hard way: the new
+  `cargo fmt` shape classified as `unexpected-cargo` and failed three order
+  tests, which is the contract doing its job. `make package` runs against the
+  committed candidate rather than this working tree, because `cargo package`
+  refuses a dirty tree and so cannot produce meaningful evidence before the
+  commit that makes it meaningful; the result is reported with the gate
+  evidence for the head.
+
+  The proof inventory was corrected in the assessment reply, not in the
+  fixtures: the Verus candidates check `result == value + 1` under
+  `value < 254`, not cardinality, and `_native_workspace()` writes a scratch
+  `probe-kernel` rather than importing the shipped one. Both are compiler and
+  wiring compatibility observations. The plan's EP-M1 scope does not require a
+  product-proof claim, and none is made.
+
+  The deadline-classification cases moved to
+  `scripts/tests/test_cardinality_ui_deadline.py` so the preparation module
+  stays under the 400-line limit as the new cases were added.
+
+- DL-56 (2026-11-06). EP-M1/EP-M2 residual assurance gaps, second round. The
+  reviewer confirmed the recaptured records and raised three narrower gaps, all
+  now repaired. First, the hosted record's digest test named four inputs
+  instead of the whole staged set. `test_verifier_record_digests` now compares
+  the record's `source_digests` keys with `staged_sources()` in both
+  directions, so a missing key hides no input and an extra key claims none the
+  build never read, and a regression case drops one staged key and requires the
+  same predicate to report exactly that key. The record itself already carried
+  all seventeen entries; the gap was in the guard.
+
+  Second, `resolve_z3` accepted injected seams but kept `uv tool run` and the
+  version command as its own defaults, so reading the function still described
+  a network and process side effect it performed by default. It is now two
+  steps: `select_solver` applies the selection policy and starts nothing, with
+  `_pinned_solver_executable` as a required parameter rather than a default, and
+  `qualify_solver` validates a version invocation the CLI observed.
+  `scripts/run_verifier_probes.py` runs that command at the command boundary
+  and passes the status and banner in. Only the default route is attributed to
+  `z3-solver==4.16.0.0`, as before. A new case asserts that qualification
+  starts no process, so the split is pinned rather than merely described.
+
+  Third, `_installation_toolchain` claimed the reading bound the record to the
+  compiler that actually ran. The record is a declaration by the release, so
+  the docstring, the `_kani_environment` docstring, and the provenance comment
+  now say so and point at the driver version check as the observation that ties
+  the run to a release. The developers' guide was corrected in both places. The
+  changed probe modules are bound by digest in both committed provenance
+  records, so both corpora were regenerated. Date/Author: 2026-11-06,
+  implementation agent.
+
+- DL-55 (2026-11-05). EP-M1/EP-M2 residual assurance gaps. A review of the
+  EP-M1/EP-M2 closure evidence raised five gaps, all now repaired. First, gate
+  preparation selected its binary by scanning
+  `tools/gates/cardinality-ui/target/debug/build` and taking the newest
+  modification time. That is not a binding to the build that just completed: an
+  inherited `CARGO_TARGET_DIR` redirects the output elsewhere, and a populated
+  tree can offer a stale binary. `scripts/cardinality_ui_gate.py` now reads the
+  executable from Cargo's own `compiler-artifact` JSON and records it, and the
+  root test runs exactly that path; clean-tree, redirected-target, and
+  stale-artefact cases pin the selection. Second, the bounded-execution
+  boundary did not cover every supported route: `make test-ui` ran the gate
+  through plain `cargo test`, with neither the root deadline nor nextest's
+  termination, and `tests/workspace_boundaries.rs` still had unbounded
+  `.output()` calls. `make test-ui` now runs the same recorded binary under the
+  same `timeout` shape, and the boundary reads go through `run_bounded`.
+
+  Third, escalation was misclassified. The predicate recognized only exit code
+  124, and the first repair replaced it with 137 on the theory that
+  `--kill-after` produces it. A direct probe of GNU `timeout` 9.5 disproved
+  that: without `--foreground` — which this helper must not use, because
+  `--foreground` signals the child alone instead of its process group —
+  `timeout` mirrors the child's ending signal by killing *itself*, so an
+  escalated run has **no exit status at all**. `subprocess` reports it as `-9`
+  and Rust exposes it through `ExitStatus::signal() == Some(9)`. Exit 137
+  appears only under `--foreground`. Both the Rust helper and the Python gate
+  now classify on signal 9 plus the verbose `sending signal KILL to command`
+  announcement, so an unrelated `SIGKILL` is not claimed as a timeout. This is
+  recorded because the wrong model was written into both code and the
+  developers' guide, and only a live probe distinguished them.
+
+  Fourth, `require_captured_output` documented `RuntimeError` while `.stat()`
+  leaked `FileNotFoundError`/`OSError`, and `resolve_z3` launched `uv tool run`
+  from inside a pure-looking resolver. The log path is now resolved once and the
+  `OSError` is chained into the documented boundary error, and the resolver
+  takes an injected discovery/execution seam so its command-side effect is
+  explicit at the call site. That seam still left the side effect inside the
+  resolver's default route; DL-56 moves it to the CLI. Fifth, focused contract
+  tests now cover the measurement workflow's route matrix and labels,
+  verifier-free staging and orchestration (with fake process and filesystem
+  dependencies), the captured output boundary, and the Kani route builders,
+  none of which require an installed verifier. The developers' guide's
+  lint-baseline text, its mtime-discovery description, and the escalation
+  paragraph were corrected to match.
+
+  The hosted record did not yet carry that evidence. It had been promoted from
+  a run whose generator predated `source_digests`, so it cited head `833ef0c5`
+  and run `41227443972` while binding none of the inputs it built, and
+  `test_verifier_record_digests` rejected it: `design-check` failed on the
+  previous head with an empty digest map. Removing and re-adding the
+  `measure-profiles` label fired `pull_request/labeled` against head `167aa82`,
+  and run `42170378137` passed both `verifier-free` and all six
+  `measure-profile` routes. The promoted record now names seventeen
+  `source_digests` covering everything `_stage_verifier_free_workspace` copies
+  — including `rust-toolchain.toml`, `.cargo/config.toml`,
+  `scripts/native-clang-linker.sh`, `scripts/build-tools-common.sh`, and
+  `tools/mold/VERSION` — together with the run identity, runner image, and
+  capture date. All seventeen were checked against the working tree, and the
+  record's `sha256` matches the committed log byte for byte. No path rewriting
+  was needed, because the generator already applies `portable_argument` at
+  capture time.
+
+  Making the gate a prerequisite of `make test`, `make lint`, and
+  `make coverage` exposed a harness defect. `tests/support/cargo_probe.rs`
+  substituted `CARGO` but left `PYTHON` reaching the real
+  `scripts/cardinality_ui_gate.py`, so preparation failed under a fake Cargo.
+  Teaching the fake to satisfy preparation was not an option: it would have
+  written a non-existent executable into the same build record that
+  `tests/cardinality_probe_ui.rs` reads, letting a fake route satisfy the real
+  gate. Substituting `PYTHON` with a recording stub removes both problems.
+
+  Two limits remain stated rather than closed. The bounded-execution boundary
+  covers the routes the review named, but sixty-five `.output()`, `.status()`,
+  and `.wait()` sites across twenty-five test files still run without a
+  deadline; they are short-lived fake-tool and `make` invocations, and widening
+  the boundary to all of them is follow-on work, not a claim made here. Also,
+  `tools/gates/cardinality-ui` is its own workspace with its own `rustfmt`
+  settings, so `make check-fmt`'s `cargo fmt --all` does not reach it; that
+  workspace carries pre-existing formatting drift. Date/Author: 2026-11-05,
+  implementation agent.
+
+- DL-54 (2026-11-04). EP-M2 cardinality-gate incident repair. The reported
+  `SLOW [>8160.000s]` for
+  `combobulate::cardinality_probe_ui checked_cardinality_result_must_be_used`
+  was not a Polars defect or a Cargo deadlock.
+  `cargo tree -e dev --all-features` lists no `polars` for the root package,
+  and the probe's `polars` sits behind a non-default feature, so the nested
+  build never compiled it. What it did compile was `trybuild`, hosted in the
+  root package, merging every root dependency and development dependency into
+  the crate it generates: a compile-fail check compiling the root graph inside
+  a nested Cargo build that no test timeout could see. The gate moved to
+  `tools/gates/cardinality-ui`, its own workspace holding only the probe and
+  `trybuild`; `make prepare-ui-gate` builds its test binary before any test
+  body, and the root test locates that binary, scrubs `CARGO_MANIFEST_DIR`, and
+  runs it under `CommandDeadline`. `CommandDeadline` wraps a command in GNU
+  `timeout`, so a nested build can no longer outlive its test.
+  `.config/nextest.toml` sets a 60 s slow warning with `terminate-after = 5`,
+  and the gate's `trybuild` case gets `terminate-after = 10` from measured cold
+  and warm runs; there is deliberately no `global-timeout`. Dependency
+  acquisition left the test bodies for `make prepare-dependencies`, because
+  nextest gives each test its own process and a fetch inside one would repeat
+  per test. Three gate failures on the first candidate were repaired. Whitaker's
+  `no_std_fs_operations` rule rejected `std::fs` in the new scope test, which
+  now uses `cap_std::fs_utf8::Dir` and `camino` handles; the `test` and `lint`
+  routes ran Cargo commands with no `RUSTFLAGS` assignment, dropping the
+  caller's flags, so every Cargo command in them now carries the standard
+  assignment; and `coverage` gained `prepare-ui-gate` as a prerequisite because
+  `llvm-cov` runs the root test, which made the held-out-target contract read
+  preparation's development build. That contract now uses
+  `--old-file=prepare-…` so it checks the measured recipe's own commands rather
+  than its prerequisites'. A narrow spelling exception covers the linker's
+  fixed spelling.
+
+  Measured on the committed candidate: the gate test passed in 195.232 s in a
+  warm full suite and in 443.24 s while 185 builds queued ahead. The gate's
+  `CommandDeadline` is therefore 15 minutes, deliberately above nextest's 600 s
+  termination point, so the queue cannot be misreported as a wedged gate. All
+  six local gates pass at `cd719c1`: `check-fmt`, `lint` (386 s), `typecheck`
+  (147 s), `test` (453 s; 383/383 nextest tests, 1 skipped, and doctests green),
+  `markdownlint`, and `spelling`. Evidence: `/tmp/lint-final.out`,
+  `/tmp/typecheck-final.out`, `/tmp/test-final.out`,
+  `/tmp/check-fmt-final.out`, and `/tmp/spelling-final.out`. Date/Author:
+  2026-11-04, implementation agent.
+
+  A hosted run of PR #22 then failed where no local gate could: `build-test`
+  reported `checked_cardinality_result_must_be_used` failing in 0.009 s with
+  `the cardinality gate test binary is not built`. The cause is that the hosted
+  lane runs `make lint` and then `leynos/shared-actions`'
+  `generate-coverage@dbe2e22c`, which invokes `cargo llvm-cov nextest` itself;
+  it never runs `make test`. `prepare-ui-gate` hung off `test` and `coverage`
+  only, so CI reached the root test with no prebuilt binary. `lint` now takes
+  both `prepare-dependencies` and `prepare-ui-gate`. The correction rule is
+  recorded in the developers' guide: a prerequisite on `test` alone is
+  invisible to CI however complete it looks locally. The gate-order contract
+  needed the extra stage in the `lint` route, and the developers' guide
+  paragraph was rewritten to match. Date/Author: 2026-11-05, implementation
+  agent.
+
+  Confirmed on `6848ed1`. Locally all seven gates pass: `check-fmt` 3 s, `lint`
+  331 s, `typecheck` 118 s, `test` 410 s (383/383, 1 skipped, doctests green),
+  `markdownlint` 16 s, `spelling` 46 s, `nixie` 2 s. On the hosted `build-test`
+  job the gate build ran inside `Lint` and took 5 s, because the action's
+  install steps already warm the Cargo cache, and
+  `checked_cardinality_result_must_be_used` then passed in 0.714 s, replacing
+  the 0.009 s failure. The job finished green in 3 m 22 s of its 8-minute AC-07
+  budget, with `design-check` green in 10 m 32 s. Evidence:
+  `/tmp/{check-fmt,lint,typecheck,test,markdownlint,spelling,nixie}-combobulate-1-2-1-establish-workspace-and-profiles.out`
+  and hosted jobs `126948077073` / `126948077338`.
+- DL-53 (2026-11-03). EP-M2 twentieth review round. The formal review of
+  `c8db23e` raised six findings, all verified and repaired. First, the Kani
+  provenance record bound neither the corpus manifest nor its lockfile; both
+  are now digested, and the record names the child SDK toolchain through the new
+  `KANI_SDK_TOOLCHAIN` constant, which `_kani_environment` also uses so a pin
+  bump must move both values together. Second, the verifier-free hosted record
+  bound no staged inputs; `staged_sources()` now enumerates the fixture tree
+  minus evidence records and build output plus the root toolchain, linker,
+  build-tool, and mold pin files, and `run_verifier_free` records a digest for
+  each. Third, the source scanner treated `'` as an ordinary character, so a
+  character literal holding `"` started a string skip that swallowed the
+  following attributes or `extern crate alloc;`; a `skip_char_literal` helper
+  now distinguishes literals from lifetimes, with `rstest` cases for `'"'`,
+  `'\"'`, and a lifetime plus a control test in the support module, which keeps
+  the touched files within the 400-line limit. Fourth, the package contract
+  asserted only `-p combobulate`; it now requires both `patch.crates-io` keys.
+  Fifth, the mutant-location rule lacked focused cases;
+  `scripts/tests/test_verus_qualification.py` covers a diagnostic inside the
+  mutant, in the preceding function, in another file, a relative path, two
+  failures, and a source without a mutant, which must raise. The Kani binding
+  assertions moved to `scripts/tests/test_kani_provenance_binding.py` for the
+  same size limit. Sixth, the hosted record named a different head; it is
+  recaptured at the repaired candidate with the staged-input digests. Both
+  corpora were regenerated. Evidence:
+  `/tmp/kani-log-corpus-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  `/tmp/verus-probe-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  and
+  `/tmp/focused-round20-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-11-03, implementation agent.
+- DL-52 (2026-11-03). EP-M2 hosted ExecPlan completeness and proof assessment.
+  The completeness assessment (comment 6593903939) and the proof assessment
+  (comment 6593931093) raised four findings, all verified and repaired. First,
+  the single-root candidate verified only its root functions, so the shared
+  `production::increment` body was never discharged; the probe now records a
+  third `single-root` observation that runs
+  `--verify-only-module=production --verify-function=increment` and requires
+  the selected-functions note with one verified function and no errors. A
+  temporary helper-body mutant was detected by that run and not by the full
+  `--verify-root` run, so the observation is sensitive to the body it claims.
+  Second, the Verus provenance record carried no `source_digests`; it now binds
+  the four candidate proof files, the shared production source, the workspace
+  manifest, lockfile, and member manifests, plus the probe modules, and the
+  provenance test requires a non-empty digest map for every record. Third,
+  mutant qualification accepted any failing run; it now requires exactly one
+  `postcondition not satisfied` diagnostic, exactly one error and no verified
+  function, a diagnostic path that resolves to the candidate source, and a line
+  inside the seeded mutant declaration's region. Fourth, an explicitly selected
+  solver was attributed to the pinned `z3-solver` distribution even though only
+  the default resolver consults it; `resolve_z3` now returns the distribution
+  only for the default selection and records `None` otherwise. The completeness
+  assessment also noted that the plan described the corpus through
+  `prover-tools kani exec` although the accepted route is direct (DL-24); the
+  plan now names the direct driver invocation. The added Verus builders moved
+  into a private `verus_probe` module so the CLI stays within the 400-line
+  limit, and both corpora were regenerated so their records bind the changed
+  sources. Evidence:
+  `/tmp/verus-probe-2-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  `/tmp/kani-log-corpus-combobulate-1-2-1-establish-workspace-and-profiles.out`,
+  and
+  `/tmp/focused-contract-2-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-11-03, implementation agent.
+- DL-51 (2026-11-03). EP-M2 seventeenth review round. The review completed
+  with one minor finding, verified and repaired. `check_package_policy` gated
+  the root manifest's ISC requirement on D04 being accepted, but the member
+  loop called `check_manifest` with the default `require_isc=True`. Had D04
+  been superseded or left proposed, the root could have changed licence while
+  every member still failed, which contradicts the checker's stated purpose of
+  applying the accepted decisions to every manifest. The D04 flag is now
+  computed once as `require_isc`, passed to the root and the member calls, and
+  reused when recording which rules were enforced. The docstring and the
+  developers' guide describe the shared licence guard, and
+  `test_every_member_carries_the_literal_policy` gained a proposed-D04 case
+  that admits a member with another licence. Evidence:
+  `/tmp/coderabbit-review-combobulate-1-2-1-establish-workspace-and-profiles-attempt20.out`.
+  Date/Author: 2026-11-03, implementation agent.
+- DL-50 (2026-11-02). EP-M2 sixteenth review round. The review completed with
+  one trivial finding, verified and repaired. The measurement workflow installed
+  `cargo-nextest` and `cargo-llvm-cov` with `cargo binstall` and no version,
+  so a release between runs could change the timings that feed the
+  pre-registered acceptance controls. The workflow recorded each tool's
+  `--version` output but did not fix it. The accepted hosted runs `41163302274`
+  and `41227443972` both recorded `cargo-nextest 0.9.150` and
+  `cargo-llvm-cov 0.9.1` in their `nextest` and `llvm-cov` artefacts, so the
+  install step now pins those exact versions and states why. Evidence:
+  `/tmp/coderabbit-review-combobulate-1-2-1-establish-workspace-and-profiles-attempt19.out`
+  and the downloaded artefacts under `/tmp/measure-ver-*`. Date/Author:
+  2026-11-02, implementation agent.
+- DL-49 (2026-11-02). EP-M2 fifteenth review round. The review completed with
+  two trivial findings, both verified and repaired. First,
+  `scripts/run_verifier_probes.py` had grown to 406 lines, over the
+  repository's 400-line module limit, so the Kani route builders (`kani_prefix`,
+  `_kani_arguments`, `_kani_observations`, and `_kani_in_place_observation`)
+  moved into a new private `kani_probe` module that only the probe scripts may
+  import. The test loader loads that module with the same stubs, the Kani
+  provenance source list now binds it, the developers' guide names it, and the
+  corpus is regenerated so the record re-binds its sources. Second, the exact
+  `=0.0.0-2026-09-06-0133` `vstd` pins in the attributes, companion, and macro
+  fixture manifests carried no rationale, so each now states that Verus rejects
+  a `vstd` that does not match the pinned verifier build and a caret
+  requirement cannot express that constraint. The CLI falls to 297 lines; both
+  focused suites and the full gates pass on the regenerated record. Evidence:
+  `/tmp/coderabbit-review-combobulate-1-2-1-establish-workspace-and-profiles-attempt18.out`.
+  Date/Author: 2026-11-02, implementation agent.
+- DL-48 (2026-11-01). EP-M2 fourteenth review round. The review completed with
+  one finding, verified and repaired. `resolve_z3` looked the pinned
+  `z3-solver==4.16.0.0` distribution up through `uv tool run` but ignored a
+  non-zero exit, leaving the `shutil.which("z3")` result in place. A system
+  solver that reported the calibrated banner would then be accepted, and
+  `_write_verus_provenance` would record `z3_distribution` as the pin for a
+  binary the pin did not supply. The default branch now raises instead of
+  falling back, and only an explicitly named solver skips the lookup. A test
+  supplies a failed resolver followed by a passing banner and asserts that the
+  run stops after the resolver; red was observed against the previous selection
+  logic (`RuntimeError not raised`), then green. The developers' guide records
+  the failure mode. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt17.out`.
+  Date/Author: 2026-11-01, implementation agent.
+- DL-47 (2026-11-01). EP-M2 thirteenth review round, on the head produced by
+  the rebase onto `main`. The review completed with one finding, verified and
+  repaired. The record scan walked the working tree, and the fixture crates are
+  excluded from the repository workspace, so Cargo builds them in place and
+  leaves untracked `target` JSON under the scanned root. That output could slow
+  the suite, and a top-level array would raise on `record.get` for a reason
+  unrelated to provenance. The walk moved into `_record_documents(root)`, which
+  skips a path any component of which is `target`, and a regression test writes
+  a `target` array beside a real record and asserts only the record is
+  returned. Red was observed without the filter
+  (`['metadata.json', 'provenance.json']` against the expected single record),
+  then green across the ten provenance tests. Limiting the scan to
+  `git ls-files` was rejected: the suite must run without Git, and a component
+  filter expresses the intent directly. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt16.out`.
+  Date/Author: 2026-11-01, implementation agent.
+- DL-46 (2026-11-01). EP-M2 twelfth review round. The review on head
+  `16a0353` completed with three findings, all verified and repaired. (a)
+  `workspace_lint_tables` is a public name whose docstring carried only prose
+  and a `Raises` section; it now documents its `manifest` parameter and the
+  returned tables, matching the rest of the support module. (b) The record walk
+  in the provenance test decomposed decoded JSON with `isinstance()` checks; it
+  now uses structural pattern matching, which six other Python modules in the
+  repository already use. This supersedes DL-43's decline of the same advisory
+  for that helper: the rewrite is behaviour-preserving and the standing
+  instruction is to action review requests unless they contradict the scope.
+  (c) The Kani provenance record still named the source digests from before the
+  round-11 rename, so three script digests no longer matched the files on disk;
+  `make kani-log-corpus` regenerated the record, all fourteen observation
+  statuses unchanged. The stale record also exposed a gap: no gate bound a
+  committed `source_digests` entry to the file it names, which is why the
+  400-line gate suite passed after the rename. A test now recomputes every
+  recorded digest and fails when a source changes without the record being
+  regenerated. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt14.out`.
+  Date/Author: 2026-11-01, implementation agent.
+- DL-45 (2026-11-01). EP-M2 eleventh review round. The review on head
+  `7faada6` completed with four findings, three of them interface gaps, all
+  verified and repaired. (a) `check_package_policy` passed every member to
+  `check_manifest` with the default publication guard, so once the D05
+  supersession and task 4.3.3 closure lifted the root guard, a released facade
+  would still fail because its path dependencies were members; the member loop
+  now forwards `require_unpublished` (the literal ISC requirement it kept then
+  was later applied through the same D04 guard as the root in DL-51), the
+  docstring describes that split, and
+  `test_release_approval_lifts_the_member_publication_guard` was observed red
+  against the old call and green after it. (b) The developers' guide still
+  named six helpers as they were spelled before the DL-44 rename; the paragraph
+  now uses the private names. (c) `refresh_candidate_fingerprint` and
+  `verifier_free_containerfile` were public names for helpers the guide calls
+  private and carried prose-only docstrings; they and four siblings named by
+  the same paragraph (`_write_kani_provenance`, `_write_verus_provenance`,
+  `_write_inconclusive_record`, `_stage_verifier_free_workspace`) were renamed
+  with their importers and tests, so the paragraph and the code agree. That
+  rename in turn left six more guide entries stale (`kani_arguments`,
+  `kani_observations`, `kani_in_place_observation`, `verus_environment`,
+  `verus_command`, and `qualified_candidates`), which were corrected in the
+  same edit so the guide names each helper exactly once. (d) The fourth finding
+  asked for DL-41 and DL-44 to cite a repository NumPy rule. No tracked file
+  states one (no `.coderabbit` configuration exists and no document requires
+  NumPy sections); the quoted `**/*.py` path instruction is hosted reviewer
+  configuration, so DL-44 now names it as such and DL-41's repository-level
+  rationale stands. The interface gap the finding describes is removed by the
+  renames above. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt13.out`.
+  Date/Author: 2026-11-01, implementation agent.
+- DL-44 (2026-11-01). EP-M2 tenth review round. The first request on head
+  `ae554c0` was rate-limited without a review, so the CLI backoff was applied
+  and the review completed on the retry with two `trivial` findings, both
+  verified against source and repaired. (a) `member_manifests` gained its
+  per-member rule in this milestone but the developers' guide still named only
+  `check_manifest` and `check_package_policy`; the package-policy paragraph now
+  documents the helper, the literal `license = "ISC"` and `publish = false`
+  requirement on every selected member, the failure for an unselected
+  `crates/*/Cargo.toml`, and the limit of its scope. (b) Six probe builders and
+  five support helpers had public names and one-line docstrings while the guide
+  describes them as private to the probe scripts. The rule the finding cites is
+  its `**/*.py` path instruction — hosted reviewer configuration, not a
+  document tracked in this repository (see the note above the Conformance
+  basis) — and the offered alternative, the underscore rename, matches the
+  documented intent and adds no lines against the 400-line limit; all eleven
+  helpers, their importers, the loader tuple, and the provenance test were
+  updated together. The finding also named `test_verifier_solver.py`; a search
+  confirmed it holds no reference to any renamed helper. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt11.out`
+  (rate limit) and `…-attempt12.out` (review). Date/Author: 2026-11-01,
+  implementation agent.
+- DL-43 (2026-11-01). EP-M2 ninth review round. The review on head `aa80909`
+  completed in 505 s with four `trivial` findings in
+  `scripts/tests/test_verifier_probe_provenance.py`, resolving to two coverage
+  gaps. (a) The scan read only `tools/verifier-fixtures`, so the Kani record at
+  `scripts/tests/fixtures/kani_logs/provenance.json` was never checked, and the
+  developer-guide sentence written in revision 16 overstated what the test did.
+  (b) The walk collected `command` arrays only, so a solver path recorded in
+  `z3` would escape the same rule. Both are repaired: `_RECORD_ROOTS` names the
+  two generator roots and `_recorded_paths` collects `command` arrays and the
+  `z3` string, with a focused test for the solver branch. The discovery test
+  was observed red on the missing Kani record before the change and green after
+  it; the committed values themselves needed no edit because both generators
+  already rewrote them. The advisory `match`/`case` rewrite was declined: the
+  repository sets no such rule, the finding's own replacement would convert
+  non-string command values the current code deliberately ignores, and the
+  existing branches are clearer here. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt10.out`.
+  Date/Author: 2026-11-01, implementation agent.
+- DL-42 (2026-11-01). EP-M2 eighth review round. The review on head `d92cbee`
+  raised one concern: `verifier-free-hosted.json` publishes twelve
+  `/home/runner/...` paths in its `command` array, contrary to the DL-39 rule
+  that committed metadata carries no host detail. Verified: the record derives
+  from hosted run `41227443972` on head `833ef0c`, which predates the
+  `portable_argument` change in `403996e`, and `f0b1650` replaced the build
+  script, digest, and provenance without touching those paths. Repaired by
+  applying the same rewrite a fresh capture now performs — repository root to
+  `<repo>`, home to `~` — and leaving the captured log untouched; recomputing
+  its digest still yields the recorded `2a81245b…`, so the binding holds. The
+  new test `test_committed_commands_publish_no_host_paths` scans every
+  committed fixture record and was observed red with exactly those twelve
+  arguments before the rewrite and green after it. Recapturing on the hosted
+  job was the reviewer's alternative; the in-place rewrite is preferred because
+  it changes no observation. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt9.out`.
+  Date/Author: 2026-11-01, implementation agent.
+- DL-41 (2026-10-31). EP-M2 seventh review round. The review on head `5e517d4`
+  completed with seven findings covering five distinct concerns. Three were
+  verified against source and repaired. (a) `raw_string_closes` consumed the
+  character it probed, so a raw string holding a bare quote before its
+  terminator (`r#"x""#`) hid every following crate attribute; the probe now
+  runs on a clone and commits only a complete `#` run, and the new test
+  `raw_string_content_quotes_do_not_hide_the_kernel_attributes` was observed
+  red before the fix and green after it. (b) `CargoManifest.workspace` was
+  declared required although member manifests omit it and callers read it
+  through `get`; it is now `NotRequired`. (c) `docs/repository-layout.md` now
+  records the generated `.verus/` release, which `make install-verus` unpacks
+  per worktree and Git ignores. A fourth concern, that `run_verifier_probes.py`
+  public helpers need structured NumPy sections, was declined: no repository
+  document states that rule, the file is 398 lines against the 400-line limit in
+  `AGENTS.md`, and peer probe modules use the same single-line form. The
+  remaining finding, that `Progress` listed `EP-M2` twice, was a defect
+  introduced by revision 14 and is repaired by this revision. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt8.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-40 (2026-10-31). EP-M2 sixth review round. The review on head `403996e`
+  raised one concern: the live dependency checks ran `cargo tree --target all`
+  under `--offline` without the dependency fetch the approved design specifies,
+  so a cold cache could leave other platforms' packages unresolvable. Verified
+  against the design record, which requires `--locked --offline` *after*
+  `cargo fetch --locked` and removal of `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS`,
+  and `CARGO_BUILD_TARGET` from the child environment; the implementation had
+  neither half. Both are now restored: a `OnceLock`-guarded
+  `cargo fetch --locked` populates every target before the first tree call, and
+  every live Cargo child clears the three selectors. A new contract test guards
+  the invocation shape. The cold-cache failure was not reproduced locally
+  because this host's cache was already warm, so the repair follows the
+  approved design rather than a reproduction. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt6.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-39 (2026-10-31). EP-M2 fifth review round. The review on head `890792e`
+  completed with two concerns sharing one root cause: committed provenance
+  recorded raw argument vectors and the resolved solver path, so the Kani and
+  Verus records published `/home/leynos`, the worktree identifier, and the uv
+  cache location. Repaired at the generators: `capture` executes the real
+  vector but records a portable copy, replacing the repository root with
+  `<repo>` and the home directory with `~`, and `write_verus_provenance`
+  rewrites the solver path the same way. The developer guide states the
+  convention, new tests cover the rewrite and the real execution, and both
+  corpora were regenerated with `make kani-log-corpus` and `make verus-probe`.
+  Captured observation logs stay verbatim, because they are the tool's own
+  output and rewriting them would break the digest that binds the evidence; the
+  guide states that the split is deliberate. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt5-retry1.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-38 (2026-10-31). EP-M2 fourth review round. The review on head `c4dd43f`
+  completed with two concerns, both verified against source and repaired. (a)
+  The user guide said the workspace "provides no public API yet", but the
+  unpublished kernel crate does expose `pub struct TargetFacts`; the sentence
+  now separates the empty facade from the kernel's single public type. (b)
+  `scripts/docs_validation/package_policy.py` passed Python types to
+  `typing.cast`; both calls now pass the annotation as a string, matching the
+  module's deferred-annotation posture. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt4.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-37 (2026-10-31). EP-M2 third review round. The confirmation review on
+  head `833ef0c` completed with five findings; each was verified and repaired.
+  (a) The hosted verifier-free record still embedded the pre-repair
+  `! command -v` script, so its recorded pass did not establish verifier
+  absence. The measurement workflow was dispatched on `833ef0c`; run
+  `41227443972` passed all seven jobs, and its `verifier-free` artefact was
+  copied with the record and both logs replaced together. The record now cites
+  the explicit branch script, digest `2a81245b…`, and head `833ef0c`. (b)
+  `provenance.json` recorded the pre-edit entry-script digest. The corpus was
+  regenerated; every observation status is unchanged, and the entry digest is
+  now `795f4ef4…`. (c) The developer guide called `KANI_PROBE_ROUTE=direct` an
+  explicit selection although the `Makefile` defaults to `direct` and the
+  script defaults to `helper`; both defaults are now stated. (d) Two comments
+  used non-oxendict spellings; they now read "recognize" and "parenthesized".
+  Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt3.out`
+  and
+  `/tmp/kani-log-corpus-round3-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-36 (2026-10-31). EP-M2 second review round. The milestone-close CodeRabbit
+  CLI review completed on head `8e1d7fa` (base `origin/main`, resolved to
+  `e61a744`) with five findings covering three distinct defects. (a) The
+  verifier-free build script used `! command -v verus` and
+  `! command -v cargo-kani`; bash does not apply `errexit` to a negated
+  command, so the container never proved the verifiers were absent. Each check
+  is now an `if command -v ...; then ... exit 1; fi` branch, and a new test
+  asserts both branches fail the build and that no negated form remains. The
+  `test ! -e "$HOME/.kani"` guard is unchanged. (b) VO-6 accepted any
+  occurrence of a lint name, so `#![allow(...)]` or `#![warn(...)]` satisfied a
+  required `deny`. The check now parses crate-level attributes in source order
+  and requires the final level for each lint to be `deny` or `forbid`; two new
+  rstest cases cover `allow`-only and `warn`-only sources, and a third covers a
+  later `allow` overriding an earlier `deny`. (c) `verus_command` touched the
+  candidate proof file while returning a command, mixing a command with a
+  query. The touch moved to `refresh_candidate_fingerprint`, called immediately
+  before each capture; `verus_command` is now pure. The entry script remains
+  398 lines. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-epm2-attempt2.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-35 (2026-10-31). EP-M2 milestone review repairs. The review raised five
+  unique concerns; each was verified against current source and repaired. (a)
+  VO-6 used `contains`, so a doc comment naming `#![no_std]`, or a string
+  literal naming the lints, satisfied the check after the real attribute was
+  deleted. The check now strips line comments, nested block comments, and plain
+  and raw string literals, then collapses whitespace, so
+  `extern /*c*/ crate alloc` is still caught. Three rstest cases prove comments
+  and literals cannot satisfy the boundary, two prove real declarations are
+  reported, and a control proves the real attribute set passes. (b) The
+  `docs/contents.md` entry said "(draft)"; it now records the approved and
+  in-progress status. (c) The `Conformance basis`, `Outcomes & retrospective`,
+  and revision notes now cover EP-M2. (d) `docs/repository-layout.md` gained the
+  `tools/` and measurement workflow rows and an ownership rule for facade,
+  kernel, macro, tests, and toolchain scripts. (e)
+  `scripts/run_verifier_probes.py` was 575 lines, above the 400-line rule. The
+  verifier-free workflow moved verbatim to `scripts/verifier_free_probe.py` and
+  the shared provenance writers to `scripts/probe_provenance.py`; the entry
+  script is now exactly 400 lines. The Kani and Verus command workflows stay in
+  the entry script: `test_verifier_solver.py` patches `run_command` and
+  `shutil.which` there, so moving them would be a decomposition, which the
+  review explicitly excluded. A new test asserts the container command keeps
+  `podman run`, `--network=none`, `--userns=keep-id`,
+  `--security-opt=label=disable`, the writable workspace and Cargo mounts, the
+  read-only `mold` mounts, the `bash -c` build script, and the
+  `test ! -e "$HOME/.kani"` guard. Because the producer digest changed,
+  `make kani-log-corpus` regenerated all fourteen observations with every
+  status unchanged (exit 0 overall), and `provenance.json` now records
+  `9b086e48d0568dcf5823022b4df9b1ad862ba4d671f1289deb815023e0546a39`,
+  `952d6c62183de6383e85647ec8ea393bf78fe416d109d50450a0bd9314c14417`, and
+  `ae38573c10cd59c1d1cfa5d6536ecf3837c0a7149b2bd672a2fd6a6b43e5d26e`. Evidence:
+  `/tmp/kani-log-corpus-1-2-1-establish-workspace-and-profiles.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-34 (2026-10-31). Two test-only dev-dependencies join the facade:
+  `googletest = "0.14.3"` and `serde_json = "1.0.154"`. `googletest` supplies
+  the matcher vocabulary EP-M2 mandates for `tests/workspace_boundaries.rs`, and
+  `serde_json` parses `cargo metadata` output and the canned JSON fixtures.
+  `serde_json` was already in `Cargo.lock` as a transitive dependency; the
+  kernel and macro crates keep empty dependency tables and the facade gains no
+  production dependency, so the conformance phrase "no new external dependency"
+  holds for the shipped graph. Evidence: `Cargo.lock` adds only `googletest`,
+  `googletest_macro`, `autocfg`, `num-traits`, and `rustversion`. Date/Author:
+  2026-10-31, implementation agent.
+- DL-33 (2026-10-31). `make package` becomes
+  `cargo package --locked -p combobulate` with two
+  `--config patch.crates-io.<member>.path='$(CURDIR)/crates/<member>'`
+  arguments. The facade now depends on two `publish = false` members (D05), and
+  `cargo package` resolves the rewritten registry versions while preparing the
+  tarball, before verification; without the patches it fails with "no matching
+  package named `combobulate-kernel` found". `--no-verify` does not help,
+  because preparation fails first. The patches restore the local members for
+  resolution only: the packaged manifest still declares `version = "0.1.0"`,
+  carries no `[patch]` table, and verification builds the facade. When D05 is
+  superseded and the members reach the registry, the patch arguments are
+  removed. Evidence:
+  `/tmp/package-probe-1-2-1-establish-workspace-and-profiles.out` (default
+  route fails), `/tmp/package-route-1-2-1-establish-workspace-and-profiles.out`
+  (candidate route verifies). Date/Author: 2026-10-31, implementation agent.
+- DL-32 (2026-10-31). The EP-M1 milestone-close CodeRabbit CLI assessment is
+  unavailable: three byte-identical runs of
+  `coderabbit review --agent --committed --fresh --base main` on head `242f03a`
+  returned `errorType: rate_limit` after 26- and 29-minute backoffs, and the
+  org has used all ten included reviews (`onDemandReviewAvailable: false`).
+  This is absence of evidence, not a clean review: no finding count may be read
+  as zero concerns. The six findings from the earlier review of `a560168` were
+  each verified against current source and repaired (DL-31). The local gates on
+  the final candidate passed. The hosted assessment therefore passes to
+  `pr-babysitting` unchanged, and the CLI assessment should be re-requested
+  once a review window reopens or usage-based reviews are enabled. Evidence:
+  `/tmp/coderabbit-review-1-2-1-establish-workspace-and-profiles-attempt{1,2,3}.out`.
+  Date/Author: 2026-10-31, implementation agent.
+- DL-31 (2026-10-31). EP-M1 review repairs. This entry supersedes only DL-27's
+  complexity and NumPy docstring disposition; every other DL-27 decision stands.
+  `kani` and `verus` now compose private builders (`kani_prefix`,
+  `kani_arguments`, `kani_observations`, `kani_in_place_observation`,
+  `write_kani_provenance`, `resolve_z3`, `verus_environment`, `verus_command`,
+  `write_verus_provenance`, and `qualified_candidates`), and the three CLI
+  commands carry NumPy-style `Parameters` sections so each route step is
+  readable and testable on its own. The builders change no command, log, or
+  provenance field; the regenerated corpus is the behavioural check. The
+  `Makefile` gains `.DEFAULT_GOAL := build`, because the prover targets are
+  declared first and a bare `make` otherwise ran `install-kani`; the Red state
+  is `/tmp/Makefile.red-check` reproduction and the guard is
+  `tests/make_default_goal.rs`. The measurement workflow's concurrency group
+  now includes the label name, so two measurement labels on one pull request
+  queue independently. The scratch workspace renames every lint table through
+  `workspace_lint_tables`, which keeps `[lints.rust]` and `[lints.rustdoc]`
+  instead of the review's weaker `[lints.clippy]`-only split, and stops a
+  following non-lint table from reaching the virtual manifest; the guard is
+  `scripts/tests/test_verifier_support_lints.py`. The verifier tests share one
+  stub loader, `scripts/tests/verifier_probe_loader.py`. Date/Author:
+  2026-10-31, implementation agent.
+- DL-30 (2026-10-31). Hosted cost go/no-go: proceed. All six routes passed
+  three cold runs and verifier-free isolation passed on a fresh runner.
+  Predicted job size is the slowest cold run plus fixed setup overhead; the
+  largest is the UI route at 134.23 s + 73 s = 207 s, inside the 6-minute
+  ceiling, and peak memory is 2.10 GiB, far below the 12 GiB stop. Single-root
+  Verus wiring and the in-place Kani run already succeeded without weakening
+  the ordinary build standard (DL-24, DL-26). Evidence: hosted run
+  `41163302274`, `Artefacts and notes`, and
+  `tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`.
+  Date/Author: 2026-10-31, implementation agent.
+
+- DL-29 (2026-10-31). Repair the hosted measurement without touching the frozen
+  CI. Measure the Whitaker route with `whitaker-installer` 0.2.11 (cargo-dylint
+  6.3.0), because 0.2.9's dylint 6.0.1 driver cannot build after the rust-clippy
+  `master` to `main` rename; the digest `a32a665d…e5410236` was verified by an
+  independent download. Leave `.github/workflows/ci.yml` unchanged: its
+  installer bump is a required job change and lands with the sponsor-approved
+  AC-07 amendment at EP-M3. Install `libatomic` in the verifier-free image so
+  the pinned `mold` linker can run. Rationale: both failures are environment
+  defects, not candidate behaviour, and measuring the runnable route is what
+  the job-split prediction needs. Date/Author: 2026-10-31, implementation agent.
+- DL-28 (2026-10-30). The sponsor raised the EP-M1 changed-line limit to 3,600
+  so the solver-selection fix, its durable regression test, and the regenerated
+  verifier logs can land in one gated commit. The fix resolves the pinned Z3
+  distribution whenever the default `z3` name is used and keeps version
+  checking for an explicitly named solver, which is the smallest change that
+  satisfies the review finding without weakening the calibrated-solver rule.
+  Date/Author: 2026-10-30, implementation agent at the sponsor's direction.
+- DL-27 (2026-10-28). Review fixes exact counts, pins, and solver selection.
+  Retain literal command provenance and the DL-21/VO-15 Kani preflight. The
+  proposed complexity/NumPy rules have no repository instruction basis; retain
+  existing interfaces. Duplicate findings share these dispositions.
+
+- DL-24 (2026-10-28). The pinned helper refuses the existing backend keys with
+  `Kani exec cannot prove isolation of Cargo backend configuration`. The
+  explicit direct probe route uses the matching SDK's LLVM backend and runtime
+  in the child, preserves compiler admission, and changes no ordinary Cargo
+  configuration or executable body. Installation/version checks stay with the
+  helper. Log: `/tmp/kani-first-combobulate-epm1.out`.
+- DL-25 (2026-10-28). The checked Verus archive contains no Z3 executable.
+  Use the pinned `z3-solver==4.16.0.0` tooling distribution, independently
+  check Z3 4.16.0, and pass its resolved executable to the helper. This is a
+  solver transport choice, not a solver-version or control-threshold change.
+- DL-26 (2026-10-28). `cargo-verus` omits function-selection arguments from
+  its fingerprint; refresh the candidate timestamp before each positive and
+  mutant run. A cached zero-exit run without a fresh count is not evidence.
+  Macro, optional-attribute, and single-root wiring passed exact positive and
+  mutant counts; companion wiring could not see its ordinary dependency's
+  specification. Prefer single-root wiring because it adds no kernel Cargo
+  dependency. Hosted costs and verifier-free isolation remain pending.
+
+- DL-01. Decision: the root package remains the `combobulate` facade and also
+  becomes the workspace root, with members under `crates/`,
+  `exclude = ["tools"]`, and `default-members` listing all three packages.
+  Rationale: the repository contract tests in `tests/` already belong to the
+  root package, and the Make, coverage, packaging, and Whitaker contracts are
+  written against it; a virtual root would move all of them for no semantic
+  gain. The exclusion is needed because the calibration probe is a path
+  dev-dependency with its own `[workspace]` table. Date/Author: 2026-10-22,
+  planning agent.
+- DL-02. Decision (direction accepted by the sponsor, 2026-10-22; D16 itself
+  is accepted after EP-M4): ADR-0010 records the crate boundary, dependency
+  direction, feature profiles, gate feature lists, the proof-dependency
+  allowlist for task 1.2.4, the selected Verus wiring, and the
+  supported-toolchain set. It resolves candidate subjects CA3 and CA5 and
+  answers ToR Q3 with a supported-toolchain set rather than one MSRV. A new
+  decision is used because accepted decisions are append-only
+  (`scripts/docs_validation/freeze.py`); superseding D07 would restate all
+  eight candidate dispositions. The `adr` disposition schema has no `bet`
+  field, so CA5's link to B01 is carried by ADR-0010, which states that B01 can
+  still falsify the kernel in task 1.2.4. Rejected alternative: a separate
+  `combobulate-polars` adapter crate (see DL-19). Date/Author: 2026-10-22,
+  planning agent.
+- DL-03. Decision (accepted by the sponsor, 2026-10-22): CI shape for the
+  Polars-enabled profile. Options: (A) one `build-test` job with Polars in
+  every route, which risks the hard timeout on every cold cache; (B) keep
+  `build-test` on the native-only profile and add parallel Polars-enabled lint
+  and test jobs, each sized from hosted measurements; (C) defer the facade's
+  Polars dependency to task 1.2.6, which contradicts this task's success
+  criterion. Recommended: B, with GitHub Actions sccache, coverage and Whitaker
+  target caches, and cache saves only on `main`. Every option edits `ci.yml`
+  and so needs DL-14. Coverage keeps measuring the native-only profile;
+  `coverage-main.yml` changes in the same commit so that its baseline uses the
+  same features. Date/Author: 2026-10-22, planning agent.
+- DL-04. Decision: the kernel is `#![no_std]` without `alloc` and declares no
+  dependency in this task. Its only item is `TargetFacts`, which reports the
+  target's `usize` width as a constant evaluated for the compilation target.
+  Rationale: technical design §3 asks the kernel to avoid unnecessary
+  allocation and external state, and §18.1 forbids substituting the host's
+  pointer width for the target's. Allocation can be admitted later only by an
+  ADR-0010 amendment. Date/Author: 2026-10-22, planning agent.
+- DL-05. Decision (accepted by the sponsor, 2026-10-22): `combobulate-macros`
+  is created now as a `proc-macro = true` crate with no exported macro and no
+  dependency; the facade's default `macros` feature enables it. Rationale: the
+  task requires the macro boundary to exist, and its wiring and build cost
+  belong in the profile record and AC-04, but adding `syn` or a placeholder
+  macro before task 2.3.1 would be speculative. Alternative: defer the crate,
+  which narrows this task's stated scope. Date/Author: 2026-10-22, planning
+  agent.
+- DL-06. Decision: the macro crate must not depend on the kernel, and the
+  kernel may not appear in any build-dependency or procedural-macro closure.
+  Rationale: a procedural macro and a build script run on the host, so
+  host-side kernel evaluation would substitute host facts for target facts
+  (technical design §18.1). Date/Author: 2026-10-22, planning agent.
+- DL-07. Decision (accepted by the sponsor, 2026-10-22): task 1.2.1 builds and
+  registers the Kani parser only; task 1.2.4 builds and registers the Verus
+  parser. Rationale: the roadmap's three named log classes are Kani outcomes,
+  and task 1.2.4 registers parsers "for this kernel's evidence". The
+  trust-audit scanner covers both vocabularies now. Date/Author: 2026-10-22,
+  planning agent.
+- DL-08. Decision: the parser and scanner are Python modules in
+  `scripts/docs_validation/`, beside the gate they feed. Rationale: the gate,
+  `VerifiedLogResult`, and `AdmissionContext` are Python, and ADR-0009 keeps
+  the Python gate as the reference model until task 1.2.4. Helper sweep:
+  `scripts/docs_validation/grammar.py` `tokenize` recognizes the macro-grammar
+  corpus only, does not handle comments or literals, and is due for deletion
+  after task 2.3.1, so it is not reused. Date/Author: 2026-10-22, planning
+  agent.
+- DL-09. Decision: a skipped harness is defined against a committed harness
+  manifest: any claim harness listed in the manifest without a result in the
+  log is skipped. The manifest is bound by digest as a result artefact of the
+  record, and `make design-check` requires its harness set to equal a lexical
+  scan of `#[kani::proof]` and `#[kani::proof_for_contract]` items in the
+  corpus sources. Rationale: a log cannot show what it omits; the bound
+  manifest makes absence observable. Date/Author: 2026-10-22, planning agent.
+- DL-10. Decision: the 1.2.1 Kani parser always derives `partial` bounds, so
+  no 1.2.1 record can reach `proof` through Kani. Deriving `type-complete`
+  moves to task 1.2.4 with its own mechanical rule (every harness input is
+  `kani::any()` of the declared type, the scanner finds no assumption or stub
+  in the harness, unwinding checks are observed) and ADR-0009 amendment.
+  Rationale: a manifest declaration of type-completeness would be
+  self-reporting on the one field that separates `proof` from `bounded`.
+  Date/Author: 2026-10-22, planning agent.
+- DL-11. Decision: no glam feature is declared in this task. Rationale: glam is
+  opt-in and has no consumer until task 5.2.1; an unexercised feature would be
+  an untested profile. The kernel boundary forbids glam regardless.
+  Date/Author: 2026-10-22, planning agent.
+- DL-12. Decision (accepted by the sponsor, 2026-10-22): the draft PR title is
+  `Plan: establish the workspace and pinned profiles (1.2.1)`. Rationale: the
+  request asked for `(1.1)`, but this task is roadmap item 1.2.1 and earlier
+  PRs used the number of the item they delivered. Date/Author: 2026-10-22,
+  planning agent.
+- DL-13. Decision: neither Verus, Kani, nor `proptest` is used to establish a
+  property of the Rust code in this task. Rationale: `TargetFacts` and
+  `BuildProfile` are finite and definitional, so a lemma, harness, or generated
+  property over them would be vacuous; the profile matrix is finite and checked
+  exactly. The contractual logic introduced here is the Python parser's
+  decision function, which receives an exhaustive enumeration check instead
+  (VO-11b). Verus and Kani run only as probe subjects and log producers.
+  Date/Author: 2026-10-22, planning agent.
+- DL-14. Decision (direction accepted by the sponsor,
+  2026-10-22; final text approved at EP-M3): the AC-07 amendment described in
+  `Sponsor decisions` item 2, with matching changes to `ci_controls.py` and
+  `preregistration.py` so that the checker accepts several required jobs and
+  reads each job's runner and timeout. Date/Author: 2026-10-22, planning agent.
+- DL-15. Decision (direction accepted by the sponsor,
+  2026-10-22; final text approved at EP-M4): the AC-04 amendment described in
+  `Sponsor decisions` item 3. If the selected Polars feature set differs from
+  the calibrated `lazy` set, the amendment records the difference. Date/Author:
+  2026-10-22, planning agent. On 2026-10-28 the sponsor directed that the
+  amended measurement follow the rebased target configuration: warm builds
+  reuse the target directory with incremental compilation disabled. Record the
+  changed workload and environment in the amendment before measurement.
+- DL-16. Decision (direction accepted by the sponsor,
+  2026-10-22; final text approved at EP-M5): amend ADR-0009 so that
+  `AdmissionContext` also carries scanner-derived trust audits. The I/O shell
+  checks the digest of every source file the harness manifest names, runs the
+  scanner over them, and passes a `VerifiedTrustAudit`; `abstract_record`
+  derives `trust = 'unaudited'` unless an audit bound to the record's sources
+  has an item multiset `(item, location)` equal to the record's. The shell
+  accepts only Git-tracked log, manifest, and source paths inside the
+  repository. A record whose `method.tool` names a registered parser must have
+  `evidence_kind` deductive or bounded, so a Kani run cannot be relabelled as a
+  test to bypass the parser. Date/Author: 2026-10-22, planning agent.
+- DL-17. Decision (direction accepted with DL-16): the matching rule for the
+  ADR-0009 vocabulary. The scanner lexes Rust, skips comments and literals, and
+  reports an identifier as a trusted item when it is (i) a Kani vocabulary item
+  reached through a path or `use` tree rooted at `kani`, including
+  `kani::any_where` and `#[cfg_attr(kani, kani::stub(..))]`; (ii) a Verus
+  vocabulary item inside a `verus!` body, a `#[verifier::…]`, `#[verifier(…)]`,
+  `#[verus_verify(…)]`, or `#[verus_spec(…)]` attribute, a `cfg_attr` carrying
+  one of those, or a `use` tree rooted at `vstd` or `verus_builtin`; or (iii)
+  any unqualified vocabulary identifier in a file that imports from `kani`,
+  `vstd`, or `verus_builtin` by glob or alias. An unqualified `should_panic`,
+  `assume`, or `external` in a file with no such import is ordinary Rust and is
+  not reported. The Verus list also covers `external_trait_specification`,
+  `assume_specification[…]`, and `exec_allows_no_decreases_clause`.
+  Date/Author: 2026-10-22, planning agent.
+- DL-18. Decision: ordinary Make gates stop using `--all-features`. Each gate
+  route runs per gate profile with an explicit feature list (native-only:
+  `--no-default-features`; Polars-enabled: default features), selected by
+  `GATE_PROFILE`, which defaults to running both locally. Rationale: a future
+  `verus` feature would otherwise enter every ordinary route, and
+  `--all-features` never lints `cfg(not(feature = "polars"))` code.
+  Date/Author: 2026-10-22, planning agent.
+- DL-19. Decision: the Polars code stays in a crate-private facade module,
+  `src/polars_backend.rs`, rather than a separate `combobulate-polars` crate.
+  Rationale: a separate crate saves no CI time (the default build still pulls
+  Polars), contradicts the three-crate arrangement in technical design §3, and
+  would force a premature `combobulate-core` split once the adapter needs
+  facade-owned traits. VO-14 enforces confinement instead. ADR-0010 lists the
+  adapter crate as a rejected option, to be revisited when task 1.2.6 or 4.2.1
+  needs facade-owned traits in the adapter. Date/Author: 2026-10-22, planning
+  agent.
+- DL-20. Decision: delivery uses one stacked PR per milestone (the
+  `github-stacks` skill), with a commit after each gated Green or Refactor
+  step. Date/Author: 2026-10-22, planning agent.
+- DL-21. Decision: prefer `rust-prover-tools` as installer and runner
+  for Kani and Verus, following the `kani` and `verus` skills' project
+  on-ramps. Pins live in `tools/kani/VERSION`, `tools/verus/VERSION`,
+  `tools/verus/SHA256SUMS`, `tools/verus/README.md`, and
+  `tools/rust-prover-tools/REF` (repository, branch, a 40-character `ref`, and a
+  `verify` command that fetches the pinned commit). Make targets
+  `install-kani`, `kani-check`, `install-verus`, and the probe targets delegate
+  to `$(PROVER_TOOLS)`; every proof target depends on `kani-check`. Kani runs
+  through
+  `prover-tools kani exec --installation <kani-0.67.0> --cwd <proof package>`
+  from the proof package, never with `--manifest-path`. Rationale: the user
+  directed that the plan use these helpers; they already solve pinning,
+  checksum verification, toolchain discovery, and this repository's build
+  standard, and the estate's reviewers reject repository shell installers.
+  Date/Author: 2026-10-22, planning agent at the sponsor's direction.
+- DL-22. Decision: the EP-M1 Verus wiring probe adds candidate (d), the
+  estate's established single-root pattern: production source carries
+  `cfg_attr(verus_keep_ghost, …)` specification attributes that are inert in
+  ordinary builds, and a proof root under `verus/` imports the production
+  module with `#[path]`, run by `prover-tools verus run --proof-file`. A design
+  check asserts that each `#[path]` target and the referenced items still
+  exist. Rationale: (d) adds no dependency to the kernel, so VO-1 and VO-3 hold
+  unchanged, and Verus compiles the same production source rather than a mirror
+  (technical design §17.2). Candidates (a) to (c) remain for comparison; (d) is
+  preferred if it passes the same exact-count acceptance. Date/Author:
+  2026-10-22, planning agent.
+- DL-23. Decision: formal jobs stay outside `ci.yml` in this task. Kani and
+  Verus run in a separate, non-required workflow on a weekly schedule and on
+  manual dispatch; a pull-request `kani-smoke` job arrives with task 1.2.4's
+  first shipped harnesses. Until then, `make kani` and `make kani-full` are
+  explicit stubs that print `FORMAL-SKIP: <target> not yet implemented` and
+  exit 0 unless `FORMAL_STRICT=1`. Rationale: there is no shipped harness to
+  run, and a required formal job would enter AC-07's amended workload for no
+  evidence. Date/Author: 2026-10-22, planning agent.
+
+## Design review record
+
+Four reviewers covered the panel's lenses on commit `7d31060` on 2026-10-22:
+structural integrity and contracts; verification and gate soundness; scaling,
+cost, and failure modes with a pre-mortem; and alternatives, long-term
+viability, and governance. Verdict: proceed with conditions. Every finding was
+applied in this revision.
+
+The design flaws found, and their resolutions, were these. The draft's checks
+trusted `cargo metadata`'s resolve graph, which is not the built feature graph;
+the checks now use `cargo tree` for closures and `cargo metadata --no-deps` for
+declared edges. Inheriting `license` and `publish` would have broken the
+package-policy checker; the fields stay literal. `make package` would break
+silently; path dependencies get versions and the real route runs in EP-M2.
+Editing `ci.yml` fails `make design-check` without an AC-07 amendment, under
+any CI option; DL-14 adds the amendment and checker changes. AC-04 was bound to
+the calibration probe, not the facade; DL-15 adds its amendment.
+`tests/make_gate_order.rs` already breaks the 400-line limit; EP-M2 splits it
+first. The vocabulary would have flagged ordinary Rust; DL-17 states the
+matching rule. The trust audit remained self-reported after registration; DL-16
+binds it. The mutation property could pass because mutants failed the digest
+check first; VO-11 now recomputes digests. The hosted-cost prediction used
+medians and a factor calibrated on Python suites; EP-M1 now measures on a
+hosted runner and sizes jobs by the slowest run.
+
+The pre-mortem scenarios (cache thrash, Polars pin churn, runner resource
+exhaustion) appear in `Risks` with mitigations. The strongest alternative, a
+separate Polars adapter crate, is recorded and rejected in DL-19.
+
+## Outcomes & retrospective
+
+EP-M1 is complete. Local probes, the Kani corpus, and the measurement workflow
+are implemented and gated, and hosted run `41163302274` measured every route
+and proved verifier-free isolation. Single-root Verus wiring preserves a
+dependency-free ordinary kernel and passed its seeded mutant check. The
+captured corpus supports the later parser work; no parser is registered and no
+product theorem is claimed. The predicted required-job sizes are recorded in
+DL-30 for the EP-M3 CI shape.
+
+EP-M2 is complete. The workspace now has a `#![no_std]` kernel owning
+`TargetFacts`, an empty procedural-macro crate, and a documentation-only
+facade. Dependency direction, backend exclusion, verifier exclusion, and the
+kernel's `no_std` boundary are checked by `tests/workspace_boundaries.rs`
+against the live Cargo graph and canned non-vacuity fixtures. The lint checks
+require the final crate-level level to be `deny` or `forbid`, so an `allow` or
+`warn` mention cannot satisfy the boundary. The package policy checks every
+member the root globs select. `make package` verifies through the patched route
+in DL-33. All commit gates passed sequentially on `f0b1650`: `make check-fmt`,
+`make lint` (rustdoc `-D warnings`, Clippy, Whitaker, interrogate 100%),
+`make test` (364 nextest cases passed, one skipped; the kernel doctest passed),
+`make design-check` (447 unittest cases; 526 pytest cases plus 691 subtests),
+`make markdownlint` with the spelling gate, `make nixie`, and `make package`,
+which packaged and recompiled `combobulate v0.1.0` from the unpacked tarball.
+The recorded hosted verifier-free evidence now matches the repaired build
+script, from measurement run `41227443972`, and the Kani corpus records the
+current producer digest. The workspace layout is published without claiming the
+array algebra or `comb!` notation, which remain unimplemented.
+
+The gate counts above describe `f0b1650`, the commit at which EP-M2 first
+became complete. The review rounds that followed tightened the evidence without
+changing that scope: the package policy forwards the release state to every
+selected member, the probe helpers that only the probe scripts use were made
+private, and the record tests gained a portability scan and a digest-binding
+check that fails when a recorded `source_digests` entry no longer matches its
+source. The counts measured on the candidate recorded in this revision are 366
+nextest cases with one skipped, 441 unittest cases, and 520 pytest cases plus
+698 subtests. They shrink relative to the pre-rebase figures because the target
+branch retired preregistration cases, so the plan quotes the current
+measurement rather than the historical one. The gate evidence for the final
+candidate is held in the delivery ledger rather than duplicated here.
+
+## Context and orientation
+
+Combobulate is a proposed Rust library for inspectable array and
+typed-collection algebra with a first-class Polars route and a proof-first
+delivery discipline. Until this task, the Rust code is a scaffold: `Cargo.toml`
+declares one package, `combobulate`, with no runtime dependency, and
+`src/lib.rs` holds only a disposable `greet()` stub tested by `tests/stub.rs`.
+The rest of `tests/` holds repository contract tests that check the Makefile,
+the workflows, the toolchain pin, and the build standard, not library behaviour.
+
+The repository's build standard pins `nightly-2026-08-27` in
+`rust-toolchain.toml`, uses Cranelift for development builds and `mold` as the
+linker through `scripts/native-clang-linker.sh` (configured in
+`.cargo/config.toml`), and runs gates through the `Makefile`: `make check-fmt`,
+`make lint` (rustdoc, Clippy, Whitaker, Python docstring coverage), `make test`
+(nextest plus doctests), and `make design-check` (the Python design-contract
+checker in `scripts/check_docs.py` and its tests under `scripts/tests/`).
+Hosted CI (`.github/workflows/ci.yml`, job `build-test`, 8-minute timeout) runs
+the formatting, spelling, audit, and lint gates, then tests through the shared
+`generate-coverage` action rather than `make test`.
+
+The design-contract checker is the repository's governance machine. Decisions
+live in `spec/decisions.json` and are rendered into
+`docs/decision-register.md`. The roadmap in `docs/roadmap.md` is exported to
+`spec/roadmap.json`; a task may be ticked only when its prerequisites are
+ticked, its completion record in `spec/task-completion.json` cites accepted
+decisions and resolvable artefacts, and every linked proof-obligation component
+is satisfied (rule MS-4 in ADR-0009). No component in
+`spec/proof-obligations.json` is linked to task 1.2.1. Acceptance controls in
+`spec/acceptance-controls.json` freeze their workload sources by SHA-256; a
+changed source fails the checker until a sponsor-approved amendment records the
+new digest (ADR-0008).
+
+The evidence gate in `scripts/docs_validation/evidence_gate.py` abstracts a
+proof-evidence record (schema version 2, `spec/proof-evidence.schema.json`) to
+ten finite fields and admits it at a level: `proof`, `bounded`, `tested`,
+`restricted`, or `rejected`. A verifier verdict counts as parsed, rather than
+self-reported, only when a registered log parser supplies a matching
+`VerifiedLogResult` for the record's tool, log path, and digest. The registry
+`spec/evidence-reason-codes.json` registers no parser today, so every verifier
+record is rejected with `verdict-self-reported`. The fixture
+`scripts/tests/fixtures/evidence/log-parsers.json` pretends a Kani parser
+exists so tests can reach the `bounded` level.
+
+A calibration probe in `tools/calibration/cardinality-probe/` is a standalone
+crate with its own `[workspace]` table, used to measure verifier and build
+costs for the acceptance controls. It is frozen and is not the shipped kernel.
+
+Terms used in this plan:
+
+- Facade: the `combobulate` crate that consumers depend on.
+- Semantic kernel: `combobulate-kernel`, the small crate that will own checked
+  shape, index, cost, and admission rules shared by runtime, constant
+  evaluation, Kani, and Verus.
+- Profile: a named combination of crates, features, toolchain, target, and
+  command. This task defines four: `native-only` (facade with
+  `--no-default-features`), `polars-enabled` (facade with default features,
+  which are `macros` and `polars`), `proof-kani` (kernel and native-only facade
+  under `cargo kani`), and `proof-verus` (kernel under `cargo verus`, wiring
+  selected in EP-M1).
+- Gate profile: the profile a Make gate route runs under, selected by
+  `GATE_PROFILE` (`native-only`, `polars-enabled`, or both).
+- Capability record: an entry stating what a pinned tool did on a probe, with
+  a status of `documented` (stated upstream, not exercised), `tested`
+  (exercised here and behaved as recorded), `unsupported` (exercised and
+  refused or failed), or `inconclusive` (exercised without a decisive result).
+  Roadmap task 1.2.6 uses the same four statuses for Polars.
+- Trusted computing base (TCB): the components whose correctness a result
+  assumes rather than checks, such as the compiler, the verifier, and the
+  solver.
+- Harness manifest: a committed JSON file listing a corpus crate's Kani
+  harnesses, each with a role (`claim` or `control`), its declared covers, and
+  for a control the property it must fail; it also lists the source files and
+  their digests. Its harness set is checked against the sources.
+- Component architecture document: technical design §3 and its component
+  table; this repository has no separate architecture document.
+
+## Conformance basis
+
+EP-M1 adds no shipped API or dependency and leaves frozen calibration sources
+and `ci.yml` unchanged. EP-M2 adds the workspace crates
+`crates/combobulate-kernel`, which declares the `pub` `TargetFacts` item, and
+`crates/combobulate-macros`. The facade depends on both by path. The kernel and
+macro crates declare no dependencies, the kernel stays `#![no_std]` and
+allocation-free, and the `googletest` and `serde_json` dev-dependencies are
+test-only (DL-34). Hosted budget acceptance remains pending.
+
+- Terms of reference: `docs/terms-of-reference.md`, revision 0.2 of 6 October
+  2026, tracing G1, G2, G6, G7, G8; S7 (native-only, proof-capable, and
+  Polars-enabled profiles within budgets); C1, C5, C7, C8; Q3 (MSRV and feature
+  matrix); Q9 (verification profiles; no Rust feature inferred from Python
+  numbering); the dependency-baseline requirement at line 223.
+- Technical design: `docs/technical-design.md`, revision 0.2, 6 October 2026.
+  Traced items: §3 package boundary and component table; R5, R7, R8; §10
+  storage and Polars; §15 row 6, GAP4, GAP7, GAP8, GAP9; §17.1, §17.2 (trust
+  audit and verdict parsing), §17.7 (profiles; no proof-feature body
+  substitution), §17.8 (pinned tools, CI cost); §18.1 (target facts, not host
+  facts); §19.1 (Rust release selected independently of Python numbering).
+- Roadmap: `docs/roadmap.md` revision 0.2, task 1.2.1 and its detail on the
+  trust-audit scanner and log parser; dependants 1.2.2, 1.2.4, 1.2.6.
+- Bets: B01 (one executable semantic core), B05 (streaming Polars contract).
+- Decisions: D04, D05, D06 (MSRV left to Q3 and 1.2.1), D07 (CA3 and CA5
+  deferred to 1.2.1), D11, D12, D15; proposed D16.
+- ADRs: ADR-0004, ADR-0005, ADR-0008, ADR-0009 (amendment proposed);
+  proposed ADR-0010.
+- Controls: AC-01, AC-02 (probe budgets), AC-04 (build budgets, amendment
+  proposed), AC-07 (pull-request critical path, amendment proposed).
+- Governing standards: `AGENTS.md`, `docs/documentation-style-guide.md`,
+  `docs/developers-guide.md`, `docs/scripting-standards.md`.
+
+Trace chains:
+
+```plaintext
+TD §3, §15 row 6, CA5 -> D16/ADR-0010 -> EP-M2 -> tests/workspace_boundaries.rs::kernel_excludes_backends
+TD §18.1, DL-06 -> EP-M2 -> tests/workspace_boundaries.rs::kernel_never_host_compiled
+TD §3, ToR line 152 -> EP-M2, EP-M3 -> tests/workspace_boundaries.rs::ordinary_profiles_exclude_verifiers
+TD §18.1, VO-6 -> EP-M2 -> tests/workspace_boundaries.rs::kernel_keeps_the_no_std_boundary
+ToR S7, TD §3 -> EP-M3 -> tests/features/build_profiles.feature, tests/native_consumer_e2e.rs
+TD §19.1, ToR Q9, B05 -> EP-M3, EP-M4 -> spec/toolchain-profiles.json -> scripts/tests/test_toolchain_profiles.py
+ToR Q3, D06 -> D16/ADR-0010 -> EP-M4 -> spec/toolchain-profiles.json::supported_toolchains
+TD §17.2, ADR-0009, D15 -> EP-M5 -> scripts/docs_validation/kani_log/ -> scripts/tests/test_kani_log.py
+TD §17.2, ADR-0009 vocabulary, DL-17 -> EP-M5 -> scripts/docs_validation/trust_audit/ -> scripts/tests/test_trust_audit.py
+AC-07, DL-03, DL-14 -> EP-M3 -> .github/workflows/ci.yml profile jobs
+AC-04, DL-15 -> EP-M6 -> spec/measurements/ac-04-*.json
+DL-21, kani and verus on-ramps -> EP-M1 -> tests/prover_tools_contract.rs
+Roadmap 1.2.1 -> EP-M6 -> spec/task-completion.json -> ticked in docs/roadmap.md
+```
+
+Gaps addressed: GAP4 (exact Rust, dependency, and feature versions selected and
+recorded; stable compilation claimed only for the recorded profiles); GAP9 in
+part (a parser and a bound scanner exist). GAP7 and GAP8 stay open for tasks
+1.2.4 and 1.2.6. A further gap is recorded for task 1.2.4: nothing yet ties a
+verifier log to a record's `binding.executable_digest` or `source_revision`.
+
+## Verification plan
+
+EP-M1 transport contracts also reject a failing SDK execution after a passing
+version preflight; the regression was observed before its fix.
+
+### Method selection
+
+This task introduces dependency-direction invariants, a profile-reporting
+contract, a pin-consistency invariant, and two fail-closed gate adapters. The
+only contractual decision logic is the Kani parser's mapping from per-harness
+facts to an admission result; it gets an exhaustive enumeration check over a
+finite abstraction, mirroring how the gate itself is checked over all states.
+Dependency and profile obligations are finite facts, discharged by exact checks
+over Cargo's own output. The scanner and the parser's structure extractor work
+over arbitrary text, so Hypothesis properties, a deterministic cross-product of
+lexical cases, and a real-log corpus discharge them; `mutmut` then audits
+whether those suites notice plausible defects. No Verus proof is warranted
+(DL-13).
+
+The Rust test stack is `rstest` for fixtures and tables, `rstest-bdd` for the
+profile behaviour scenarios, `googletest` matchers and `pretty_assertions`
+diffs for clear failures, and `insta` as the single oracle for the rendered
+profile line. Dependency predicates are pure functions over injected
+`cargo tree` and `cargo metadata` output, tested against canned fixtures, and
+exercised once against the real workspace through `env!("CARGO")` with
+`--locked --offline` after `cargo fetch --locked`, with `RUSTFLAGS`,
+`CARGO_ENCODED_RUSTFLAGS`, and `CARGO_BUILD_TARGET` removed from the child
+environment. The Python stack follows `scripts/tests/`: `unittest` cases run by
+both `unittest discover` and `pytest`, with Hypothesis 6.168.5.
+
+### Obligations
+
+- VO-1, kernel excludes backends: (i) in this task the kernel's
+  `cargo metadata --no-deps` dependency list is empty; (ii) durably, no package
+  whose name starts with `polars` or `glam` appears in
+  `cargo tree -p combobulate-kernel --all-features --target all -e all`.
+  - Method: pure predicate over injected output, parameterized by the canned
+    fixtures and the live workspace.
+  - Artefact: `tests/workspace_boundaries.rs::kernel_excludes_backends`.
+  - Evidence: red before EP-M2 because the package does not exist.
+  - Non-vacuity: a canned fixture in which the kernel reaches `glam` through a
+    target-specific dependency must fail naming `glam`; the same query on the
+    live `polars-enabled` facade must report `polars` (VO-4).
+- VO-2, dependency direction: over declared edges of every kind and target in
+  `cargo metadata --no-deps`, the macro crate depends on neither the kernel nor
+  any backend; the kernel depends on no member; no member has a normal or build
+  dependency on the facade (dev-dependency cycles are allowed); and the kernel
+  never appears in a build-dependency edge or in any procedural-macro crate's
+  closure.
+  - Artefact: `tests/workspace_boundaries.rs::dependency_direction_holds` and
+    `kernel_never_host_compiled`.
+  - Non-vacuity: the facade's normal edges to both members must be observed;
+    canned fixtures with a kernel build-dependency and a macro-to-kernel edge
+    must each fail.
+- VO-3, ordinary profiles exclude verifiers: in `native-only` and
+  `polars-enabled`, no package whose name starts with `kani`, `vstd`, or
+  `verus` appears in the facade's closure. The prefix list is confirmed against
+  the lock file of the EP-M1 Verus probe.
+  - Artefact:
+    `tests/workspace_boundaries.rs::ordinary_profiles_exclude_verifiers`.
+  - Non-vacuity: a canned fixture of a facade that depends on `vstd` must fail;
+    building alone would not detect a leak, because `vstd` compiles without the
+    Verus binary.
+- VO-4, profile separation: the `native-only` closure contains no `polars*`
+  package; the `polars-enabled` closure contains `polars` at exactly the pinned
+  version and features.
+  - Artefact: `tests/workspace_boundaries.rs::polars_appears_only_when_enabled`.
+  - Non-vacuity: the positive case witnesses the negative case.
+- VO-5, profile report: `BuildProfile::current()` reports exactly the features
+  compiled into the binary.
+  - Method: `rstest-bdd` scenarios tagged `@native` (bound under
+    `cfg(not(feature = "polars"))`) and `@polars` (bound under
+    `cfg(feature = "polars")`), `insta` snapshots of the rendered line named
+    per profile, and an end-to-end run of `tools/fixtures/native-consumer/`.
+  - Artefacts: `tests/features/build_profiles.feature`,
+    `tests/build_profiles.rs`, `tests/native_consumer_e2e.rs`,
+    `tests/snapshots/`.
+  - Evidence: the `@native` scenarios run in the `native-only` test route, the
+    `@polars` scenarios in the `polars-enabled` route. Red before EP-M3.
+  - Non-vacuity: each scenario asserts the absence of the other profile's
+    backend, so a report that always or never claims Polars fails one route;
+    EP-M3 confirms that `rstest-bdd` rejects a tag filter matching no scenario,
+    and if it does not, a test counts the executed scenarios instead. The
+    end-to-end consumer's output must equal the `native-only` snapshot.
+- VO-6, target facts: `TargetFacts::current().usize_bits()` equals
+  `usize::BITS` and is usable in constant context; the kernel's `lib.rs`
+  declares `#![no_std]`, contains no `extern crate alloc` or
+  `extern crate std`, and denies `clippy::std_instead_of_core` and
+  `clippy::alloc_instead_of_core`.
+  - Method: unit test, a constant assertion in a doctest, and a source check in
+    `tests/workspace_boundaries.rs`.
+  - Rationale: definitional; the tests guard wiring and the no-allocation
+    boundary.
+- VO-7, pin consistency: every pinned revision agrees across
+  `spec/toolchain-profiles.json`, `rust-toolchain.toml`, `Cargo.lock`,
+  `tools/kani/VERSION`, `tools/verus/VERSION`, `tools/verus/SHA256SUMS`,
+  `tools/rust-prover-tools/REF`, the probe CLI PEP 723 dependency, the
+  `Makefile`, the workflows, and the `environment.toolchains` of controls
+  AC-01, AC-02, AC-04, and AC-07; a sweep of tracked files for each pinned
+  version string finds no pin site outside the enumerated sources.
+  - Artefacts: `scripts/docs_validation/toolchain_profiles.py`,
+    `scripts/tests/test_toolchain_profiles.py`.
+  - Non-vacuity: one test per source mutates that source's pin in a temporary
+    copy and requires failure naming it; a test adds an unlisted pin site and
+    requires the sweep to fail.
+- VO-8, capability records are evidence-backed: every capability marked
+  `tested`, `unsupported`, or `inconclusive` cites a committed probe log by
+  path and SHA-256, and every digest matches.
+  - Non-vacuity: a `tested` entry without a log and an entry with a wrong
+    digest must both fail.
+- VO-9, trust-audit soundness under DL-17: for any Rust source text, every
+  trusted item in code position is reported once with its line and column;
+  aliased and glob imports are covered by rule (iii); comments, string, raw,
+  byte, C-string, and character literals hide nothing and report nothing;
+  ordinary Rust uses outside rule (iii) report nothing; and unterminated
+  comments or literals, `include!`, out-of-tree `#[path]`, `paste!`, and
+  `concat_idents!` make the scan fail closed with an error, never an empty
+  audit. In procedural-macro crates, vocabulary inside string literals is also
+  reported.
+  - Method: a deterministic, parameterized cross-product of every vocabulary
+    item with every lexical context (code position, each comment form, each
+    literal form, qualified, aliased, glob-imported, inside `cfg_attr`);
+    Hypothesis properties over generated token streams (inserting an item in
+    code position adds exactly that item; inserting inside a comment or literal
+    adds nothing; arbitrary text never raises an unhandled exception).
+  - Artefacts: `scripts/docs_validation/trust_audit/` (lexer, matcher, command
+    modules), `scripts/tests/test_trust_audit.py`,
+    `scripts/tests/fixtures/trust_audit/`.
+  - Non-vacuity: the cross-product enumerates every cell; a scanner variant
+    with any one vocabulary entry or lexical rule removed must fail, which the
+    suite demonstrates by running against those variants; `mutmut` over the
+    package reports surviving mutants, each resolved by a new test or a
+    recorded equivalence.
+- VO-10, shipped crates are trust-free: the scan of every workspace member's
+  sources, enumerated from `cargo metadata`, reports no item.
+  - Method: design-checker check `trust-audit`.
+  - Non-vacuity: the same check over `tools/verifier-fixtures/` must report
+    the seeded items.
+- VO-11a, Kani structure extraction: the extractor turns a log into
+  per-harness facts (status, failed properties with identifiers and locations,
+  cover results, unwinding-check results), the version banner, the output
+  format, and the summary counts, or returns a structural error for any
+  unrecognized, truncated, interleaved, or count-inconsistent log.
+  - Method: the real-log corpus (one log per class below) plus Hypothesis
+    mutations of corpus logs: truncation, line deletion, duplicated harness
+    blocks, altered summary counts, altered version banners, and interleaved
+    harness blocks. Each mutant's SHA-256 is recomputed and supplied as the
+    expected digest, mutation operators only degrade or break structure, and
+    each test asserts that the refusal reason is structural, never a digest
+    mismatch.
+  - Artefacts: `scripts/docs_validation/kani_log/extract.py`,
+    `scripts/tests/test_kani_log.py`, `scripts/tests/fixtures/kani_logs/`.
+- VO-11b, Kani decision function: a pure function from per-harness facts and
+  the manifest to
+  `(outcome, bounds, witness_statuses, negative_controls, run_mode)`.
+  Precedence: structural error gives `tool-error`; otherwise any claim harness
+  with a failed non-unwinding property gives `counterexample`; otherwise a
+  timeout gives `resource-exhausted`, as does a failure of unwinding checks
+  alone; otherwise an undetermined result gives `unsupported` when Kani names
+  an unsupported construct and `solver-unknown` otherwise; otherwise a claim
+  harness without a result gives `skipped`; otherwise `verified`. Bounds are
+  always `partial` (DL-10). Each declared cover maps to `satisfied` or
+  `unsatisfied`. Each control harness maps to `rejected-as-intended` when it
+  failed exactly the property the manifest expects, `rejected-otherwise` for
+  any other failure, `accepted` when it succeeded, and `not-run` when it has no
+  result; `#[kani::should_panic]` may not mark a control, and a harness without
+  a role is a structural error. `run_mode` is `full-profile` only when the
+  claim results equal the manifest claim set, the log is a single sequential
+  regular-format run, and unwinding checks are confirmed enabled; otherwise
+  `focused`.
+  - Method: exhaustive enumeration of every combination of per-harness facts
+    for up to three harnesses, checked against a data table and against
+    properties: monotonicity (degrading any fact never improves the outcome),
+    counterexample dominance, and `verified` exactly when every claim harness
+    succeeded with every declared cover satisfied.
+  - Artefacts: `scripts/docs_validation/kani_log/decide.py`,
+    `scripts/tests/fixtures/kani_decision_table.json`.
+  - Non-vacuity: the corpus includes a log whose completion reports success
+    while a cover is unsatisfied; the suite runs the corpus against three
+    deliberately broken parsers (always `verified`; success line only; manifest
+    ignored) and requires all three to fail; `mutmut` over the package.
+- VO-12, gate integration: a fixture record citing a committed corpus log,
+  manifest, and sources reaches `bounded` only through the parser and the
+  scanner. The same record with a tampered log digest, a tampered manifest
+  digest, an unregistered tool, an untracked path, a mismatched derived fact, a
+  fabricated empty trust audit over a harness that uses `kani::assume`, or its
+  Kani run relabelled as a test, is rejected with its intended reason. The gate
+  function stays pure.
+  - Method: integration tests over `scripts/check_evidence.py` and
+    `evidence_records.admitted_evidence`.
+  - Non-vacuity: the positive record must reach `bounded`, so the tests cannot
+    pass by rejecting everything.
+- VO-13, registration discipline: every name in `registered_log_parsers` has a
+  corpus manifest whose logs, when parsed (not by their labels), cover the
+  outcomes verified, counterexample, resource-exhausted (timeout),
+  some-unsatisfied witness, skipped, tool-error (truncated), and unsupported or
+  solver-unknown, and whose corpus tests run in `make design-check`.
+  - Method: design-checker check `log-parser-registration`.
+  - Non-vacuity: a registry entry whose corpus lacks the timeout class must
+    fail.
+- VO-14, Polars confinement: Polars paths appear only in
+  `src/polars_backend.rs` and its submodules, checked with the trust-audit
+  lexer.
+  - Non-vacuity: a seeded `use polars::` in a copy of `src/profile.rs` must
+    fail.
+- VO-15, prover-tools wiring contract: installation and version checks delegate
+  through `$(PROVER_TOOLS)`; the explicitly recorded direct probe routes retain
+  the pinned SDK and admission. Test the exact argument vectors, flag
+  forwarding, and exit-status propagation; every proof target depends on
+  `kani-check`; no recipe contains `cargo install`, `cargo kani setup`, `curl`,
+  `unzip`, `sha256sum`, or `rustup toolchain install`;
+  `tools/rust-prover-tools/REF` holds a 40-character `ref`;
+  `tools/kani/VERSION` and `tools/verus/VERSION` are non-empty; and
+  `tools/verus/SHA256SUMS` has a row naming the configured archive. The
+  `FORMAL-SKIP` stubs exit 0, and exit non-zero under `FORMAL_STRICT=1`.
+  - Method: Make contract tests in the style of `tests/make_gate_order.rs`,
+    running each target against a recording fake executable (not `echo`)
+    passed as `PROVER_TOOLS_CONTRACT_TEST=1 PROVER_TOOLS=<fake>` on the `make`
+    command line, plus static checks of the recipes and pin files.
+  - Artefact: `tests/prover_tools_contract.rs` with helpers in `tests/support/`.
+  - Non-vacuity: the same seam supplied only through the environment must not
+    unlock the fake; a fake that exits non-zero must make the target fail; a
+    malformed `ref` must stop Make before any recipe runs.
+
+### Axioms
+
+- AXIOM-01: rustc, Cargo, and the pinned Cranelift and LLVM backends compile
+  what they accept faithfully, and `cargo tree` reports the dependency graph
+  that Cargo builds for the stated features, targets, and edge kinds.
+- AXIOM-02: Kani 0.67.0 with its bundled CBMC and CaDiCaL reports harness
+  results faithfully in its regular output format.
+- AXIOM-03: Verus 0.2026.09.06.8dea4a2 with Z3 4.16.0 and the matching `vstd`
+  reports verification results faithfully; Verus's trusted basis includes
+  `vstd`'s specifications and any `external` items it uses.
+- AXIOM-04: GitHub-hosted `ubuntu-24.04` runners match the AC environment
+  description closely enough for the registered thresholds to apply.
+- AXIOM-05: Polars 0.55.2's public API behaves as documented for the small
+  calls made in this task; no Polars capability is claimed.
+- AXIOM-06: a harness manifest's roles and expected control failures are
+  reviewed repository facts, bound to the record by digest and checked against
+  the sources' harness set.
+- AXIOM-07: `prover-tools` at the pinned commit installs and runs exactly the
+  pinned releases it reports, verifies the Verus archive digest, and, through
+  `kani exec`, removes only the flags its users' guide documents. Its
+  `kani install` route trusts the crates.io `kani-verifier` crate and the Kani
+  bundle that `cargo kani setup` downloads.
+
+## Plan of work
+
+Every milestone ends with `make check-fmt`, `make lint`, `make test`,
+`make design-check`, `make markdownlint`, and `make spelling`, run sequentially
+by the `scrutineer` agent, plus the milestone's own commands. Every milestone
+records its Red evidence in `Progress`, ends with the conformance check in
+`Milestones and plateaus`, and is delivered as one stacked PR.
+
+### EP-M1. Prototype: toolchain, profile, and hosted-cost probes
+
+This milestone records each tool and profile capability and trust boundary
+before anything depends on it. Its probe crates are kept as fixtures when later
+milestones use them and are deleted otherwise. No shipped code changes.
+
+- Proof-tool pins and Make wiring (DL-21). Add `tools/rust-prover-tools/REF`
+  pinning `9c4a27a86c678ceac1155404f45d95ee4a14a172` (or the `main` head at
+  implementation time, recorded with its `verify` output); `tools/kani/VERSION`
+  (0.67.0); `tools/verus/VERSION` (0.2026.09.06.8dea4a2);
+  `tools/verus/SHA256SUMS` in `sha256sum` format, naming
+  `verus-0.2026.09.06.8dea4a2-x86-linux.zip` with digest
+  `13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16`; and
+  `tools/verus/README.md` saying what is pinned and how to bump it. Add the
+  `PROVER_TOOLS` block from the `kani` skill's on-ramp to the `Makefile`, with
+  targets `install-kani`, `kani-check`, `install-verus`, `kani` and `kani-full`
+  (`FORMAL-SKIP` stubs, DL-23), `kani-log-corpus`, and `verus-probe`. Ignore
+  `.verus/` in Git and in the Markdown lint configuration. Red first: add
+  `tests/prover_tools_contract.rs` (VO-15), run it, and record the failure.
+  Then run `make install-kani`, `make kani-check`, and `make install-verus`,
+  recording the rustup toolchains each fetches (nightly-2025-11-21 for Kani,
+  1.98.0 for Verus), the crates.io `kani-verifier` source, whether the Verus
+  archive bundles Z3 4.16.0, and, for reference, the Kani release asset digest
+  `3b5f7afd3b51603ee720db7bc1bc4fe46b5a4f5d36daad9939c4b4c658b51ac0`.
+- Kani log corpus. Create `tools/verifier-fixtures/kani-corpus/`, a standalone
+  crate with its own `[workspace]` table and a harness manifest. Its labelled
+  subjects produce, through `make kani-log-corpus` (which runs
+  `make kani-check`, then invokes the installed Kani 0.67.0 driver directly
+  with each verifier argument passed separately, because the helper's
+  `kani exec` route refuses the repository's backend configuration (DL-24)),
+  one log per class: a claim that passes with a satisfied cover; a claim with a
+  counterexample; a claim whose success line hides an unreachable cover; a
+  symbolic full-width multiplication run with
+  `-Z unstable-options --harness-timeout 5s`; a failed unwinding check; a pure
+  skip (`--harness X --exact`, with all run results passing); a `--fail-fast`
+  run mixing a counterexample with skipped harnesses; a run killed from
+  outside, leaving a truncated log; `kani::assume(false)` before a cover; an
+  undetermined or unsupported construct; a `#[kani::should_panic]` claim; and
+  control harnesses (seeded faults as separate functions, no `cfg` body swaps)
+  that fail their expected property. Each log is stored under
+  `scripts/tests/fixtures/kani_logs/` with
+  `kani-driver kani list --format json` output, taken through the same direct
+  route as the observations (DL-24), and a provenance file naming the command,
+  Kani version, digest, and whether `--verbose` output shows CBMC's
+  unwinding-assertion flag; if it does not, the unwinding-check capability is
+  recorded `inconclusive`.
+- Verus wiring probe. Create `tools/verifier-fixtures/verus-wiring-probe/` with
+  four candidates for the kernel's eventual proof profile, each a `#![no_std]`
+  crate without `alloc`: (a) a non-optional `vstd` dependency
+  (`default-features = false`) with `verus!` blocks; (b) an optional `vstd`
+  dependency behind a `verus` feature, with attribute-form specifications inert
+  in ordinary builds; (c) a companion proof crate that depends on the
+  production crate and states lemmas about its public functions (technical
+  design §17.7); and (d) the single-root pattern of DL-22, run by
+  `prover-tools verus run --proof-file`. Candidates (a) to (c) need
+  `cargo verus`, which `prover-tools` does not wrap, so they run the
+  `cargo-verus` binary from the installed release directly and record that gap.
+  Each holds one labelled capability lemma and one seeded mutant. Acceptance is
+  by exact counts: the lemma run reports one function verified and zero errors
+  (zero verified means the attributes were inert, which is a failure); the
+  mutant run reports exactly one "postcondition not satisfied" located at the
+  mutant. Record for each candidate whether its verifier route succeeds in
+  place under the repository's `.cargo/config.toml`, whether an ordinary build
+  succeeds without a verifier, tested in a rootless Podman container on a fresh
+  hosted runner. Local admission launches compilers outside the container
+  namespace, so local isolation is inconclusive. Record extra build time,
+  package names (for VO-3), the scanner's trust items, and how VO-1 would be
+  amended for that wiring. Confirm that `vstd` `0.0.0-2026-09-06-0133` matches
+  the pinned Verus. The probe selects the wiring task 1.2.4 will use; it adds
+  no proof content to the kernel.
+- Kani in place. On a scratch copy of the planned kernel and native-only facade
+  inside the repository tree, run one completed harness whose cover is
+  satisfied through `prover-tools kani exec`, recording whether it accepts the
+  repository's Cargo configuration, the compile-admission wrapper, the
+  workspace lint tables, and a `#![no_std]` crate, and which flags it removed
+  from the child.
+- Toolchain identities. Record `rustc -vV` and `cargo -V` for the repository
+  nightly, Kani's toolchain, and Verus's Rust 1.98.0.
+- Polars feature set. Determine the smallest Polars 0.55.2 feature set,
+  starting from the calibrated `default-features = false, features = ["lazy"]`,
+  that builds an `Int64` `Series` and collects a trivial `LazyFrame`.
+- Hosted cost. Add `tools/probes/polars-profile/`, a standalone crate that
+  mirrors the planned facade with the selected Polars features, and
+  `.github/workflows/profile-measurements.yml`, triggered by manual dispatch
+  and by a `pull_request` event when the `measure-profiles` label is applied
+  (guarded on that label name, checking out the PR head SHA, with a concurrency
+  group). It runs on `ubuntu-24.04` in a job not named `build-test`, so it is
+  outside AC-07, and measures each Polars route cold three times: rustdoc,
+  Clippy, Whitaker, nextest under Cranelift, LLVM coverage, and the `trybuild`
+  UI test. It records wall time, peak memory, `target/` size, whether rustdoc
+  and Clippy share dependency metadata, and cache save time, with
+  `CARGO_BUILD_JOBS=4` and the hosted `CARGO_INCREMENTAL` value recorded. A new
+  workflow file leaves `ci.yml` untouched. Size each proposed job as its
+  slowest observed run plus fixed overhead (setup, Whitaker driver, cache save)
+  and require at most 6 minutes.
+- Go/no-go: proceed only if at least one Verus wiring and the in-place Kani run
+  succeed without weakening the ordinary build standard, and a job split is
+  predicted within 6 minutes per job. Otherwise set status `BLOCKED` and record
+  the deviation in `Decision log`.
+- Validation: `make install-kani`, `make kani-check`, and `make install-verus`
+  (each run twice, to show that a repeated install is harmless);
+  `make kani-log-corpus`; `make verus-probe`, which runs each candidate's
+  verifier route and checks the exact counts above; the hosted measurement run;
+  then the common gates.
+- Recovery: delete `tools/verifier-fixtures/`, `tools/probes/`, the pin files,
+  the prover Make targets, and the measurement workflow; nothing else depends
+  on them yet.
+
+### EP-M2. Workspace, crate boundaries, and dependency-direction checks
+
+- Refactor first, as its own commit: split `tests/make_gate_order.rs` (481
+  lines) below 400 lines by moving case tables into `tests/support/`, with all
+  existing tests passing before and after.
+- Red: add `tests/workspace_boundaries.rs` with VO-1, VO-2, VO-3, and VO-6 as
+  `rstest` tables using `googletest` matchers, over canned fixtures in
+  `tests/fixtures/cargo/` and the live workspace; run it and record the
+  failure, which arises because neither member crate exists.
+- Convert `Cargo.toml` into a workspace root with `members = ["crates/*"]`,
+  `default-members = [".", "crates/combobulate-kernel",
+  "crates/combobulate-macros"]`,
+  `exclude = ["tools"]`, and `resolver = "3"`. Move the lint tables to
+  `[workspace.lints]`, add `unexpected_cfgs` with
+  `check-cfg = ["cfg(kani)", "cfg(verus_keep_ghost)"]`, and set
+  `lints.workspace = true` in every package. Share only edition, repository,
+  and homepage through `[workspace.package]`; `license` and `publish` stay
+  literal.
+- Create `crates/combobulate-kernel/` (`#![no_std]`, no dependencies,
+  `TargetFacts`) and `crates/combobulate-macros/` (`proc-macro = true`, no
+  dependencies, crate documentation only). The facade depends on both by path
+  with `version = "0.1.0"`.
+- Extend `scripts/docs_validation/package_policy.py` and its test so that every
+  member found through the root `members` globs carries the literal ISC licence
+  and `publish = false`, and any `crates/*/Cargo.toml` outside those globs
+  fails.
+- Remove `greet()` and `tests/stub.rs`.
+- Green: rerun the boundary tests; run the real `make package`, deciding and
+  recording whether the route becomes `-p combobulate`; update route contract
+  tests in the same commit as any route change.
+- Acceptance: VO-1, VO-2, VO-3 (native-only), and VO-6 pass; the kernel
+  isolation command under `Concrete steps` prints only the kernel; and
+  `make package` succeeds.
+- Conformance: kernel and direction rules hold; no public item besides
+  `TargetFacts`; no new external dependency; no trust boundary change.
+- Recovery: revert the milestone's commits; the single-crate state is
+  self-consistent. Remaining gaps: features, profiles, CI, records.
+- Compatibility decision: none; every changed surface is pre-1.0 and
+  unreleased.
+
+### EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape
+
+This milestone adds Polars to the facade, so it lands in one push together with
+the approved CI shape and the AC-07 amendment.
+
+- Red: write `tests/features/build_profiles.feature` (below), its step
+  definitions in `tests/build_profiles.rs`, `insta` snapshot tests of the
+  rendered line, `tests/native_consumer_e2e.rs`, and VO-4 and VO-14 checks;
+  record the failure, which arises because `BuildProfile` does not exist.
+- Add the facade features `default = ["macros", "polars"]`,
+  `macros = ["dep:combobulate-macros"]`, and `polars = ["dep:polars"]`, with
+  `polars = { version = "0.55.2", default-features = false, features = [...] }`
+  using the EP-M1 set. Add a Dependabot `ignore` for `polars*`.
+- Add `src/profile.rs` with `BuildProfile`, and a crate-private
+  `src/polars_backend.rs` behind `cfg(feature = "polars")` that builds an
+  `Int64` `Series` in a unit test, proving the Polars-enabled build compiles
+  and links without claiming any capability.
+- Add `tools/fixtures/native-consumer/`, a standalone binary crate depending on
+  the facade by path with `default-features = false`, which prints
+  `BuildProfile::current()`. `tests/native_consumer_e2e.rs` builds and runs it
+  through `env!("CARGO")` into `env!("CARGO_TARGET_TMPDIR")`, checks its
+  `cargo tree`, and compares its output with the `native-only` snapshot.
+- Gate profiles (DL-18): replace `--all-features` in `CARGO_FLAGS` with
+  per-profile feature lists selected by `GATE_PROFILE`. Add `lint-profiles`
+  (Clippy and Whitaker per profile) under `make lint` and `test-profiles`
+  (nextest per profile, with the `trybuild` UI test only in `native-only`) under
+  `make test`. Each runs profiles as separate Cargo invocations so that
+  feature unification cannot mask a profile. Update the route contract tests in
+  the same commit.
+- CI shape (DL-03, DL-14): implement the approved job split in
+  `.github/workflows/ci.yml` and `coverage-main.yml`, enable GitHub Actions
+  sccache, save caches only on `main`, set the coverage features to the
+  native-only profile explicitly, and update `ci_controls.py`,
+  `preregistration.py`, and their tests to accept the amended AC-07 workload.
+  Record the amendment, with its new `ci.yml` digest, in
+  `spec/acceptance-controls.json` in the same commit.
+- Checkpoint: the sponsor approves the AC-07 amendment text and job sizes
+  before this push. Status is `BLOCKED` until then.
+- Green: rerun the scenarios, snapshots, end-to-end test, and both profile
+  routes; then the common gates and the hosted CI on the push.
+- Acceptance: VO-4, VO-5, VO-14; both profiles lint and test locally; hosted
+  jobs green within their sizes.
+- Conformance: profiles match ADR-0010's draft; no capability claimed for
+  Polars; no verifier in any ordinary closure.
+- Recovery: revert the push as a unit; a partial revert would leave Polars in
+  `build-test` without the split. Remaining gaps: profile record, scanner,
+  parser, AC-04, documents.
+- Compatibility decision: none.
+
+The behaviour specification:
+
+```gherkin
+Feature: Build profiles report what was compiled
+
+  @native
+  Scenario: A native-only build reports no Polars backend
+    Given the facade compiled without default features
+    When a consumer reads the build profile
+    Then the profile reports the native backend
+    And the profile does not report a Polars backend
+    And the profile does not report the macro feature
+    And the profile reports the target usize width
+
+  @polars
+  Scenario: The default build reports the Polars backend
+    Given the facade compiled with default features
+    When a consumer reads the build profile
+    Then the profile reports the native backend
+    And the profile reports a Polars backend
+    And the profile reports the macro feature
+```
+
+### EP-M4. Profile record, pin consistency, and ADR-0010
+
+- Red: add `scripts/tests/test_toolchain_profiles.py` with the VO-7 and VO-8
+  tests; record the failure.
+- Add `spec/toolchain-profiles.schema.json` and `spec/toolchain-profiles.json`
+  recording the repository nightly with its commit hash; Kani 0.67.0, its
+  toolchain, CBMC, and CaDiCaL versions; Verus 0.2026.09.06.8dea4a2, Rust
+  1.98.0, Z3 4.16.0, and the matching `vstd`; Polars 0.55.2 and its features;
+  the target `x86_64-unknown-linux-gnu`; the four profiles with crates,
+  features, toolchains, and commands; the supported-toolchain set; every EP-M1
+  capability with status and log citation; and each tool's trusted computing
+  base, including the rustup toolchains, the crates.io `kani-verifier` crate,
+  the unverified Kani bundle download, and `rust-prover-tools` at its pinned
+  commit.
+- Add `scripts/docs_validation/toolchain_profiles.py`, registered in
+  `scripts/check_docs.py`. Green: rerun.
+- Write `docs/adrs/adr-0010-workspace-crate-boundaries-and-profiles.md` as
+  `Proposed`, following the style guide's ADR template: CA3, CA5, Q3, the
+  selected Verus wiring, the proof-dependency allowlist that VO-1 will admit in
+  task 1.2.4, gate feature lists, the B01 falsification route, and the rejected
+  adapter-crate option. Add proposed D16 to `spec/decisions.json` and
+  regenerate the register. Draft the AC-04 amendment (DL-15).
+- Checkpoint: the sponsor accepts the AC-04 amendment before EP-M6 measures.
+- Acceptance: VO-7, VO-8; `make design-check` passes with D16 proposed.
+- Recovery: revert; nothing downstream reads the record yet. Remaining gaps:
+  D16 acceptance, scanner, parser, AC-04 record.
+- Compatibility decision: none.
+
+### EP-M5. Trust-audit scanner, Kani log parser, and gate binding
+
+- Red: add `scripts/tests/test_trust_audit.py` and
+  `scripts/tests/test_kani_log.py` (VO-9 to VO-13) over the EP-M1 corpus, and
+  the VO-12 integration tests; record the failure.
+- Implement `scripts/docs_validation/trust_audit/` (lexer, matcher, and command
+  modules, each under 400 lines) with DL-17's rule, and the command
+  `scripts/trust_audit.py PATH...`, which prints items in the schema's
+  `trust_audit.items` shape. Add the `trust-audit` design check over members
+  enumerated from `cargo metadata`.
+- Implement `scripts/docs_validation/kani_log/` (structure extractor, decision
+  function, and shell adapter). Extend `evidence_records.evidence_inputs` and
+  `scripts/check_evidence.py` so the I/O shell reads each Git-tracked log,
+  manifest, and source named by a record, checks digests, runs the registered
+  adapter and the scanner, and passes `verified_log_results` and
+  `verified_trust_audits` into `AdmissionContext`. Change `abstract_record` as
+  DL-16 states; the rule table and levels do not change, and the existing gate
+  property tests must still pass.
+- Add fixture records under `scripts/tests/fixtures/evidence/` that cite corpus
+  artefacts, never under `spec/evidence/`, so they cannot affect roadmap
+  closure.
+- Write the ADR-0009 amendment (DL-16, DL-17, DL-10). Checkpoint: the sponsor
+  approves it before registration.
+- Only when every corpus test passes, add `"kani"` to
+  `registered_log_parsers`, add the `log-parser-registration` check, and update
+  the description in `scripts/tests/fixtures/evidence/log-parsers.json`.
+- Run `mutmut` over `trust_audit/` and `kani_log/`; resolve survivors.
+- Acceptance: VO-9 to VO-13; `scripts/check_evidence.py --as-of DATE` over the
+  fixture records prints `bounded` for the positive record and the intended
+  reason for every negative one.
+- Recovery: unregister the parser first, then revert. Remaining gaps: Verus
+  parser and type-complete bounds (task 1.2.4).
+- Compatibility decision: none.
+
+### EP-M6. AC-04 measurement, documents, decisions, and roadmap tick
+
+- Red: add a check rejecting a `deferred` candidate ADR subject whose roadmap
+  item is ticked; with CA3 and CA5 still deferred to 1.2.1, a trial tick in a
+  temporary copy must fail it.
+- AC-04: extend `profile-measurements.yml` with the amended protocol: five cold
+  and five warm builds per profile, profiles alternating run by run, one
+  discarded warm-up; a fresh `CARGO_TARGET_DIR` for each cold run, deleted
+  afterwards; warm runs reuse the target directory and touch `src/lib.rs` or
+  `crates/combobulate-kernel/src/lib.rs`; sccache off with `RUSTC_WRAPPER`
+  verified unset; incremental compilation remains disabled as on the rebased
+  target; an untimed `cargo fetch --locked`; `CARGO_BUILD_JOBS=4`; one step per
+  timed invocation; `nproc`, memory, and image version recorded; partial
+  results uploaded with `if: always()`. The proof profile is Kani codegen of
+  the kernel through `make install-kani`, `make kani-check`, and
+  `prover-tools kani exec --cwd crates/combobulate-kernel` with
+  `--extra-arg=--only-codegen` (plus `-Z unstable-options` if Kani 0.67.0
+  requires it), timing only the `kani exec` step. Commit the acceptance record
+  to `spec/measurements/` and report its verdict honestly.
+- Add `.github/workflows/formal.yml` (DL-23), not required for merging,
+  triggered weekly and by manual dispatch, which runs `make install-kani`,
+  `make kani-check`, `make kani-log-corpus`, `make install-verus`, and
+  `make verus-probe`, so the verifier route does not rot before task 1.2.4. It
+  has its own `concurrency` group and timeout.
+- Documents: ADR-0010; the decision register; technical design §3 (crate
+  names, dependency direction, profiles, and the component table's reuse column
+  for the kernel and the profile report), §15 (GAP4), §17.7 (profile wiring),
+  and §19.1 (selected Polars release); `docs/users-guide.md` (features,
+  native-only use, `BuildProfile`, the reserved `macros` feature);
+  `docs/developers-guide.md` (workspace layout, profiles, `GATE_PROFILE`,
+    proof-tool installation through `prover-tools`, the `.verus/` disk cost, a
+  harness inventory for the Kani corpus with each harness's role, bounds, and
+  expected outcome, the module-owner rows, and the re-use policies below);
+  `docs/repository-layout.md`; `docs/contents.md` (ADR-0010 and this plan);
+  `docs/evidence-and-decision-records.md`; `docs/validation.md` (GAP9 in part);
+  `docs/references.md` (Kani, Verus, and Polars release sources);
+  `docs/acceptance-calibration.md` (Polars no longer provisional); the
+  `docs/terms-of-reference.md` §9 Q3 row linking `decision-register.md#d16`,
+  with any open-status wording about Q3 retired.
+- Decisions: the sponsor accepts D16 and ADR-0010; commit the approval
+  reference (`author_login` and `accepted_by` both `leynos`, naming D16); then
+  repoint CA3 and CA5 to `{"kind": "adr", "adrs": ["ADR-0010"]}` under D16.
+- Tick: add the 1.2.1 entry to `spec/task-completion.json` citing D16 and its
+  artefacts, tick task 1.2.1 and its detail in `docs/roadmap.md`, and regenerate
+  `spec/roadmap.json`. AC-07 is inconclusive at this point because its window
+  restarted; the sponsor accepted that in decision item 2.
+- Acceptance: `make design-check` accepts the tick; the AC-04 record states
+  pass or fail; the hosted jobs are green.
+- Recovery: untick and revert the documents; the code milestones stand.
+- Compatibility decision: none.
+
+Re-use policies to record in `docs/developers-guide.md`:
+
+- `TargetFacts` is kernel-owned, the single source of target facts for checked
+  rules and later certificate keys. The macro crate must not construct it, and
+  the facade exposes only derived values through `BuildProfile`.
+- `BuildProfile` reports compiled features and target facts only. It is not a
+  capability report: task 1.2.6 owns Polars capability statuses and must not
+  infer them from `BuildProfile`.
+- `trust_audit` serves the evidence gate's I/O shell and the `trust-audit`
+  design check only; it is not a general Rust parser.
+- `kani_log` serves the evidence gate's I/O shell only; its decision function
+  is pure and must not read files.
+- `toolchain_profiles` validates pins; other checks read pins from
+  `spec/toolchain-profiles.json` rather than duplicating them.
+
+## Milestones and plateaus
+
+- EP-M1: probes, corpus, and measurements committed; no product code changed.
+  Requirements: Q3, Q9, AC-04 and AC-07 inputs, B01 and B05 preconditions.
+  Evidence: VO-15, `make kani-check`, `make kani-log-corpus`,
+  `make verus-probe`, hosted measurement run.
+- EP-M2: three-crate workspace; boundary tests green. Requirements: technical
+  design §3, §18.1, CA5 structure. Evidence: VO-1, VO-2, VO-3 (native-only),
+  VO-6, `make package`.
+- EP-M3: features, `BuildProfile`, gate profiles, CI shape, AC-07 amendment.
+  Requirements: ToR S7, technical design §3, §19.1. Evidence: VO-4, VO-5,
+  VO-14, hosted jobs.
+- EP-M4: profile record, pin checker, proposed ADR-0010 and D16, AC-04
+  amendment. Requirements: GAP4, Q3. Evidence: VO-7, VO-8.
+- EP-M5: scanner, parser, gate binding, ADR-0009 amendment, Kani registered.
+  Requirements: D15, ADR-0009. Evidence: VO-9 to VO-13.
+- EP-M6: AC-04 record, documents, D16 accepted, tick. Evidence: AC-04 record,
+  `make design-check` accepting the tick.
+
+Each milestone's recovery, remaining gaps, and compatibility decision are
+stated in its `Plan of work` entry. At every boundary, run the focused
+conformance check, one line per item:
+
+- Requirements assigned to the milestone are satisfied.
+- ADR-0010 (draft or accepted) is still followed.
+- No B01, B05, or Q9 assumption has been falsified.
+- No unapproved public interface or dependency was introduced.
+- No unapproved trust boundary, control, or persisted-format change was made.
+- Trace links in `Conformance basis` are current.
+
+## Concrete steps
+
+All commands run from the repository root. Long outputs go through `tee` into
+`/tmp/$ACTION-combobulate-1-2-1-establish-workspace-and-profiles.out`.
+
+```bash
+make install-kani kani-check 2>&1 | tee /tmp/install-kani-combobulate-1-2-1-establish-workspace-and-profiles.out
+make install-verus 2>&1 | tee /tmp/install-verus-combobulate-1-2-1-establish-workspace-and-profiles.out
+make kani-log-corpus 2>&1 | tee /tmp/kani-corpus-combobulate-1-2-1-establish-workspace-and-profiles.out
+make verus-probe 2>&1 | tee /tmp/verus-probe-combobulate-1-2-1-establish-workspace-and-profiles.out
+make check-fmt 2>&1 | tee /tmp/check-fmt-combobulate-1-2-1-establish-workspace-and-profiles.out
+make lint 2>&1 | tee /tmp/lint-combobulate-1-2-1-establish-workspace-and-profiles.out
+make test 2>&1 | tee /tmp/test-combobulate-1-2-1-establish-workspace-and-profiles.out
+make design-check 2>&1 | tee /tmp/design-check-combobulate-1-2-1-establish-workspace-and-profiles.out
+make markdownlint 2>&1 | tee /tmp/markdownlint-combobulate-1-2-1-establish-workspace-and-profiles.out
+```
+
+Expected kernel isolation after EP-M2:
+
+```plaintext
+$ cargo tree -p combobulate-kernel --all-features --target all -e all --prefix none
+combobulate-kernel v0.1.0 (.../crates/combobulate-kernel)
+```
+
+Expected profile lines after EP-M3 (exact wording fixed by the snapshots):
+
+```plaintext
+$ cargo run --quiet --manifest-path tools/fixtures/native-consumer/Cargo.toml
+features: native; target usize: 64 bits
+```
+
+```plaintext
+polars-enabled snapshot: features: native, macros, polars; target usize: 64 bits
+```
+
+## Validation and acceptance
+
+Quality criteria:
+
+- Tests: `make test` (both gate profiles) and `make design-check` pass; the
+  boundary, profile, end-to-end, pin, scanner, parser, and integration tests
+  each failed before their implementation and pass after, with the Red logs
+  recorded in `Progress`.
+- Verification: VO-1 to VO-14 discharged as stated, with their non-vacuity
+  controls observed; `make verus-probe` shows the exact counts for each wiring
+  candidate; the Kani corpus parses to every required outcome class; `mutmut`
+  survivors over the parser and scanner are resolved.
+- Lint and format: `make check-fmt`, `make lint`, `make markdownlint`,
+  `make spelling`, and `make nixie` pass.
+- Performance: the AC-04 acceptance record states pass or fail against its
+  ceilings; each hosted required job stays within its measured size; AC-07 is
+  recorded as inconclusive at the tick.
+- Security: `make audit` passes with Polars in the lock file; no new audit
+  ignore is added without a recorded reason.
+
+## Idempotence and recovery
+
+Installation idempotence and download integrity belong to `prover-tools`;
+`make kani-check` after every install, and the Verus archive's checksum,
+establish that the installed tools match their pins. `make kani-log-corpus`
+regenerates logs and provenance; regenerated logs differ in timings, so their
+digests are refreshed together with the fixture records and manifests, and the
+parser tests assert classifications rather than timings. Every milestone ends
+in a committed, gated state, so reverting one milestone's commits returns to
+the previous plateau; EP-M3 must be reverted as a unit.
+
+## Artefacts and notes
+
+Hosted profile measurements, run `41163302274` on head `4d4f031`
+(`ubuntu24 20261026.354.1`, four vCPUs), 2026-10-31, three cold runs each:
+
+- rustdoc: 38.45 / 36.85 / 36.75 s; peak 0.68 GiB; target 0.24 GiB
+- clippy: 39.16 / 37.85 / 39.40 s; peak 0.68 GiB; target 0.24 GiB
+- whitaker: 57.71 / 23.10 / 27.23 s; peak 0.83 GiB; target 0.47 GiB
+- nextest: 52.08 / 51.50 / 51.03 s; peak 2.08 GiB; target 1.08 GiB
+- coverage: 58.89 / 56.40 / 57.47 s; peak 1.68 GiB; target 0.95 GiB
+- ui: 134.23 / 128.67 / 130.26 s; peak 2.10 GiB; target 1.13 GiB
+
+Setup before the first run took 61-80 s per job. Clippy after rustdoc took
+13.08 s, so those routes share dependency metadata. The verifier-free job
+recorded `status: pass` in
+`tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
+the container build and probe logs beside its local counterparts.
+
+Release digests obtained on 2026-10-22 from the GitHub releases API:
+
+```plaintext
+verus-0.2026.09.06.8dea4a2-x86-linux.zip  sha256:13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16
+kani-0.67.0-x86_64-unknown-linux-gnu.tar.gz  sha256:3b5f7afd3b51603ee720db7bc1bc4fe46b5a4f5d36daad9939c4b4c658b51ac0
+```
+
+## Interfaces and dependencies
+
+In `crates/combobulate-kernel/src/lib.rs`:
+
+```rust
+/// Facts about the compilation target that checked rules must use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TargetFacts { usize_bits: u32 }
+
+impl TargetFacts {
+    /// Facts for the target this crate is compiled for.
+    pub const fn current() -> Self { Self { usize_bits: usize::BITS } }
+    /// Width of `usize` on the target, in bits.
+    pub const fn usize_bits(self) -> u32 { self.usize_bits }
+}
+```
+
+In `src/profile.rs`, re-exported from the facade root; `TargetFacts` is not
+re-exported:
+
+```rust
+/// Features and target facts compiled into this build of Combobulate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BuildProfile { /* private fields */ }
+
+impl BuildProfile {
+    pub const fn current() -> Self;
+    pub const fn has_macros(self) -> bool;
+    pub const fn has_polars(self) -> bool;
+    pub const fn target_usize_bits(self) -> u32;
+}
+
+impl core::fmt::Display for BuildProfile { /* the profile line */ }
+```
+
+Dependencies (caret requirements):
+
+- Facade runtime: `combobulate-kernel` (path, version 0.1.0), optional
+  `combobulate-macros` (path, version 0.1.0), optional `polars = "0.55.2"` with
+  `default-features = false` and the EP-M1 feature set.
+- Facade development: `rstest-bdd = "0.6.0"`, `googletest = "0.14.3"`,
+  `pretty_assertions = "1.4.1"`, `insta = "1.49.0"`; `rstest` may move from
+  0.27.0 to 0.28.0 only if `rstest-bdd` requires it.
+- Kernel and macros: none.
+- Python: none new; Hypothesis 6.168.5 and pytest 9.1.1 are already pinned.
+  `mutmut` runs through `uv tool run` at a pinned version, not as a project
+  dependency.
+- Proof tools (not Cargo dependencies of shipped crates): Kani 0.67.0, Verus
+  0.2026.09.06.8dea4a2, Z3 4.16.0, and `vstd` `=0.0.0-2026-09-06-0133` in the
+  Verus probe's crate-based candidates only; the exact pin is required because
+  Verus checks that `vstd` matches the verifier build.
+- Prover tooling: `rust-prover-tools` at the commit in
+  `tools/rust-prover-tools/REF`, run through `uv tool run --from` its pinned
+  Git source (Python 3.14, already required by the repository's tooling); it is
+  not a project dependency.
+
+## Signposts
+
+Read before implementing: `docs/technical-design.md` §§3, 10, 15, 17-19;
+`docs/terms-of-reference.md` §6, §9, and Q3, Q9; `docs/testable-bets.md` B01,
+B05; `docs/adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md`;
+`docs/adrs/adr-0008-acceptance-control-pre-registration.md`;
+`docs/adrs/adr-0009-proof-first-policy-and-evidence-gate.md`;
+`docs/evidence-and-decision-records.md`; `docs/acceptance-calibration.md`;
+`docs/decision-register.md`; `docs/developers-guide.md`;
+`docs/reliable-testing-in-rust-via-dependency-injection.md`;
+`docs/rust-testing-with-rstest-fixtures.md`; `docs/rstest-bdd-users-guide.md`;
+`docs/rust-doctest-dry-guide.md`;
+`docs/complexity-antipatterns-and-refactoring-strategies.md`;
+`docs/references.md` (E-KANI-*, E-VERUS-*, E-POLARS2-*);
+`docs/documentation-style-guide.md` (ADR template and naming);
+`docs/scripting-standards.md`. Outside the repository: the
+`leynos/rust-prover-tools` README, users' guide (`docs/users-guide.md`, in
+particular "Explicit legacy Kani execution"), and CLI design
+(`docs/prover-tools-cli-design.md`); and the `kani` and `verus` skills'
+`references/project-on-ramp.md`.
+
+Skills: `execplans`, `rust-router`, `arch-crate-design`,
+`arch-decision-records`, `arch-supply-chain`, `rust-unit-testing`, `kani`,
+`verus`, `rust-verification`, `hypothesis`, `mutmut`, `python-testing`,
+`nextest`, `codegraph-mcp`, `firecrawl-mcp`, `github-stacks`,
+`en-gb-oxendict-style`, `pr-creation`.
+
+## Revision note
+
+2026-10-22, revision 1: initial draft from Wyvern reconnaissance and external
+research.
+
+2026-10-22, revision 2: applied the community-of-experts review. Added the
+AC-07, AC-04, and ADR-0009 amendments and their checkpoints; moved the CI
+change into EP-M3 so that Polars never reaches `build-test` without the split;
+replaced `--all-features` gates with explicit gate profiles; bound the trust
+audit to the gate and stated the vocabulary's matching rule; fixed parser
+bounds to `partial`; specified negative controls, `run_mode`, outcome
+precedence, and the bound harness manifest; widened the Kani corpus; made the
+Verus probe decisive with exact counts, a third wiring candidate, and a
+container build; replaced metadata-graph checks with `cargo tree` and
+declared-edge checks, added the host-compilation rule; trimmed the public API;
+kept `license` and `publish` literal; added the package route, the
+`make_gate_order.rs` split, the external native consumer, VO-14, re-use
+policies, and per-milestone recovery and gates. Remaining work is unchanged in
+scope: implementation begins only after sponsor approval.
+
+2026-10-22, revision 3: recorded the sponsor's acceptance of the recommended
+option for all eight sponsor decisions, and renamed the section to
+`Sponsor decisions`. Explicit approval of the plan and the Q3
+`in_scope_questions` answer remain before EP-M1 begins.
+
+2026-10-22, revision 4: at the sponsor's direction, adopted
+`leynos/rust-prover-tools` as the only installer and runner for Kani and Verus
+(DL-21). Dropped the repository-owned installer; added the pinned
+`tools/rust-prover-tools/REF`, the on-ramp's Make wiring and recording-fake
+contract tests (VO-15), `prover-tools kani exec` as the Kani route, the
+single-root Verus wiring candidate (DL-22), and a separate non-required formal
+workflow with `FORMAL-SKIP` stubs (DL-23). New risks cover the unverified Kani
+bundle download, the missing `cargo verus` route, and `.verus/` disk use.
+Remaining work is unchanged otherwise; EP-M1 still awaits explicit plan
+approval and the Q3 answer.
+
+2026-10-27, revision 5: recorded sponsor approval to implement the plan and the
+direction to bring Q3 into scope when its evidence-based D16 is proposed.
+
+2026-10-28, revision 6: adopted the rebased development configuration for AC-04
+warm measurements and clarified the amendment; prefer `prover-tools`, with a
+documented direct pinned-tool route when a probe requires it.
+
+2026-10-28, revision 7: recorded the local probe evidence, explicit helper
+compatibility route, solver transport, and hosted acceptance gaps.
+
+2026-10-30, revision 8: recorded the durable solver-selection probe, its Red
+and Green evidence, and the regenerated corpus.
+
+2026-10-31, revision 9: recorded EP-M1 hosted measurement and close, then
+EP-M2: the three-crate workspace, the dependency-direction, backend, verifier,
+and `no_std` contracts, per-member package policy, the package route, and the
+milestone review repairs (DL-31 through DL-35).
+
+2026-10-31, revision 10: recorded the milestone-close CLI review and its three
+repaired defects: the verifier-absence branches, the effective-deny lint check,
+and the separate candidate-fingerprint command (DL-36).
+
+2026-10-31, revision 11: recorded the confirmation review: recaptured hosted
+verifier-free evidence on measurement run `41227443972`, the regenerated Kani
+corpus provenance, the corrected route defaults, and the spelling fixes (DL-37).
+
+2026-10-31, revision 12: recorded the fourth review round: the corrected
+user-guide scope statement and the string-form `typing.cast` calls (DL-38).
+
+2026-10-31, revision 13: recorded the fifth review round: portable paths in
+committed provenance, applied at the generators, with both corpora regenerated
+(DL-39).
+
+2026-10-31, revision 14: recorded the sixth review round, EP-M2 completion, and
+the round-5 gate evidence: the dependency fetch and build-override clearing the
+design specifies are restored in the live boundary checks (DL-40).
+
+2026-10-31, revision 15: recorded the seventh review round: the raw-string
+terminator probe no longer consumes the character it tests, the manifest
+projection marks `workspace` optional, the layout documents `.verus/`, and the
+duplicate `EP-M2` progress entry introduced by revision 14 is removed (DL-41).
+
+2026-11-01, revision 16: recorded the eighth review round: the hosted
+verifier-free record now names `<repo>` and `~` instead of the runner's account
+path, with its captured log and digest unchanged, and a committed-record test
+holds the convention (DL-42).
+
+2026-11-01, revision 17: recorded the ninth review round: the portability scan
+now reads both generator roots and the recorded solver path, matching the
+documented claim (DL-43).
+
+2026-11-01, revision 18: recorded the tenth review round: the developers' guide
+documents `member_manifests` and the per-member package rule it enforces, and
+the probe helpers the guide calls private now carry private names (DL-44).
+
+2026-11-01, revision 19: recorded the eleventh review round: member publication
+follows the root release guard, the guide's helper names match the code, and
+the remaining private-intent probe helpers were renamed (DL-45).
+
+2026-11-01, revision 20: recorded the twelfth review round: the public
+lint-table helper documents its parameter and result, the record walk uses
+structural pattern matching, and the Kani provenance source digests were
+regenerated after the rename, with a new test that fails on a stale digest
+(DL-46).
+
+2026-11-01, revision 21: recorded that the Outcomes gate counts describe
+`f0b1650`, the commit at which EP-M2 first became complete, and named the final
+counts and the evidence the later review rounds added.
+
+2026-11-01, revision 22: recorded the thirteenth review round, on the head
+produced by the rebase onto `main`: the record scan skips a fixture crate's
+Cargo `target` directory, with a regression test (DL-47).
+
+2026-11-01, revision 23: recorded the fourteenth review round: the default
+solver selection fails when the pinned `z3-solver` distribution cannot be
+resolved, instead of recording a `PATH` solver as the pin (DL-48).
+
+2026-11-01, revision 24: recorded the fourteenth round's gate evidence and
+replaced the pre-rebase Python suite counts with the measurement taken on the
+current candidate, because the target branch retired preregistration cases (366
+nextest with one skipped, 441 unittest, 520 pytest plus 696 subtests).
+
+2026-11-02, revision 25: recorded the fifteenth review round: the Kani route
+builders moved into a private `kani_probe` module so the probe CLI stays under
+the 400-line module limit, and the exact `vstd` pins state why a caret cannot
+express them (DL-49). The regenerated record and the full gate set were
+measured on this candidate: 366 nextest cases with one skipped, 441 unittest
+cases, and 520 pytest cases plus 697 subtests.
+
+2026-11-02, revision 26: recorded the sixteenth review round: the measurement
+workflow pins `cargo-nextest` 0.9.150 and `cargo-llvm-cov` 0.9.1, the versions
+the accepted hosted runs recorded, so a tool release cannot change the
+pre-registered timings between runs (DL-50).
+
+2026-11-03, revision 27: recorded the seventeenth review round: member
+manifests follow the D04 licence guard as the root does, so a non-accepted D04
+changes both together (DL-51). The added package-policy case raises the
+measured subtest count to 698; the other counts are unchanged.
+
+2026-11-03, revision 28: recorded the eighteenth review round: the review of
+candidate `3e10968` against `9fa10a1` reported no findings, so the candidate
+proceeds to delivery unchanged.
+
+2026-11-03, revision 29: recorded the nineteenth assessment round: the hosted
+completeness and proof assessments raised four findings, all repaired (DL-52).
+The single-root candidate now verifies the shared helper body, the Verus record
+binds its sources, mutant qualification requires the diagnostic to name the
+seeded mutant, and only the default solver resolver is attributed to the pinned
+distribution. The plan's Kani corpus description now names the direct driver
+invocation, and both corpora are regenerated.
+
+2026-11-05, revision 30: recorded the EP-M1/EP-M2 residual assurance round:
+gate preparation reads Cargo's own compiler-artifact record, the bounded
+execution boundary covers `make test-ui` and the workspace-boundary subprocess
+audit, escalation is classified on signal 9 rather than a phantom exit 137, the
+captured-output guard and solver seam are documented, and the hosted
+verifier-free record was recaptured as run `42170378137` with all seventeen
+staged inputs bound (DL-55).
+
+2026-11-06, revision 31: recorded the second residual round: the hosted digest
+test now requires the whole staged set in both directions, solver resolution is
+split so the package-index resolver and version command live at the CLI
+boundary, and the Kani toolchain record is described as the declaration it is
+rather than proof of the compiler binary (DL-56). Both corpora were regenerated
+because both records bind the changed probe modules by digest.

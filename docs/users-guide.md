@@ -1,7 +1,8 @@
 # User guide
 
-Combobulate's array algebra is not yet implemented. The current crate provides
-only a disposable `greet()` stub for scaffold checks; it carries no stability
+Combobulate's array algebra is not yet implemented. The `combobulate` facade
+crate exports no public item yet, and the unpublished `combobulate-kernel`
+crate exposes only `TargetFacts`. Nothing in the workspace carries a stability
 promise. Do not use the proposed design examples as working Rust examples.
 
 Read the [language reference](language-reference.md) for the intended `comb!`

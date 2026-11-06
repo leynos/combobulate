@@ -1,0 +1,27 @@
+# Standalone compile-fail gate for the calibration probe's `#[must_use]`
+# contract.
+#
+# `trybuild` generates a nested crate from the package under test and copies in
+# that package's dependencies *and* every development dependency. Running this
+# gate from the repository root therefore made the nested build inherit the
+# whole root dependency graph. This package declares only the probe and
+# `trybuild`, so the nested build compiles the probe and nothing else.
+#
+# The probe's optional measurement backend is off by default, so the root graph
+# never included it; the cost was the graph itself, not any one crate in it.
+#
+# It is deliberately not a workspace member: `tools` is excluded from the root
+# workspace, which keeps the gate's target directory and lockfile separate from
+# the ordinary suite's.
+[package]
+name = "cardinality-ui-gate"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "ISC"
+
+[workspace]
+
+[dev-dependencies]
+cardinality-probe = { path = "../../calibration/cardinality-probe" }
+trybuild = "1.0.122"

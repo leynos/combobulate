@@ -1,0 +1,73 @@
+# cargo-nextest configuration for Combobulate.
+#
+# Scope: this file governs every `cargo nextest` invocation whose workspace
+# root is this repository, including `cargo llvm-cov nextest`. It covers the
+# non-doctest pass of `make test`; nextest does not run doctests, so those stay
+# with the separate `cargo test --doc` pass. Packages under `tools/` declare
+# their own workspace, so they read their own config, not this one.
+#
+# Ownership: the policy, the measured evidence, and the arithmetic behind every
+# number here live in "Test timeouts" in docs/developers-guide.md. Change the
+# two together.
+#
+# Policy: no blanket retries. A test that fails intermittently is a defect to
+# diagnose, not to paper over with re-runs.
+
+[profile.default]
+# Warn after 60 s and terminate after five warning periods, so a hung test ends
+# at 300 s instead of holding the run open until an outer job timeout kills it.
+#
+# This file exists because the suite had no deadline at any layer. The incident
+# that prompted it showed `SLOW [>8160.000s]` for a test nested one Cargo build
+# deep: nextest's default `slow-timeout` only warns, because termination needs
+# `terminate-after`, and the `trybuild` build inside the test had no timeout of
+# its own. Both layers now bound their work — this period for the test process,
+# and the external-command deadline described in the developers' guide for the
+# build it starts.
+#
+# The green hosted gate's slowest ordinary test took 13.0 s, so 300 s is a
+# sixfold margin for a test that genuinely computes rather than waits.
+slow-timeout = { period = "60s", terminate-after = 5 }
+
+# An anchored regex, not `test(=NAME)`. Nextest's `=` form compares the whole
+# test name, but a parameterized `#[rstest]` is identified by its instances,
+# `name::case_1_…`, so `test(=NAME)` would match none of them and the test
+# would silently keep the profile default. `^NAME($|::)` matches the plain name
+# and every case suffix alike.
+#
+# `checked_cardinality_result_must_be_used` runs `trybuild`, which compiles a
+# generated crate in a nested Cargo build. Measured: 50.3 s in the green hosted
+# `build-test` run, 99.2 s and 102.2 s on an idle local host, 134.2 s in the
+# hosted profile measurement, 377.2 s locally while the shared compile queue
+# held 86 waiting builds, and 443.24 s locally with 185 builds queued ahead.
+# Ten periods (600 s) clears the slowest contended sample by 157 s. It stays
+# below the whole-run cap discussed below and still ends a genuinely hung
+# nested build long before an outer job timeout would.
+#
+# The test's own `CommandDeadline` is set above this figure (900 s) on
+# purpose. A test process terminated here reports that it overran; if the inner
+# deadline were tighter, a build that was only queueing would be reported as a
+# wedged gate instead. Keep this the first deadline to fire.
+[[profile.default.overrides]]
+filter = 'test(/^checked_cardinality_result_must_be_used($|::)/)'
+slow-timeout = { period = "60s", terminate-after = 10 }
+
+# No `global-timeout` here, deliberately.
+#
+# A whole-run budget on a developer's host would diagnose local compile-queue
+# contention rather than a defect, and this repository's host is shared with
+# other agents. The hosted lanes are the ones with a fixed clock, and they
+# already have one: `build-test` declares `timeout-minutes: 8` and
+# `coverage-main.yml` bounds its own run, so a runaway suite is ended by the
+# job rather than by nextest.
+#
+# That matters for the coverage lane specifically. The shared
+# `generate-coverage` action writes a temporary nextest config (180 s /
+# `terminate-after` 1 / `grace-period` 5 s, plus `global-timeout = "10m"`) only
+# when no config resolves, and it prefers any existing one. Landing this file
+# therefore replaces that temporary file in `build-test`: the per-test
+# allowance becomes 300 s instead of 180 s, and the 10-minute whole-run cap
+# disappears. Neither change moves the lane's effective ceiling, because the
+# job's own 8-minute `timeout-minutes` is already stricter than the 10-minute
+# cap it replaces. Only a longer per-test allowance remains, and no workspace
+# member test comes close to either figure.

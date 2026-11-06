@@ -1,17 +1,8 @@
-//! Combobulate development scaffold.
+//! Combobulate: inspectable array and typed-collection algebra.
 //!
-//! The proposed array algebra and `comb!` notation are not implemented yet.
-//! See the repository design documents for the intended contracts.
+//! The array algebra and `comb!` notation are not implemented yet. This
+//! release publishes the workspace layout: a `#![no_std]` kernel that owns
+//! target facts, a procedural-macro crate waiting for the notation, and this
+//! facade. See the repository design documents for the intended contracts.
 
-// TODO: Remove this stub as soon as actual library functionality exists.
-/// Returns a greeting for the development scaffold.
-///
-/// ```
-/// assert_eq!(
-///     combobulate::greet(),
-///     "Hello from Combobulate!",
-///     "scaffold greeting"
-/// );
-/// ```
-#[must_use]
-pub const fn greet() -> &'static str { "Hello from Combobulate!" }
+// No facade item exists yet: `BuildProfile` arrives with the profile milestone.

@@ -7,12 +7,58 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
-.PHONY: help all clean test act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
+.PHONY: help all clean test test-ui prepare-dependencies prepare-ui-gate act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker lint-python docstring-coverage check-python-sources fmt check-fmt markdownlint spelling nixie \
   audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
 SHELL := bash
 
+# The prover targets are declared first so `make install-kani` and friends read
+# beside their version pins. Without an explicit default goal Make would adopt
+# `install-kani`, turning a bare `make` into a tool installation, so pin the
+# ordinary build instead.
+.DEFAULT_GOAL := build
+
+
+override PROVER_TOOLS_REF_FILE := tools/rust-prover-tools/REF
+override PROVER_TOOLS_REF := $(shell awk '/^ref:/ { print $$2 }' $(PROVER_TOOLS_REF_FILE))
+ifeq ($(shell printf '%s' '$(PROVER_TOOLS_REF)' | grep -Ec '^[0-9a-f]{40}$$'),0)
+$(error PROVER_TOOLS_REF missing or malformed; expected "ref: <40-hex>" in $(PROVER_TOOLS_REF_FILE))
+endif
+override PROVER_TOOLS_SOURCE := git+https://github.com/leynos/rust-prover-tools.git@$(PROVER_TOOLS_REF)
+# Only the paired command-line seam may replace the pinned helper in tests.
+PROVER_TOOLS_ORIGINS := $(origin PROVER_TOOLS_CONTRACT_TEST),$(origin PROVER_TOOLS),$(PROVER_TOOLS_CONTRACT_TEST)
+ifeq ($(PROVER_TOOLS_ORIGINS),command line,command line,1)
+else
+override PROVER_TOOLS := uv tool run --from "$(PROVER_TOOLS_SOURCE)" prover-tools
+endif
+KANI ?= cargo kani
+KANI_INSTALLATION ?= $(HOME)/.kani/kani-$(shell cat tools/kani/VERSION)
+KANI_FLAGS ?=
+KANI_PROBE_ROUTE ?= direct
+VERUS_FLAGS ?=
+FORMAL_STRICT ?= 0
+
+.PHONY: install-kani kani-check install-verus kani kani-full kani-log-corpus verus-probe
+
+install-kani: ## Install the pinned Kani release
+	$(PROVER_TOOLS) kani install --repo-root .
+
+kani-check: ## Require the calibrated Kani release
+	$(PROVER_TOOLS) kani check-version --repo-root . --kani-command "$(KANI)"
+
+install-verus: ## Install the checksum-verified Verus release
+	$(PROVER_TOOLS) verus install --repo-root .
+
+kani kani-full: kani-check ## Report that product proofs arrive in task 1.2.4
+	@printf 'FORMAL-SKIP: %s has no product harnesses until task 1.2.4\n' '$@'
+	@test "$(FORMAL_STRICT)" != 1
+
+kani-log-corpus: kani-check ## Capture real Kani parser fixtures
+	@uv run --script scripts/run_verifier_probes.py kani --prover-tools '$(PROVER_TOOLS)' --installation '$(KANI_INSTALLATION)' --route '$(KANI_PROBE_ROUTE)' $(KANI_FLAGS)
+
+verus-probe: kani-check ## Compare the four pinned Verus wiring candidates
+	@uv run --script scripts/run_verifier_probes.py verus --prover-tools '$(PROVER_TOOLS)' $(VERUS_FLAGS)
 
 TARGET ?= libcombobulate.rlib
 
@@ -42,13 +88,30 @@ BUILD_HOST_TRIPLE := $(shell rustup show 2>/dev/null | sed -n 's/^Default host: 
 DEV_LINKER_FLAGS ?= $(if $(and $(filter Linux,$(BUILD_HOST_OS)),$(filter x86_64,$(BUILD_HOST_ARCH)),$(filter x86_64-unknown-linux-gnu,$(BUILD_HOST_TRIPLE))),-C link-arg=-fuse-ld=mold)
 DEV_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS) $(DEV_THREADS_FLAGS) $(DEV_LINKER_FLAGS)
 RELEASE_RUST_FLAGS ?= $(RUST_FLAGS) $(POLONIUS_FLAGS)
-PACKAGE_FLAGS ?=
+# The kernel and macro crates are unpublished (D05), so `cargo package` cannot
+# resolve them from the registry on its own. Patch them to their workspace
+# paths for this run: the packaged manifest still names versions, and
+# verification still compiles the facade against the local members.
+PACKAGE_FLAGS ?= -p combobulate \
+	--config "patch.crates-io.combobulate-kernel.path='$(CURDIR)/crates/combobulate-kernel'" \
+	--config "patch.crates-io.combobulate-macros.path='$(CURDIR)/crates/combobulate-macros'"
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
+# The cardinality compile-fail gate is its own workspace: `tools/` is excluded
+# from the root workspace, so it carries its own manifest, lockfile, and target
+# directory. `make prepare-dependencies` fetches it; the preparation and direct
+# routes below share one script that records the built binary and runs it. The
+# root suite reaches the same record through `tests/cardinality_probe_ui.rs`.
+UI_GATE_MANIFEST ?= tools/gates/cardinality-ui/Cargo.toml
+UI_GATE_SCRIPT ?= scripts/cardinality_ui_gate.py
+# The script composes RUSTFLAGS from these flags, so they are passed by value.
+# An assigned RUSTFLAGS here would replace the caller's value instead.
+UI_GATE_ENVIRONMENT = DEV_RUST_FLAGS="$(DEV_RUST_FLAGS)"
+PYTHON ?= python3
 WITH_ACT ?= 0
 ACT ?= act
 ACT_RUNNER_IMAGE ?= catthehacker/ubuntu:act-latest
@@ -82,10 +145,84 @@ clean: ## Remove build artefacts
 	$(CARGO) clean
 	rm -f .typos-oxendict-base.json .typos-oxendict-base.toml
 
-test: check-build-tools ## Run tests with warnings treated as errors
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+BUILD_STANDARD_ENV = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)"
+
+test: prepare-ui-gate ## Run tests with warnings treated as errors
+	$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+	$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
+
+# Every Rust command a development route runs must compose the caller's
+# RUSTFLAGS with the standard flags, and only an assignment does that: without
+# one, Cargo falls back to `.cargo/config.toml` and silently drops the caller's
+# flags. The acquisition step below compiles nothing, so its commands carry no
+# assignment either way; the checks in `tests/build_standard_contract.rs` read
+# `make -n` output and fail on a bare Cargo command in a development route, so
+# any new command here needs the assignment too.
+#
+# Acquisition happens before any test body runs, and its failure names the
+# manifest and the likely cause: a cold cache, an unreachable registry, or a
+# lockfile that needs updating. `--locked` is deliberate, so a stale lockfile
+# fails here rather than silently resolving new versions.
+#
+# A plain `cargo fetch` covers every target. `--target` takes a triple, not
+# `all`, and Cargo resolves the entire lockfile graph for `fetch` regardless of
+# the host, which is what the boundary checks' `cargo tree --target all` needs.
+#
+# `lint` runs this too, and that is not redundant. The hosted lane runs
+# `make lint` before the coverage action and never runs `make test`, so this is
+# the only place a hosted runner can populate the cache before the boundary
+# tests execute inside the coverage action.
+prepare-dependencies: check-build-tools ## Acquire locked dependencies before any test body runs
+	@if ! $(BUILD_STANDARD_ENV) $(CARGO) fetch --locked; then \
+		printf '\n%s\n\n' \
+			"make prepare-dependencies could not acquire the workspace's dependencies." \
+			"Run it directly to read the full error. The workspace boundary checks fetch" \
+			"nothing themselves, so a cold or offline cache and a lockfile that needs" \
+			"regenerating all fail there instead, as an unrelated-looking test failure." >&2; \
+		exit 1; \
+	fi
+	@if ! $(BUILD_STANDARD_ENV) $(CARGO) fetch --locked --manifest-path '$(UI_GATE_MANIFEST)'; then \
+		printf '\n%s\n\n' \
+			"make prepare-dependencies could not acquire $(UI_GATE_MANIFEST)." \
+			"Run it directly to read the full error. That package is its own workspace," \
+			"so the workspace fetch above does not cover it." >&2; \
+		exit 1; \
+	fi
+
+# The gate lives in its own workspace so its nested `trybuild` build inherits
+# only the probe and `trybuild`. Running it from the root package would merge
+# every root dependency and dev-dependency into that generated crate; this
+# route keeps the diagnostic contract without making the nested build pay for
+# the root package's graph.
+#
+# `prepare-ui-gate` chains onto `prepare-dependencies` rather than sitting
+# beside it as a second prerequisite of `test`. Under `make -j` independent
+# prerequisites run in parallel, and measurement showed the gate build then
+# sometimes starting before the fetches that populate its own workspace: a
+# build racing the acquisition it needs.
+#
+# `make test` builds the gate's test binary here, before any test body runs, so
+# `tests/cardinality_probe_ui.rs` only has to read and run it. Building inside
+# that test body is what the incident did: a nested Cargo build, of a generated
+# crate that inherited the root package's whole dev-dependency graph, under no
+# deadline of its own. The build keeps `--no-run` so preparation cannot pass
+# because the gate happened to pass on a previous run.
+#
+# The script records the executable Cargo reports rather than leaving the test
+# to search the build directory. Cargo chooses its own output directory, so an
+# inherited `CARGO_TARGET_DIR` would put the binary where a search never looks,
+# and a newest-mtime search binds the run to whatever was written last. The
+# script also removes those redirecting variables, so preparation and the run
+# that follows it agree on one build.
+prepare-ui-gate: prepare-dependencies ## Build the cardinality gate's test binary
+	$(UI_GATE_ENVIRONMENT) $(PYTHON) $(UI_GATE_SCRIPT) prepare
+
+# The direct route for a developer who wants only the gate. It builds through
+# the same recipe and then runs the recorded binary under the same deadline the
+# root test applies, so this route is bounded on the same terms.
+test-ui: prepare-ui-gate ## Run the cardinality compile-fail gate outside the root workspace
+	$(UI_GATE_ENVIRONMENT) $(PYTHON) $(UI_GATE_SCRIPT) run
 
 act-validation: ## Run the CI workflow through Act after outer Cargo tests pass
 	@GITHUB_TOKEN="$(ACT_GITHUB_TOKEN)" $(ACT) pull_request --bind \
@@ -114,7 +251,13 @@ target/debug/$(TARGET): check-build-tools ## Build debug binary
 # encoded flags value would outrank RUSTFLAGS, so remove it explicitly.
 PRODUCTION_ENV = env -u CARGO_ENCODED_RUSTFLAGS CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm CARGO_PROFILE_RELEASE_CODEGEN_BACKEND=llvm RUSTFLAGS="$(RELEASE_RUST_FLAGS)"
 
-coverage: check-coverage-tools ## Generate lcov coverage with lld for llvm-tools compatibility
+# `prepare-ui-gate` is a prerequisite, not a trailing recipe line. `llvm-cov`
+# runs the workspace suite, and the root `cardinality_probe_ui` test now finds a
+# prebuilt gate binary rather than compiling one; without the prerequisite a
+# clean tree would fail that test before the trailing `test-ui` ever ran. Making
+# it a prerequisite also means the gate is no longer run twice, since the root
+# test already executes it under the coverage run.
+coverage: check-coverage-tools prepare-ui-gate ## Generate lcov coverage with lld for llvm-tools compatibility
 	@echo "coverage linker flags: $(COVERAGE_LINKER_FLAGS)"
 	CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
 		CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm \
@@ -123,7 +266,16 @@ coverage: check-coverage-tools ## Generate lcov coverage with lld for llvm-tools
 		LDFLAGS="$(COVERAGE_LINKER_FLAGS)" \
 		$(CARGO) llvm-cov --lcov --output-path lcov.info $(TEST_FLAGS)
 
-lint: ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
+# Preparation is here, not only on `test`. The hosted lane runs `make lint`
+# and then the coverage action, which runs `cargo llvm-cov nextest` itself; it
+# never runs `make test`. Without `prepare-dependencies` a hosted runner
+# reaches the workspace-boundary tests with whatever the action's own install
+# steps happened to cache, and the offline `cargo tree` checks fail there with
+# an unrelated-looking HTTP refusal. Without `prepare-ui-gate` the root
+# `cardinality_probe_ui` test finds no prebuilt gate binary and fails the lane.
+# Both must therefore run before the coverage action, and `make lint` is the
+# only Make target the hosted lane runs first.
+lint: prepare-dependencies prepare-ui-gate ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
 	+$(MAKE) lint-clippy
 	+$(MAKE) lint-whitaker
 	+$(MAKE) lint-python
@@ -184,11 +336,14 @@ check-coverage-tools: ## Check coverage linker prerequisites
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
+	$(CARGO) fmt --manifest-path $(UI_GATE_MANIFEST) --all
 	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 	$(MDLINT) --fix "**/*.md"
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
+	# The gate is its own workspace, so the root `cargo fmt --all` cannot reach it.
+	$(CARGO) fmt --manifest-path $(UI_GATE_MANIFEST) --all -- --check
 	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
 markdownlint: ## Lint Markdown files
@@ -236,8 +391,6 @@ help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
 	awk 'BEGIN {FS=":"; printf "Available targets:\n"} {printf "  %-20s %s\n", $$1, $$2}'
 
-
-PYTHON ?= python3
 # Date-dependent design checks use the HEAD commit date, never the wall clock.
 AS_OF ?= $(shell git log -1 --format=%cs)
 # Set BASE_REV (for example to the merge base) to reject edits to frozen registers.

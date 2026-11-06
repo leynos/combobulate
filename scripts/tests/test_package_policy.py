@@ -139,6 +139,106 @@ class PackagePolicy(unittest.TestCase):
             self.assertEqual(context.results[-1]['check'], 'package-policy',
                              'an approved release must still record a package-policy result')
 
+    def test_every_member_carries_the_literal_policy(self):
+        """Require ISC and publish = false in every crate the member globs select."""
+        cases = (
+            ('valid members', 'accepted', 'license = "ISC"\npublish = false\n', None),
+            ('publishable member', 'accepted', 'license = "ISC"\npublish = true\n',
+             'publish = false'),
+            ('other licence', 'accepted', 'license = "MIT"\npublish = false\n',
+             'license = "ISC"'),
+            ('missing policy', 'accepted', '', 'license = "ISC"'),
+            ('proposed D04 permits another licence', 'proposed',
+             'license = "MIT"\npublish = false\n', None),
+        )
+        for label, d04_lifecycle, fields, expected_error in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.write_workspace_fixture(root, member_fields=fields,
+                                             d04_lifecycle=d04_lifecycle)
+                context = ValidationContext(root)
+                if expected_error is None:
+                    check_package_policy(context)
+                    self.assertEqual(context.results[-1]['check'], 'package-policy',
+                                     f'{label} must record a successful package-policy check')
+                else:
+                    with self.assertRaisesRegex(AssertionError, expected_error):
+                        check_package_policy(context)
+
+    def test_release_approval_lifts_the_member_publication_guard(self):
+        """Let published members through once the root release conditions pass."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_release_workspace_fixture(root)
+            context = ValidationContext(root)
+            self.add_validated_core_closure(context)
+            check_package_policy(context)
+            self.assertEqual(context.results[-1]['check'], 'package-policy',
+                             'an approved release must lift the member publication guard')
+
+    def test_crate_manifest_outside_the_member_globs_fails(self):
+        """Reject a crates/* manifest no workspace member glob selects."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_workspace_fixture(root, members=['crates/listed'],
+                                         crates=('listed', 'rogue'))
+            with self.assertRaisesRegex(AssertionError, 'must match a workspace member glob'):
+                check_package_policy(ValidationContext(root))
+
+    def test_member_glob_selecting_every_crate_passes(self):
+        """Accept a workspace whose globs cover each crates directory."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.write_workspace_fixture(root, members=['crates/listed'], crates=('listed',))
+            context = ValidationContext(root)
+            check_package_policy(context)
+            self.assertEqual(context.results[-1]['check'], 'package-policy',
+                             'a fully listed workspace must record a package-policy result')
+
+    @staticmethod
+    def write_workspace_fixture(root: Path, *, members: list[str] | None = None,
+                                member_fields: str = 'license = "ISC"\npublish = false\n',
+                                crates: tuple[str, ...] = ('member',),
+                                d04_lifecycle: str = 'accepted') -> None:
+        """Write a root workspace manifest, a D04 register, and member crates."""
+        (root / 'spec').mkdir()
+        patterns = ['crates/*'] if members is None else members
+        member_list = ', '.join(f'"{pattern}"' for pattern in patterns)
+        (root / 'Cargo.toml').write_text(
+            f'[workspace]\nmembers = [{member_list}]\n\n'
+            '[package]\nname = "policy-fixture"\nversion = "0.1.0"\n'
+            'license = "ISC"\npublish = false\n', encoding='utf-8')
+        decisions = [{'id': 'D04', 'lifecycle': d04_lifecycle}]
+        (root / 'spec/decisions.json').write_text(
+            json.dumps({'decisions': decisions}), encoding='utf-8')
+        for crate in crates:
+            crate_root = root / 'crates' / crate
+            crate_root.mkdir(parents=True)
+            (crate_root / 'Cargo.toml').write_text(
+                f'[package]\nname = "{crate}"\nversion = "0.1.0"\n' + member_fields,
+                encoding='utf-8')
+
+    @staticmethod
+    def write_release_workspace_fixture(root: Path) -> None:
+        """Write a publishable workspace whose released members may publish."""
+        (root / 'spec').mkdir()
+        (root / 'Cargo.toml').write_text(
+            '[workspace]\nmembers = ["crates/*"]\n\n'
+            '[package]\nname = "policy-fixture"\nversion = "0.1.0"\n'
+            'license = "ISC"\npublish = true\n', encoding='utf-8')
+        decisions = [
+            {'id': 'D04', 'lifecycle': 'accepted'},
+            {'id': 'D05', 'lifecycle': 'superseded', 'superseded_by': 'D16'},
+            {'id': 'D16', 'lifecycle': 'accepted', 'supersedes': ['D05']},
+        ]
+        (root / 'spec/decisions.json').write_text(
+            json.dumps({'decisions': decisions}), encoding='utf-8')
+        crate = root / 'crates/member'
+        crate.mkdir(parents=True)
+        (crate / 'Cargo.toml').write_text(
+            '[package]\nname = "member"\nversion = "0.1.0"\n'
+            'license = "ISC"\npublish = true\n', encoding='utf-8')
+
     @staticmethod
     def write_release_fixture(root: Path, *, publish: bool, supersede_d05: bool = True) -> None:
         """Write the smallest manifest and decision register for D05 release cases."""

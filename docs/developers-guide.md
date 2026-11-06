@@ -41,9 +41,13 @@ Dylint then checks the repository from its root and discovers
 `.cargo/config.toml`; that check uses the development backend and linker
 defaults. The recipe sends warnings-as-errors to the repository check through
 Dylint's `DYLINT_RUSTFLAGS` input. `make test` prefers `cargo nextest run` and
-falls back to `cargo test` when cargo-nextest is not available. It also runs
-the cardinality probe's `trybuild` UI test for its `#[must_use]` result
-contract. `make check-fmt` verifies Rust formatting with
+falls back to `cargo test` when cargo-nextest is not available. It prepares
+both workspaces' dependencies and builds the cardinality probe's `trybuild` UI
+gate before any test body runs, then the root test runs the binary Cargo
+reported for its `#[must_use]` result contract. `make test-ui` prepares and
+runs the same gate directly, under the same deadline. See
+[Test timeouts](#test-timeouts) for why preparation sits outside the suite and
+what bounds each child process. `make check-fmt` verifies Rust formatting with
 `cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
 using the configured selection and formatting rules. `make fmt` formats Rust
 with the pinned `rustfmt`, then applies the Markdown formatter and
@@ -55,7 +59,8 @@ from the workspace root. PR CI skips `make audit` and the audit-only setup when
 blocking unrelated Dependabot PRs while human PRs retain the audit gate. The
 compensating control is `.github/workflows/audit.yml`, which runs weekly and
 can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
-`lld`.
+`lld` and prepares the gate before measuring; see
+[Test timeouts](#test-timeouts) for why preparation sits outside the suite.
 
 `make check-fmt` checks Git-tracked Markdown and untracked files Git does not
 ignore; files need not be staged. Markdown lint covers every matching file. The
@@ -151,6 +156,200 @@ workflow, so it publishes nothing until a dispatch from `main` or the next
 push. This scaffold does not include an automerge workflow.
 `tests/codescene_publisher.rs` holds the shape over the committed workflows.
 
+## Test timeouts
+
+A test that starts a child process owns a nested build, and a nested build is
+where this repository has already lost two and a quarter hours to a single
+test. Two deadlines bound that work, and they sit at different layers.
+
+`nextest` bounds the test process. `.config/nextest.toml` sets a 60 s slow
+warning with `terminate-after = 5`, so an ordinary test ends at 300 s. The
+cardinality gate's `trybuild` test has its own override at
+`terminate-after = 10`, because it compiles a generated crate; the comment
+there records the measurements the figure came from. Those numbers, the
+arithmetic behind them, and the reasons there is no `global-timeout` are
+policy, and they live in that file beside the values rather than here.
+
+`CommandDeadline` in `tests/support/process_deadline.rs` bounds one external
+command. It wraps the command in GNU `timeout`, which puts the child in its own
+process group, signals the whole group at the deadline, and kills whatever
+ignored `SIGTERM`. A run that overruns reports `exceeded_deadline()` and the
+output collected so far, so a timeout is diagnosed rather than merely failing.
+
+### Ownership and permitted callers
+
+`CommandDeadline` is test support for command lines the test suite builds
+itself. It is deliberately narrow: it does not wrap arbitrary process
+management, it does not own environment policy, and it must not grow into a
+second process API beside `std::process`. Extend it only when a test needs a
+deadline; do not route production code through it.
+
+It is compiled into more than one test binary, so it carries no default
+deadline. A default would be dead code in every binary that picks a different
+tier. Each caller declares its own:
+
+| Caller                                      | Deadline | Why                                                   |
+| ------------------------------------------- | -------- | ----------------------------------------------------- |
+| `tests/cardinality_probe_ui.rs`             | 900 s    | Runs the pre-built gate binary.                       |
+| `tests/workspace_boundaries.rs`             | 120 s    | Live `cargo metadata` and offline `cargo tree` reads. |
+| `tests/support/make_gate_order_commands.rs` | 60 s     | Enumerates the Python sources with Git.               |
+| `tests/process_deadline.rs`                 | 60 s     | Policy tests against fake executables.                |
+| `scripts/cardinality_ui_gate.py run`        | 600 s    | `make test-ui`, with no nextest behind the child.     |
+
+The Python gate runner is not a `CommandDeadline` caller: it invokes the same
+GNU `timeout` shape directly, and classifies the result the same way. It is
+listed because a reader checking "what bounds this route" needs the whole set.
+
+The gate's tier sits deliberately above nextest's own termination point. If the
+inner deadline fired first, a build merely waiting in the shared compile queue
+would be reported as a wedged gate, hiding the real cause. The slower bound
+lets nextest's diagnosis reach the operator first.
+
+A new caller adds its tier to this table and to the test that measures it, in
+the same change.
+
+`make test-ui` is the one supported route outside the root suite, and nothing
+there runs under nextest: the standalone `cargo test --test cardinality_ui`
+invocation inside the gate package has neither the root deadline nor nextest's
+`terminate-after`. That is why the recipe runs the recorded binary itself under
+`timeout` rather than letting Cargo run the test; the binary's own bounded
+execution is the only thing standing between a wedged `trybuild` child and an
+unbounded route.
+
+Escalation is reported explicitly, and the status is subtler than "124 or 137".
+GNU `timeout` returns 124 when the child exits after `SIGTERM`. When the child
+ignores `SIGTERM` and `--kill-after` has to send `SIGKILL`, `timeout` does not
+exit 137: because it runs the child in its own process group — which is what
+lets the signal reach the child's descendants — it mirrors the ending signal by
+killing *itself* with it. The run then has no exit status at all, and only the
+signal (9) records what happened. Exit status 137 appears only under
+`--foreground`, and `--foreground` is unusable here because it would signal the
+child alone. A child that kills itself, or one killed by the out-of-memory
+killer, ends the same way, with signal 9 and an empty standard error.
+
+The wrapper therefore runs `timeout --verbose` and treats a signal-9 death as
+an escalation only when the announcement `sending signal KILL to command` is
+present. Anything else is propagated unchanged and diagnosed by its own output,
+never reported as a deadline the wrapper enforced. `CommandDeadline` reports
+the three cases as `DeadlineOutcome::{Completed, Terminated, Escalated}`;
+`scripts/cardinality_ui_gate.py` makes the same distinction on `subprocess`'s
+`-9` return code and normalizes it to the shell's `128 + N` convention before
+returning it as the process status.
+
+### Preparation happens outside test bodies
+
+No test body fetches packages or compiles the repository. The suite used to,
+and that is the shape of the incident: a nested Cargo build, of a crate whose
+dev-dependencies included the measurement probe, under a deadline that did not
+exist.
+
+Two narrow readings remain, and neither is the incident's shape. The live
+workspace reads in `tests/workspace_boundaries.rs` run `cargo metadata` and
+`cargo tree --offline --locked`; they resolve the lockfile, compile nothing,
+and are bounded by that file's 120 s tier. The gate preparation itself is a
+Cargo command, but it is a Make recipe that runs before any test body, not
+something a test body starts.
+
+`make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
+and for the cardinality gate's separate workspace. `make prepare-ui-gate`
+chains onto it and builds the gate's test binary with `--no-run`.
+`tests/cardinality_probe_ui.rs` then reads the recorded executable path and
+runs that binary under its deadline; it does not search a build directory.
+`make test-ui` is the direct route that prepares and runs the same gate in one
+command.
+
+The record is withdrawn before a preparation starts and published only once
+Cargo has named its executable, so a failed build leaves nothing runnable
+behind. Keeping the previous path would let a later `run` execute a binary from
+a build that no longer describes the tree, and a preparation failure observed
+through Make cannot be relied on to stop every later invocation. Both failure
+shapes — a non-zero Cargo, and a successful Cargo that names no executable —
+leave no usable record.
+
+The gate is a separate workspace, so the root `cargo fmt --all` does not reach
+it. `make check-fmt` and `make fmt` therefore also run
+`cargo fmt --manifest-path tools/gates/cardinality-ui/Cargo.toml --all`,
+otherwise a formatting failure in the gate package would pass the root check.
+`tests/make_gate_order.rs` records that pass as its own `gate-formatting`
+stage, so dropping it fails the order contract instead of hiding behind a still
+green root pass.
+
+The chain is deliberate. Under `make -j`, independent prerequisites run in
+parallel, and measurement showed the gate build sometimes starting before the
+fetches that populate its own workspace. Do not make `prepare-ui-gate` a
+sibling prerequisite of `prepare-dependencies`.
+
+### The gate runs with a scrubbed environment
+
+`trybuild` chooses the package whose manifest it copies by reading
+`CARGO_MANIFEST_DIR` from its own process environment, and Cargo sets that
+variable to the package under test for every test process it starts. Running
+the gate binary from the root suite therefore handed it the *root* package even
+though the binary lived in the gate's workspace: the generated crate listed
+`camino`, `cap-std`, `googletest`, `rstest`, `serde`, `serde_yaml`, and
+`trybuild`, which is the whole dev-dependency graph the gate package exists to
+exclude.
+
+`tests/cardinality_probe_ui.rs` starts the gate with `CARGO_MANIFEST_DIR`
+removed and the working directory set to the gate package. `trybuild` falls
+back to walking up from the current directory when the variable is absent, so
+it finds the gate's own manifest. Both halves are required: removing the
+variable is what keeps the nested build narrow, and the working directory is
+what gives `trybuild` a manifest to read once the variable is gone. Do not
+"helpfully" pass the variable through, and do not run the gate from the
+repository root.
+
+The gate's test binary does not live at a stable path. It sits under
+`target/debug/build/<package>/<hash>/out/` in the ordinary layout, and Cargo
+puts it somewhere else entirely when `CARGO_TARGET_DIR`, `CARGO_BUILD_TARGET`,
+or a profile override redirects the build. Preparation therefore asks Cargo
+where it wrote the binary, by reading the `compiler-artifact` record from
+`--message-format=json`, and `scripts/cardinality_ui_gate.py` records that path
+under the gate workspace. The root test reads the record and runs exactly the
+binary the preparation built.
+
+Nothing searches for a newest file. A modification-time search answers a
+different question from the one being asked: on a clean tree with a redirected
+target directory it finds nothing and reports the binary missing, and on a
+populated tree it can select a stale artefact left by an earlier build and
+report a pass for code that was never compiled. Recording Cargo's own answer
+binds execution to the build that just completed, and the preparation removes
+the redirecting variables so the recorded path and the run cannot disagree.
+
+`prepare-dependencies` and `prepare-ui-gate` also hang off `make lint`, not only
+`make test`. The hosted lane runs `make lint` and then the coverage action,
+which runs `cargo llvm-cov nextest` itself; it never runs `make test`. Without
+the fetch a hosted runner reaches the offline `cargo tree` boundary checks with
+whatever the action's own install steps happened to cache, and without the gate
+build the root `cardinality_probe_ui` test finds no prebuilt binary.
+`make coverage` depends on `prepare-ui-gate` for the same reason: the coverage
+run executes the ordinary suite, including that root test.
+
+Anything the suite needs prepared must therefore hang off `lint`, or off a
+target the hosted lane runs before it. A prerequisite on `test` alone is
+invisible to CI however complete it looks locally.
+
+Every Cargo command a development route runs composes the caller's `RUSTFLAGS`
+with the standard flags, because only an assignment displaces the
+configuration's `rustflags`. The preparation targets are development routes, so
+their `cargo fetch` commands carry the same assignment. The gate build they
+share is a development build, which is why `tests/build_standard_contract.rs`
+reads a held-out target's own commands with `--old-file` on the preparation
+targets: the flags that test excludes belong to the measured recipe, not to the
+preparation every route depends on.
+
+### Cold-cache diagnostics
+
+A failure here is reported where it happened, not inside a test. Both fetch
+steps print the manifest that failed and name the likely causes: a cold cache,
+an unreachable registry, or a lockfile that needs regenerating. `--locked` is
+deliberate, so a stale lockfile fails at preparation rather than silently
+resolving new versions.
+
+Plain `cargo fetch` covers every target. `--target` takes a target triple, not
+`all`, and Cargo resolves the whole lockfile graph for `fetch` regardless of
+host, which is what the boundary checks' `cargo tree --target all` needs.
+
 ## Tooling
 
 Development builds use Cranelift for debug code generation. Every `rustflags`
@@ -212,8 +411,10 @@ rejects `--target` and `--target=<triple>` while allowing `--target-dir`.
 
 ## Lint baseline
 
-The single-crate lint tables live in the root `Cargo.toml`; new packages in a
-future workspace must inherit the workspace lint tables. `clippy.toml` sets
+The lint tables live in `[workspace.lints]` in the root `Cargo.toml`, and every
+member manifest opts in with `[lints] workspace = true`. A new package must
+carry that stanza; a member without it compiles clean under Clippy and fails
+nothing, which makes an omission look like a passing crate. `clippy.toml` sets
 cognitive complexity to 9, argument count to 4, function length to 70 lines,
 and nesting depth to 4. Fix findings at their source. Keep exceptions narrow,
 documented, and reasoned; do not use lint allowances to defer work. Code that
@@ -373,6 +574,87 @@ operating system sandbox, simulate every composite step, or prove the behaviour
 of nested actions or the real installer binary. Installer archive integrity
 remains anchored by the approved upstream digest manifest. Acquisition has
 per-file size and time limits; the CI gate has a three-minute timeout.
+
+## Profile measurements
+
+`.github/workflows/profile-measurements.yml` measures the standalone Polars
+probe crate rather than the workspace, and its numbers feed the pre-registered
+acceptance controls. It is not part of `ci.yml`, and none of its jobs is named
+`build-test`, so it neither gates a pull request nor contributes to AC-07.
+
+A run starts in one of two ways: `workflow_dispatch`, or a `pull_request` event
+whose action is `labeled` and whose label is exactly `measure-profiles`. The
+job guard restates that condition, so labelling a pull request for any other
+reason leaves both jobs skipped rather than spending a runner. Applying the
+same label again starts a fresh run; that is the supported way to recapture an
+observation after the measured sources change.
+
+The concurrency group is
+`profile-measurements-<pull request number or ref>-<label name or manual>`, and
+`cancel-in-progress` is false. The label name is part of the group on purpose:
+two different measurement labels on one pull request queue independently
+instead of one waiting on the other. A repeated appearance of the same label
+shares a group, so the earlier run finishes and keeps its artefacts complete.
+
+`measure-profile` runs a six-route matrix — `rustdoc`, `clippy`, `whitaker`,
+`nextest`, `coverage`, and `ui` — with `fail-fast` disabled, so one broken
+route still reports the other five. Every route measures the same crate,
+`tools/probes/polars-profile/Cargo.toml`. The job carries five environment
+settings: `CARGO_BUILD_JOBS=4` fixes the parallelism each route sees,
+`CARGO_INCREMENTAL=0` keeps incremental state out of the measurement,
+`CARGO_TERM_COLOR=never` keeps logs diffable, `RUSTDOCFLAGS=-D warnings` makes
+a documentation warning fail the rustdoc route, and `SCCACHE_RECACHE=1` forces
+recompilation so a warm local cache cannot shorten a cold measurement.
+
+Tool identities are pinned in the workflow rather than resolved from a moving
+release:
+
+| Tool     | Pin                                           |
+| -------- | --------------------------------------------- |
+| nextest  | `cargo-nextest@0.9.150`                       |
+| coverage | `cargo-llvm-cov@0.9.1`                        |
+| Whitaker | installer `0.2.11`, sha256 `a32a665d…5410236` |
+
+Those are the versions behind the accepted measurement runs 41163302274 and
+41227443972. A tool release between runs would move the timings the controls
+record, so the workflow names the versions instead of tracking the newest
+release. Unlike a Dependabot-owned action SHA, a bump here is a deliberate
+recalibration, which is why the comment beside the install step says so.
+
+Each route runs three times cold. Every run exports its own
+`CARGO_TARGET_DIR="$PWD/profile-target-$run"` and
+`DYLINT_DRIVER_PATH="$CARGO_TARGET_DIR/whitaker-driver"`, so run two cannot
+inherit run one's objects, and each route owns a driver directory it can
+discard. Runs one and two are deleted afterwards; run three survives as the
+candidate for the cache save. Per run the workflow records the expanded
+command, the `/usr/bin/time -v` report, `du -sb` of the target directory, and
+the cgroup memory peak. The `rustdoc` route adds a Clippy run against the
+rustdoc-warm target, which is the observation that answers whether the two
+routes share dependency metadata.
+
+Cache saving happens only on `main`. When `github.ref` is `refs/heads/main` the
+workflow saves `profile-target-3` under `profile-measurement-<route>-<run id>`;
+otherwise the always-running evidence step writes the line
+`not measured: caches are saved only on main`. The key includes the run id
+because the measurement exists to record a cold build, and a restored cache
+from an earlier run would quietly turn the next observation warm.
+
+Artefacts are uploaded with `if: always()`, so a route that fails still
+delivers its logs, timings, and sizes. An artefact uploaded only on success
+would discard exactly the evidence a failing route needs. The `verifier-free`
+job uploads the same way, publishing its observations directory and the
+generated `verifier-free.json` even when the container build fails.
+
+`verifier-free` is the second job, with a thirty-minute timeout. It first
+asserts `test -z "${RUSTC_WRAPPER-}"`, because a hosted runner must not carry
+the local admission wrapper across the container boundary, then installs a
+compiler with no verifier present and runs
+`uv run --script scripts/run_verifier_probes.py verifier-free`. That is the
+same command documented for local use above; on a fresh runner it produces a
+passing observation where the local one is explicitly inconclusive. Promoting
+that output to the committed `verifier-free-hosted.json` record is a manual
+step that must carry the run identity and the staged-input digests together
+with the captured logs.
 
 ## Markdown formatting
 
@@ -727,14 +1009,20 @@ tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
 Kani calibration artefacts.
 
-`check_manifest` in `scripts/docs_validation/package_policy.py` is an internal
-package-policy helper. `check_package_policy` is its only production caller and
-supplies the D04/D05 decision state. The checker runs after roadmap closure:
-publication remains disabled until an accepted D05 supersession and a
-successful task 4.3.3 closure result are both present. Unit tests may call the
-helpers directly to isolate those rules. Do not use them as general Cargo
-manifest APIs or from another checker composition; repository validation goes
-through `collect_checks`.
+`check_manifest` and `member_manifests` in
+`scripts/docs_validation/package_policy.py` are internal package-policy helpers.
+`check_package_policy` is their only production caller and supplies the
+D04/D05 decision state. `member_manifests` returns the manifests the root
+`members` globs select. Each selected member follows the same D04 licence guard
+as the root, so the literal `license = "ISC"` is required while D04 is
+accepted; publication follows the same D05 guard too, so an approved release
+lifts both requirements from the root and the members together. A manifest under
+`crates/` that no glob selects fails the check rather than escaping it. The
+checker runs after roadmap closure: publication remains disabled until an
+accepted D05 supersession and a successful task 4.3.3 closure result are both
+present. Unit tests may call the helpers directly to isolate those rules. Do
+not use them as general Cargo manifest or workspace APIs or from another
+checker composition; repository validation goes through `collect_checks`.
 
 Roadmap closure and frozen-register comparison keep repository access behind
 small reader callbacks. `ClosureInputs` receives an artefact resolver that
@@ -806,3 +1094,155 @@ no SemVer meaning, so whether Dependabot groups a bump or opens it alone
 depends on how it classifies the version; both are normal. The entry sets no
 cooldown: Dependabot's toolchain fetcher publishes no release date, so a
 cooldown would delay nothing.
+
+## Verifier capability probes
+
+Task 1.2.1's probes are tool observations, not proofs of Combobulate. Run
+`make install-kani`, `make kani-check`, `make install-verus`,
+`make kani-log-corpus`, and `make verus-probe` from the root. The ordinary
+commit gates do not install or execute a verifier. `make kani` and
+`make kani-full` visibly report `FORMAL-SKIP` until task 1.2.4;
+`FORMAL_STRICT=1` rejects those placeholders.
+
+The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
+private `kani_probe` module owns the Kani route builders and their capture
+loops; the private `verus_probe` module owns solver resolution, the Verus
+command builders, and mutant qualification; the private
+`verifier_probe_support` module owns capture, digests, and scratch workspace
+construction; the private `probe_provenance` module owns the source digest
+records and the captured-output guard; and the private `verifier_free_probe`
+module owns the container workflow. Only the probe scripts may import them.
+These helpers are not an evidence parser and must not enter the evidence gate
+or product code. Recording fixtures and result-based expectations stay private
+to the prover command contracts. The runner reuses `rust-prover-tools`' Cuprum
+command boundary rather than another installer.
+
+The Kani builders — `kani_prefix`, `_kani_arguments`, `_kani_observations`, and
+`_kani_in_place_observation` — live in `kani_probe`, and the Verus builders —
+`select_solver`, `qualify_solver`, `_pinned_solver_executable`,
+`_verus_environment`, `_refresh_candidate_fingerprint`, `_verus_command`, and
+`_qualified_candidates` — live in `verus_probe`, so the CLI file stays within
+the repository's 400-line module limit. Solver resolution is split at the
+command boundary: `select_solver` applies the selection policy and starts
+nothing, `qualify_solver` validates a version invocation the CLI observed, and
+`_pinned_solver_executable` — the one resolver that may consult a package index
+and write to uv's cache — is a required parameter of `select_solver` rather
+than a default, so the CLI passes it explicitly at the boundary. The
+fingerprint refresh is a command, separate from `_verus_command`, because
+cargo-verus does not fingerprint the function-selection arguments and the proof
+file must be touched immediately before each build. The provenance writers
+`_write_kani_provenance` and `_write_verus_provenance` and the guard
+`require_captured_output` live in `probe_provenance`. The verifier-free
+workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
+`_write_inconclusive_record`, `_stage_verifier_free_workspace`,
+`ensure_base_image`, `container_run_command`, and `run_verifier_free`. These
+helpers are private to the probe scripts. They exist so each route step can be
+read and tested on its own. They are not a public API, must not be imported by
+the support module, the evidence gate, or product code, and a new probe route
+composes them instead of adding a parallel capture path.
+
+Committed metadata must not publish host detail. `capture` still executes the
+real argument vector but stores a portable copy, replacing the repository root
+with `<repo>` and the home directory with `~`; `_write_verus_provenance`
+applies the same rewrite to the resolved solver path. Without it, a record
+would name the developer's account and worktree and could not be reproduced
+elsewhere. Captured observation logs stay verbatim: they are the tool's own
+output, and rewriting them would break the evidence the digest binds. The split
+is deliberate — metadata is rewritten, output is not. A record captured before
+this rule keeps the path it ran under until it is rewritten in place; because
+the digest binds the log and not the metadata, that edit leaves the evidence
+valid. The provenance test scans every committed fixture record and fails on
+any remaining account home.
+
+Both provenance writers bind their inputs with `source_digests`. The Kani
+record covers the corpus manifest and lockfile, the harness sources, the
+harness and listing inventories, the probe modules that build and record the
+run, and `.cargo/config.toml`, because Cargo reads the repository's profile and
+target configuration during the corpus build. It additionally records
+`lint_tables_sha256`, the digest of the `[workspace.lints.*]` tables the
+`in_place` route copies into its scratch workspace. Binding the extracted
+tables rather than the whole root manifest keeps an unrelated dependency edit
+from forcing a recapture while still covering the lints the run applied. The
+Verus record covers the four candidate proof files, the shared production
+source, the workspace manifest, lockfile, and member manifests, plus the probe
+modules that generate and record the observations. The provenance test
+recomputes every recorded digest and requires each `provenance.json` to carry a
+non-empty digest map, so a Verus record cannot pass merely by omitting the
+field.
+
+The pinned helper rejects ancestor `codegen-backend` configuration before
+running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
+which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
+admission, and changes no ordinary Cargo file or executable source body. The
+script's own default is `helper`. Installation and version checks still use the
+helper. Set `KANI_PROBE_ROUTE=helper` to retest that compatibility boundary.
+The child toolchain is read from the installed release's own
+`rust-toolchain-version` record and checked against `KANI_SDK_TOOLCHAIN`. The
+record names that declared toolchain and the constant it was checked against
+(`toolchain` and `expected_toolchain_prefix`). The record is a declaration by
+the release, not proof of which compiler binary ran: `_kani_environment` also
+asks the driver for its version and compares it with the repository pin, and
+that second observation is what ties the run to a release. A pin bump that
+lands a release bundling a different nightly therefore fails the check or
+changes the record, rather than leaving a constant that merely agreed with the
+environment at the time it was written.
+
+The Verus archive does not bundle Z3. The probe's tool environment therefore
+uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
+supplies its resolved path through `VERUS_Z3_PATH`. The default `z3` selection
+resolves that pinned distribution even when another `z3` appears on `PATH`, and
+fails rather than falling back to `PATH` when that resolution does not succeed,
+because the record would otherwise name the pin for a binary the pin did not
+supply. An explicitly named solver is used as given but must pass the same
+version check; the record keeps its path and digest and records no distribution
+attribution, because only the default resolver consults `z3-solver==4.16.0.0`.
+Neither the package-index resolver nor the version command is a default inside
+the resolution module: the CLI names the resolver it passes and runs the
+selected executable itself, so a caller reading `select_solver` or
+`qualify_solver` can see that neither touches the network or a process. The
+Kani provenance label and the Z3 distribution come from their pin files and
+named module constants rather than being restated at each call site.
+Single-root verification uses `prover-tools verus run`; crate comparisons use
+the pinned `cargo-verus` directly. Each selected function is rebuilt because
+`cargo-verus` does not fingerprint function-selection arguments. A successful
+capability must report exactly one verified function, its mutant must report
+exactly one error and no verified function with one postcondition diagnostic
+located at the seeded mutant declaration, and the single-root route
+additionally verifies `production::increment` through
+`--verify-only-module=production`, because `--verify-root` selects only the
+root module's functions. A mutant verdict whose diagnostic names no location,
+another source, or a line outside the mutant declaration does not qualify.
+
+Kani harness inventory (all subjects are deliberately separate fixture bodies):
+
+| Harness                  | Inputs and bounds                                   | Observation                                |
+| ------------------------ | --------------------------------------------------- | ------------------------------------------ |
+| `verified`               | Every `u8`                                          | Saturation property and a reachable cover  |
+| `counterexample`         | Every `u8`                                          | Deliberately false upper bound             |
+| `unsatisfied_cover`      | Every `u8`                                          | Passing assertion with an impossible cover |
+| `multiplication_timeout` | Two `u128` values restricted to `2..=u64::MAX`; 5 s | Solver timeout                             |
+| `insufficient_unwind`    | Count `0..=4`; unwind 2                             | Failed unwinding check                     |
+| `vacuous_assumption`     | Contradictory assumption                            | Unsatisfied witness                        |
+| `unsupported`            | Empty inline assembly                               | Unsupported operation                      |
+| `expected_panic`         | No symbolic inputs                                  | Expected-panic output semantics            |
+| `seeded_wrapping_mutant` | Every `u8`                                          | Failed wrapping arithmetic mutant          |
+
+Run definitions, the tool-produced inventory, source digests, exact commands,
+and statuses accompany the captured logs. Exit status alone cannot establish a
+verdict: the impossible-cover subject exits successfully. The corpus is not
+registered as an evidence parser until task 1.2.1's parser milestone passes.
+
+`uv run --script scripts/run_verifier_probes.py verifier-free` builds the
+comparison sources in a rootless container without verifier installations. This
+local host's admission supervisor launches compilers outside the container
+namespace, so its result is explicitly inconclusive. The script refuses to
+remove the wrapper; the separate hosted observation job uses a fresh runner.
+Its record is
+`tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
+the container build and probe logs in the adjacent `observations/` directory.
+The record carries `source_digests` for every file the staging step copies: the
+fixture tree minus evidence records and build output, plus the root toolchain,
+linker, build-tool, and mold pin files. The hosted record is excluded from the
+staged set so it can bind the inputs without hashing itself. The recorded
+observation must be recaptured whenever the build script or a staged input
+changes, so the stored command, digests, and the code under test stay the same.

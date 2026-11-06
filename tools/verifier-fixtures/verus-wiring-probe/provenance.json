@@ -1,0 +1,213 @@
+{
+  "verus": "0.2026.09.06.8dea4a2",
+  "z3": "~/.cache/uv/archive-v0/hPnTuCdDC4hFXVHn/bin/z3",
+  "z3_distribution": "z3-solver==4.16.0.0",
+  "z3_version": "Z3 version 4.16.0 - 64 bit",
+  "z3_sha256": "a06c2a851d58c5f5a7c1e5de188fd0e1b1135e778112aee83ffd1a433685516b",
+  "source_digests": {
+    "tools/verifier-fixtures/verus-wiring-probe/macro.rs": "5237f1efb1d0cd6c84016451be72a6d2f5797143e2af55799af32ffac3ca74f6",
+    "tools/verifier-fixtures/verus-wiring-probe/attributes.rs": "1e9882dc64b181001c72032c848be76f7a7c246b5645bb63478353a5640f5351",
+    "tools/verifier-fixtures/verus-wiring-probe/companion.rs": "62454ca60c4f398fe03185d9b1dc847d0cfc2b48bff7256e627ea7ca9bae822d",
+    "tools/verifier-fixtures/verus-wiring-probe/single-root.rs": "25bb9bd1dc546f983e15719bacacc69d7430ed68a42f7af9de95f7a7da7c63ba",
+    "tools/verifier-fixtures/verus-wiring-probe/production.rs": "f3583f0d0d4e4ef20303be6cfd6022273bb3b0d1c4062c00d6aa91712efb809d",
+    "tools/verifier-fixtures/verus-wiring-probe/Cargo.toml": "37d01917d81d7afac9ac83f0af0d0e005811a0f598c01ff21f22232c851ba569",
+    "tools/verifier-fixtures/verus-wiring-probe/Cargo.lock": "21a1569e5468fc9a52115bfadfcd379dd5ebae74b5ce047aef7811d7637e5daa",
+    "tools/verifier-fixtures/verus-wiring-probe/macro/Cargo.toml": "7b3b965f71c57902557abf2dfcb757b36c5e44b4ed529657ad8cd3efb720c99c",
+    "tools/verifier-fixtures/verus-wiring-probe/attributes/Cargo.toml": "779b056d531fa355f5079e3ca8bbfa4c7f8ee74d3cc4aab416b59f17f0e9ddad",
+    "tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml": "172ccd7edafdee90925b14789a6c6d544fe2763af0c2fed1e9ac18dd37b1620b",
+    "tools/verifier-fixtures/verus-wiring-probe/production/Cargo.toml": "163493ee2c1d29682edd358b60ceff1a12dc4be0c66ecf4baab79993da71920a",
+    "scripts/run_verifier_probes.py": "345970343395336cdcea6c8b55834c6c6da94feb8fa59c4b0c1120feb6d2e70e",
+    "scripts/verus_probe.py": "b1a912f1d07a230d58e87776161f04068c8e55c42b906efa3821ec6b04614b3a",
+    "scripts/probe_provenance.py": "0a7b02494d122308864f4ab4fc925aea3698fedd718bdf3c1d6c4f8bbb0cab19",
+    "scripts/verifier_probe_support.py": "df7849b558acb37b12b732a1af408c78e60bde9a2e4f751a92ed682cd4730d94"
+  },
+  "observations": [
+    {
+      "candidate": "macro",
+      "function": "capability",
+      "command": [
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus/cargo-verus",
+        "verus",
+        "focus",
+        "--manifest-path",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/macro/Cargo.toml",
+        "--",
+        "--verify-root",
+        "--verify-function=capability"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 0,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/macro-capability.log",
+      "sha256": "cbf8c514d1e483c12cca873775f65c39dbdc8a5e7dc954ba409c93708c67640c"
+    },
+    {
+      "candidate": "macro",
+      "function": "mutant",
+      "command": [
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus/cargo-verus",
+        "verus",
+        "focus",
+        "--manifest-path",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/macro/Cargo.toml",
+        "--",
+        "--verify-root",
+        "--verify-function=mutant"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 101,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/macro-mutant.log",
+      "sha256": "5524eaecea4cb7c119731b482bf05f771a1685fb962b1b204f40977ca3388bfc"
+    },
+    {
+      "candidate": "attributes",
+      "function": "capability",
+      "command": [
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus/cargo-verus",
+        "verus",
+        "focus",
+        "--manifest-path",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/attributes/Cargo.toml",
+        "--features",
+        "verus",
+        "--",
+        "--verify-root",
+        "--verify-function=capability"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 0,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/attributes-capability.log",
+      "sha256": "b5c2111dc480e682a751fd0b61fb677b0e1e23eab6c19ee1bb8d8ac7c4831a8d"
+    },
+    {
+      "candidate": "attributes",
+      "function": "mutant",
+      "command": [
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus/cargo-verus",
+        "verus",
+        "focus",
+        "--manifest-path",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/attributes/Cargo.toml",
+        "--features",
+        "verus",
+        "--",
+        "--verify-root",
+        "--verify-function=mutant"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 101,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/attributes-mutant.log",
+      "sha256": "fe434dabdbde2dd7ff808ab189592518501e418656e1498ed1bdceeca9525709"
+    },
+    {
+      "candidate": "companion",
+      "function": "capability",
+      "command": [
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus/cargo-verus",
+        "verus",
+        "focus",
+        "--manifest-path",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml",
+        "--",
+        "--verify-root",
+        "--verify-function=capability"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 101,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/companion-capability.log",
+      "sha256": "20cb1e0b5145315d9e427e508222fc124ce32b258cadb32487ec2dced20ce17a"
+    },
+    {
+      "candidate": "companion",
+      "function": "mutant",
+      "command": [
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus/cargo-verus",
+        "verus",
+        "focus",
+        "--manifest-path",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml",
+        "--",
+        "--verify-root",
+        "--verify-function=mutant"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 101,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/companion-mutant.log",
+      "sha256": "46ad3222bd9da6fe18eebfba8f97a832c0b5d1368bbb09a20be1d5550085b3b6"
+    },
+    {
+      "candidate": "single-root",
+      "function": "capability",
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools.git@9c4a27a86c678ceac1155404f45d95ee4a14a172",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/single-root.rs",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=capability"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 0,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/single-root-capability.log",
+      "sha256": "06aee624ceefb0f504401bde45618b53b002b11f413534c07dd4771d593a2dc7"
+    },
+    {
+      "candidate": "single-root",
+      "function": "helper",
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools.git@9c4a27a86c678ceac1155404f45d95ee4a14a172",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/single-root.rs",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--verify-only-module=production",
+        "--extra-arg=--verify-function=increment"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 0,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/single-root-helper.log",
+      "sha256": "0fc1fab29f897b92cecf8583c76e46f5234d348867aebf82ec531b1d718286aa"
+    },
+    {
+      "candidate": "single-root",
+      "function": "mutant",
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools.git@9c4a27a86c678ceac1155404f45d95ee4a14a172",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/tools/verifier-fixtures/verus-wiring-probe/single-root.rs",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=mutant"
+      ],
+      "cwd": "tools/verifier-fixtures/verus-wiring-probe",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-wiring-probe/observations/single-root-mutant.log",
+      "sha256": "b800c64c608394166ac3866b33252cbd4de62d583804378b48e68be657137524"
+    }
+  ]
+}

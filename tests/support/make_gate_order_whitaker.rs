@@ -48,6 +48,8 @@ pub(super) const RECORDING_HELPERS: &str = concat!(
     "    record_env_value CURDIR \"${CURDIR+x}\" \"${CURDIR-}\"\n",
     "    record_env_value GATE_FAIL_AT \"${GATE_FAIL_AT+x}\" \"${GATE_FAIL_AT-}\"\n",
     "    record_env_value CARGO \"${CARGO+x}\" \"${CARGO-}\"\n",
+    "    record_env_value PYTHON \"${PYTHON+x}\" \"${PYTHON-}\"\n",
+    "    record_env_value DEV_RUST_FLAGS \"${DEV_RUST_FLAGS+x}\" \"${DEV_RUST_FLAGS-}\"\n",
     "    record_env_value CHECK_BUILD_TOOLS \"${CHECK_BUILD_TOOLS+x}\" \"${CHECK_BUILD_TOOLS-}\"\n",
     "    record_env_value WHITAKER \"${WHITAKER+x}\" \"${WHITAKER-}\"\n",
     "    record_env_value MDTABLEFIX \"${MDTABLEFIX+x}\" \"${MDTABLEFIX-}\"\n",

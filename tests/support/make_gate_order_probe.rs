@@ -134,6 +134,7 @@ impl GateProbe {
         for (variable, executable) in [
             ("CARGO", "probe-cargo"),
             ("UV", "probe-uv"),
+            ("PYTHON", "probe-python"),
             ("CHECK_BUILD_TOOLS", "probe-check"),
             ("WHITAKER", "probe-whitaker"),
             ("MDTABLEFIX", "probe-mdtablefix"),
@@ -205,6 +206,11 @@ impl GateProbe {
         )?;
         self.directory
             .write("Makefile", repository.read("Makefile")?)?;
+        self.directory.create_dir_all("tools/rust-prover-tools")?;
+        self.directory.write(
+            "tools/rust-prover-tools/REF",
+            repository.read("tools/rust-prover-tools/REF")?,
+        )?;
         Ok(())
     }
 
@@ -286,6 +292,7 @@ impl GateProbe {
     fn write_executors(&self) -> Read<()> {
         self.write_executor("probe-cargo", scripts::CARGO_SCRIPT)?;
         self.write_executor("probe-uv", scripts::INTERROGATE_SCRIPT)?;
+        self.write_executor("probe-python", scripts::GATE_SCRIPT)?;
         self.write_executor("probe-check", scripts::PREFLIGHT_SCRIPT)?;
         self.write_executor("probe-whitaker", scripts::WHITAKER_SCRIPT)?;
         self.write_executor("probe-mdtablefix", scripts::MDTABLEFIX_SCRIPT)?;

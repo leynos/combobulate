@@ -1,0 +1,28 @@
+{
+  "packages": [
+    {
+      "name": "combobulate",
+      "targets": [
+        {
+          "kind": ["lib"]
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "combobulate-kernel",
+          "kind": "build",
+          "target": null
+        }
+      ]
+    },
+    {
+      "name": "combobulate-kernel",
+      "targets": [
+        {
+          "kind": ["lib"]
+        }
+      ],
+      "dependencies": []
+    }
+  ]
+}

@@ -34,10 +34,27 @@ ignore = [
   '\bmold (?:directory|installation|release|target|build route|link argument|linker argument|[0-9]+\.[0-9]+\.[0-9]+)\b',
   'selects mold only',
   'use mold at all',
+  # Prose describing the pinned linker release rather than an ordinary word.
+  'mold pin files',
   'mold at \$resolved',
   'mold \$installed',
   'mold \$version',
+  # Cargo's message field, quoted in prose wherever its JSON is parsed. The
+  # en-GB spelling does not apply: `compiler-artifact` is the literal value
+  # `reason` carries, and renaming it in documentation would be wrong.
+  '`compiler-artifact`',
+  '\bcompiler-artifact\b',
+  # Cargo's terminal-colour control, named in prose and in workflow contracts.
+  '\bCARGO_TERM_COLOR\b',
+  # GitHub's pull-request event action, fixed by the webhook payload name.
+  '`labeled`',
+  '\baction is `labeled`\b',
 ]
 
 [files]
-exclude = []
+# Verifier output is evidence: changing its spelling would invalidate digests.
+exclude = [
+  "scripts/tests/fixtures/kani_logs/*.log",
+  "tools/verifier-fixtures/verus-wiring-probe/observations/*.log",
+  "tools/probes/observations/*.log",
+]

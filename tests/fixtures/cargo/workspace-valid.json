@@ -1,0 +1,42 @@
+{
+  "packages": [
+    {
+      "name": "combobulate",
+      "targets": [
+        {
+          "kind": ["lib"]
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "combobulate-kernel",
+          "kind": null,
+          "target": null
+        },
+        {
+          "name": "combobulate-macros",
+          "kind": null,
+          "target": null
+        }
+      ]
+    },
+    {
+      "name": "combobulate-kernel",
+      "targets": [
+        {
+          "kind": ["lib"]
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "name": "combobulate-macros",
+      "targets": [
+        {
+          "kind": ["proc-macro"]
+        }
+      ],
+      "dependencies": []
+    }
+  ]
+}
