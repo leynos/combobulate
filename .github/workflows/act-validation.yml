@@ -19,7 +19,7 @@ jobs:
           persist-credentials: false
       - name: Install mdtablefix
         uses: >-
-          leynos/shared-actions/.github/actions/install-mdtablefix@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
+          leynos/shared-actions/.github/actions/install-mdtablefix@6ca3d5217016143c5857d23a63eb649ea5fcd538
         with:
           version: '0.6.1'
       - name: Setup Rust
