@@ -22,12 +22,40 @@ import hashlib
 import json
 import unittest
 
-from verifier_probe_loader import ROOT
+from verifier_probe_loader import ROOT, load_verifier_free_probe
 from verifier_records import committed_record_documents
+
+# The staged set is the staging function's own answer, so the record can only
+# be compared with what the generator copies rather than a second list here.
+staged_sources = load_verifier_free_probe().staged_sources
 
 HOSTED_RECORD = (
     'tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json'
 )
+
+
+def unbound_staged_inputs(digests: dict[str, str]) -> list[str]:
+    """Return the staged inputs a record's digest map does not cover.
+
+    Comparing key sets in both directions is the point: a missing key hides an
+    input the build read, and an extra key claims one it never did. A record
+    that names only the inputs a reviewer thinks of would otherwise pass.
+
+    Examples
+    --------
+    A record binding nothing leaves every staged input unbound::
+
+        unbound_staged_inputs({})
+        # ['rust-toolchain.toml', ...]
+    """
+    staged = {str(path.relative_to(ROOT)) for path in staged_sources()}
+    return sorted(staged - set(digests))
+
+
+def unstaged_recorded_inputs(digests: dict[str, str]) -> list[str]:
+    """Return the recorded inputs the verifier-free build never stages."""
+    staged = {str(path.relative_to(ROOT)) for path in staged_sources()}
+    return sorted(set(digests) - staged)
 
 
 class SourceDigestTests(unittest.TestCase):
@@ -73,20 +101,55 @@ class HostedRecordTests(unittest.TestCase):
         about an unrecorded tree: the toolchain, linker, and fixture sources
         could have changed after the run and the record would not notice.
         """
+        self.assertTrue(
+            self.record.get('source_digests', {}),
+            'the hosted record must bind the staged inputs it built',
+        )
+
+    def test_the_hosted_record_binds_every_staged_input(self) -> None:
+        """The record must cover the whole staged set, not a sample of it.
+
+        A hand-promoted record could name the four inputs a reviewer thinks of
+        and silently omit the rest. Every file ``staged_sources`` copies
+        changes what the container built, so the recorded key set has to equal
+        the staged set in both directions: a missing key hides an input, and an
+        extra key would bind a file the build never read.
+        """
         digests = self.record.get('source_digests', {})
 
-        self.assertTrue(digests, 'the hosted record must bind the staged inputs it built')
-        for relative in (
-            'rust-toolchain.toml',
-            'tools/verifier-fixtures/verus-wiring-probe/Cargo.lock',
-            'scripts/native-clang-linker.sh',
-            '.cargo/config.toml',
-        ):
-            self.assertIn(
-                relative,
-                digests,
-                f'{relative} changes what was built, so the record must bind it',
-            )
+        self.assertEqual(
+            unbound_staged_inputs(digests),
+            [],
+            'every staged input changes what was built, so the record must bind it',
+        )
+        self.assertEqual(
+            unstaged_recorded_inputs(digests),
+            [],
+            'the record must not bind files the verifier-free build never stages',
+        )
+
+    def test_a_record_missing_a_staged_input_is_rejected(self) -> None:
+        """The comparison above must fail when one staged input is dropped.
+
+        Guarding the guard: comparing two sets that both came from the record
+        would pass whatever it held. Dropping one staged key has to be
+        detected by the same predicate the real case uses, so the
+        missing-entry direction is proven rather than assumed.
+        """
+        digests = dict(self.record['source_digests'])
+        dropped = min(digests)
+        self.assertIn(
+            dropped,
+            {str(path.relative_to(ROOT)) for path in staged_sources()},
+            'the case needs a staged key, which the real record already covers',
+        )
+        del digests[dropped]
+
+        self.assertEqual(
+            unbound_staged_inputs(digests),
+            [dropped],
+            'dropping a staged input must leave exactly that input unbound',
+        )
 
     def test_the_hosted_record_binds_its_run_identity(self) -> None:
         """A passing record that names no run cannot be traced back to one."""

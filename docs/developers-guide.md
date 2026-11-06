@@ -1103,12 +1103,18 @@ command boundary rather than another installer.
 
 The Kani builders — `kani_prefix`, `_kani_arguments`, `_kani_observations`, and
 `_kani_in_place_observation` — live in `kani_probe`, and the Verus builders —
-`resolve_z3`, `_verus_environment`, `_refresh_candidate_fingerprint`,
-`_verus_command`, and `_qualified_candidates` — live in `verus_probe`, so the
-CLI file stays within the repository's 400-line module limit. The fingerprint
-refresh is a command, separate from `_verus_command`, because cargo-verus does
-not fingerprint the function-selection arguments and the proof file must be
-touched immediately before each build. The provenance writers
+`select_solver`, `qualify_solver`, `_pinned_solver_executable`,
+`_verus_environment`, `_refresh_candidate_fingerprint`, `_verus_command`, and
+`_qualified_candidates` — live in `verus_probe`, so the CLI file stays within
+the repository's 400-line module limit. Solver resolution is split at the
+command boundary: `select_solver` applies the selection policy and starts
+nothing, `qualify_solver` validates a version invocation the CLI observed, and
+`_pinned_solver_executable` — the one resolver that may consult a package index
+and write to uv's cache — is a required parameter of `select_solver` rather
+than a default, so the CLI passes it explicitly at the boundary. The
+fingerprint refresh is a command, separate from `_verus_command`, because
+cargo-verus does not fingerprint the function-selection arguments and the proof
+file must be touched immediately before each build. The provenance writers
 `_write_kani_provenance` and `_write_verus_provenance` and the guard
 `require_captured_output` live in `probe_provenance`. The verifier-free
 workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
@@ -1156,11 +1162,14 @@ script's own default is `helper`. Installation and version checks still use the
 helper. Set `KANI_PROBE_ROUTE=helper` to retest that compatibility boundary.
 The child toolchain is read from the installed release's own
 `rust-toolchain-version` record and checked against `KANI_SDK_TOOLCHAIN`. The
-record names the observed toolchain and the constant it was checked against
-(`toolchain` and `expected_toolchain_prefix`). A pin bump that lands a release
-bundling a different nightly therefore fails the check or changes the record,
-rather than leaving a constant that merely agreed with the environment at the
-time it was written.
+record names that declared toolchain and the constant it was checked against
+(`toolchain` and `expected_toolchain_prefix`). The record is a declaration by
+the release, not proof of which compiler binary ran: `_kani_environment` also
+asks the driver for its version and compares it with the repository pin, and
+that second observation is what ties the run to a release. A pin bump that
+lands a release bundling a different nightly therefore fails the check or
+changes the record, rather than leaving a constant that merely agreed with the
+environment at the time it was written.
 
 The Verus archive does not bundle Z3. The probe's tool environment therefore
 uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
@@ -1171,7 +1180,11 @@ because the record would otherwise name the pin for a binary the pin did not
 supply. An explicitly named solver is used as given but must pass the same
 version check; the record keeps its path and digest and records no distribution
 attribution, because only the default resolver consults `z3-solver==4.16.0.0`.
-The Kani provenance label and the Z3 distribution come from their pin files and
+Neither the package-index resolver nor the version command is a default inside
+the resolution module: the CLI names the resolver it passes and runs the
+selected executable itself, so a caller reading `select_solver` or
+`qualify_solver` can see that neither touches the network or a process. The
+Kani provenance label and the Z3 distribution come from their pin files and
 named module constants rather than being restated at each call site.
 Single-root verification uses `prover-tools verus run`; crate comparisons use
 the pinned `cargo-verus` directly. Each selected function is rebuilt because

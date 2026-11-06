@@ -32,11 +32,10 @@ VERUS_FUNCTIONS = {
 def _pinned_solver_executable() -> str | None:
     """Ask the pinned distribution where it installed the solver.
 
-    This is the one command-side effect in solver resolution, and it is named
-    here so it is visible rather than buried in ``resolve_z3``: ``uv tool run``
-    may consult a package index and unpack ``z3-solver`` into uv's cache. It is
-    therefore never reached from a test; a caller that only needs the selection
-    policy injects a resolver instead.
+    ``uv tool run`` may consult a package index and unpack ``z3-solver`` into
+    uv's cache, so this is a command-side effect rather than a lookup. It is
+    therefore never a default: the probe CLI passes it as the resolver seam,
+    and a caller that only needs the selection policy supplies its own.
 
     Returns
     -------
@@ -73,72 +72,115 @@ def _pinned_solver_executable() -> str | None:
     return selected.stdout.strip() or None
 
 
-def resolve_z3(
+def select_solver(
     selection: str,
     *,
-    resolver: Callable[[], str | None] | None = None,
-    discovery: Callable[[str], str | None] | None = None,
-    execute: Callable[..., object] | None = None,
-) -> tuple[Path, str, str | None]:
-    """Resolve the calibrated solver with the identity of its source.
+    pinned: Callable[[], str | None],
+    discovery: Callable[[str], str | None] = shutil.which,
+) -> tuple[Path, str | None]:
+    """Choose the solver a selection names, without running anything.
 
-    The three boundaries are injected so both the command-side effect and the
-    process execution can be replaced without a real ``uv`` or solver: the
-    default route is exactly the pinned resolver, an explicit selection is
-    looked up by name, and the version banner is always checked by executing
-    the resolved path.
+    The selection policy and its side effects are separate steps: this
+    function decides which executable a selection refers to, and the caller
+    observes its version. ``pinned`` is a required parameter rather than a
+    default because it is the one resolver that may consult a package index and
+    write to uv's cache; a caller that only needs the policy still has to name
+    the resolver it wants, so no innocuous-looking default can reach the
+    network.
 
     Parameters
     ----------
     selection : str
-        A solver name or path. The default name resolves the pinned
+        A solver name or path. The default ``z3`` name resolves the pinned
         ``z3-solver`` distribution, while any explicit selection is looked up
         as given. ``PATH`` is never consulted for the default: doing so would
         silently substitute an uncalibrated solver.
-    resolver : Callable[[], str | None] | None
-        Overrides the pinned-distribution resolver.
-    discovery : Callable[[str], str | None] | None
-        Overrides the lookup used for an explicit selection.
-    execute : Callable[..., object] | None
-        Overrides the process execution used to read the version banner.
+    pinned : Callable[[], str | None]
+        Resolver for the pinned distribution. Supplied by the command boundary.
+    discovery : Callable[[str], str | None]
+        Lookup used for an explicit selection; a pure ``PATH``-style lookup by
+        default.
 
     Returns
     -------
-    tuple[Path, str, str | None]
-        The resolved executable, the exact version banner it reported, and the
-        pinned distribution when that resolver supplied the executable. An
-        explicit selection records ``None``: its path and digest identify it,
-        and attributing it to the pin would claim a source the probe never
-        consulted.
+    tuple[Path, str | None]
+        The selected executable and the pinned distribution when the resolver
+        supplied it. An explicit selection records ``None``: its path and
+        digest identify it, and attributing it to the pin would claim a source
+        the probe never consulted.
 
     Raises
     ------
     RuntimeError
-        When the default selection cannot resolve the pinned distribution, no
-        solver is available, or its banner is not the calibrated one.
+        When the selection resolves to no executable.
 
     Examples
     --------
     The default route names the pin, and an explicit path does not::
 
-        resolve_z3('z3')  # (".../bin/z3", "Z3 version 4.16.0 - 64 bit", "z3-solver==4.16.0.0")
-        resolve_z3('/opt/z3')  # ("/opt/z3", "Z3 version 4.16.0 - 64 bit", None)
+        select_solver('z3', pinned=lambda: '/pinned/z3')
+        # (PosixPath('/pinned/z3'), 'z3-solver==4.16.0.0')
+        select_solver('/opt/z3', pinned=lambda: '/pinned/z3')
+        # (PosixPath('/opt/z3'), None)
     """
-    discover = discovery or shutil.which
-    run = execute or run_command
-    if selection == "z3":
-        solver = (resolver or _pinned_solver_executable)()
-        distribution = Z3_DISTRIBUTION
-    else:
-        solver = discover(selection)
-        distribution = None
+    solver = pinned() if selection == "z3" else discovery(selection)
     if solver is None:
         raise RuntimeError("the pinned Z3 executable is unavailable")
-    z3_path = Path(solver).resolve()
-    identity = run(CommandSpec((str(z3_path), "--version")))
-    if identity.exit_code != 0 or identity.stdout.strip() != Z3_VERSION_BANNER:
+    distribution = Z3_DISTRIBUTION if selection == "z3" else None
+    return Path(solver).resolve(), distribution
+
+
+def qualify_solver(
+    z3_path: Path,
+    *,
+    exit_code: int,
+    reported: str,
+    distribution: str | None,
+) -> tuple[Path, str, str | None]:
+    """Validate an observed solver invocation and name the recorded solver.
+
+    The version command runs at the command boundary because it launches the
+    resolved executable. This function receives its status and output, so
+    qualification itself starts no process and a caller cannot mistake it for a
+    step that does.
+
+    Parameters
+    ----------
+    z3_path : Path
+        Executable the selection resolved to.
+    exit_code : int
+        Exit status reported by ``z3_path --version``.
+    reported : str
+        Standard output of that invocation, already stripped.
+    distribution : str | None
+        Pinned distribution when its resolver supplied the executable.
+
+    Returns
+    -------
+    tuple[Path, str, str | None]
+        The validated executable, the exact banner it reported, and the
+        distribution attribution. An explicit selection keeps ``None``: its
+        path and digest identify it, and only the default resolver consults the
+        pin.
+
+    Raises
+    ------
+    RuntimeError
+        When the run failed or its banner is not the calibrated one.
+
+    Examples
+    --------
+    A calibrated banner is returned unchanged::
+
+        qualify_solver(Path('/pinned/z3'), exit_code=0,
+                       reported=Z3_VERSION_BANNER,
+                       distribution=Z3_DISTRIBUTION)
+        # (PosixPath('/pinned/z3'), 'Z3 version 4.16.0 - 64 bit', 'z3-solver==4.16.0.0')
+    """
+    if exit_code != 0 or reported != Z3_VERSION_BANNER:
         raise RuntimeError("the solver must report the calibrated Z3 4.16.0 release")
-    return z3_path, identity.stdout.strip(), distribution
+    return z3_path, reported, distribution
+
 
 
 def _verus_environment(z3_path: Path) -> dict[str, str]:

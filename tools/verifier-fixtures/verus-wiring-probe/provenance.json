@@ -16,10 +16,10 @@
     "tools/verifier-fixtures/verus-wiring-probe/attributes/Cargo.toml": "779b056d531fa355f5079e3ca8bbfa4c7f8ee74d3cc4aab416b59f17f0e9ddad",
     "tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml": "172ccd7edafdee90925b14789a6c6d544fe2763af0c2fed1e9ac18dd37b1620b",
     "tools/verifier-fixtures/verus-wiring-probe/production/Cargo.toml": "163493ee2c1d29682edd358b60ceff1a12dc4be0c66ecf4baab79993da71920a",
-    "scripts/run_verifier_probes.py": "814bc6dd77391c2c021b5f1342c243f503ddef39039f37b31bd2a62f38e6ffa2",
-    "scripts/verus_probe.py": "9cf0be4b474f7bae064464ac7f683ffeabace2b76a3de7d72adaed4581edba1d",
-    "scripts/probe_provenance.py": "d4961e8ef573fac50fa5f26b21f926354fb91ca3db680749188ef0e9f2c51101",
-    "scripts/verifier_probe_support.py": "3af31e73a94ecfacf3a046fe515068e229d2435cab1ee2b14eb111e884135924"
+    "scripts/run_verifier_probes.py": "345970343395336cdcea6c8b55834c6c6da94feb8fa59c4b0c1120feb6d2e70e",
+    "scripts/verus_probe.py": "b1a912f1d07a230d58e87776161f04068c8e55c42b906efa3821ec6b04614b3a",
+    "scripts/probe_provenance.py": "0a7b02494d122308864f4ab4fc925aea3698fedd718bdf3c1d6c4f8bbb0cab19",
+    "scripts/verifier_probe_support.py": "df7849b558acb37b12b732a1af408c78e60bde9a2e4f751a92ed682cd4730d94"
   },
   "observations": [
     {
@@ -38,7 +38,7 @@
       "cwd": "tools/verifier-fixtures/verus-wiring-probe",
       "exit_code": 0,
       "log": "tools/verifier-fixtures/verus-wiring-probe/observations/macro-capability.log",
-      "sha256": "d04fb6ecff902e2545810d5830e4dedecc3928abfa9ee36b9c758840ef4a5ae6"
+      "sha256": "cbf8c514d1e483c12cca873775f65c39dbdc8a5e7dc954ba409c93708c67640c"
     },
     {
       "candidate": "macro",
@@ -76,7 +76,7 @@
       "cwd": "tools/verifier-fixtures/verus-wiring-probe",
       "exit_code": 0,
       "log": "tools/verifier-fixtures/verus-wiring-probe/observations/attributes-capability.log",
-      "sha256": "b788a7f0686e1ddfa91744cefd650fc3c63dfa6a96614962109bc6208bfade53"
+      "sha256": "b5c2111dc480e682a751fd0b61fb677b0e1e23eab6c19ee1bb8d8ac7c4831a8d"
     },
     {
       "candidate": "attributes",
@@ -114,7 +114,7 @@
       "cwd": "tools/verifier-fixtures/verus-wiring-probe",
       "exit_code": 101,
       "log": "tools/verifier-fixtures/verus-wiring-probe/observations/companion-capability.log",
-      "sha256": "82a4eabbab2e3359afdb5ad19757999efe8b44a67a6cd2f3e0c8472ffb3d701c"
+      "sha256": "20cb1e0b5145315d9e427e508222fc124ce32b258cadb32487ec2dced20ce17a"
     },
     {
       "candidate": "companion",

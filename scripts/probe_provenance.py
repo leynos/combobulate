@@ -118,9 +118,11 @@ def _write_kani_provenance(
     )
     provenance = {
         "tool": f"Kani {(ROOT / 'tools/kani/VERSION').read_text().strip()}",
-        # The installed release's own record, not the constant the environment
-        # was built from: a release bundling a different nightly then shows up
-        # as a provenance change rather than passing on a stale claim.
+        # The toolchain the installed release declares, not the constant the
+        # environment was built from: a release bundling a different nightly
+        # then shows up as a provenance change rather than passing on a stale
+        # claim. It is a declaration, so the driver's version check in
+        # ``_kani_environment`` is what shows the observed release.
         "toolchain": _installation_toolchain(installation),
         "expected_toolchain_prefix": KANI_SDK_TOOLCHAIN,
         "route": route,

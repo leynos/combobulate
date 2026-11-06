@@ -705,6 +705,36 @@ committed together with its Green change.
 
 ## Decision log
 
+- DL-56 (2026-11-06). EP-M1/EP-M2 residual assurance gaps, second round. The
+  reviewer confirmed the recaptured records and raised three narrower gaps, all
+  now repaired. First, the hosted record's digest test named four inputs
+  instead of the whole staged set. `test_verifier_record_digests` now compares
+  the record's `source_digests` keys with `staged_sources()` in both
+  directions, so a missing key hides no input and an extra key claims none the
+  build never read, and a regression case drops one staged key and requires the
+  same predicate to report exactly that key. The record itself already carried
+  all seventeen entries; the gap was in the guard.
+
+  Second, `resolve_z3` accepted injected seams but kept `uv tool run` and the
+  version command as its own defaults, so reading the function still described
+  a network and process side effect it performed by default. It is now two
+  steps: `select_solver` applies the selection policy and starts nothing, with
+  `_pinned_solver_executable` as a required parameter rather than a default, and
+  `qualify_solver` validates a version invocation the CLI observed.
+  `scripts/run_verifier_probes.py` runs that command at the command boundary
+  and passes the status and banner in. Only the default route is attributed to
+  `z3-solver==4.16.0.0`, as before. A new case asserts that qualification
+  starts no process, so the split is pinned rather than merely described.
+
+  Third, `_installation_toolchain` claimed the reading bound the record to the
+  compiler that actually ran. The record is a declaration by the release, so
+  the docstring, the `_kani_environment` docstring, and the provenance comment
+  now say so and point at the driver version check as the observation that ties
+  the run to a release. The developers' guide was corrected in both places. The
+  changed probe modules are bound by digest in both committed provenance
+  records, so both corpora were regenerated. Date/Author: 2026-11-06,
+  implementation agent.
+
 - DL-55 (2026-11-05). EP-M1/EP-M2 residual assurance gaps. A review of the
   EP-M1/EP-M2 closure evidence raised five gaps, all now repaired. First, gate
   preparation selected its binary by scanning
@@ -740,13 +770,14 @@ committed together with its Green change.
   from inside a pure-looking resolver. The log path is now resolved once and the
   `OSError` is chained into the documented boundary error, and the resolver
   takes an injected discovery/execution seam so its command-side effect is
-  explicit at the call site. Fifth, focused contract tests now cover the
-  measurement workflow's route matrix and labels, verifier-free staging and
-  orchestration (with fake process and filesystem dependencies), the captured
-  output boundary, and the Kani route builders, none of which require an
-  installed verifier. The developers' guide's lint-baseline text, its
-  mtime-discovery description, and the escalation paragraph were corrected to
-  match.
+  explicit at the call site. That seam still left the side effect inside the
+  resolver's default route; DL-56 moves it to the CLI. Fifth, focused contract
+  tests now cover the measurement workflow's route matrix and labels,
+  verifier-free staging and orchestration (with fake process and filesystem
+  dependencies), the captured output boundary, and the Kani route builders,
+  none of which require an installed verifier. The developers' guide's
+  lint-baseline text, its mtime-discovery description, and the escalation
+  paragraph were corrected to match.
 
   The hosted record did not yet carry that evidence. It had been promoted from
   a run whose generator predated `source_digests`, so it cited head `833ef0c5`
@@ -2677,3 +2708,18 @@ binds its sources, mutant qualification requires the diagnostic to name the
 seeded mutant, and only the default solver resolver is attributed to the pinned
 distribution. The plan's Kani corpus description now names the direct driver
 invocation, and both corpora are regenerated.
+
+2026-11-05, revision 30: recorded the EP-M1/EP-M2 residual assurance round:
+gate preparation reads Cargo's own compiler-artifact record, the bounded
+execution boundary covers `make test-ui` and the workspace-boundary subprocess
+audit, escalation is classified on signal 9 rather than a phantom exit 137, the
+captured-output guard and solver seam are documented, and the hosted
+verifier-free record was recaptured as run `42170378137` with all seventeen
+staged inputs bound (DL-55).
+
+2026-11-06, revision 31: recorded the second residual round: the hosted digest
+test now requires the whole staged set in both directions, solver resolution is
+split so the package-index resolver and version command live at the CLI
+boundary, and the Kani toolchain record is described as the declaration it is
+rather than proof of the compiler binary (DL-56). Both corpora were regenerated
+because both records bind the changed probe modules by digest.

@@ -72,14 +72,17 @@ def _digest(path: Path) -> str:
 
 
 def _installation_toolchain(installation: Path) -> str:
-    """Return the SDK toolchain the installed Kani release ships with.
+    """Return the SDK toolchain the installed Kani release declares.
 
     The pin is a release, not a toolchain. ``tools/kani/VERSION`` can be bumped
     with a release that bundles a different nightly, and a separately installed
     SDK under the same version directory would otherwise pass unnoticed. The
-    installation records the toolchain it was built from, so reading it binds
-    the record to the compiler that actually ran rather than to a constant that
-    merely agreed with the environment at the time it was written.
+    installation declares the toolchain it was built from, so reading it
+    replaces the module constant with the value this release names. That is
+    still a declaration: it identifies the toolchain the release says it
+    bundles, and only the driver's own version output shows which binary
+    actually ran. ``_kani_environment`` therefore checks both — the declared
+    prefix here and the release version from the driver.
 
     Parameters
     ----------
@@ -173,10 +176,12 @@ def _kani_environment(installation: Path, environment: dict[str, str]) -> dict[s
     The helper rejects ancestor backend keys. This explicit fallback leaves
     ordinary Cargo files intact and does not replace any executable Rust body.
 
-    The selected toolchain is the one the installed release ships, checked
+    The selected toolchain is the one the installed release declares, checked
     against the module constant so a pin bump that lands a release bundling a
     different nightly fails here rather than recording a constant the run did
-    not use.
+    not use. The declaration is not itself proof of the compiler that ran, so
+    the driver is asked for its release version below and the answer is
+    compared with the repository pin.
     """
     toolchain = _installation_toolchain(installation)
     if not toolchain.startswith(f"{KANI_SDK_TOOLCHAIN}-"):

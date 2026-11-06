@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 
 from cyclopts import App
+from rust_prover_tools.commands import CommandSpec, run_command
 
 import verus_probe
 from kani_probe import (
@@ -103,7 +104,16 @@ def verus(
     directory = FIXTURES / "verus-wiring-probe"
     version = (ROOT / "tools/verus/VERSION").read_text().strip()
     binaries = verus_installation or ROOT / ".verus" / version / "verus"
-    z3_path, banner, z3_distribution = verus_probe.resolve_z3(z3)
+    z3_path, z3_distribution = verus_probe.select_solver(
+        z3, pinned=verus_probe._pinned_solver_executable
+    )
+    identity = run_command(CommandSpec((str(z3_path), "--version")))
+    _, banner, z3_distribution = verus_probe.qualify_solver(
+        z3_path,
+        exit_code=identity.exit_code,
+        reported=identity.stdout.strip(),
+        distribution=z3_distribution,
+    )
     environment = verus_probe._verus_environment(z3_path)
     output = output_dir or directory / "observations"
     observations = []
