@@ -6,8 +6,8 @@ host: x86_64-unknown-linux-gnu
 release: 1.100.0-nightly
 LLVM version: 23.1.0
    Compiling proc-macro2 v1.0.107
-   Compiling quote v1.0.47
    Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
    Compiling verus_prettyplease v0.0.0-2026-09-06-0133
    Compiling hashbrown v0.17.1
    Compiling equivalent v1.0.3
@@ -24,4 +24,4 @@ LLVM version: 23.1.0
    Compiling wiring-macro v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/macro)
    Compiling wiring-companion v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/companion)
    Compiling wiring-attributes v0.1.0 (/home/runner/work/combobulate/combobulate/target/epm1-verifier-free-workspace/probe/attributes)
-    Finished `dev` profile [unoptimized] target(s) in 6.91s
+    Finished `dev` profile [unoptimized] target(s) in 6.16s
