@@ -170,8 +170,9 @@ values rather than here.
 
 Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
-that deliberately ignores `SIGTERM` is not ended by that. Only the job's own
-`timeout-minutes` bounds it, where one is set (`build-test` has one;
+that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
+because nextest then has no process left to escalate to `SIGKILL`. Only the
+job's own `timeout-minutes` bounds it, where one is set (`build-test` has one;
 `coverage-main.yml` has none), and a local `cargo test` run, which `make test`
 falls back to when cargo-nextest is missing, has no limit at all. Ordinary
 builds and sleeping children do end under nextest.
