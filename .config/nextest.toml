@@ -21,9 +21,10 @@
 # that prompted it showed `SLOW [>8160.000s]` for a test nested one Cargo build
 # deep: nextest's default `slow-timeout` only warns, because termination needs
 # `terminate-after`, and the `trybuild` build inside the test had no timeout of
-# its own. Both layers now bound their work — this period for the test process,
-# and the external-command deadline described in the developers' guide for the
-# build it starts.
+# its own. Nextest terminates the test's process group, which takes the nested
+# build with it. A descendant survives only if it ignores `SIGTERM` and the test
+# process itself exits on `SIGTERM`, so nextest sees no process left to
+# escalate against; "Test timeouts" in the developers' guide records the gap.
 #
 # The green hosted gate's slowest ordinary test took 13.0 s, so 300 s is a
 # sixfold margin for a test that genuinely computes rather than waits.
@@ -43,11 +44,7 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # Ten periods (600 s) clears the slowest contended sample by 157 s. It stays
 # below the whole-run cap discussed below and still ends a genuinely hung
 # nested build long before an outer job timeout would.
-#
-# The test's own `CommandDeadline` is set above this figure (900 s) on
-# purpose. A test process terminated here reports that it overran; if the inner
-# deadline were tighter, a build that was only queueing would be reported as a
-# wedged gate instead. Keep this the first deadline to fire.
+
 [[profile.default.overrides]]
 filter = 'test(/^checked_cardinality_result_must_be_used($|::)/)'
 slow-timeout = { period = "60s", terminate-after = 10 }
@@ -57,9 +54,11 @@ slow-timeout = { period = "60s", terminate-after = 10 }
 # A whole-run budget on a developer's host would diagnose local compile-queue
 # contention rather than a defect, and this repository's host is shared with
 # other agents. The hosted lanes are the ones with a fixed clock, and they
-# already have one: `build-test` declares `timeout-minutes: 8` and
-# `coverage-main.yml` bounds its own run, so a runaway suite is ended by the
-# job rather than by nextest.
+# already have one on `build-test`, which declares `timeout-minutes: 8`, so a
+# runaway suite there is ended by the job rather than by nextest.
+# `coverage-main.yml` declares none, so GitHub's 360-minute default applies
+# there, and the per-test `terminate-after` limits do not cover steps that run
+# before nextest, such as `make prepare-ui-gate`.
 #
 # That matters for the coverage lane specifically. The shared
 # `generate-coverage` action writes a temporary nextest config (180 s /

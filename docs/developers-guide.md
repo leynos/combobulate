@@ -45,22 +45,22 @@ falls back to `cargo test` when cargo-nextest is not available. It prepares
 both workspaces' dependencies and builds the cardinality probe's `trybuild` UI
 gate before any test body runs, then the root test runs the binary Cargo
 reported for its `#[must_use]` result contract. `make test-ui` prepares and
-runs the same gate directly, under the same deadline. See
-[Test timeouts](#test-timeouts) for why preparation sits outside the suite and
-what bounds each child process. `make check-fmt` verifies Rust formatting with
-`cargo fmt --all -- --check` and Markdown formatting via `mdtablefix --check`
-using the configured selection and formatting rules. `make fmt` formats Rust
-with the pinned `rustfmt`, then applies the Markdown formatter and
-`markdownlint-cli2 --fix`. `make typecheck` type-checks without building via
-`cargo check`. `make audit` derives the Rust workspace root with
-`cargo metadata`, logs workspace member manifests, and runs `cargo audit` once
-from the workspace root. PR CI skips `make audit` and the audit-only setup when
-`github.actor` is `dependabot[bot]`; that keeps whole-lockfile advisories from
-blocking unrelated Dependabot PRs while human PRs retain the audit gate. The
-compensating control is `.github/workflows/audit.yml`, which runs weekly and
-can also be triggered manually. `make coverage` uses `cargo llvm-cov` with
-`lld` and prepares the gate before measuring; see
-[Test timeouts](#test-timeouts) for why preparation sits outside the suite.
+runs the same gate directly. See [Test timeouts](#test-timeouts) for why
+preparation sits outside the suite and what bounds each child process.
+`make check-fmt` verifies Rust formatting with `cargo fmt --all -- --check` and
+Markdown formatting via `mdtablefix --check` using the configured selection and
+formatting rules. `make fmt` formats Rust with the pinned `rustfmt`, then
+applies the Markdown formatter and `markdownlint-cli2 --fix`. `make typecheck`
+type-checks without building via `cargo check`. `make audit` derives the Rust
+workspace root with `cargo metadata`, logs workspace member manifests, and runs
+`cargo audit` once from the workspace root. PR CI skips `make audit` and the
+audit-only setup when `github.actor` is `dependabot[bot]`; that keeps
+whole-lockfile advisories from blocking unrelated Dependabot PRs while human
+PRs retain the audit gate. The compensating control is
+`.github/workflows/audit.yml`, which runs weekly and can also be triggered
+manually. `make coverage` uses `cargo llvm-cov` with `lld` and prepares the
+gate before measuring; see [Test timeouts](#test-timeouts) for why preparation
+sits outside the suite.
 
 `make check-fmt` checks Git-tracked Markdown and untracked files Git does not
 ignore; files need not be staged. Markdown lint covers every matching file. The
@@ -160,81 +160,29 @@ push. This scaffold does not include an automerge workflow.
 
 A test that starts a child process owns a nested build, and a nested build is
 where this repository has already lost two and a quarter hours to a single
-test. Two deadlines bound that work, and they sit at different layers.
+test. Nextest bounds that work: `.config/nextest.toml` sets a 60 s slow warning
+with `terminate-after = 5`, so an ordinary test ends at 300 s. The cardinality
+gate's `trybuild` test has its own override at `terminate-after = 10`, because
+it compiles a generated crate; the comment there records the measurements the
+figure came from. Those numbers, the arithmetic behind them, and the reasons
+there is no `global-timeout` are policy, and they live in that file beside the
+values rather than here.
 
-`nextest` bounds the test process. `.config/nextest.toml` sets a 60 s slow
-warning with `terminate-after = 5`, so an ordinary test ends at 300 s. The
-cardinality gate's `trybuild` test has its own override at
-`terminate-after = 10`, because it compiles a generated crate; the comment
-there records the measurements the figure came from. Those numbers, the
-arithmetic behind them, and the reasons there is no `global-timeout` are
-policy, and they live in that file beside the values rather than here.
+Tests start plain `std::process::Command` children and add no deadline of their
+own. Nextest terminates the test's process group at the limit. A descendant
+that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
+because nextest then has no process left to escalate to `SIGKILL`. Only the
+job's own `timeout-minutes` bounds it (`build-test` sets 8; `coverage-main.yml`
+sets none, so GitHub's 360-minute default applies, and nextest's limits do not
+cover `make prepare-ui-gate`, which runs before it), and a local `cargo test`
+run, which `make test` falls back to when cargo-nextest is missing, has no
+limit at all. Ordinary builds and sleeping children do end under nextest.
 
-`CommandDeadline` in `tests/support/process_deadline.rs` bounds one external
-command. It wraps the command in GNU `timeout`, which puts the child in its own
-process group, signals the whole group at the deadline, and kills whatever
-ignored `SIGTERM`. A run that overruns reports `exceeded_deadline()` and the
-output collected so far, so a timeout is diagnosed rather than merely failing.
-
-### Ownership and permitted callers
-
-`CommandDeadline` is test support for command lines the test suite builds
-itself. It is deliberately narrow: it does not wrap arbitrary process
-management, it does not own environment policy, and it must not grow into a
-second process API beside `std::process`. Extend it only when a test needs a
-deadline; do not route production code through it.
-
-It is compiled into more than one test binary, so it carries no default
-deadline. A default would be dead code in every binary that picks a different
-tier. Each caller declares its own:
-
-| Caller                                      | Deadline | Why                                                   |
-| ------------------------------------------- | -------- | ----------------------------------------------------- |
-| `tests/cardinality_probe_ui.rs`             | 900 s    | Runs the pre-built gate binary.                       |
-| `tests/workspace_boundaries.rs`             | 120 s    | Live `cargo metadata` and offline `cargo tree` reads. |
-| `tests/support/make_gate_order_commands.rs` | 60 s     | Enumerates the Python sources with Git.               |
-| `tests/process_deadline.rs`                 | 60 s     | Policy tests against fake executables.                |
-| `scripts/cardinality_ui_gate.py run`        | 600 s    | `make test-ui`, with no nextest behind the child.     |
-
-The Python gate runner is not a `CommandDeadline` caller: it invokes the same
-GNU `timeout` shape directly, and classifies the result the same way. It is
-listed because a reader checking "what bounds this route" needs the whole set.
-
-The gate's tier sits deliberately above nextest's own termination point. If the
-inner deadline fired first, a build merely waiting in the shared compile queue
-would be reported as a wedged gate, hiding the real cause. The slower bound
-lets nextest's diagnosis reach the operator first.
-
-A new caller adds its tier to this table and to the test that measures it, in
-the same change.
-
-`make test-ui` is the one supported route outside the root suite, and nothing
-there runs under nextest: the standalone `cargo test --test cardinality_ui`
-invocation inside the gate package has neither the root deadline nor nextest's
-`terminate-after`. That is why the recipe runs the recorded binary itself under
-`timeout` rather than letting Cargo run the test; the binary's own bounded
-execution is the only thing standing between a wedged `trybuild` child and an
-unbounded route.
-
-Escalation is reported explicitly, and the status is subtler than "124 or 137".
-GNU `timeout` returns 124 when the child exits after `SIGTERM`. When the child
-ignores `SIGTERM` and `--kill-after` has to send `SIGKILL`, `timeout` does not
-exit 137: because it runs the child in its own process group — which is what
-lets the signal reach the child's descendants — it mirrors the ending signal by
-killing *itself* with it. The run then has no exit status at all, and only the
-signal (9) records what happened. Exit status 137 appears only under
-`--foreground`, and `--foreground` is unusable here because it would signal the
-child alone. A child that kills itself, or one killed by the out-of-memory
-killer, ends the same way, with signal 9 and an empty standard error.
-
-The wrapper therefore runs `timeout --verbose` and treats a signal-9 death as
-an escalation only when the announcement `sending signal KILL to command` is
-present. Anything else is propagated unchanged and diagnosed by its own output,
-never reported as a deadline the wrapper enforced. `CommandDeadline` reports
-the three cases as `DeadlineOutcome::{Completed, Terminated, Escalated}`;
-`scripts/cardinality_ui_gate.py` makes the same distinction on `subprocess`'s
-`-9` return code and normalizes it to the shell's `128 + N` convention before
-returning it as the process status.
+`make test-ui` is the one route with its own bound. It runs the recorded gate
+binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600
+s, classified by `scripts/tests/test_cardinality_ui_deadline.py`), because the
+standalone `cargo test --test cardinality_ui` invocation inside the gate
+package has no `terminate-after` behind it.
 
 ### Preparation happens outside test bodies
 
@@ -246,7 +194,7 @@ exist.
 Two narrow readings remain, and neither is the incident's shape. The live
 workspace reads in `tests/workspace_boundaries.rs` run `cargo metadata` and
 `cargo tree --offline --locked`; they resolve the lockfile, compile nothing,
-and are bounded by that file's 120 s tier. The gate preparation itself is a
+and are bounded by nextest when it runs them. The gate preparation itself is a
 Cargo command, but it is a Make recipe that runs before any test body, not
 something a test body starts.
 
@@ -254,9 +202,8 @@ something a test body starts.
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
 chains onto it and builds the gate's test binary with `--no-run`.
 `tests/cardinality_probe_ui.rs` then reads the recorded executable path and
-runs that binary under its deadline; it does not search a build directory.
-`make test-ui` is the direct route that prepares and runs the same gate in one
-command.
+runs that binary; it does not search a build directory. `make test-ui` is the
+direct route that prepares and runs the same gate in one command.
 
 The record is withdrawn before a preparation starts and published only once
 Cargo has named its executable, so a failed build leaves nothing runnable

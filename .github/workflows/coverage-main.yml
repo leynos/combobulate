@@ -31,7 +31,8 @@ concurrency:
 
 jobs:
   coverage-upload:
-    # The deadline wrapper needs GNU `timeout`; ubuntu-26.04's kills only the child.
+    # Pinned so results stay comparable between runs. The test deadline wrapper
+    # that once needed GNU `timeout` is gone; nextest bounds the tests.
     runs-on: ubuntu-24.04
     # Restrict this environment to main before adding CS_ACCESS_TOKEN.
     # With no token configured, the conditional CodeScene upload skips.

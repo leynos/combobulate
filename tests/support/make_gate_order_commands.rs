@@ -1,20 +1,8 @@
 //! Expected Make gate stages and the executor calls they must produce.
 
-use std::time::Duration;
-
-#[path = "process_deadline.rs"]
-mod deadline;
-
-use deadline::CommandDeadline;
+use std::process::Command;
 
 use super::{probe::GateProbe, records::Invocation};
-
-/// How long Git's Python inventory may take before the contract is wedged.
-///
-/// `git ls-files` walks the index of a single checkout and starts no build. A
-/// minute is generous for a large repository and still ends a child that never
-/// returns, so the contract cannot hold the suite open.
-const INVENTORY_DEADLINE: Duration = Duration::from_secs(60);
 
 /// Expected command stages for the complete ordered Make target.
 ///
@@ -193,9 +181,7 @@ pub(super) fn assert_interrogate_command(
 
 /// Reads the tracked and non-ignored untracked Python paths selected by Make.
 fn python_sources_from_git() -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let mut command = CommandDeadline::with_deadline("git", INVENTORY_DEADLINE);
-    command
-        .command()
+    let observed = Command::new("git")
         .args([
             "ls-files",
             "--cached",
@@ -205,27 +191,17 @@ fn python_sources_from_git() -> Result<Vec<String>, Box<dyn std::error::Error>> 
             "*.py",
             "*.pyi",
         ])
-        .current_dir(env!("CARGO_MANIFEST_DIR"));
-    let observed = command.output()?;
-    if observed.exceeded_deadline() {
-        return Err(format!(
-            "Git did not enumerate the Python sources inside {INVENTORY_DEADLINE:?}: {:?} after \
-             {:?} for `{}`",
-            observed.outcome(),
-            observed.duration(),
-            observed.line()
-        )
-        .into());
-    }
-    if !observed.status().success() {
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()?;
+    if !observed.status.success() {
         return Err(format!(
             "Git must enumerate the Python sources used by the Make contract; exited with {}: {}",
-            observed.status(),
-            String::from_utf8_lossy(observed.stderr())
+            observed.status,
+            String::from_utf8_lossy(&observed.stderr)
         )
         .into());
     }
-    Ok(String::from_utf8(observed.stdout().to_vec())?
+    Ok(String::from_utf8(observed.stdout)?
         .lines()
         .map(str::to_owned)
         .collect())
