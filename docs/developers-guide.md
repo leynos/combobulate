@@ -170,11 +170,13 @@ values rather than here.
 
 Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
-that deliberately ignores `SIGTERM` is not ended by that, and the owning job's
-`timeout-minutes` is what finally bounds it; ordinary builds and sleeping
-children do end.
+that deliberately ignores `SIGTERM` is not ended by that. Only the job's own
+`timeout-minutes` bounds it, where one is set (`build-test` has one;
+`coverage-main.yml` has none), and a local `cargo test` run, which `make test`
+falls back to when cargo-nextest is missing, has no limit at all. Ordinary
+builds and sleeping children do end under nextest.
 
-`make test-ui` is the one route outside nextest. It runs the recorded gate
+`make test-ui` is the one route with its own bound. It runs the recorded gate
 binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600
 s, classified by `scripts/tests/test_cardinality_ui_deadline.py`), because the
 standalone `cargo test --test cardinality_ui` invocation inside the gate

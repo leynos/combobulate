@@ -22,7 +22,8 @@
 # deep: nextest's default `slow-timeout` only warns, because termination needs
 # `terminate-after`, and the `trybuild` build inside the test had no timeout of
 # its own. Nextest terminates the test's process group, which takes the nested
-# build with it.
+# build with it. A descendant that deliberately ignores `SIGTERM` survives that;
+# "Test timeouts" in the developers' guide records the gap.
 #
 # The green hosted gate's slowest ordinary test took 13.0 s, so 300 s is a
 # sixfold margin for a test that genuinely computes rather than waits.
