@@ -284,10 +284,23 @@ Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
     selected. Listing every `scripts/tests/test_trust_audit*.py` and re-running
     the 75 outstanding survivors killed 42 that the narrower selection had left
     alive; a second pass over the residual 33 killed 6 more. 27 remain, and the
-    21 the equivalence analysis already covered are confirmed. Six were never
-    classified and are with the `artisan` agent. Logs:
-    `/tmp/mut-rerun-1-2-1-profiles-and-trust-audit.out` and
-    `/tmp/mut-rerun2-1-2-1-profiles-and-trust-audit.out`.
+    21 the equivalence analysis already covered are confirmed.
+  - The final six were run as explicit probes rather than left as survivors,
+    because each needed a hand-built input the corpus never spells. Over that
+    eleven-module selection the census is **23 killed, 23 equivalent, 0
+    unaccounted** across 46 probes, with `baseline PASS` before and after, so
+    the working tree each probe ran against was sound. Four were real test
+    gaps and are now killed: `Cursor.skip_until_6` (`find` → `rfind`, which
+    reports 5,332 differences across 523,137 probes and would let a raw
+    literal swallow the code after it), `module_references_6` (`or` → `and`),
+    `opening_bracket_10` and `opening_paren_10` (each a `-2` stop that wraps
+    to `tokens[-1]`). Two are equivalent and argued in
+    `test_trust_audit_structure_survivors.py`'s module docstring:
+    `skip_visibility_2` and `skip_visibility_3`, distinguished from the
+    pristine form only at index zero, where the answer is `0` under every
+    form — an exhaustive differential run over 6,501,848 token sequences and
+    indices, including exceptions, found no difference. Log:
+    `/tmp/killmatrix-trust-1-2-1-profiles-and-trust-audit.out`.
   - Two production defects fell out of the survivor triage; see below.
 
 ### EP-M5 findings so far
@@ -423,3 +436,40 @@ developer guide now states.
 Run every gate on `make` targets rather than bare Cargo, sequentially, one at a
 time, and let the shared compile-admission queue serialize the rest. Do not run
 a second build to speed up a queued one.
+
+## Staging discipline while a mutation census runs
+
+`git add -A` captured a live mutant. While the `artisan` held
+`skip_visibility_2` (`>= 0` → `> 0`) applied to
+`scripts/docs_validation/trust_audit/structure.py`, a commit ran and recorded
+the mutant as production source. The mutant is semantically equivalent, so no
+gate result was invalidated by behaviour — but the provenance was wrong, and
+that is the failure that matters: a committed file must be the change the
+commit message describes, not whatever a concurrent process had written at the
+instant `add` ran.
+
+The diagnosis took longer than the fix because it was first run backwards. The
+committed text was assumed authoritative and the snapshot in `/tmp` assumed
+contaminated, and a `git checkout --` on that assumption preserved the mutant
+and discarded the good copy. The artisan's report was the only thing pointing
+the other way; four witnesses confirmed it — `mutmut show`, the census tree,
+and two revisions predating the commit — and a fifth settled it: `8107e4d` and
+`2a7b7a0` are the *same tree* saved 33 seconds apart for an unrelated rebase,
+and both read `>= 0`, so two independent captures agreed against the commit.
+
+The rules that follow:
+
+- Commit only after confirming no subagent is mutating the tree. A census that
+  applies mutants in place and restores them has no safe overlap with `add`.
+- Stage explicitly by path, never `-A`, while any process may be writing.
+- Prefer a pre-census snapshot over the working tree when adjudicating
+  contamination. Git history is the oracle; a `/tmp` census tree is a working
+  copy that mutmut leaves with a mutant applied, so it is not pristine either.
+- When HEAD and a snapshot disagree, do not assume HEAD is right. Ask when each
+  was produced, and prefer the one written before the suspect event.
+
+The mutant was removed from history by amending, which was safe because the
+branch had never been pushed. Production source under `scripts/` is now
+byte-identical to the pre-contamination snapshot; the only remaining deltas
+against that snapshot are documentation, `spec/` records, and the survivor
+tests the artisan deliberately wrote.
