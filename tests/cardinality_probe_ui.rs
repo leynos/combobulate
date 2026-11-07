@@ -4,7 +4,7 @@
 //! workspace. `trybuild` copies the host package's dependencies and development
 //! dependencies into the crate it generates, so running it from this package
 //! made the generated crate inherit the whole root dev-dependency graph and
-//! compile it in a nested build with no clock of its own. That is the shape of
+//! compile it in a nested build that nothing bounded. That is the shape of
 //! the incident this test exists to prevent: a `[>8160s]` test that was really
 //! waiting on a nested Cargo build.
 //!
@@ -20,9 +20,9 @@
 //! So this test does not compile the gate. `make prepare-dependencies` fetches
 //! both workspaces, `make prepare-ui-gate` builds the gate's test binary before
 //! any test body runs, and this file only reads the path that build recorded
-//! and holds that binary to its diagnostic contract under an external-command
-//! deadline. `make test-ui` builds the same binary through the same recipe and
-//! then runs it under the same deadline, so both routes agree.
+//! and holds that binary to its diagnostic contract; nextest bounds the test.
+//! `make test-ui` builds the same binary through the same recipe and then runs
+//! it, so both routes agree.
 //!
 //! The path comes from Cargo, not from a search of the build directory. A
 //! preparation step lets Cargo choose where its output goes, so an inherited
@@ -47,15 +47,10 @@
 //! fails with the command that builds it rather than spending minutes
 //! compiling the root dev-dependency graph inside this process.
 
-use std::time::Duration;
+use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
-
-#[path = "support/process_deadline.rs"]
-mod deadline;
-
-use deadline::CommandDeadline;
 
 /// Environment variable `trybuild` uses to locate the package it copies.
 ///
@@ -74,24 +69,6 @@ const GATE_DIRECTORY: &str = "tools/gates/cardinality-ui";
 /// under `target/`, which the repository's root `.gitignore` excludes.
 const GATE_BINARY_RECORD: &str = "target/cardinality-ui-binary";
 
-/// How long the gate may run before it is treated as wedged.
-///
-/// The gate compiles one crate plus `trybuild`'s generated crate. The
-/// measurements behind the nextest override in `.config/nextest.toml` put the
-/// green hosted run at 50.3 s and the hosted profile run at 134.2 s, so this
-/// bound clears the slower figure by a wide margin.
-///
-/// This deadline is deliberately *slower* than nextest's. Nextest terminates
-/// the test process at `terminate-after = 10` (600 s); if this deadline fired
-/// first, a build slowed by the shared compile queue would be reported as a
-/// wedged gate and the real cause — queue contention — would be hidden behind
-/// a timeout message. Measured locally while 185 builds were queued ahead, the
-/// gate still completed in 443.24 s; a warm full-suite run took 195.23 s. This
-/// bound clears the contended sample by 457 s. A genuinely hung build is still
-/// ended well before an outer job timeout, and nextest's own diagnosis reaches
-/// the operator first.
-const GATE_DEADLINE: Duration = Duration::from_mins(15);
-
 /// The gate must be run, passing, from the root suite.
 #[test]
 fn checked_cardinality_result_must_be_used() {
@@ -109,33 +86,19 @@ fn checked_cardinality_result_must_be_used() {
         )
     });
 
-    let mut command = CommandDeadline::with_deadline(&binary, GATE_DEADLINE);
-    command
-        .command()
+    let observed = Command::new(&binary)
         .current_dir(&gate)
-        .env_remove(MANIFEST_DIR_VARIABLE);
-    let observed = command
+        .env_remove(MANIFEST_DIR_VARIABLE)
         .output()
-        .expect("the gate test binary must start through the bounded command boundary");
+        .expect("the gate test binary must start");
 
     assert!(
-        !observed.exceeded_deadline(),
-        "the cardinality gate must finish inside {GATE_DEADLINE:?}; it was still running after \
-         {:?}.\noutcome: {:?}\ncommand: {}\ndirectory: {}",
-        observed.duration(),
-        observed.outcome(),
-        observed.line(),
-        gate
-    );
-    assert!(
-        observed.status().success(),
-        "the cardinality compile-fail gate must pass.\ncommand: {}\ndirectory: {}\nstatus: \
-         {}\nstdout:\n{}\nstderr:\n{}",
-        observed.line(),
-        gate,
-        observed.status(),
-        String::from_utf8_lossy(observed.stdout()),
-        String::from_utf8_lossy(observed.stderr())
+        observed.status.success(),
+        "the cardinality compile-fail gate must pass.\ncommand: {binary}\ndirectory: \
+         {gate}\nstatus: {}\nstdout:\n{}\nstderr:\n{}",
+        observed.status,
+        String::from_utf8_lossy(&observed.stdout),
+        String::from_utf8_lossy(&observed.stderr)
     );
 }
 
