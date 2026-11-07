@@ -49,8 +49,10 @@ Specification: parent plan lines 2250-2320.
 - [x] `tools/fixtures/native-consumer/`, a standalone binary crate depending on
   the facade by path with `default-features = false`, printing
   `BuildProfile::current()`.
-- [ ] `tests/native_consumer_e2e.rs` green: build, run, `cargo tree` check, and
-  comparison with the `native-only` snapshot.
+- [x] `tests/native_consumer_e2e.rs` green: build, run, `cargo tree` check, and
+  comparison with the `native-only` snapshot. The fixture's `Cargo.lock` is
+  committed beside it, as every other fixture crate in the repository does;
+  without it `--locked` fails before the fixture is built at all.
 - [x] `tests/build_profiles.rs` compiles under both profiles
   (`cargo check --all-targets --no-default-features` exits 0). Running the
   scenarios is the step after this one.
@@ -267,11 +269,17 @@ Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
 - [x] The `log-parser-registration` check, wired into `scripts/check_docs.py`.
 - [x] `scripts/tests/fixtures/evidence/log-parsers.json`'s description updated:
   the repository registry no longer registers none.
-- [ ] ADR-0009 amendment (DL-10, DL-16, DL-17). **Checkpoint, sponsor-owned:**
-  approval before registration. Registration has already happened, on the
-  footing that D15 was approved on 2026-10-22 and DL-16 and DL-17 restate the
-  approved technical design; the amendment is recorded as outstanding.
-- [ ] `mutmut` over `trust_audit/` and `kani_log/`; survivors resolved.
+- [x] ADR-0009 amendment (DL-10, DL-16, DL-17), recorded as the 2026-11-07
+  entry in
+  `docs/adrs/adr-0009-proof-first-policy-and-evidence-gate.md`. The sponsor
+  approved DL-16 ("Approved at EP-M5") together with the rest of the
+  2026-10-22 decision set; registration landed on the footing that DL-16 and
+  DL-17 restate that approved technical design. The amendment states the three
+  consequences rather than restating the options.
+- [x] `mutmut` over `trust_audit/` and `kani_log/`; survivors resolved. Both
+  censuses are closed: `kani_log/`'s triage is recorded in the parent plan,
+  and `trust_audit/`'s final eleven-module selection leaves 23 killed and 23
+  equivalent across 46 probes with nothing unaccounted for.
   - `kani_log/`: 1100 mutants, 986 killed, 110 survived, 4 timeouts on the
     first full run.
   - `trust_audit/`: 922 mutants, 760 killed, 153 survived, 9 timeouts.
