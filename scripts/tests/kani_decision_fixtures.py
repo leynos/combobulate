@@ -1,7 +1,7 @@
 """Construct the per-harness facts the Kani decision suite enumerates.
 
 VO-11b asks for an exhaustive enumeration, which is only exhaustive if the
-generator is. Rather than sample a handful of hand-written logs, this module
+generator is. Rather than sample a handful of handwritten logs, this module
 names every *decision-relevant class* of per-harness fact — two facts belong to
 the same class when no reader of ``decide`` can tell them apart — and the suite
 takes the full cartesian product of those classes for one, two, and three

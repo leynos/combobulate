@@ -7,7 +7,7 @@ a gap in the grammar. So every mutant here is a real log with one edit — a cut
 tail, a deleted report line, a raised count, a duplicated or interleaved block,
 an altered banner — and every assertion demands a structural reason.
 
-The mutants are generated rather than hand-written so the sweep is exhaustive
+The mutants are generated rather than handwritten so the sweep is exhaustive
 over the lines and cut points a producer could actually differ in; where the
 line set is large, Hypothesis samples it and the report names the log and the
 edit, so a failure reproduces.

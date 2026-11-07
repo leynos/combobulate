@@ -77,15 +77,18 @@ class BoundedParserCase(unittest.TestCase):
     """
 
     def setUp(self):
+        """Arm the stall alarm and remember whatever handler was already installed."""
         self._previous_alarm = signal.signal(signal.SIGALRM, self._stalled)
         signal.setitimer(signal.ITIMER_REAL, 5)
 
     def tearDown(self):
+        """Disarm the alarm and restore the inherited handler, so no case leaks a timer."""
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, self._previous_alarm)
 
     @staticmethod
     def _stalled(signum, frame):
+        """Turn the alarm into a failure naming the stall rather than a hang."""
         raise AssertionError('the parser did not terminate; it is stuck on a line it matched')
 
 

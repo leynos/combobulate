@@ -53,7 +53,7 @@ class VocabularyContextCrossProduct(unittest.TestCase):
     """Hold every vocabulary word to the same answer in every lexical context.
 
     A rule that worked for ``assume`` but not for ``external`` would pass a
-    hand-written example per word and still leave a gap. Reading every word
+    handwritten example per word and still leave a gap. Reading every word
     through every context makes the contexts the thing under test.
     """
 
@@ -239,7 +239,7 @@ class LexicalObligations(unittest.TestCase):
     def test_inserting_a_trust_item_adds_exactly_that_item(self, prefix):
         """Require one inserted ``kani::`` call to add exactly one item.
 
-        Generated prefixes reach positions the hand-written cases do not: a
+        Generated prefixes reach positions the handwritten cases do not: a
         prefix may open a brace, close one, or end mid-identifier. Exactly-one
         is the claim that catches double reporting as well as a miss.
         """

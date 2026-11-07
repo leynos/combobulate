@@ -49,6 +49,22 @@ def roadmap_step(number: str, *statuses: str) -> dict:
     return {'number': number, 'tasks': tasks}
 
 
+def roadmap_tasks_under(text: str, item: str) -> list[str]:
+    """Return the task identifiers a trial tick of ``item`` has to tick.
+
+    A deferred item is either a task (``1.2.6``) or a step (``2.4``). A task
+    has its own checkbox and is its own answer. A step has none, so it counts
+    as ticked only when every task beneath it is, and the step's identifier is
+    a prefix of each of those tasks' identifiers. Matching on the dot keeps
+    ``2.4`` from claiming ``2.40.1``.
+    """
+    roadmap = json.loads(export_text(text))
+    tasks = [task['id'] for phase in roadmap['phases'] for step in phase['steps']
+             for task in step['tasks']]
+    under = [task_id for task_id in tasks if task_id.startswith(f'{item}.')]
+    return under if under else [item]
+
+
 class TickVocabulary(unittest.TestCase):
     """The tick vocabulary distinguishes whole steps from partly finished ones."""
 
@@ -153,24 +169,49 @@ class CommittedDeferrals(unittest.TestCase):
                         'the committed register must keep at least one deferral for this check to guard')
 
     def test_trial_tick_in_a_temporary_copy_fails(self):
-        """Tick 1.2.1 in a copy of the canonical roadmap and require the committed register to reject it."""
+        """Tick a deferred item in a copy of the canonical roadmap and require rejection.
+
+        The item is read out of the committed register rather than named here.
+        A candidate stops constraining its old roadmap item as soon as a
+        decision settles it, so a hardcoded identifier silently stops testing
+        this check the moment that decision is accepted -- which is exactly
+        what happened when D16 repointed CA3 and CA5 at ADR-0010. Reading the
+        register keeps the case aimed at a deferral that still stands, and
+        fails loudly rather than passing vacuously if none does.
+
+        A deferral may name a task or a step, and the two tick differently: a
+        task needs its own checkbox, while a step has none and counts as ticked
+        only once every task beneath it is. The trial tick therefore covers the
+        whole item either way.
+        """
+        register = json.loads((ROOT / 'spec/decisions.json').read_text(encoding='utf-8'))
+        text = (ROOT / 'docs/roadmap.md').read_text(encoding='utf-8')
+        deferred = [candidate for candidate in deferred_candidates(register)
+                    if f'- [ ] {candidate["disposition"]["roadmap_item"]}.' in text]
+        self.assertTrue(deferred, 'the committed register must keep a deferral to an unticked item')
+        item = deferred[0]['disposition']['roadmap_item']
+        expected = [candidate['id'] for candidate in deferred
+                    if candidate['disposition']['roadmap_item'] == item]
+
+        trialled = text
+        for task_id in roadmap_tasks_under(text, item):
+            trialled = trialled.replace(f'- [ ] {task_id}.', f'- [x] {task_id}.', 1)
+        self.assertNotEqual(trialled, text, 'the trial tick must change the canonical roadmap')
+
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
         (root / 'spec').mkdir()
         (root / 'docs').mkdir()
         shutil.copyfile(ROOT / 'spec/decisions.json', root / 'spec/decisions.json')
-        text = (ROOT / 'docs/roadmap.md').read_text(encoding='utf-8')
-        trialled = text.replace('- [ ] 1.2.1.', '- [x] 1.2.1.', 1)
-        self.assertNotEqual(trialled, text, 'the trial tick must change the canonical roadmap')
         (root / 'docs/roadmap.md').write_text(trialled, encoding='utf-8')
         (root / 'spec/roadmap.json').write_text(export_text(trialled), encoding='utf-8')
         with self.assertRaises(AssertionError) as raised:
             check_candidate_deferral(ValidationContext(root))
         message = str(raised.exception)
-        for candidate_id in ('CA3', 'CA5'):
+        for candidate_id in expected:
             self.assertIn(f'{candidate_id} (', message,
-                          'every candidate still deferred to 1.2.1 must be named by the trial tick')
+                          'every candidate still deferred to the ticked item must be named')
 
 
 if __name__ == '__main__':
