@@ -194,9 +194,9 @@ exist.
 Two narrow readings remain, and neither is the incident's shape. The live
 workspace reads in `tests/workspace_boundaries.rs` run `cargo metadata` and
 `cargo tree --offline --locked`; they resolve the lockfile, compile nothing,
-and are bounded by nextest. The gate preparation itself is a Cargo command, but
-it is a Make recipe that runs before any test body, not something a test body
-starts.
+and are bounded by nextest when it runs them. The gate preparation itself is a
+Cargo command, but it is a Make recipe that runs before any test body, not
+something a test body starts.
 
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`

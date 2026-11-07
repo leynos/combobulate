@@ -88,7 +88,7 @@ fn offline_recovery(detail: &str) -> String {
     )
 }
 
-/// Runs a live Cargo read; nextest bounds the test that calls it.
+/// Runs a live Cargo read; under nextest, nextest bounds the test that calls it.
 fn run_read(arguments: &[&str]) -> Result<Output, Box<dyn Error>> {
     let mut command = Command::new(env!("CARGO"));
     command.args(arguments);

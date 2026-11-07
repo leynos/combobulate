@@ -20,7 +20,7 @@
 //! So this test does not compile the gate. `make prepare-dependencies` fetches
 //! both workspaces, `make prepare-ui-gate` builds the gate's test binary before
 //! any test body runs, and this file only reads the path that build recorded
-//! and holds that binary to its diagnostic contract; nextest bounds the test.
+//! and holds that binary to its diagnostic contract; under nextest, nextest bounds the test.
 //! `make test-ui` builds the same binary through the same recipe and then runs
 //! it, so both routes agree.
 //!
