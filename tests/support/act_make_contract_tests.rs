@@ -42,8 +42,13 @@ fn available_nextest_selects_the_nextest_run_branch() {
     });
     assert_eq!(
         test_arguments,
-        Some(vec!["nextest", "run", "--all-targets", "--all-features"]),
-        "a successful Nextest probe must select its run command"
+        Some(vec![
+            "nextest",
+            "run",
+            "--all-targets",
+            "--no-default-features"
+        ]),
+        "a successful Nextest probe must select its run command for the first gate profile"
     );
     let doctest_arguments = invocations.get(6).map(|call| {
         call.arguments
@@ -53,8 +58,35 @@ fn available_nextest_selects_the_nextest_run_branch() {
     });
     assert_eq!(
         doctest_arguments,
-        Some(vec!["test", "--doc", "--workspace", "--all-features"]),
+        Some(vec![
+            "test",
+            "--doc",
+            "--workspace",
+            "--no-default-features"
+        ]),
         "doctests must still follow Nextest"
+    );
+    let polars_test_arguments = invocations.get(7).map(|call| {
+        call.arguments
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(
+        polars_test_arguments,
+        Some(vec!["nextest", "run", "--all-targets"]),
+        "the Polars-enabled profile must run in its own Nextest invocation"
+    );
+    let polars_doctest_arguments = invocations.get(8).map(|call| {
+        call.arguments
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(
+        polars_doctest_arguments,
+        Some(vec!["test", "--doc", "--workspace"]),
+        "the Polars-enabled profile must run in its own doctest invocation"
     );
 }
 

@@ -18,7 +18,8 @@ from jsonschema import Draft202012Validator
 
 from .closure_evidence import ClosureEvidence
 from .context import ValidationContext, require
-from .evidence_gate import Admission, AdmissionContext, Level, abstract_record, admit, all_states, is_valid
+from .evidence_binding import checked_inputs
+from .evidence_gate import Admission, AdmissionContext, Level, admit, admit_evidence, all_states, is_valid
 from .exceptions import annotated_exceptions, ticked_tasks
 
 SATISFYING = {Level.PROOF, Level.BOUNDED, Level.TESTED}
@@ -39,16 +40,39 @@ def committed_records(context: ValidationContext) -> list[tuple[str, dict]]:
             for path in sorted((context.root / 'spec/evidence').glob('*.json'))]
 
 
-def admit_record(record: Mapping[str, object], context: ValidationContext, inputs: tuple) -> Admission:
-    """Admit one schema-valid record on the context's injected date; without a date, exceptions fail closed."""
+def admit_record(record: Mapping[str, object], context: ValidationContext, inputs: tuple,
+                 checked: tuple = ((), ())) -> Admission:
+    """Admit one schema-valid record on the context's injected date; without a date, exceptions fail closed.
+
+    Parameters
+    ----------
+    record
+        A record already validated against proof-evidence schema version 2.
+    context
+        The checker's repository inputs and evaluation date.
+    inputs
+        ``(exceptions, bindings, registered parsers)`` from :func:`evidence_inputs`.
+    checked
+        ``(verified log results, verified trust audits)`` from
+        :func:`~docs_validation.evidence_binding.checked_inputs`. The empty
+        default keeps a caller that has no files to bind — a unit test, or a
+        record citing nothing — on the self-reported path rather than failing.
+
+    Returns
+    -------
+    Admission
+        The level and ordered reason codes.
+    """
     exceptions, bindings, parsers = inputs
+    verified_logs, trust_audits = checked
     as_of = context.as_of
     if as_of is None:
         exceptions = {key: dict(entry) | {'problems': ['no-evaluation-date']} for key, entry in exceptions.items()}
         as_of = datetime.date.min
-    return admit(abstract_record(record, AdmissionContext(
+    return admit_evidence(record, AdmissionContext(
         exceptions=exceptions, bindings=bindings, as_of=as_of, log_parsers=parsers,
-    )))
+        verified_log_results=verified_logs, verified_trust_audits=trust_audits,
+    ))
 
 
 def closure_evidence(record: Mapping[str, object], admission: Admission) -> ClosureEvidence:
@@ -82,9 +106,11 @@ def closure_evidence(record: Mapping[str, object], admission: Admission) -> Clos
 def admitted_evidence(context: ValidationContext) -> dict[str, list[ClosureEvidence]]:
     """Index committed record admissions as domain facts for roadmap closure."""
     inputs = evidence_inputs(context)
+    records = [record for _, record in committed_records(context)]
+    checked = checked_inputs(context.root, records, inputs[2])
     evidence: dict[str, list[ClosureEvidence]] = {}
-    for _, record in committed_records(context):
-        facts = closure_evidence(record, admit_record(record, context, inputs))
+    for record in records:
+        facts = closure_evidence(record, admit_record(record, context, inputs, checked))
         evidence.setdefault(facts.component_id, []).append(facts)
     return evidence
 
@@ -109,7 +135,8 @@ def check_evidence_gate(context: ValidationContext) -> None:
     records = [('spec/proof-evidence.example.json', example)] + committed_records(context)
     for path, record in records:
         validator.validate(record)
-    planned = admit_record(example, context, inputs)
+    checked = checked_inputs(context.root, [example], inputs[2])
+    planned = admit_record(example, context, inputs, checked)
     require(planned.level is Level.REJECTED and 'not-run' in planned.reasons, 'The planned example must be rejected as not run')
     context.record('evidence-gate', 'Gate reason codes and levels match the registry; P3 and P4 hold over all valid '
                                     'abstract states; every committed evidence record validates against schema '

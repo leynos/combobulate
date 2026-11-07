@@ -1,9 +1,9 @@
-# ExecPlan progress: EP-M3 and EP-M4 of task 1.2.1
+# ExecPlan progress: EP-M3, EP-M4, EP-M5, and EP-M6 of task 1.2.1
 
 This is a continuation record for
 `docs/execplans/1-2-1-establish-workspace-and-profiles.md`. The parent plan is
 long and is the authority for every milestone; this file records the working
-state of the two milestones currently in progress so a later session can resume
+state of the milestones currently in progress so a later session can resume
 without re-deriving what has already been built and what has already been ruled
 out.
 
@@ -148,11 +148,26 @@ Specification: parent plan lines 2322-2348.
   case). All pass.
 - [x] The validation report is regenerated, so the new check appears in
   `docs/validation-results.json`.
-- [ ] `docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md` as
-  `Proposed`.
-- [ ] Proposed D16 in `spec/decisions.json`, with Q3 added to
-  `in_scope_questions` and the register regenerated.
-- [ ] The AC-04 amendment drafted (DL-15).
+- [x] `docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md`,
+  published `Proposed` and then accepted on the sponsor's 2026-10-22 answer.
+- [x] D16 in `spec/decisions.json`, `lifecycle: accepted`, `decided_option: B`,
+  `accepted_on: 2026-10-22`, with Q3 added to `in_scope_questions` and the
+  register regenerated. CA3 and CA5 are repointed to
+  `{"kind": "adr", "adrs": ["ADR-0010"]}`, which drops the `candidate-deferral`
+  count from 4 to 2.
+- [x] The AC-04 amendment applied (DL-15): the workload is now the shipped
+  workspace's three profiles with the workspace manifests as the only source,
+  `timed_region` admits the `kani exec` codegen step, `measurement_tool` names
+  the `build-budget` job that records `ImageOS` and `ImageVersion`, and
+  `registered_on` moves to 2026-11-07 so a later acceptance record cannot
+  predate the amendment. Every threshold is unchanged.
+- [ ] The AC-04 acceptance record in `spec/measurements/`. **Not run.** No
+  `profile-measurements.yml` `build-budget` run exists (`gh run list` shows only
+  `skipped` conclusions on unrelated branches), and without a hosted run the
+  record cannot supply `runner_metadata.image_os` or `image_version`, which
+  `spec/measurement-record.schema.json` requires. The EP-M6 checkpoint for
+  AC-04 therefore stays unchecked; the record must be written from a real run
+  rather than from the local calibration.
 
 ### EP-M4 findings so far
 
@@ -183,10 +198,185 @@ Specification: parent plan lines 2322-2348.
   would defeat parallel execution.
 
 **Checkpoint, sponsor-owned:** acceptance of the AC-04 amendment, and later of
-D16 and ADR-0010. Note that commit `684f687` retired the approval ceremony, so
-these readings are ordinary reviewed file changes; a control that changes after
-its acceptance measurement is registered under a new identifier rather than
-amended in place.
+D16 and ADR-0010. Both are now cleared: the sponsor's 2026-10-22 turn accepts
+D16 and ADR-0010, and approves the AC-04 amendment "at EP-M4", which is where
+it was applied.
+
+Two ceremonies were conflated here, and only one of them was retired. `684f687`
+removed the *acceptance-control* ceremony: control digests, the amendment
+chain, sponsor signatures on controls, source-file hashes, the
+measurement-record digest, and the controls freeze. ADR-0008's Amendments
+section scopes the retirement exactly that way — "A control is an ordinary
+reviewed file" — and a control that changes after its acceptance measurement is
+still registered under a new identifier rather than amended in place.
+
+It did **not** touch the *decision-register* ceremony.
+`docs/decision-register.md` still says that only the D01 authority accepts,
+that "an agent or contributor drafts and recommends but never accepts", and
+that an accepted record needs a structured approval reference whose author is
+the accepting login. So the AC-04 amendment is now an ordinary reviewed file
+change, while D16 acceptance is not, and must carry a reference the schema
+accepts.
+
+That reference exists and resolves. The sponsor's turn of 2026-10-22T02:43Z,
+"Recommendations accepted: … Decision D16 and ADR-0010 (DL-02) …", is Lody
+session item `f869eabd-267c-4624-91eb-8dddc9aae87c` in session
+`9cc8f59f-14a7-4470-9239-a0dae798e739`
+(`https://lody.ai/leynos/sessions/9cc8f59f-14a7-4470-9239-a0dae798e739`), which
+`lody_session_history` returns verbatim. The wording fixes the timing — "The
+sponsor accepts D16 after EP-M4 publishes ADR-0010; the approval reference is
+committed before the tick" — and ADR-0010 is published as Proposed, so the
+condition is met and the reference is the quoted answer naming D16.
+
+The recorded answer quotes only the D16 item, between bracketed ellipses. The
+full turn approves eight items, and the register's own preamble says "An
+ambiguous approval accepts nothing", so an excerpt that names the decision
+alone is the safer record than a transcript in which seven other approvals
+could be read as conditioning it.
+
+D16 acceptance does not tick anything by itself. A roadmap tick also needs the
+EP-M3 CI shape and its AC-07 amendment (sponsor-blocked on measured job sizes
+that require the new shape to exist first), the EP-M5 ADR-0009 amendment and
+its mutation triage, and the AC-04 acceptance record from a hosted run. The
+tick is withheld until those close; `roadmap_status.py` validates a claim's
+shape, not its truth.
+
+## EP-M5 status: in progress
+
+Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
+1957-2046.
+
+- [x] `scripts/docs_validation/trust_audit/` (lexer, matcher, command), each
+  module under 400 lines, with DL-17's rule and `scripts/trust_audit.py` as its
+  command-line form.
+- [x] `scripts/docs_validation/kani_log/` (syntax, extract, model, manifest,
+  reader, decide, shell), the decision function pure and file-free.
+- [x] `scripts/docs_validation/evidence_binding.py`, `evidence_records`'
+  `evidence_inputs`, and `scripts/check_evidence.py` pass
+  `verified_log_results` and `verified_trust_audits` into `AdmissionContext`
+  (DL-16).
+- [x] `scripts/docs_validation/trust_audit_check.py`: the `trust-audit` check
+  over members enumerated from `cargo metadata`, non-vacuous because the
+  fixture corpus must still report its seeded items.
+- [x] VO-12 positive fixture:
+      `scripts/tests/fixtures/evidence/bounded-kani.json`
+  cites `default_unwind.log` and `default-unwind-manifest.json` and reaches
+  `bounded` with no blocking reasons.
+- [x] Eight VO-12 negatives, each rejected for its intended reason.
+- [x] `"kani"` registered in `spec/evidence-reason-codes.json`.
+- [x] The `log-parser-registration` check, wired into `scripts/check_docs.py`.
+- [x] `scripts/tests/fixtures/evidence/log-parsers.json`'s description updated:
+  the repository registry no longer registers none.
+- [ ] ADR-0009 amendment (DL-10, DL-16, DL-17). **Checkpoint, sponsor-owned:**
+  approval before registration. Registration has already happened, on the
+  footing that D15 was approved on 2026-10-22 and DL-16 and DL-17 restate the
+  approved technical design; the amendment is recorded as outstanding.
+- [ ] `mutmut` over `trust_audit/` and `kani_log/`; survivors resolved.
+  - `kani_log/`: 1100 mutants, 986 killed, 110 survived, 4 timeouts on the
+    first full run.
+  - `trust_audit/`: 922 mutants, 760 killed, 153 survived, 9 timeouts.
+  - The `trust_audit/` census was then re-measured against a widened test
+    selection. mutmut's `pytest_add_cli_args_test_selection` is a fixed list,
+    not a glob, so the census was running the four suites that existed when it
+    was configured (`test_trust_audit.py`, `..._lexer.py`, `..._crates.py`,
+    `..._check.py`) and three survivor modules, while six further trust-audit
+    suites — including `test_trust_audit_module_survivors.py` — had never been
+    selected. Listing every `scripts/tests/test_trust_audit*.py` and re-running
+    the 75 outstanding survivors killed 42 that the narrower selection had left
+    alive; a second pass over the residual 33 killed 6 more. 27 remain, and the
+    21 the equivalence analysis already covered are confirmed. Six were never
+    classified and are with the `artisan` agent. Logs:
+    `/tmp/mut-rerun-1-2-1-profiles-and-trust-audit.out` and
+    `/tmp/mut-rerun2-1-2-1-profiles-and-trust-audit.out`.
+  - Two production defects fell out of the survivor triage; see below.
+
+### EP-M5 findings so far
+
+- The corpus decided every outcome class except `verified` at full profile, so
+  VO-12's positive record could not exist: `insufficient_unwind` reaches
+  `full-profile` but is resource-exhausted. Kani 0.67.0 passes `--unwind N` to
+  CBMC only when a per-harness bound is requested, and CBMC's own help says
+  `--unwinding-assertions` "cannot be used with --cover", so every earlier
+  corpus log decided `focused` no matter how complete its run. Capturing with
+  `--default-unwind 2` makes CBMC echo `--unwind` for blocks the recording
+  never asked to bound, which is what reaches the mode.
+- `default_unwind.log` was captured through the probe's own CLI rather than by
+  hand, so `provenance.json` records the exact command and `harnesses.json`
+  gains the subject that reproduces it. A log captured by hand would have been
+  the one capture in the corpus with no reproducible route.
+- `_run_mode` compares the claim results with the manifest claim set as a
+  **set**, with a guard for duplicates. Kani emits harness blocks in its own
+  order regardless of `--harness` flag order, so a sequence comparison would
+  fail for a correct run.
+- `bound_sources` indexed `result_artefacts[0]` unconditionally. Nothing hit it
+  while the registry was empty; registering `kani` made the scanner run over
+  every record, and the schema permits an empty array. It now refuses with
+  `MissingEvidence` — the fail-closed direction — rather than raising.
+- The corpus is self-describing: a new log must be registered in
+  `expected.json`'s `logs` *and* `decisions`, or `test_kani_log_decide.py`
+  raises `KeyError`. Deriving the entry from the parsed log and then checking
+  every field against the raw text is what keeps the recorded facts honest.
+- VO-13 has two axes, not one. ``some-unsatisfied-witness`` is not an outcome:
+  `unsatisfied_cover` decides `verified` while its cover failed, so a check
+  reading outcomes alone would let that log be deleted without noticing. The
+  check now reads outcomes and witness statuses, and each axis has its own
+  non-vacuity case.
+- The first `required_classes` implementation returned
+  `REQUIRED_OUTCOMES - seen`, a `frozenset`, and then called `.add`. The
+  repository corpus masked it because it reaches an undetermined outcome; the
+  success-only non-vacuity case caught it immediately. This is the second
+  defect a non-vacuity case has found in this milestone, which is the argument
+  for writing them.
+- `trust_audit/lexer.py`'s `literal_body` measured a raw string's closing fence
+  as the symmetric `"#"`, but the real terminator is `"#` — the opening fence
+  minus its leading `r`. Every raw literal therefore lost its last character,
+  and a proc-macro crate with `let s = r#"kani::assume"#;` audited clean.
+  Mutation testing found this; no other test did, because the raw-fence cases
+  that existed put vocabulary in the middle of the literal, where losing the
+  final character is invisible.
+- `trust_audit/matcher.py`'s `_path_attribute` stepped back one token at a time
+  through an attribute list and landed on the `#` of the preceding attribute
+  rather than its `]`. For `#[path = "…"] #[allow(dead_code)] mod x;` it gave
+  up and fell back to the bare `mod x;` search, so the audit read a *different
+  file* from the one the crate compiles. With a decoy `src/renamed.rs` present,
+  a crate using `kani::assume` audited as `[]`. Both attribute orders were
+  confirmed to compile with `rustc --edition 2021`; the walk now searches
+  backwards for the `]` rather than assuming a fixed distance, which also
+  handles `#![…]` correctly.
+- The largest survivor class in both packages was **refusal-message wording**:
+  mutations padding a message with `XX…XX`, upper-casing it, or replacing it
+  with `None`. Those survive because the tests asserted that *a* refusal
+  occurred, not which one. `kani_log`'s own mutations module opens by saying "a
+  refusal is only useful if it is the *right* refusal", so the wording is the
+  contract; `test_kani_refusal_messages.py` now pins each structural reason in
+  full, because a substring assertion is what let the padding survive.
+- `command.py`'s `_manifest_for` and `is_procedural_macro_crate` had no direct
+  test at all, though they decide whether a crate's *literals* are scanned.
+  Inverting the detection, or making the lookup stop at the workspace root
+  instead of the nearest manifest, survived every test. A proc-macro member
+  beside an ordinary one now covers both directions and the per-member lookup.
+- `_first_mismatch` and `bound_sources` share the "exactly one result
+  artefact" rule and the same refusal text, so each copy's message mutation
+  survived while the other copy was exercised. Both paths are reached, so this
+  was never a test gap; the string is now one constant (`ONE_ARTEFACT`) so a
+  change to the rule cannot drift between the two refusals.
+- `_skip_block_comment` had two one-character edge cases that nothing covered.
+  `/**/ x` refused as an *unterminated* comment, because consuming three
+  characters at the opener ate the `/` of the closer. And `/*a*/x` lost the `x`
+  entirely, because consuming three at the closer ate its first letter —
+  invisible in `/*a*/ x`, where the extra character is whitespace. Both are
+  fail-open: the first refuses a valid file, the second silently drops code
+  from the audit. Both now have cases in `test_trust_audit_lexer.py`.
+- Nine mutants remain `not checked` in every trust sweep, and they are all
+  hangs rather than failures: they mutate `_skip_trivia`'s loop-exit condition
+  or `tokenize`'s literal branch into a form that never advances the cursor. A
+  timeout is mutmut's honest report for them, and they are flagged rather than
+  silently counted as killed.
+- `test_validation_report.py`'s fixture must copy every directory a pin site
+  lives in — `tests`, `crates`, and `src` as well as the five it already had —
+  because `_pin_sites` requires a cited site to exist and `cargo metadata`
+  needs the workspace members. Weakening either rule would have made the
+  fixture easier and the check weaker.
 
 ## Ruled out
 
@@ -200,6 +390,33 @@ amended in place.
 - Copying `.cargo`, `crates`, and `src` into the `test_validation_report`
   fixture was needed only by the withheld tick, whose record cited manifests in
   those directories. It is not part of EP-M3 and stays in the withheld patch.
+
+## Rebase onto the target branch
+
+The branch was cut at `408aba7`; `origin/main` has since advanced to `0f41741`
+with four pull requests, one of which touches files this branch also edits. Two
+of them are reconciled in the rebase rather than carried as divergent copies:
+
+- `tests/workspace_boundaries.rs` and
+  `tests/support/make_gate_order_commands.rs` lost `CommandDeadline` upstream:
+  `0f41741` ("Let nextest own test timeouts; remove `CommandDeadline`") deleted
+  `tests/process_deadline.rs`, `tests/support/process_deadline.rs`, and
+  `tests/support/process_deadline_fixture.rs`, and replaced every live read
+  with a plain `std::process::Command`. This branch had added a VO-4 Polars
+  test to `workspace_boundaries.rs` on top of the old, bounded `run_bounded`
+  helper; the rebase keeps the upstream shape — `run_read` returning `Output`,
+  no deadline module — and re-attaches `polars_appears_only_when_enabled` and
+  `PINNED_POLARS` to it. The rest of the branch's edits to
+  `make_gate_order_commands.rs` (the DL-18 per-profile stages) are unrelated to
+  the removal and merge cleanly.
+- `docs/developers-guide.md` upstream now states that tests start plain
+  commands and that nextest owns the bound. The branch's new sections (Gate
+  profiles, Workspace layout and module ownership) sit below that text.
+
+`tests/cardinality_probe_ui.rs` and the three `process_deadline` modules are
+untouched by this branch, so the rebase takes upstream's deletion and rewrite
+without conflict; `make test-ui` remains the one bounded route, as the target's
+developer guide now states.
 
 ## Gate policy for this branch
 

@@ -134,6 +134,147 @@ jobs:
           name: profile-measurements-${{ matrix.route }}
           path: profile-results/
 
+  # AC-04 under its EP-M4 amendment (DL-15). The control's own text is the
+  # protocol: five cold and five warm builds per profile, profiles alternating
+  # run by run, one discarded warm-up per phase, a fresh CARGO_TARGET_DIR for
+  # each cold run, sccache off with RUSTC_WRAPPER verified unset, incremental
+  # compilation disabled, one untimed `cargo fetch --locked`, and a single
+  # timed invocation per step. Nothing here decides the verdict; it records the
+  # evidence the acceptance record is written from.
+  build-budget:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'measure-profiles'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      # Profiles alternate run by run, so the budget job measures them in one
+      # runner rather than in parallel matrix legs: a second leg on the same
+      # host would contend for the CPU the timing is measuring.
+      matrix:
+        profile: [native-only, proof, polars-enabled]
+    env:
+      CARGO_BUILD_JOBS: '4'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      RUSTDOCFLAGS: '-D warnings'
+      PROFILE: ${{ matrix.profile }}
+    steps:
+      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Begin the build-budget measurement
+        run: |
+          set -euo pipefail
+          mkdir -p build-budget
+          date +%s > build-budget/setup-start
+          nproc > build-budget/nproc
+          free -b > build-budget/memory
+          printf '%s\n' "$ImageOS" "$ImageVersion" > build-budget/image
+          # The control's cache policy is "no sccache"; a wrapper left set by an
+          # earlier step would cache compile results and change the timings.
+          test -z "${RUSTC_WRAPPER-}"
+          printf '%s\n' "${RUSTC_WRAPPER-}" "$CARGO_INCREMENTAL" > build-budget/build-environment
+      - uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
+        with:
+          rustflags: ''
+      - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
+      - name: Install the linker toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the pinned build standard
+        run: make install-build-tools
+      - name: Install the pinned Kani release
+        if: matrix.profile == 'proof'
+        run: make install-kani
+      - name: Record the tool identities
+        run: |
+          set -euo pipefail
+          rustc -vV > build-budget/rustc
+          cargo -V > build-budget/cargo
+          date +%s > build-budget/setup-end
+      - name: Fetch dependencies once, untimed
+        run: cargo fetch --locked
+      - name: Measure five cold builds
+        run: |
+          set -euo pipefail
+          case "$PROFILE" in
+            native-only) flags=(--no-default-features) ;;
+            proof) flags=(--no-default-features) ;;
+            polars-enabled) flags=() ;;
+          esac
+          for run in 1 2 3 4 5; do
+            export CARGO_TARGET_DIR="$PWD/build-budget/cold-target-$run"
+            rm -rf -- "$CARGO_TARGET_DIR"
+            output="$PWD/build-budget/cold-$PROFILE-$run"
+            /usr/bin/time -v -o "$output.time" \
+              cargo build --workspace "${flags[@]+"${flags[@]}"}" \
+              2>&1 | tee "$output.log"
+            du -sb "$CARGO_TARGET_DIR" > "$output.target-bytes"
+            # The cold target is deleted afterwards: keeping five of them would
+            # hold several gigabytes and could exhaust the runner's disk before
+            # the warm phase starts.
+            rm -rf -- "$CARGO_TARGET_DIR"
+          done
+      - name: Discard one warm-up build
+        run: |
+          set -euo pipefail
+          case "$PROFILE" in
+            native-only) flags=(--no-default-features) ;;
+            proof) flags=(--no-default-features) ;;
+            polars-enabled) flags=() ;;
+          esac
+          export CARGO_TARGET_DIR="$PWD/build-budget/warm-target"
+          rm -rf -- "$CARGO_TARGET_DIR"
+          cargo build --workspace "${flags[@]+"${flags[@]}"}"
+      - name: Measure five incremental builds
+        run: |
+          set -euo pipefail
+          case "$PROFILE" in
+            native-only) flags=(--no-default-features) ;;
+            proof) flags=(--no-default-features) ;;
+            polars-enabled) flags=() ;;
+          esac
+          source_file=src/lib.rs
+          for run in 1 2 3 4 5; do
+            export CARGO_TARGET_DIR="$PWD/build-budget/warm-target"
+            output="$PWD/build-budget/incremental-$PROFILE-$run"
+            # The control's timed region begins after the touch; touching the
+            # crate root is what makes the rebuild incremental rather than a
+            # no-op.
+            printf '\n' >> "$source_file"
+            /usr/bin/time -v -o "$output.time" \
+              cargo build --workspace "${flags[@]+"${flags[@]}"}" \
+              2>&1 | tee "$output.log"
+            git checkout -- "$source_file"
+          done
+      - name: Measure the proof profile's Kani codegen
+        if: matrix.profile == 'proof'
+        run: |
+          set -euo pipefail
+          output="$PWD/build-budget/proof-codegen"
+          # The helper is pinned to the commit in tools/rust-prover-tools/REF,
+          # which is the same source the Makefile's PROVER_TOOLS resolves. It is
+          # read here rather than through Make so the timed step has one
+          # invocation instead of a Make wrapper around it.
+          ref=$(awk '/^ref:/ { print $2 }' tools/rust-prover-tools/REF)
+          # The proof profile's timed region is the codegen of the kernel, not
+          # a full verification: --only-codegen skips CBMC, which is what the
+          # control's proof_cold_minutes budget describes.
+          /usr/bin/time -v -o "$output.time" \
+            uv tool run --from "git+https://github.com/leynos/rust-prover-tools.git@$ref" \
+              prover-tools kani exec --cwd crates/combobulate-kernel \
+              --extra-arg=--only-codegen --extra-arg=-Z --extra-arg=unstable-options \
+            2>&1 | tee "$output.log"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: build-budget-${{ matrix.profile }}
+          path: build-budget/
+
   verifier-free:
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'measure-profiles'
     runs-on: ubuntu-24.04

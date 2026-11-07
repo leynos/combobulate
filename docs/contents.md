@@ -40,6 +40,7 @@ implemented API or completed verification.
 - [ADR-0007: `comb!` macro grammar and staging][adr-0007].
 - [ADR-0008: acceptance-control pre-registration][adr-0008].
 - [ADR-0009: proof-first policy and evidence gate][adr-0009].
+- [ADR-0010: workspace crate boundaries and build profiles][adr-0010].
 
 ## Execution plans
 
@@ -47,15 +48,19 @@ implemented API or completed verification.
   ExecPlan for roadmap step 1.1, implemented in stacked pull requests.
 - [Roadmap 1.2.1: establish the workspace and pinned profiles][roadmap-1-2-1]:
   ExecPlan for the facade, macro, and semantic-kernel workspace, approved and
-  being implemented in stacked pull requests.
+  being implemented in one pull request for the whole plan.
+- [Roadmap 1.2.1 continuation][roadmap-1-2-1-continuation]: progress record
+  for EP-M3 to EP-M6, the milestones the closed delivery vehicle left unclaimed.
 
 [roadmap-1-1]: execplans/1-1-resolve-acceptance-control-decisions.md
 [roadmap-1-2-1]: execplans/1-2-1-establish-workspace-and-profiles.md
+[roadmap-1-2-1-continuation]: execplans/1-2-1-ep-m3-and-ep-m4.md
 [adr-0005]: adrs/adr-0005-pre-1-0-api-and-proof-interface-policy.md
 [adr-0006]: adrs/adr-0006-numeric-validity-and-reduction-contracts.md
 [adr-0007]: adrs/adr-0007-comb-macro-grammar-and-staging.md
 [adr-0008]: adrs/adr-0008-acceptance-control-pre-registration.md
 [adr-0009]: adrs/adr-0009-proof-first-policy-and-evidence-gate.md
+[adr-0010]: adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md
 
 ## Project guides
 

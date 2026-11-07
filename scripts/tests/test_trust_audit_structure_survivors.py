@@ -7,16 +7,32 @@ corpus of real files never spells the boundary each mutant moves. Each case
 here hands the helper the token sequence the mutant needs and asserts the index
 the helper promises.
 
-Three survivors are equivalent rather than untested, and this module records why
+Four survivors are equivalent rather than untested, and this module records why
 instead of silencing them. ``attribute_spans``'s ``index + 2 < len(tokens)``
 weakens a guard whose false branch can only be reached when the source ends
 ``# !``; there both the guarded and unguarded openings fail the ``[`` test, so
-no span is reported either way. In ``previous_closer`` and both opening-bracket
-searches, a range that runs one index further (``-2`` instead of ``-1``) can
-only visit Python's ``tokens[-1]``, and every branch that index can take either
-returns the same ``-1`` the loop would have returned or leaves the search
-unfinished; an index of ``-1`` is therefore indistinguishable from exhaustion.
-A survivor no input can distinguish is not a test gap.
+no span is reported either way. ``previous_closer``'s ``-2`` stop can only add
+one visit, at the loop variable ``-1``, which Python reads as the *last*
+token. The walk reaches that visit only when every token before the opener is
+``#`` or ``!``, and whatever the last token is, the visit's answer is the loop
+variable itself, ``-1``: a ``]`` returns it, ``#`` and ``!`` continue to
+exhaustion, and anything else returns ``-1`` explicitly. That is the same
+answer the completed walk gives. The only other reading is an ``IndexError``
+on an empty token tuple, which no caller can supply because the walk begins at
+a real attribute's opening bracket. ``skip_visibility``'s ``index > 0`` and
+``index >= 1`` differ from ``index >= 0`` only at index zero. There a ``)``
+cannot close on itself, so ``opening_paren`` answers ``None`` and the function
+reports ``0``; the mutant's fallback reports ``0`` as well, since the token is
+not ``pub``, and a ``pub`` at index zero fails the pristine guard too. Negative
+indices take the same fallback under both forms. An exhaustive differential run
+over 6,501,848 token sequences and indices, including exceptions, found no
+difference for either form. A survivor no input can distinguish is not a test
+gap.
+
+By contrast, the two opening-bracket ``-2`` stops are *not* equivalents: each
+adds a step that reads ``tokens[-1]``, and when that token is the opening
+bracket itself the search reports ``-1`` where the function promises ``None``.
+The cases below pin that difference.
 
 Examples
 --------
@@ -220,6 +236,79 @@ class OpeningBrackets(unittest.TestCase):
         tokens = tokenize('x]')
         self.assertIsNone(opening_bracket(tokens, 1),
                           'an unmatched bracket must report None')
+
+    def test_an_unmatched_bracket_at_the_start_reports_none(self):
+        """Require the search to stop when it runs out, not to wrap to the last token.
+
+        ``range(close_index, -1, -1)`` visits index ``0`` and then stops. A stop
+        of ``-2`` adds one more step, and Python reads index ``-1`` as the
+        *last* token. Here the last token is a ``[``, which decrements the
+        depth, so the search reports ``-1`` -- a plausible-looking index that
+        the caller would use to read an unrelated token. The honest answer is
+        ``None``, which the caller treats as "no opener".
+        """
+        tokens = tokenize('] [')
+        self.assertIsNone(opening_bracket(tokens, 0),
+                          'an exhausted bracket search must report None, not index -1')
+
+    def test_an_unmatched_parenthesis_at_the_start_reports_none(self):
+        """Require the same bound for the parenthesis search.
+
+        ``) (`` is the parenthesis form of the case above, and the ``-2`` stop
+        makes the search read the trailing ``(`` as its opener and report
+        ``-1`` rather than ``None``.
+        """
+        tokens = tokenize(') (')
+        self.assertIsNone(opening_paren(tokens, 0),
+                          'an exhausted parenthesis search must report None, not index -1')
+
+
+class PreviousCloserReach(unittest.TestCase):
+    """Require the backwards walk to reach the token immediately before the opener.
+
+    The walk is a ``range`` over the tokens before ``opener``, so both of its
+    ends are load-bearing. A start of ``opener - 2`` skips the neighbour; a
+    stop of ``+1`` never reaches the first two tokens. ``][ a`` puts a ``]`` at
+    index 0 and an opener at index 1, where both faults are visible at once:
+    the correct walk answers ``0``, and either mutation answers ``-1``, which
+    the caller reads as "no attribute here".
+    """
+
+    def test_a_closer_immediately_before_the_opener_is_found(self):
+        """Require the walk to reach index 0 when the opener is at index 1."""
+        tokens = tokenize('][ a')
+        self.assertEqual(previous_closer(tokens, 1), 0,
+                         'a closer directly before the opener must be found')
+
+
+class PathValueBounds(unittest.TestCase):
+    """Require a span that ends before the value's own literal to report nothing.
+
+    The value sits at ``open_index + 3``, so the guard has to refuse any
+    ``close_index`` up to and including that offset: a bracket closing at or
+    before the literal says the attribute carries no value, and reading the
+    literal anyway would report a token the span does not contain. Both ends
+    of the comparison are load-bearing, hence one case at the offset and one
+    just below it.
+    """
+
+    def test_a_close_just_below_the_literal_is_refused(self):
+        """Require ``close_index`` at ``open_index + 2`` to report nothing."""
+        tokens = tokenize('#[path = "x.rs"]')
+        self.assertIsNone(path_value(tokens, 1, 3),
+                          'a bracket closed before the value must report no path')
+
+    def test_a_close_at_the_literal_is_refused(self):
+        """Require ``<=`` rather than ``<``, which would admit the literal's own offset."""
+        tokens = tokenize('#[path = "x.rs"]')
+        self.assertIsNone(path_value(tokens, 1, 4),
+                          'a bracket closing at the literal must report no path')
+
+    def test_the_full_span_reports_its_value(self):
+        """Require the positive case, so the guard is not vacuous."""
+        tokens = tokenize('#[path = "x.rs"]')
+        self.assertEqual(path_value(tokens, 1, 5), 'x.rs',
+                         'a complete path attribute must report its value')
 
 
 class PathValues(unittest.TestCase):

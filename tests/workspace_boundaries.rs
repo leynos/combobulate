@@ -7,6 +7,7 @@
 //! against canned fixtures that would otherwise let the rule pass vacuously.
 
 use std::{
+    collections::HashSet,
     error::Error,
     process::{Command, Output},
 };
@@ -17,9 +18,19 @@ use rstest::rstest;
 /// Dependency-direction predicates over Cargo's declared graph.
 #[path = "support/workspace_metadata.rs"]
 mod metadata;
+
 /// `cargo tree` parsing and dependency-prefix predicates.
 #[path = "support/workspace_tree.rs"]
 mod tree;
+
+use metadata::{FACADE, KERNEL, MACROS, Metadata};
+
+/// The Polars release AC-04 and task 1.2.6 are calibrated against.
+///
+/// Written as it appears in `cargo tree` output so the assertion reads the
+/// resolved version rather than trusting the manifest's requirement.
+const PINNED_POLARS: &str = "polars v0.55.2";
+
 
 use metadata::{FACADE, KERNEL, MACROS, Metadata};
 
@@ -320,6 +331,38 @@ fn ordinary_profiles_exclude_verifiers() -> Result<(), Box<dyn Error>> {
 fn verifier_leaks_are_reported() {
     let reported = tree::verifier_packages(include_str!("fixtures/cargo/facade-reaches-vstd.tree"));
     assert_that!(reported, contains(eq("vstd")));
+}
+
+/// VO-4: Polars reaches exactly one profile, at exactly the pinned release.
+///
+/// The two closures are compared to each other rather than to a literal, so
+/// the positive case witnesses the negative one: if the native-only closure
+/// also carried Polars the difference would be empty, and if the Polars-enabled
+/// closure did not the difference would be too.
+#[test]
+fn polars_appears_only_when_enabled() -> Result<(), Box<dyn Error>> {
+    let native_tree = live_tree(&[
+        "-p",
+        FACADE,
+        "--no-default-features",
+        "--target",
+        "all",
+        "-e",
+        "all",
+    ])?;
+    let polars_tree = live_tree(&["-p", FACADE, "--target", "all", "-e", "all"])?;
+
+    assert_that!(tree::backend_packages(&native_tree), is_empty());
+    assert_that!(polars_tree, contains_substring(PINNED_POLARS));
+
+    let native_packages: HashSet<String> = tree::package_names(&native_tree).into_iter().collect();
+    let added: HashSet<String> = tree::package_names(&polars_tree)
+        .into_iter()
+        .filter(|package| !native_packages.contains(package))
+        .collect();
+    assert_that!(added, contains(eq(&"polars".to_owned())));
+    assert_that!(native_packages.contains("polars"), eq(false));
+    Ok(())
 }
 
 // VO-6 cases live in `workspace_kernel_boundary.rs`. The source-boundary

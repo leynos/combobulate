@@ -150,7 +150,6 @@ fn assert_whitaker_command(invocation: &Invocation, expected_cache_state: &str) 
             "--all".to_owned(),
             "--".to_owned(),
             "--all-targets".to_owned(),
-            "--all-features".to_owned(),
         ],
         "the repository checking arguments must reach Whitaker unchanged"
     );

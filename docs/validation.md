@@ -30,7 +30,7 @@ a log fail their negative controls. Schema validity checks the declaration, not
 the truth of its contents.
 
 Governance checks cover the records that control acceptance. The decision
-register validates D01 to D15 and keeps the five governing documents linked to
+register validates D01 to D16 and keeps the five governing documents linked to
 it and free of retired or open-status wording for accepted questions. The
 semantic contract register (`SC-01` to `SC-11`) evaluates 68 tagged-scalar
 examples and a 29-entry `comb!` corpus in documentation models, and proves each
@@ -38,11 +38,13 @@ seeded mutation changes an outcome. The acceptance controls (`AC-01` to
 `AC-07`) define every registered field, and host-free calibration records bind
 to them. The evidence gate's reason codes match their registry, the exception
 register satisfies D02, and the package manifest agrees with the licence and
-publication decisions. Roadmap closure accepts a ticked task only when its
-prerequisites, completion record, accepted decisions, and obligation components
-back it; tasks 1.1.1 to 1.1.4 are ticked. With a base revision, the freeze
-check rejects edits to accepted decisions, registered controls, and approved
-exceptions.
+publication decisions. The toolchain-profile record binds every pin to the
+sites that assert it, and the log-parser registration check requires each
+registered parser's committed corpus to decide every class the gate keys on.
+Roadmap closure accepts a ticked task only when its prerequisites, completion
+record, accepted decisions, and obligation components back it; tasks 1.1.1 to
+1.1.4 are ticked. With a base revision, the freeze check rejects edits to
+accepted decisions, registered controls, and approved exceptions.
 
 A separate small Python documentation model evaluates the original 20 semantic
 cases, including right/left association, empty frames/cells, nulls, broadcasts,
@@ -98,15 +100,30 @@ make design-check BASE_REV="$(git merge-base origin/main HEAD)"
 
 The roadmap-status check accepts a ticked task only when its prerequisites,
 completion record, accepted decisions, and obligation components back it. The
-supplied Python helpers do not invoke a compiler, verifier or backend.
+candidate-deferral check, which runs immediately before it, refuses a tick of
+any roadmap item that a candidate ADR subject is still deferred to, and refuses
+a deferral naming an item the roadmap does not declare, so a typo cannot make
+the guard vacuous. The supplied Python helpers do not invoke a compiler,
+verifier or backend.
 
 ## Unrun checks and limits
 
-No Combobulate implementation exists in the supplied pack. Rust compilation,
-doctests, macro UI tests, actual const-evaluated cost admission, Kani/Verus
-verification, external proof-consumer builds, optimized/reference execution,
-Polars engine/spill/capability probes, Miri, numerical/performance
-measurements, and trasic adoption remain unrun.
+The array algebra described by the design pack is not implemented, and these
+documentation checks do not execute any of it. Rust compilation, doctests,
+macro UI tests, actual const-evaluated cost admission, Kani/Verus verification,
+external proof-consumer builds, optimized/reference execution, Polars
+engine/spill/capability probes, Miri, numerical/performance measurements, and
+trasic adoption remain unrun here; the repository runs its own Rust gates
+separately, and this report claims none of their results.
+
+GAP9 is partly closed and partly open. Closed: ADR-0009's evidence gate exists
+and is wired into `scripts/check_evidence.py`, `kani` is registered as a log
+parser only after its corpus demonstrated every class the gate keys on, the
+trust-audit scanner reports the items a record must cover, and the
+toolchain-profile record binds each pin to its sites. Open: no Verus parser
+exists, Kani evidence can reach `bounded` but not `proof`, and no type-complete
+bound has been recorded. Q9 remains, and an exception still cannot count as
+proof or remove ordinary runtime safety.
 
 The design-model report does not claim repository Markdown lint or Rust CI
 results. The repository runs those gates separately. The imported design has no

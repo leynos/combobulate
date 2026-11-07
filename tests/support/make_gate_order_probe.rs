@@ -150,8 +150,8 @@ impl GateProbe {
             .args([
                 "WITH_ACT=0",
                 "BUILD_JOBS=",
-                "CARGO_FLAGS=--all-targets --all-features",
-                "TEST_FLAGS=--all-targets --all-features",
+                "CARGO_FLAGS=--all-targets",
+                "TEST_FLAGS=--all-targets",
             ]);
     }
 

@@ -416,6 +416,81 @@ Install `clang`, `lld`, `python3`, and `cargo-audit` before running the full
 generated workflow locally on Linux. `make install-build-tools` supplies the
 pinned `mold` and nightly toolchain.
 
+## Gate profiles
+
+The facade has two feature profiles, and a gate that runs only one of them
+cannot see the other's code. `--all-features` reaches the Polars-enabled code
+but never the `cfg(not(feature = "polars"))` branches, and a plain
+default-feature run repeats what the Polars-enabled route already checks. Each
+profile is therefore its own Cargo invocation.
+
+| Profile          | Flags                   | Reaches                                       |
+| ---------------- | ----------------------- | --------------------------------------------- |
+| `native-only`    | `--no-default-features` | `cfg(not(feature = "polars"))`, no macros     |
+| `polars-enabled` | none (defaults)         | `cfg(feature = "polars")` and the macro crate |
+
+`GATE_PROFILE` selects which profiles a gate runs:
+
+- `GATE_PROFILE=both` (the default) runs `native-only` then `polars-enabled`,
+  which is what `make lint` and `make test` do.
+- `GATE_PROFILE=native-only` or `GATE_PROFILE=polars-enabled` runs one, which is
+  what a focused iteration should use.
+- Any other value fails the Make parse with an error naming the accepted set.
+
+Because `make lint` and `make test` already iterate the profile list, running
+them is the profile-isolation check; there is no separate profile target.
+Whitaker and rustdoc stay profile-independent: they inspect Dylint drivers and
+repository crates rather than a feature selection, and rustdoc runs once.
+
+## Workspace layout and module ownership
+
+The workspace holds three crates, and dependency edges point one way. The facade
+`combobulate` depends on both `combobulate-kernel` and `combobulate-macros`;
+neither of those depends on anything, and the macro crate never reaches the
+kernel. `tests/workspace_boundaries.rs` asserts that shape against live
+`cargo metadata` and `cargo tree` output, so a new edge fails a test rather
+than being noticed at review.
+
+| Path                                            | Role                                                   | Re-use boundary                                               |
+| ----------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
+| `crates/combobulate-kernel/`                    | `#![no_std]` without `alloc`; owns `TargetFacts`       | Target facts only; see the first policy below                 |
+| `crates/combobulate-macros/`                    | `proc-macro` crate; exports nothing until task 2.3.1   | Expansion boundary only; must not build `TargetFacts`         |
+| `src/lib.rs`                                    | Facade crate root                                      | Re-exports behind features; owns nothing below the facade     |
+| `src/profile.rs`                                | `BuildProfile`                                         | Reports features and target facts only                        |
+| `src/polars_backend.rs`                         | Crate-private Polars module, `cfg(feature = "polars")` | Wiring target for the pinned release; claims no capability    |
+| `scripts/docs_validation/trust_audit/`          | Trusted-item scanner behind the evidence gate          | The gate and the design check only                            |
+| `scripts/docs_validation/kani_log/`             | Kani log parser behind the evidence gate               | The gate's I/O shell only; the decision function is pure      |
+| `scripts/docs_validation/toolchain_profiles.py` | Pin checker for `spec/toolchain-profiles.json`         | Derives pins; other checks read the record instead of the pin |
+| `scripts/docs_validation/candidate_deferral.py` | Guard against a tick outrunning a deferred candidate   | Reads the roadmap export and D07's dispositions only          |
+
+*Table 1: Workspace modules, roles, and re-use boundaries.*
+
+Five re-use policies follow from that table. They are stated here because each
+one has already been tempting to break in a different file, and a boundary that
+lives only in a review comment is not a boundary.
+
+- `TargetFacts` is kernel-owned, and it is the single source of target facts
+  for checked rules and for the certificate keys that later tasks derive from
+  them. The macro crate must not construct it: a procedural macro runs on the
+  host, so a `TargetFacts` built there would describe the wrong machine. The
+  facade exposes only derived values, through `BuildProfile`'s
+  `target_usize_bits`.
+- `BuildProfile` reports compiled features and target facts only. It is not a
+  capability report. Task 1.2.6 owns the Polars capability statuses and must
+  not infer them from `BuildProfile`; a build that links Polars says only that,
+  never that an operation is supported.
+- `trust_audit` serves the evidence gate's I/O shell and the `trust-audit`
+  design check only. It reads the item shapes those two consumers need and is
+  not a general Rust parser: adding a caller means deciding whether it needs
+  the scanner or something else.
+- `kani_log` serves the evidence gate's I/O shell only. Its decision function
+  is pure — it takes the parsed facts and the manifest and returns the
+  admission facts — so it must not read files, and a rule that needs another
+  input belongs in the shell that assembles the facts.
+- `toolchain_profiles` validates pins. Other checks read pins from
+  `spec/toolchain-profiles.json` rather than duplicating them, so a pin bump
+  edits one record and the sites it names, not every consumer.
+
 ## Spelling policy
 
 Markdown uses en-GB-oxendict spelling enforced by the shared
@@ -674,7 +749,7 @@ column says when each is meant to shrink or go.
 | `scripts/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
 | `scripts/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
 
-*Table 1: Governance modules, ownership, and retirement.*
+*Table 2: Governance modules, ownership, and retirement.*
 
 Bet/task traceability is an internal documentation-pack validation rule.
 `check_bets_and_tasks` calls `check_bet_links` in
@@ -863,12 +938,16 @@ and verified adapter results. The evidence-record and CLI adapters validate
 each record against the schema and assemble this context. A parser adapter may
 provide `VerifiedLogResult` only after reading the cited log, validating its
 digest, and deriving the admission-relevant facts. Tool registration alone is
-insufficient. The CLI currently has no verifier parser adapter, so verifier
-records remain self-reported there. `abstract_record(record, context)` maps a
-schema-valid record to the ten-field model; `admit` applies the pure MS-0 to
-MS-2 rules and returns an admission level with reason codes. Neither function
-reads files, the clock, the environment, or the network. Add producers at the
-adapter boundary and pass explicit inputs into the gate.
+insufficient. The CLI has one verifier adapter, `evidence_binding`: it reads a
+Kani record's committed log, its harness manifest, and that manifest's sources,
+binds them, and passes a `VerifiedLogResult` and `VerifiedTrustAudit` into the
+gate. A record whose log, manifest, or audit it cannot bind falls back to
+`self-reported` and is rejected; Verus has no adapter yet and is always
+self-reported. `abstract_record(record, context)` maps a schema-valid record to
+the ten-field model; `admit` applies the pure MS-0 to MS-2 rules and returns an
+admission level with reason codes. Neither function reads files, the clock, the
+environment, or the network. Add producers at the adapter boundary and pass
+explicit inputs into the gate.
 
 The `scripts/check_docs.py` composition root resolves the checked-out source
 revision through the Git adapter and places it in
@@ -1051,6 +1130,21 @@ Task 1.2.1's probes are tool observations, not proofs of Combobulate. Run
 commit gates do not install or execute a verifier. `make kani` and
 `make kani-full` visibly report `FORMAL-SKIP` until task 1.2.4;
 `FORMAL_STRICT=1` rejects those placeholders.
+
+`make install-verus` unpacks the pinned release into `.verus/<version>/` in the
+worktree it runs in, and it does so per worktree rather than once per host. The
+pins are `Kani 0.67.0` in `tools/kani/VERSION` and `Verus 0.2026.09.06.8dea4a2`
+on Rust 1.98.0 with Z3 4.16.0 in `tools/verus/VERSION` and `SHA256SUMS`;
+`tools/rust-prover-tools/REF` pins the helper that installs and runs both, and
+`spec/toolchain-profiles.json` binds each of those to the sites that assert it.
+That is a real cost: measured on 2026-11-07, `.verus/` held 1,530,050,105 bytes
+(1.5 GB allocated), of which `verus/deps/` was 1,209,809,341 bytes and
+`verus/build/` 121,147,739. The upstream `x86-linux` archive is 456,338,154
+bytes, and the rest is the unpacked tree; the count includes no build products
+of this repository. Four worktrees therefore cost about 6 GB before any Cargo
+output, which is worth knowing before installing the verifier in each one.
+`.verus/` is Git-ignored and listed in the Markdown lint ignores, so a local
+installation cannot enter a commit, a Markdown scan, or a spelling scan.
 
 The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
 private `kani_probe` module owns the Kani route builders and their capture

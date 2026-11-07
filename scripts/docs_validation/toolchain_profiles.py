@@ -157,6 +157,7 @@ def _read_toolchain_channel(root: Path) -> str:
 def _read_single_line(relative: str):
     """Build a reader for a pin file whose whole content is the value."""
     def read(root: Path) -> str:
+        """Return the pin file's content with its trailing newline removed."""
         return (root / relative).read_text(encoding='utf-8').strip()
     return read
 

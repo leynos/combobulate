@@ -1,0 +1,17 @@
+# nested-cargo-allow: manifest a consumer fixture: `tests/native_consumer_e2e.rs` builds
+# it from the root suite, and it must stay its own workspace so the fixture's
+# dependency graph is the consumer's, not the repository's.
+[package]
+name = "native-consumer"
+version = "0.1.0"
+edition = "2024"
+license = "ISC"
+publish = false
+
+[workspace]
+
+# The fixture exists to prove the native-only profile is usable by an ordinary
+# downstream crate: it takes the facade by path with default features off, so
+# its closure can never contain Polars, glam, Kani, or Verus.
+[dependencies]
+combobulate = { path = "../../..", version = "0.1.0", default-features = false }

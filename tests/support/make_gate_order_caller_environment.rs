@@ -2,11 +2,18 @@
 
 use super::records::{EnvironmentValue, Invocation};
 
+/// Stages that exercise the caller's routing values: rustdoc, then one Clippy
+/// run per gate profile.
+///
+/// Under DL-18 the two Clippy runs are separate stages, so naming only
+/// `"clippy"` would silently match nothing and leave this contract vacuous.
+const ROUTE_STAGES: [&str; 3] = ["doc", "clippy-native-only", "clippy-polars-enabled"];
+
 /// Checks coverage-only caller values reached Clippy before Whitaker isolation.
 pub(super) fn assert_coverage_contamination(invocations: &[Invocation]) {
     for invocation in invocations
         .iter()
-        .filter(|invocation| matches!(invocation.stage.as_str(), "doc" | "clippy"))
+        .filter(|invocation| ROUTE_STAGES.contains(&invocation.stage.as_str()))
     {
         assert_env_value(
             invocation,
@@ -59,7 +66,7 @@ pub(super) fn assert_target_rustflags_isolated(invocations: &[Invocation]) {
 
 /// Confirms an empty inherited flag value stays distinct from an unset route.
 pub(super) fn assert_clean_caller(invocations: &[Invocation]) {
-    for stage in ["doc", "clippy"] {
+    for stage in ROUTE_STAGES {
         let matching = invocations
             .iter()
             .filter(|invocation| invocation.stage == stage)

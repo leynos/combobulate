@@ -97,8 +97,27 @@ PACKAGE_FLAGS ?= -p combobulate \
 	--config "patch.crates-io.combobulate-macros.path='$(CURDIR)/crates/combobulate-macros'"
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
-CARGO_FLAGS ?= --all-targets --all-features
-CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
+# DL-18: ordinary gates select a named feature profile rather than
+# `--all-features`. `--all-features` would let a future verifier feature enter
+# every route, and it never lints the `cfg(not(feature = "polars"))` code the
+# native-only route exists to cover. Both profiles run locally by default;
+# `GATE_PROFILE=native-only` or `polars-enabled` selects one.
+#
+# Each profile is a separate Cargo invocation. Sharing one would let feature
+# unification mask a profile: Polars pulls in dependencies that would then
+# satisfy the native-only route's graph too, so the native-only route would
+# stop proving that the facade builds without them.
+GATE_PROFILE ?= both
+GATE_PROFILES = $(strip $(if $(filter both,$(GATE_PROFILE)),native-only polars-enabled,\
+	$(filter native-only polars-enabled,$(GATE_PROFILE))))
+ifeq ($(GATE_PROFILES),)
+$(error GATE_PROFILE must be one of native-only, polars-enabled, or both; got '$(GATE_PROFILE)')
+endif
+# The per-profile flags are the only difference between the two routes, so they
+# are named once and reused by every gate below.
+PROFILE_FLAGS_native-only := --no-default-features
+PROFILE_FLAGS_polars-enabled :=
+CARGO_FLAGS ?= --all-targets
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
 # The cardinality compile-fail gate is its own workspace: `tools/` is excluded
@@ -148,8 +167,16 @@ clean: ## Remove build artefacts
 BUILD_STANDARD_ENV = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)"
 
 test: prepare-ui-gate ## Run tests with warnings treated as errors
-	$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== test profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+		esac; \
+		$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $$flags $(BUILD_JOBS); \
+		$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" \
+			$(CARGO) test --doc --workspace $$flags; \
+	done
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
 
 # Every Rust command a development route runs must compose the caller's
@@ -280,6 +307,37 @@ lint: prepare-dependencies prepare-ui-gate ## Run rustdoc, Clippy, Whitaker, and
 	+$(MAKE) lint-whitaker
 	+$(MAKE) lint-python
 
+# DL-18: each gate profile is its own Cargo invocation. Sharing one invocation
+# would let feature unification mask a profile: a dependency enabled by the
+# Polars route would silently satisfy the native-only route's graph too.
+#
+# The profiles run in one shell loop rather than through recursive `$(MAKE)`.
+# Make expands `TEST_CMD`'s `$(shell cargo nextest --version)` once per process,
+# so a recursive route would probe Nextest again for every profile, and that
+# probe is a Cargo call the route contracts count. The loop also keeps one
+# `lint` or `test` run to a single shell, so a caller's exported flags reach
+# every profile unchanged.
+#
+# `lint-whitaker` below stays profile-independent: Whitaker inspects Dylint
+# drivers and repository crates, not feature selections. Rustdoc runs once for
+# the same reason; `lint-clippy` first builds it, then lints every gate profile.
+#
+# `--all-features` could never reach the native-only profile's
+# `cfg(not(feature = "polars"))` code, and a plain default-feature run repeats
+# only what the Polars-enabled profile checks, so each profile is its own
+# invocation.
+lint-clippy: check-build-tools ## Run rustdoc, then Clippy for every gate profile
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== lint profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+		esac; \
+		RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+			$(CARGO) clippy $(CARGO_FLAGS) $$flags -- $(RUST_FLAGS); \
+	done
+
 # Discover Python sources from Git so hidden workflow/action paths and new
 # repository areas are included without maintaining a second source manifest.
 PYTHON_TARGETS_FROM_GIT := $(if $(filter undefined,$(origin PYTHON_TARGETS)),1,0)
@@ -304,9 +362,6 @@ lint-python: ## Require complete Interrogate coverage for all Python sources
 docstring-coverage: check-python-sources ## Check docstrings in tracked and untracked Python files
 	$(UV) tool run --python 3.14 --from interrogate==$(INTERROGATE_VERSION) interrogate --fail-under 100 $(PYTHON_TARGETS)
 
-lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 
 WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
 	-u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \

@@ -190,8 +190,8 @@ fn whitaker_clears_driver_overrides_and_checks_with_repository_defaults() {
          {whitaker}"
     );
     assert!(
-        whitaker.ends_with("--all -- --all-targets --all-features"),
-        "the repository check must retain all targets and features: {whitaker}"
+        whitaker.ends_with("--all -- --all-targets"),
+        "the repository check must retain all targets: {whitaker}"
     );
 }
 

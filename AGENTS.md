@@ -192,7 +192,9 @@ project:
     ```makefile
     RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" \
       RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
-    RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+    # One run per profile in $(GATE_PROFILES), with that profile's flags.
+    RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+      $(CARGO) clippy $(CARGO_FLAGS) $(PROFILE_FLAGS) -- $(RUST_FLAGS)
     env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
       -u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
       -u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
@@ -207,11 +209,14 @@ project:
       $(WHITAKER) --all -- $(CARGO_FLAGS)
     ```
 
-    building documentation before linting every target with all features
-    enabled. Whitaker also clears inherited `RUSTFLAGS` before its preflight.
-    Documentation warnings, Clippy warnings, and Whitaker findings fail the
-    command. `make all` runs formatting, linting, testing, and spelling in
-    order even under `make -j all`.
+    building documentation once, then linting every target in each selected
+    feature profile. `GATE_PROFILE` selects `native-only`, `polars-enabled`, or
+    `both` (the default). A profile is its own Cargo invocation, because
+    sharing one lets feature unification mask a profile. Whitaker also clears
+    inherited `RUSTFLAGS` before its preflight. Documentation warnings, Clippy
+    warnings, and Whitaker findings fail the command. `make all` runs
+    formatting, linting, testing, and spelling in order even under
+    `make -j all`.
   - `make test` checks build prerequisites, uses `cargo-nextest` when available,
     and falls back to `cargo test`. Both Cargo commands retain caller
     `RUSTFLAGS` alongside the development flags; doctests also deny Rustdoc
@@ -220,10 +225,11 @@ project:
     ```makefile
     TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
     test: check-build-tools
+        # One run per profile in $(GATE_PROFILES), with that profile's flags.
         RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
-          $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
+          $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(PROFILE_FLAGS) $(BUILD_JOBS)
         RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
-          RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+          RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace $(PROFILE_FLAGS)
         if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
     ```
 

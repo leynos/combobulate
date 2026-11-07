@@ -1,9 +1,11 @@
 # User guide
 
 Combobulate's array algebra is not yet implemented. The `combobulate` facade
-crate exports no public item yet, and the unpublished `combobulate-kernel`
-crate exposes only `TargetFacts`. Nothing in the workspace carries a stability
-promise. Do not use the proposed design examples as working Rust examples.
+crate exports one public item, [`BuildProfile`](#build-profile), which reports
+the features and target facts compiled into the binary you are holding. The
+unpublished `combobulate-kernel` crate exposes only `TargetFacts`. Nothing in
+the workspace carries a stability promise. Do not use the proposed design
+examples as working Rust examples.
 
 Read the [language reference](language-reference.md) for the intended `comb!`
 pipeline notation, verbs, modifiers, and conjunctions. The
@@ -46,6 +48,38 @@ evidence remains `bounded`, never `proof`. The initial release covers the Core
 scope class of the [language reference](language-reference.md)
 ([ADR-0003](adrs/adr-0003-initial-release-scope.md)).
 
+## Build profile
+
+`BuildProfile` reports which features and target facts are compiled into the
+binary, so an embedder can tell what backends it actually contains without
+reading Cargo's build plan.
+
+```rust
+use combobulate::BuildProfile;
+
+let profile = BuildProfile::current();
+println!("{profile}");
+```
+
+The rendered line names the compiled backends and the target's pointer width,
+for example `features: native, macros, polars; target usize: 64 bits`. Every
+accessor is `const`, so the profile can be folded into constant context.
+
+`BuildProfile` states compiled features and target facts only. It is **not** a
+capability report: nothing may infer that an operation is supported from it.
+Task 1.2.6 owns the Polars capability statuses.
+
+### Cargo features
+
+| Feature  | Default | Meaning                                                                         |
+| -------- | ------- | ------------------------------------------------------------------------------- |
+| `macros` | on      | Builds `combobulate-macros`. Reserved until task 2.3.1; exports nothing yet.    |
+| `polars` | on      | Builds the crate-private Polars backend, which proves the pinned release links. |
+
+Build with `default-features = false` to get a native-only build with no Polars
+dependency and no macro crate. That route is what a consumer that must avoid
+Polars entirely should select.
+
 ## Check proof-evidence records
 
 Run
@@ -58,7 +92,10 @@ when every record meets the requirement, `1` when a record is admitted below
 it, and `2` for unreadable input, a schema failure, or a usage error. A
 verifier's verdict remains self-reported until a registered adapter validates
 the cited log digest and supplies a matching result; registration by itself
-cannot satisfy `proof` or `bounded`.
+cannot satisfy `proof` or `bounded`. Kani is registered and has an adapter, so
+a Kani record that cites a committed log, its harness manifest, and that
+manifest's sources is decided from those artefacts. Verus has no adapter yet,
+so its records remain self-reported.
 
 The command reads the repository policy files by default. To check records
 against alternate or temporary inputs, pass all relevant paths explicitly:

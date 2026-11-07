@@ -13,9 +13,11 @@ for a schema-invalid record or a usage error. Exceptions come from
 `spec/exceptions.json` and current bindings from
 `spec/evidence-bindings.json`. Verifier records stay self-reported until a
 registered parser adapter supplies a digest-bound result to the gate; tool
-registration alone cannot admit them (ADR-0009). No parser adapter is
-integrated into this command yet, so verifier records cannot reach `proof` or
-`bounded` through the CLI.
+registration alone cannot admit them (ADR-0009). The Kani adapter is
+integrated: a record citing a committed log, its harness manifest, and that
+manifest's sources is re-derived by `docs_validation.evidence_binding`, so it
+can reach `bounded`. A record whose log, manifest, or audit the adapter cannot
+bind falls back to `self-reported` and is rejected.
 """
 from __future__ import annotations
 
@@ -115,6 +117,20 @@ def load_bindings(path: Path) -> dict:
     return bindings
 
 
+def readable_record(path: Path) -> dict | None:
+    """Read one input for the binding pass, or None when it cannot be parsed.
+
+    The binding pass runs before any record is reported, so a record it cannot
+    read must not abort the run: :func:`evaluate_record` reports that failure
+    with the CLI's documented exit code afterwards.
+    """
+    try:
+        record = load_json(path)
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
 def report_line(path: Path, level: str, reasons: tuple[str, ...]) -> str:
     """Format one result; e.g. 'spec/x.json: rejected [not-run]'.
 
@@ -186,7 +202,7 @@ def evaluate_record(path: Path, configuration: EvidenceCliConfiguration) -> tupl
         The insufficient-level status and whether the record was unreadable or
         schema-invalid. Expected input failures are reported on standard error.
     """
-    from docs_validation.evidence_gate import LEVEL_RANK, Level, abstract_record, admit
+    from docs_validation.evidence_gate import LEVEL_RANK, Level, admit_evidence
 
     try:
         record = load_json(path)
@@ -197,8 +213,7 @@ def evaluate_record(path: Path, configuration: EvidenceCliConfiguration) -> tupl
     if errors:
         print(f'{path}: schema-invalid: {errors[0].message}', file=sys.stderr)
         return 0, True
-    abstract = abstract_record(record, configuration.admission_context)
-    admission = admit(abstract)
+    admission = admit_evidence(record, configuration.admission_context)
     print(report_line(path, admission.level.value, admission.reasons))
     required = Level(configuration.required_level)
     return int(LEVEL_RANK[admission.level] < LEVEL_RANK[required]), False
@@ -227,6 +242,7 @@ def main(
         Zero when all records reach the required level, one when any falls
         short, or two for invalid records, configuration, or usage.
     """
+    from docs_validation.evidence_binding import checked_inputs
     from docs_validation.evidence_gate import AdmissionContext, Level
 
     try:
@@ -243,10 +259,14 @@ def main(
                                          format_checker=Draft202012Validator.FORMAT_CHECKER)
         register = exception_register(options.exceptions, options.decisions, options.roadmap)
         current = load_bindings(options.bindings)
+        parsers = frozenset(load_json(ROOT / 'spec/evidence-reason-codes.json')['registered_log_parsers'])
+        reviewed = [record for record in (readable_record(path) for path in records) if record is not None]
+        verified_logs, trust_audits = checked_inputs(ROOT, reviewed, parsers)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
         return 2
-    admission_context = AdmissionContext(register, current, date)
+    admission_context = AdmissionContext(register, current, date, parsers,
+                                         verified_logs, trust_audits)
     configuration = EvidenceCliConfiguration(validator, admission_context, wanted.value)
 
     status, invalid = 0, False

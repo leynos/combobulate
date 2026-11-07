@@ -65,10 +65,16 @@ def test_complete_test_record_is_admitted_at_tested(capsys):
 
 @pytest.mark.parametrize('required', ['bounded', 'proof'])
 def test_partial_bounds_stay_self_reported_without_a_parser_adapter(required, capsys):
-    """Keep verifier claims below bounded until an adapter verifies their cited log."""
+    """Keep verifier claims below bounded until an adapter verifies their cited log.
+
+    Two reasons, in the gate's rule order. The record claims an audit but binds
+    no manifest for a scanner to have audited, so DL-16 demotes the claim to
+    ``unaudited``; the trust rule is checked before the verdict-source rule and
+    is reported first.
+    """
     assert run('--as-of', '2026-10-10', '--require', required, *WITH_BINDINGS,
                fixture('partial-bounds-kani')) == 1, 'tool registration alone cannot satisfy a proof level'
-    assert ': rejected [verdict-self-reported]' in capsys.readouterr().out
+    assert ': rejected [trust-unaudited, verdict-self-reported]' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(('name', 'reason'), [('resource-exhausted-kani', 'outcome-resource-exhausted'),

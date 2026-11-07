@@ -104,12 +104,14 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
             "prepare-ui-gate",
             "preflight",
             "doc",
-            "clippy",
+            "clippy-native-only",
+            "clippy-polars-enabled",
             "preflight",
             "whitaker",
             "interrogate"
         ],
-        "nothing may run after a failing Interrogate gate"
+        "nothing may run after a failing Interrogate gate; both Clippy profiles must precede \
+         Whitaker"
     );
 }
 
@@ -121,11 +123,14 @@ fn parallel_all_stops_after_the_first_failing_gate() {
         "gate-formatting",
         "markdown-formatting",
         "preflight",
-        "clippy",
+        "clippy-native-only",
+        "clippy-polars-enabled",
         "whitaker",
         "interrogate",
-        "nextest",
-        "doctest",
+        "nextest-native-only",
+        "doctest-native-only",
+        "nextest-polars-enabled",
+        "doctest-polars-enabled",
         "spelling",
     ] {
         let expected = expected_stages_through(failure);
@@ -242,13 +247,15 @@ fn assert_contaminated_lint_run(
             "prepare-ui-gate",
             "preflight",
             "doc",
-            "clippy",
+            "clippy-native-only",
+            "clippy-polars-enabled",
             "preflight",
             "whitaker",
             "interrogate"
         ]
         .map(str::to_owned),
-        "make -j lint must finish Whitaker before Interrogate"
+        "make -j lint must finish both Clippy profiles before Whitaker, and Whitaker before \
+         Interrogate"
     );
     assert_coverage_contamination(run.invocations);
     whitaker::assert_repository_route(
@@ -288,7 +295,7 @@ fn assert_clean_lint_run(
 fn parallel_lint_never_starts_whitaker_after_clippy_failure() {
     let probe = GateProbe::new().expect("create private gate probes");
     let output = probe
-        .run("lint", Some("clippy"))
+        .run("lint", Some("clippy-native-only"))
         .expect("execute failing Make lint");
     assert!(
         !output.status.success(),
@@ -303,9 +310,9 @@ fn parallel_lint_never_starts_whitaker_after_clippy_failure() {
             "prepare-ui-gate",
             "preflight",
             "doc",
-            "clippy"
+            "clippy-native-only"
         ],
-        "Whitaker must not start after Clippy fails"
+        "a failing native-only Clippy must stop the loop before the Polars-enabled profile"
     );
     assert!(
         probe.whitaker_records().is_err(),

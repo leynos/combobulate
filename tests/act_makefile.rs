@@ -38,6 +38,23 @@ const RUNNER_IMAGE: &str = "controlled/ubuntu:act-test";
 /// here rather than silently loosen the count.
 const PREPARATION_INVOCATIONS: usize = 5;
 
+/// The executor sequence a successful `make test` records without Act.
+///
+/// The probe and the four preparation commands, then one Nextest run and one
+/// doctest run for each gate profile. Under DL-18 the two profiles are separate
+/// Cargo invocations, so the test phase is four commands rather than two.
+const OUTER_EXECUTORS: &[&str] = &[
+    "cargo",
+    "check-build-tools",
+    "cargo",
+    "cargo",
+    "python",
+    "cargo",
+    "cargo",
+    "cargo",
+    "cargo",
+];
+
 /// Runs the normal outer tests without invoking Act when disabled.
 #[test]
 fn with_act_disabled_runs_only_outer_cargo_commands() {
@@ -54,17 +71,9 @@ fn with_act_disabled_runs_only_outer_cargo_commands() {
             .iter()
             .map(|invocation| invocation.executable.as_str())
             .collect::<Vec<_>>(),
-        vec![
-            "cargo",
-            "check-build-tools",
-            "cargo",
-            "cargo",
-            "python",
-            "cargo",
-            "cargo"
-        ],
-        "WITH_ACT=0 must probe, prepare dependencies, preflight, build the gate, run tests, and \
-         run doctests"
+        OUTER_EXECUTORS,
+        "WITH_ACT=0 must probe, prepare dependencies, preflight, build the gate, then run one \
+         unit and one documentation suite per gate profile"
     );
     assert_cargo_probe(invocation_at(
         &invocations,
@@ -110,8 +119,9 @@ fn with_act_enabled_runs_outer_tests_then_configured_act() {
     assert!(output.status.success(), "make test WITH_ACT=1 must succeed");
     assert_eq!(
         invocations.len(),
-        9,
-        "recursive Make must replay preparation, the gate build, and the probe before invoking Act"
+        11,
+        "recursive Make must replay preparation, the gate build, both profile routes, and the \
+         probe before invoking Act"
     );
     assert_preparation_invocations(
         invocations
@@ -124,18 +134,18 @@ fn with_act_enabled_runs_outer_tests_then_configured_act() {
         "build preflight must be recorded",
     ));
     assert_outer_invocations_are_ordered(
-        invocations
-            .get(2..7)
-            .expect("preparation, the gate build, and both test commands must be recorded"),
+        invocations.get(2..9).expect(
+            "preparation, the gate build, and both profiles' test commands must be recorded",
+        ),
     );
     assert_invocations_use_repository_directory(&invocations);
     assert_cargo_probe(invocation_at(
         &invocations,
-        7,
+        9,
         "recursive Make must repeat the Cargo probe",
     ));
     assert_act_invocation_matches(
-        invocation_at(&invocations, 8, "Act invocation must be recorded"),
+        invocation_at(&invocations, 10, "Act invocation must be recorded"),
         &expected_common_directory,
     );
     assertions::assert_forwarded_environment(&invocations);
@@ -198,15 +208,7 @@ fn explicit_workflow_test_setting_prevents_nested_act_recursion() {
             .iter()
             .map(|invocation| invocation.executable.as_str())
             .collect::<Vec<_>>(),
-        vec![
-            "cargo",
-            "check-build-tools",
-            "cargo",
-            "cargo",
-            "python",
-            "cargo",
-            "cargo"
-        ],
+        OUTER_EXECUTORS,
         "workflow test execution must not start Act recursively"
     );
     assert_outer_invocations_are_ordered(
@@ -223,15 +225,17 @@ fn explicit_workflow_test_setting_prevents_nested_act_recursion() {
     );
 }
 
-/// Proves failures in either outer Cargo phase prevent Act from running.
+/// Proves a failure in any outer Cargo phase prevents Act from running.
 ///
-/// The harness numbers only test-bearing Cargo calls, so 1 is Nextest and 2 is
-/// the doctests. Both sit after the whole preparation phase now, so the
-/// recorded count is the preparation prefix plus the failure whichever one it
-/// is; the assertion that earns its keep is that no `act` was ever started.
+/// The harness numbers only test-bearing Cargo calls, so 1 and 2 are the
+/// native-only profile's Nextest and doctest commands and 3 and 4 are the
+/// Polars-enabled profile's. All four sit after the whole preparation phase, so
+/// the recorded count is the preparation prefix plus the failure whichever one
+/// it is; the assertion that earns its keep is that no `act` was ever started,
+/// which also proves the loop stops at the first failing profile.
 #[test]
 fn failed_outer_cargo_commands_prevent_act() {
-    for failed_invocation in [1, 2] {
+    for failed_invocation in [1, 2, 3, 4] {
         let harness = unwrap_test_result(MakeHarness::new(), "create the Make harness");
         let output = unwrap_test_result(
             harness.run_make_test(MakeOptions {

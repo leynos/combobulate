@@ -197,16 +197,16 @@ class RegisterInvariants(unittest.TestCase):
         """Reject a proposed replacement that claims to supersede an accepted record."""
         register = accepted_register()
         older = record(register, 'D03')
-        older.update(lifecycle='superseded', superseded_by='D16')
+        older.update(lifecycle='superseded', superseded_by='D17')
         replacement = copy.deepcopy(older)
         replacement.update({
-            'id': 'D16', 'subject': 'Revised initial release scope',
+            'id': 'D17', 'subject': 'Revised initial release scope',
             'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None,
             'accepted_on': None, 'approval_reference': None, 'adr': None,
             'supersedes': ['D03'], 'superseded_by': None,
         })
         register['decisions'].append(replacement)
-        self.assert_rejected(register, 'D16 must be accepted before superseding D03')
+        self.assert_rejected(register, 'D17 must be accepted before superseding D03')
 
     def test_candidate_must_cite_a_known_decision(self):
         """Reject candidate ADR metadata that points to an absent decision."""

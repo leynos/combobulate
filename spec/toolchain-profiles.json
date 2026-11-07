@@ -78,19 +78,21 @@
     "kani_release": {
       "value": "0.67.0",
       "sites": [
-        "tools/kani/VERSION",
+        "scripts/docs_validation/kani_log/syntax.py",
+        "scripts/tests/fixtures/evidence/bounded-kani.json",
+        "scripts/tests/fixtures/kani_logs/provenance.json",
+        "scripts/tests/test_preregistration.py",
+        "scripts/tests/test_preregistration_measurements.py",
+        "scripts/tests/test_toolchain_profiles.py",
+        "scripts/tests/test_validation_report.py",
+        "scripts/verifier_probe_support.py",
         "spec/acceptance-controls.json",
         "spec/calibration/builds.json",
         "spec/calibration/shared-workloads-local.json",
         "spec/calibration/verifier-probe.json",
-        "scripts/tests/fixtures/kani_logs/provenance.json",
-        "tools/verifier-fixtures/kani-corpus/kani-list.json",
-        "scripts/verifier_probe_support.py",
-        "scripts/tests/test_preregistration.py",
-        "scripts/tests/test_preregistration_measurements.py",
-        "scripts/tests/test_validation_report.py",
         "tests/support/prover_tools_probe.rs",
-        "scripts/tests/test_toolchain_profiles.py"
+        "tools/kani/VERSION",
+        "tools/verifier-fixtures/kani-corpus/kani-list.json"
       ]
     },
     "kani_toolchain": {

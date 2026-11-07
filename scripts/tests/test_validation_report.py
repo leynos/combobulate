@@ -338,7 +338,13 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(self.run_main([]), 0, 'supported completed tasks must pass the full checker')
         report = json.loads(self.report.read_text())
         closure = next(row for row in report['checks'] if row['check'] == 'roadmap-status')
-        self.assertEqual(closure['count'], 4, 'all four completed acceptance-control tasks must be validated')
+        # Derive the expected count from the fixture's own export rather than
+        # naming a number, so closing a further roadmap task does not churn
+        # this assertion while a skipped task still fails it.
+        ticked = sum(1 for phase in json.loads((self.root / 'spec/roadmap.json').read_text())['phases']
+                     for step in phase['steps'] for task in step['tasks'] if task['status'] == 'done')
+        self.assertGreater(ticked, 0, 'the fixture needs at least one completed task to exercise closure')
+        self.assertEqual(closure['count'], ticked, 'every completed task must be validated')
         self.assertEqual(closure['status'], 'pass', 'completion requires a passing evidence check')
 
     def test_completed_task_without_its_completion_record_fails_the_full_checker(self):

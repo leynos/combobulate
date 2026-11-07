@@ -21,6 +21,12 @@ use super::{probe::GateProbe, records::Invocation};
 /// `gate-formatting` follows `fmt` for the same reason: the gate is a separate
 /// workspace, so the root `cargo fmt --all` cannot reach it and `check-fmt`
 /// must run a second `cargo fmt --manifest-path` over it.
+///
+/// Under DL-18 every Clippy, Nextest, and doctest stage is per profile. Both
+/// profiles run by default and each is its own Cargo invocation, so the stages
+/// are named for the profile they exercise rather than repeated under one name:
+/// a repeated stage would let an argument assertion compare one profile's
+/// command against the other's record.
 pub(super) const ALL_STAGES: &[&str] = &[
     "fmt",
     "gate-formatting",
@@ -31,7 +37,8 @@ pub(super) const ALL_STAGES: &[&str] = &[
     "prepare-ui-gate",
     "preflight",
     "doc",
-    "clippy",
+    "clippy-native-only",
+    "clippy-polars-enabled",
     "preflight",
     "whitaker",
     "interrogate",
@@ -39,8 +46,10 @@ pub(super) const ALL_STAGES: &[&str] = &[
     "prepare-dependencies",
     "prepare-ui-gate-dependencies",
     "prepare-ui-gate",
-    "nextest",
-    "doctest",
+    "nextest-native-only",
+    "doctest-native-only",
+    "nextest-polars-enabled",
+    "doctest-polars-enabled",
     "spelling",
 ];
 
@@ -48,7 +57,7 @@ pub(super) const ALL_STAGES: &[&str] = &[
 ///
 /// Kept out of the assertion function so the table stays readable: the
 /// expectations are data, and the function that walks them is three lines.
-const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 14] = [
+const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 17] = [
     (
         "prepare-dependencies",
         "probe-cargo",
@@ -94,21 +103,26 @@ const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 14] = [
     ("preflight", "probe-check", &[]),
     ("doc", "probe-cargo", &["doc", "--no-deps"]),
     (
-        "clippy",
+        "clippy-native-only",
         "probe-cargo",
         &[
             "clippy",
             "--all-targets",
-            "--all-features",
+            "--no-default-features",
             "--",
             "-D",
             "warnings",
         ],
     ),
     (
+        "clippy-polars-enabled",
+        "probe-cargo",
+        &["clippy", "--all-targets", "--", "-D", "warnings"],
+    ),
+    (
         "whitaker",
         "probe-whitaker",
-        &["--all", "--", "--all-targets", "--all-features"],
+        &["--all", "--", "--all-targets"],
     ),
     (
         "prepare-ui-gate",
@@ -121,14 +135,24 @@ const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 14] = [
         &["nextest", "--version"],
     ),
     (
-        "nextest",
+        "nextest-native-only",
         "probe-cargo",
-        &["nextest", "run", "--all-targets", "--all-features"],
+        &["nextest", "run", "--all-targets", "--no-default-features"],
     ),
     (
-        "doctest",
+        "doctest-native-only",
         "probe-cargo",
-        &["test", "--doc", "--workspace", "--all-features"],
+        &["test", "--doc", "--workspace", "--no-default-features"],
+    ),
+    (
+        "nextest-polars-enabled",
+        "probe-cargo",
+        &["nextest", "run", "--all-targets"],
+    ),
+    (
+        "doctest-polars-enabled",
+        "probe-cargo",
+        &["test", "--doc", "--workspace"],
     ),
     ("spelling", "probe-spelling", &["gate"]),
 ];

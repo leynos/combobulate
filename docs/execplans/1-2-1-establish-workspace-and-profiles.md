@@ -548,8 +548,77 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     expected failure, and by adding a gate-only fixture and observing the
     bidirectional comparison reject it.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
+  - [x] (2026-11-07) Delivery-vehicle amendment (DL-20). PR #22 delivered
+    EP-M1 and EP-M2 against `main` and its head branch was deleted at merge,
+    which left EP-M3 to EP-M6 without a vehicle and contradicted DL-20's
+    one-stacked-PR-per-milestone shape. DL-20 now requires one pull request
+    for the whole plan, so the assessment scope, readiness gate, and delivered
+    branch are the same object. Branch `1-2-1-profiles-and-trust-audit`.
+  - [x] (2026-11-07) Postmortem of the premature readiness (PR #22). The PR
+    left draft at 2026-11-03T12:27:35Z on a completeness reply that cleared
+    only "EP-M1 and EP-M2, not … roadmap task 1.2.1", which
+    `pr-babysitting`'s clearing rule names as not cleared. Every assessment
+    request listed the four unimplemented milestones under `Known
+    limitations:`, so CodeRabbit answered the scope question the request
+    asked and the completeness question never arose.
+  - [x] (2026-11-07) The three readiness-contract gaps are filed upstream as
+    `leynos/agent-helper-scripts#271`, cross-referenced to the
+    `pr-babysitting` text each one sits beside, so the fix is a
+    cross-reference rather than a second copy of the rule.
+  - Status (2026-11-07): `BuildProfile`, both profile routes, snapshots, and
+    the native-consumer end-to-end test exist and `make typecheck` passed.
+    Gate profiles (DL-18) are present in the Makefile as `GATE_PROFILE` and
+    per-profile Cargo invocations. Neither is marked done: the milestone
+    closes only when its own gates and conformance check pass together.
+  - [ ] CI shape (DL-03, DL-14). **BLOCKED on the sponsor checkpoint.** `ci.yml`
+    still has a single `build-test` job, `coverage-main.yml` names no profile
+    features, the AC-07 amendment is absent from `spec/acceptance-controls.json`,
+    and `ci_controls.py`/`preregistration.py` still assume one required job.
+    That is the correct state, not an omission: `Constraints` and DL-03 make
+    `.github/workflows/ci.yml` a frozen AC-07 source that "must not change until
+    the AC-07 amendment is sponsor-approved, and the amendment and the change
+    land in one commit", and EP-M3's checkpoint requires the sponsor to approve
+    that amendment text *with measured job sizes* first. Those sizes come from a
+    hosted measurement on the new shape, so the dependency is circular until the
+    sponsor approves. Implementing the shape before that approval would breach a
+    pre-registered control. Status: `BLOCKED`; owner: sponsor (`leynos`).
+  - Note (2026-11-07): `make lint` and `make test` iterate `GATE_PROFILES`, so
+    running them is what verifies DL-18's two-profile isolation. There is no
+    separate profile gate to run.
 - [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
+  - Status (2026-11-07): `spec/toolchain-profiles.json`, its schema,
+    `scripts/docs_validation/toolchain_profiles.py`, ADR-0010 (Proposed), and
+    proposed D16 exist.
+  - [ ] Sponsor acceptance of D16 and ADR-0010, and the AC-04 amendment text.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
+  - [x] (2026-11-07) Mutation census over both packages. mutmut 3.6.0, run from
+    a private virtualenv at `/tmp/mut-venv` rather than through `uv tool run`
+    as the plan's dependency note states; the census trees are `/tmp/mut-work2`
+    (`kani_log/`) and `/tmp/mut-trust` (`trust_audit/`). Measured, and
+    re-read from each tree's own `mutmut results --all true`:
+
+    | package       | mutants | killed | survived | timeout |
+    | ------------- | ------- | ------ | -------- | ------- |
+    | `kani_log/`   | 1077    | 1038   | 35       | 4       |
+    | `trust_audit/`| 923     | 839    | 75       | 9       |
+
+  - [x] (2026-11-07) `kani_log/` triage complete: 21 survivors killed by
+    `scripts/tests/test_kani_parser_survivors.py` and
+    `scripts/tests/test_kani_binding_survivors.py`, and 15 recorded as
+    equivalents in those modules' docstrings. The four timeouts are the
+    stall family, which the same suites now bound with a five-second
+    `SIGALRM` (`BoundedParserCase`), so a mutant that drops a consuming call
+    fails its case instead of hanging the gate. Every claim was re-measured
+    by writing the mutant into the live source and running the suites:
+    `/tmp/verify-parser-1-2-1-profiles-and-trust-audit.out`,
+    `/tmp/verify-bind-1-2-1-profiles-and-trust-audit.out`, and
+    `/tmp/verify-bind4-1-2-1-profiles-and-trust-audit.out`.
+  - Status (2026-11-07): `scripts/docs_validation/trust_audit/`, `kani_log/`,
+    `verified_evidence.py`, the evidence-binding shell, and the `"kani"`
+    registry entry exist.
+  - [ ] `trust_audit/` triage: 39 of the 75 survivors remain open after the
+        four survivor modules were added to the census selection; each must be
+        killed or classified before the milestone closes.
 - [ ] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
 
 Each Red step records its log path and the names of the failing tests here. A
@@ -1601,9 +1670,19 @@ committed together with its Green change.
   adapter crate as a rejected option, to be revisited when task 1.2.6 or 4.2.1
   needs facade-owned traits in the adapter. Date/Author: 2026-10-22, planning
   agent.
-- DL-20. Decision: delivery uses one stacked PR per milestone (the
-  `github-stacks` skill), with a commit after each gated Green or Refactor
-  step. Date/Author: 2026-10-22, planning agent.
+- DL-20. Decision (amended 2026-11-07): delivery uses **one pull request for
+  the whole plan**, with a commit after each gated Green or Refactor step. The
+  original 2026-10-22 text specified one stacked PR per milestone through the
+  `github-stacks` skill. That shape was not executed: PR #22 carried EP-M1 and
+  EP-M2 together against `main`, and its head branch was deleted when it
+  merged, so EP-M3 to EP-M6 had no delivery vehicle and the plan's stated shape
+  contradicted its delivery. A single pull request makes the assessment scope,
+  the readiness gate, and the delivered branch the same object, so a readiness
+  decision cannot be read against one milestone while the plan requires six.
+  The milestone sequence is unchanged: each still ends with its own gates and
+  conformance check, and the pull request is not marked ready until CodeRabbit
+  has assessed it as a complete implementation of this plan. Date/Author:
+  2026-10-22, planning agent; amended 2026-11-07, implementation agent.
 - DL-21. Decision: prefer `rust-prover-tools` as installer and runner
   for Kani and Verus, following the `kani` and `verus` skills' project
   on-ramps. Pins live in `tools/kani/VERSION`, `tools/verus/VERSION`,
@@ -2097,7 +2176,8 @@ Every milestone ends with `make check-fmt`, `make lint`, `make test`,
 `make design-check`, `make markdownlint`, and `make spelling`, run sequentially
 by the `scrutineer` agent, plus the milestone's own commands. Every milestone
 records its Red evidence in `Progress`, ends with the conformance check in
-`Milestones and plateaus`, and is delivered as one stacked PR.
+`Milestones and plateaus`, and is delivered in one pull request covering the
+whole plan (DL-20, amended 2026-11-07).
 
 ### EP-M1. Prototype: toolchain, profile, and hosted-cost probes
 
@@ -2385,7 +2465,20 @@ Feature: Build profiles report what was compiled
 
 - Red: add a check rejecting a `deferred` candidate ADR subject whose roadmap
   item is ticked; with CA3 and CA5 still deferred to 1.2.1, a trial tick in a
-  temporary copy must fail it.
+  temporary copy must fail it. **Done.**
+  `scripts/docs_validation/candidate_deferral.py` is the `candidate-deferral`
+  check, registered immediately before `roadmap-status` so its verdict is
+  recorded before closure reports ticks. The Red control is real rather than
+  hypothetical:
+  `scripts/tests/test_candidate_deferral.py::CommittedDeferrals::test_trial_tick_in_a_temporary_copy_fails`
+  copies the committed register, ticks `- [ ] 1.2.1.` to `- [x] 1.2.1.` in a
+  copy of `docs/roadmap.md`, re-exports `spec/roadmap.json` from that copy, and
+  requires the real register to fail naming both CA3 and CA5. Two faults beyond
+  the Red step are also rejected: a deferral naming an item the export does not
+  declare (otherwise a typo disables the guard silently), and a deferral that a
+  step-level tick has outrun, since D07 defers CA7 to the step `2.4` rather
+  than to a task. A step counts as ticked only when every task beneath it is,
+  so partly finished work leaves its deferral standing.
 - AC-04: extend `profile-measurements.yml` with the amended protocol: five cold
   and five warm builds per profile, profiles alternating run by run, one
   discarded warm-up; a fresh `CARGO_TARGET_DIR` for each cold run, deleted
@@ -2615,6 +2708,13 @@ Dependencies (caret requirements):
 - Python: none new; Hypothesis 6.168.5 and pytest 9.1.1 are already pinned.
   `mutmut` runs through `uv tool run` at a pinned version, not as a project
   dependency.
+  - Deviation (2026-11-07): the census ran as mutmut 3.6.0 from a private
+    virtualenv at `/tmp/mut-venv`, not through `uv tool run`. The version is
+    the same one this note pins, and running it from a throwaway environment
+    keeps it out of the project's dependency set for the same reason. `uv`
+    resolves `mutmut` from the network on each invocation, so pinning the
+    rebuild to a local environment is what made re-running the census
+    reproducible during triage.
 - Proof tools (not Cargo dependencies of shipped crates): Kani 0.67.0, Verus
   0.2026.09.06.8dea4a2, Z3 4.16.0, and `vstd` `=0.0.0-2026-09-06-0133` in the
   Verus probe's crate-based candidates only; the exact pin is required because

@@ -12,7 +12,9 @@ interface policy (D06) recorded in the
 compatibility subject assigned here by D07.
 
 Amended by ADR-0009 (2026-10-14): clerical fixture relocation, recorded in
-[Amendments](#amendments).
+[Amendments](#amendments). Amended by ADR-0009 (2026-11-07): scanner-derived
+trust audits, the trust-audit matching rule, Kani partial bounds, and the Kani
+parser's registration, recorded in [Amendments](#amendments).
 
 ## Date
 
@@ -177,3 +179,59 @@ The Python tooling relocation on 2026-10-12 moved the evidence-gate fixture from
 `scripts/tests/fixtures/evidence_gate_rules.json`. Use the latter path in the
 current repository. The accepted rule table and policy are unchanged; the
 original path above remains part of the accepted record's history.
+
+### 2026-11-07: Scanner-derived trust audits and the Kani parser (DL-10, DL-16, DL-17)
+
+The rule table, the ten abstract fields, the base levels, and properties P1-P6
+are unchanged. Three parts of the policy are now implemented rather than
+reserved, and each is stated here because it changes what a record must supply.
+
+**Trust audits are scanner-derived (DL-16).** `AdmissionContext` carries
+`verified_trust_audits` alongside `verified_log_results`. The I/O shell reads
+every source file the record's harness manifest names, requires each path to be
+Git-tracked and inside the repository, checks each file's digest against the
+manifest, runs the scanner over it, and passes a `VerifiedTrustAudit` bound to
+the same manifest. `abstract_record` then derives `trust = 'unaudited'` unless
+an audit bound to the record's single `result_artefacts` manifest has an item
+multiset `(item, location)` equal to the record's `trust_audit.items`. A record
+that claims `audited` with no matching scan is therefore `unaudited`, which
+MS-1 already blocks for deductive and bounded evidence. A record whose
+`method.tool` names a registered parser must have `evidence_kind` `deductive` or
+`bounded`, so a failed verifier run cannot be renamed a passing test to step
+outside the parser; that rejection reuses `schema-invalid`.
+
+**The trust-audit matching rule (DL-17).** The scanner lexes Rust, skips
+comments and literals, and reports an identifier as a trusted item when it is:
+
+1. a Kani vocabulary item reached through a path or `use` tree rooted at
+   `kani`, including `kani::any_where` and `#[cfg_attr(kani, kani::stub(..))]`;
+2. a Verus vocabulary item inside a `verus!` body, a `#[verifier::…]`,
+   `#[verifier(…)]`, `#[verus_verify(…)]`, or `#[verus_spec(…)]` attribute, a
+   `cfg_attr` carrying one of those, or a `use` tree rooted at `vstd` or
+   `verus_builtin`; or
+3. any unqualified vocabulary identifier in a file that imports from `kani`,
+   `vstd`, or `verus_builtin` by glob or alias.
+
+An unqualified `should_panic`, `assume`, or `external` in a file with no such
+import is ordinary Rust and is not reported; without rule (iii) the vocabulary
+would flag ordinary code. The Verus list also covers
+`external_trait_specification`, `assume_specification[…]`, and
+`exec_allows_no_decreases_clause`. The scan fails closed, never with an empty
+audit, on an unterminated comment or literal, `include!`, an out-of-tree
+`#[path]`, `paste!`, or `concat_idents!`.
+
+**Kani bounds are always partial (DL-10).** The 1.2.1 Kani parser derives
+`bounds = partial` for every record it decides, so no 1.2.1 record can reach
+`proof` through Kani however complete its run. Deriving `type-complete` moves
+to task 1.2.4 with its own mechanical rule and its own amendment, because a
+manifest declaration of type-completeness would be self-reporting on the one
+field that separates `proof` from `bounded`.
+
+**Registration.** `kani` is now a registered log parser in
+`spec/evidence-reason-codes.json`. The sentence above saying no parser is
+registered or integrated yet is superseded: the adapter is
+`scripts/docs_validation/evidence_binding.py` with the parser in
+`scripts/docs_validation/kani_log/`, and `make design-check` refuses a
+registration whose committed corpus does not reach every outcome class the gate
+keys on, including an unsatisfied cover. Verus remains unregistered and its
+parser deferred to task 1.2.4.

@@ -37,7 +37,7 @@
         }
       ],
       "recommendation": "B",
-      "rationale": "Terms of reference \u00a79 already names \"Sponsor and technical owner\" as the authority for Q2 and Q4; choosing the sponsor alone would require amending that column.",
+      "rationale": "Terms of reference §9 already names \"Sponsor and technical owner\" as the authority for Q2 and Q4; choosing the sponsor alone would require amending that column.",
       "lifecycle": "accepted",
       "decided_option": "B",
       "accepted_by": "leynos",
@@ -85,7 +85,7 @@
         }
       ],
       "recommendation": "A",
-      "rationale": "Bounded lifetimes force each exception to be revisited, and a narrowed claim keeps an exception from being read as proof (technical design \u00a717.2, GAP9).",
+      "rationale": "Bounded lifetimes force each exception to be revisited, and a narrowed claim keeps an exception from being read as proof (technical design §17.2, GAP9).",
       "lifecycle": "accepted",
       "decided_option": "A",
       "accepted_by": "leynos",
@@ -122,11 +122,11 @@
       "options": [
         {
           "id": "A",
-          "summary": "Accept the Core, Integration, and Deferred split in technical design \u00a72 unchanged."
+          "summary": "Accept the Core, Integration, and Deferred split in technical design §2 unchanged."
         },
         {
           "id": "B",
-          "summary": "Amend the scope matrix in technical design \u00a72 before acceptance."
+          "summary": "Amend the scope matrix in technical design §2 before acceptance."
         }
       ],
       "recommendation": "A",
@@ -166,7 +166,7 @@
         },
         {
           "document": "docs/roadmap.md",
-          "text": "The foundational phase resolves candidate ADRs identified in `technical-design.md` \u00a715; no accepted ADR or ExecPlan exists in this evidence set."
+          "text": "The foundational phase resolves candidate ADRs identified in `technical-design.md` §15; no accepted ADR or ExecPlan exists in this evidence set."
         }
       ]
     },
@@ -260,7 +260,7 @@
       "options": [
         {
           "id": "A",
-          "summary": "Ratify ToR C5 and technical design \u00a715 row 10 (no shims for pre-1.0 or unreleased APIs); follow Cargo's 0.y.z rule (a change to the leftmost non-zero component is breaking); version the public proof interface (models, pre- and postconditions, lemmas, trust declarations) with the crate version, treating a strengthened precondition or weakened postcondition as breaking (technical design \u00a717.8). MSRV stays with ToR Q3 and task 1.2.1."
+          "summary": "Ratify ToR C5 and technical design §15 row 10 (no shims for pre-1.0 or unreleased APIs); follow Cargo's 0.y.z rule (a change to the leftmost non-zero component is breaking); version the public proof interface (models, pre- and postconditions, lemmas, trust declarations) with the crate version, treating a strengthened precondition or weakened postcondition as breaking (technical design §17.8). MSRV stays with ToR Q3 and task 1.2.1."
         }
       ],
       "recommendation": "A",
@@ -591,7 +591,7 @@
         }
       ],
       "recommendation": "A",
-      "rationale": "Technical design \u00a76.1 says only \"true division to F64\"; converting operands first matches what every candidate backend computes.",
+      "rationale": "Technical design §6.1 says only \"true division to F64\"; converting operands first matches what every candidate backend computes.",
       "lifecycle": "accepted",
       "decided_option": "A",
       "accepted_by": "leynos",
@@ -674,12 +674,20 @@
         }
       ],
       "recommendation": "B",
-      "rationale": "Option B keeps the three crates of technical design \u00a73, keeps the kernel dependency-free so B01 stays testable, and keeps a native-only consumer free of Polars. Adapter-crate separation saves no CI time because the default build pulls Polars either way, and it would force a premature `combobulate-core` split. Q3 is answered with a supported-toolchain set because three toolchains with distinct roles build this repository and no single MSRV describes them.",
-      "lifecycle": "proposed",
-      "decided_option": null,
-      "accepted_by": null,
-      "accepted_on": null,
-      "approval_reference": null,
+      "rationale": "Option B keeps the three crates of technical design §3, keeps the kernel dependency-free so B01 stays testable, and keeps a native-only consumer free of Polars. Adapter-crate separation saves no CI time because the default build pulls Polars either way, and it would force a premature `combobulate-core` split. Q3 is answered with a supported-toolchain set because three toolchains with distinct roles build this repository and no single MSRV describes them.",
+      "lifecycle": "accepted",
+      "decided_option": "B",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-22",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/9cc8f59f-14a7-4470-9239-a0dae798e739",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D16"
+        ],
+        "answer": "… Decision D16 and ADR-0010 (DL-02). Recommended: D16 accepts ADR-0010, which records the crate boundary, dependency direction, feature profiles, gate feature lists, and the supported-toolchain set that answers ToR Q3 in place of one MSRV. The sponsor accepts D16 after EP-M4 publishes ADR-0010; the approval reference is committed before the tick. The sponsor also says whether Q3 joins in_scope_questions in spec/decisions.json. …"
+      },
       "adr": "docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md",
       "supersedes": [],
       "superseded_by": null,
@@ -690,7 +698,7 @@
     {
       "id": "CA1",
       "subject": "Numerical and array semantics",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
         "kind": "adr",
@@ -702,7 +710,7 @@
     {
       "id": "CA2",
       "subject": "Macro staging and stable-Rust application",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
         "kind": "adr",
@@ -714,17 +722,19 @@
     {
       "id": "CA3",
       "subject": "Backend and cell separation",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
-        "kind": "deferred",
-        "roadmap_item": "1.2.1"
+        "kind": "adr",
+        "adrs": [
+          "ADR-0010"
+        ]
       }
     },
     {
       "id": "CA4",
       "subject": "Initial feature and release scope",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
         "kind": "adr",
@@ -736,18 +746,19 @@
     {
       "id": "CA5",
       "subject": "Shared semantic kernel",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
-        "kind": "deferred",
-        "roadmap_item": "1.2.1",
-        "bet": "B01"
+        "kind": "adr",
+        "adrs": [
+          "ADR-0010"
+        ]
       }
     },
     {
       "id": "CA6",
       "subject": "Public proof compatibility",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
         "kind": "adr",
@@ -760,7 +771,7 @@
     {
       "id": "CA7",
       "subject": "Resource certification",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
         "kind": "deferred",
@@ -771,7 +782,7 @@
     {
       "id": "CA8",
       "subject": "Backend input and output control scope",
-      "source": "technical-design.md \u00a715",
+      "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
         "kind": "deferred",

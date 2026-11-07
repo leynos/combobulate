@@ -35,7 +35,9 @@ than tightening them.
 1. Toolchains. Rust nightly-2026-08-27 with the repository's Cranelift dev
    profile; Verus 0.2026.09.06.8dea4a2 (Rust 1.98.0) with Z3 4.16.0; Kani
    0.67.0 (CBMC with CaDiCaL); Python 3.14; Polars 0.55.2 with the `lazy`
-   feature, provisional until task 1.2.1 pins it.
+   feature, no longer provisional: task 1.2.1 pinned it in the facade manifest
+   and in `spec/toolchain-profiles.json` under ADR-0010, so the calibration
+   measured the release the gate now builds rather than a candidate.
 2. Probe. `tools/calibration/cardinality-probe/` is a standalone crate, outside
    the repository package and workspace, with a checked cardinality function
    (zero extent first, then checked multiplication), a Verus proof of its full

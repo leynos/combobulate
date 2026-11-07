@@ -225,12 +225,12 @@
       ],
       "frozen": {
         "workload": {
-          "description": "Cold and incremental builds of the 1.2.1 foundational probe in its three feature profiles; calibrated on the repository package and the calibration probe."
+          "description": "Cold and incremental builds of the shipped workspace in its three feature profiles: native-only (`--no-default-features`), proof-capable (Kani codegen of `combobulate-kernel`) and Polars-enabled (default features). The workspace manifests are the only source; the 1.2.1 calibration probe is retired as a measurement input (DL-15)."
         },
         "control": null,
         "sizes": "Three profiles; cold (empty target directory) and incremental (after touching the crate root).",
         "seeds": "Not applicable.",
-        "timed_region": "The cargo invocation, excluding queueing for a compile slot.",
+        "timed_region": "The cargo or `kani exec` invocation, excluding queueing for a compile slot.",
         "metric": "Build wall time.",
         "unit": "minutes",
         "estimand": "Median build time per profile and phase.",
@@ -265,14 +265,14 @@
         },
         "cache_policy": "No sccache; cold builds start from an empty target directory.",
         "proof_scope": "Not applicable.",
-        "measurement_tool": "Hosted runner step timing.",
+        "measurement_tool": "Hosted runner step timing from `.github/workflows/profile-measurements.yml`'s `build-budget` job, which records `ImageOS` and `ImageVersion` per run.",
         "analysis_script": null,
         "calibration": {
           "status": "calibrated",
           "record": "spec/calibration/builds.json",
           "derivation": "Each ceiling: local median x factor 1.2 x 2, rounded up to whole minutes, with 4 build jobs to match the runner."
         },
-        "registered_on": "2026-10-11"
+        "registered_on": "2026-11-07"
       }
     },
     {

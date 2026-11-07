@@ -11,8 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from jsonschema import Draft202012Validator
 
 from docs_validation.context import ValidationContext
-from docs_validation.evidence_gate import (AbstractRecord, AdmissionContext, VerifiedLogResult, abstract_record,
-                                           all_states, is_valid)
+from docs_validation.evidence_gate import (AbstractRecord, AdmissionContext, VerifiedLogResult, VerifiedTrustAudit,
+                                           abstract_record, all_states, is_valid)
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTEXT = ValidationContext(ROOT)
@@ -22,6 +22,7 @@ TEMPLATE = CONTEXT.load('spec/proof-evidence.example.json')
 AS_OF = datetime.date(2026, 10, 11)
 DIGEST = 'a' * 64
 REVISION = 'b' * 40
+MANIFEST = 'logs/harness-manifest.json'
 CURRENT_BINDING = TEMPLATE['binding'] | {
     'executable_digest': DIGEST,
     'specification_digest': DIGEST,
@@ -56,6 +57,7 @@ def concrete(state: AbstractRecord) -> tuple[dict, dict]:
     record['method'].update(tool='kani', run_mode=state.run_mode)
     record['verdict_source'] = ({'kind': 'log-parser', 'log': {'path': 'logs/run.log', 'sha256': DIGEST}}
                                 if state.verdict_source == 'log-parser' else {'kind': 'self-reported', 'log': None})
+    record['result_artefacts'] = [{'path': MANIFEST, 'sha256': DIGEST}]
     exceptions: dict = {}
     if state.exception == 'none':
         record['exception'] = None
@@ -87,11 +89,26 @@ def verified_log_results(record: dict) -> tuple[VerifiedLogResult, ...]:
     ),)
 
 
+def verified_trust_audits(record: dict) -> tuple[VerifiedTrustAudit, ...]:
+    """Build the scanner result a record's manifest binding would produce (DL-16).
+
+    The scanner reports what the manifest's sources contain, so the fixture
+    audit lists the same ``(item, location)`` pairs the record claims. Which
+    assumption covers an item is the record author's claim and stays out of the
+    multiset, exactly as the real matcher compares it.
+    """
+    if record['trust_audit']['status'] != 'audited':
+        return ()
+    items = tuple(sorted((item['item'], item['location']) for item in record['trust_audit']['items']))
+    return (VerifiedTrustAudit(manifest_path=MANIFEST, manifest_sha256=DIGEST, items=items),)
+
+
 def admission_context(record: dict, exceptions: dict) -> AdmissionContext:
-    """Compose default policy inputs and synthetic parser results for gate tests."""
+    """Compose default policy inputs and synthetic parser and scanner results for gate tests."""
     return AdmissionContext(
         exceptions=exceptions, bindings=BINDINGS, as_of=AS_OF, log_parsers=PARSERS,
         verified_log_results=verified_log_results(record),
+        verified_trust_audits=verified_trust_audits(record),
     )
 
 

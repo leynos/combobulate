@@ -89,13 +89,32 @@ unnecessary allocation, dynamic dispatch and external state in its checked
 core. These are dependency boundaries, not three independently marketed release
 units.
 
-The proposed default facade features enable macros and Polars. Native-only
-execution and optional proof SDK profiles remain available without Polars;
-ordinary consumers need no verifier installation. Glam is opt-in. A companion
-proof package can organize exported metadata/lemmas, but must bind to
-production bodies rather than replace them. The early shared-kernel and
-downstream probes must validate this arrangement before feature or proof-API
-stabilization.
+Task 1.2.1 landed the arrangement as three crates, decided by
+[ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md) and
+D16. The facade is the root package `combobulate`; the kernel is
+`combobulate-kernel`, `#![no_std]` without `alloc` and declaring no dependency;
+the macro crate is `combobulate-macros`, a `proc-macro` crate that reaches
+neither the kernel nor a backend. The Polars adapter is a crate-private module
+inside the facade under `cfg(feature = "polars")`. Dependency edges point one
+way (facade to kernel, facade to macros), and `tests/workspace_boundaries.rs`
+asserts that against live `cargo metadata` and `cargo tree` output.
+
+The default facade features enable macros and Polars, spelled
+`default = ["macros", "polars"]`. Native-only execution and the proof SDK
+profiles remain available without Polars; ordinary consumers need no verifier
+installation. The facade's only public item in this task is `BuildProfile`,
+which reports the compiled features and the target's `usize` width. Glam is
+opt-in. A companion proof package can organize exported metadata/lemmas, but
+must bind to production bodies rather than replace them. The early
+shared-kernel and downstream probes must validate this arrangement before
+feature or proof-API stabilization.
+
+The gate profiles are recorded once, in
+[`spec/toolchain-profiles.json`](../spec/toolchain-profiles.json), and selected
+by `GATE_PROFILE`: `native-only` builds with `--no-default-features`,
+`polars-enabled` with defaults, and `proof-kani` and `proof-verus` pin the two
+verifier toolchains. Each is its own Cargo invocation, because feature
+unification would otherwise let one profile's resolution mask the other's.
 
 The dependency direction is frontend to semantic graph to planner to backend
 ports. The semantic module must not import Polars or glam types. The public
@@ -103,17 +122,18 @@ facade may re-export supported adapters behind features. Domain extensions own
 their types and kernels; backend registrations refer to operation identities
 through core-owned registry interfaces.
 
-| Component           | Responsibility and contracts                                                                                            | Principal failure                                                             | Reuse or reason for custom code                                                                        |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Syntax frontend     | Parse literals, pipelines, and graph bodies; attach source spans; build ordinary descriptors.                           | Syntax or unsupported host/DSL boundary.                                      | A token parser such as `syn` can supply Rust-expression parsing; the `\|>` grammar remains custom.     |
-| Semantic kernel     | Checked shapes/indexing, restricted cost expressions, admission and schedule validation, with public logical contracts. | Invalid bounds, unsupported certificate, or failed proof obligation.          | One dependency-light executable core for const/runtime and the supported verifier subset.              |
-| Semantic graph      | Own dynamic/static descriptors, schemas, effects, policies, provenance, and denotation.                                 | Inconsistent constraints or invalid application.                              | Array meaning stays independent of dataframe semantics; public proofs do not expose private IR layout. |
-| Operation catalogue | Supply built-in descriptors and derived public operations.                                                              | Unsupported dtype, rank, or operator operand.                                 | One registry, with public composition used for examples rather than hidden special cases.              |
-| Planner and checker | Propose eligible regions/schedules and validate semantic/resource obligations through the smaller kernel.               | Unsupported or invalid certificate, budget failure, or unresolved binding.    | Heuristic planning stays separate from checked rule/admission validity.                                |
-| Native executor     | Run compiled scalar/cell/batch kernels with explicit views, scratch, masks, and cancellation points.                    | Kernel error, schema violation, or resource exhaustion.                       | Ordinary Rust loops and domain kernels; no new JIT is required.                                        |
-| Polars adapter      | Translate eligible graph regions and table crossings while preserving semantics.                                        | Incompatible policy, unexpected backend schema, or backend execution failure. | Reuse expressions and query execution where their contract matches.                                    |
-| Typed/glam adapter  | Map logical cell schemas to checked typed views and component layouts.                                                  | Invalid domain construction or incompatible layout/validity.                  | Reuse glam within a cell; keep geometric meaning in the consumer.                                      |
-| Diagnostics         | Render structured failures and explain plans with user-level provenance.                                                | Missing or ambiguous origin after a rewrite.                                  | Shared source map and operation labels, not backend message parsing alone.                             |
+| Component            | Responsibility and contracts                                                                                            | Principal failure                                                             | Reuse or reason for custom code                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Syntax frontend      | Parse literals, pipelines, and graph bodies; attach source spans; build ordinary descriptors.                           | Syntax or unsupported host/DSL boundary.                                      | A token parser such as `syn` can supply Rust-expression parsing; the `\|>` grammar remains custom.                                            |
+| Semantic kernel      | Checked shapes/indexing, restricted cost expressions, admission and schedule validation, with public logical contracts. | Invalid bounds, unsupported certificate, or failed proof obligation.          | One dependency-light executable core for const/runtime and the supported verifier subset; `TargetFacts` is its single source of target facts. |
+| Semantic graph       | Own dynamic/static descriptors, schemas, effects, policies, provenance, and denotation.                                 | Inconsistent constraints or invalid application.                              | Array meaning stays independent of dataframe semantics; public proofs do not expose private IR layout.                                        |
+| Operation catalogue  | Supply built-in descriptors and derived public operations.                                                              | Unsupported dtype, rank, or operator operand.                                 | One registry, with public composition used for examples rather than hidden special cases.                                                     |
+| Planner and checker  | Propose eligible regions/schedules and validate semantic/resource obligations through the smaller kernel.               | Unsupported or invalid certificate, budget failure, or unresolved binding.    | Heuristic planning stays separate from checked rule/admission validity.                                                                       |
+| Native executor      | Run compiled scalar/cell/batch kernels with explicit views, scratch, masks, and cancellation points.                    | Kernel error, schema violation, or resource exhaustion.                       | Ordinary Rust loops and domain kernels; no new JIT is required.                                                                               |
+| Polars adapter       | Translate eligible graph regions and table crossings while preserving semantics.                                        | Incompatible policy, unexpected backend schema, or backend execution failure. | Reuse expressions and query execution where their contract matches; a crate-private facade module, not a fourth crate.                        |
+| Build profile report | Name the features and target facts compiled into a facade build.                                                        | A reader treating it as a capability claim.                                   | Reports compiled features and target facts only; task 1.2.6 owns capability statuses.                                                         |
+| Typed/glam adapter   | Map logical cell schemas to checked typed views and component layouts.                                                  | Invalid domain construction or incompatible layout/validity.                  | Reuse glam within a cell; keep geometric meaning in the consumer.                                                                             |
+| Diagnostics          | Render structured failures and explain plans with user-level provenance.                                                | Missing or ambiguous origin after a rewrite.                                  | Shared source map and operation labels, not backend message parsing alone.                                                                    |
 
 A typical numeric pipeline flows through graph construction, schema inference,
 preparation, region execution, and result assembly. A native geometry path
@@ -902,17 +922,17 @@ earn its custom layer through reusable rank composition, domain diagnostics,
 and collection coordination, not through an unsupported claim that alternatives
 cannot perform the calculations.
 
-| Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                                                                                                          |
-| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                                                                                                                    |
-| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); no acceptance measurement exists yet.                                                                                                             |
-| GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                                                                                                        |
-| GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Foundational probe and Q3 before publishing manifests or claiming stable compilation.                                                                                                                                                                                      |
-| GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3 passes and the D01 authority approves release in a superseding decision.                                                                                             |
-| GAP6 | R1-R11      | GitHub publication destination unresolved.                                                                        | Q6; provide repository-ready files without creating unrelated remote records.                                                                                                                                                                                              |
-| GAP7 | R8-R10      | Shared const/runtime/verifier subset and public proof dependencies untested.                                      | B01/B02 and tasks 1.2.4-1.2.5; narrow representation or certified subset without substituting an unproved body.                                                                                                                                                            |
-| GAP8 | R11         | Polars 2-era Rust hooks, streaming/spill controls and benefit untested; final release/upgrade refresh incomplete. | PC probes, B05/B06 and task 1.2.6; document capabilities and refusal scope before eligibility.                                                                                                                                                                             |
-| GAP9 | R8-R9       | Specification-compatibility evidence and the proof-first evidence gate.                                           | Authority (D01), exception policy (D02), proof-interface policy (D06), and the evidence gate ([ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md), task 1.1.4) are in place; Q9 remains. Exceptions cannot count as proof or remove ordinary runtime safety. |
+| Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                                                                                                                                                                                                                                                                                 |
+| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); no acceptance measurement exists yet.                                                                                                                                                                                                                                                                          |
+| GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                                                                                                                                                                                                                                                                     |
+| GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Closed by [ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md) and D16: `spec/toolchain-profiles.json` records the nightly, the Polars pin, and the two verifier toolchains with every site that asserts them, and `GATE_PROFILE` runs each feature profile in its own invocation. Q3 is answered with a supported-toolchain set rather than one MSRV.                                                            |
+| GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3 passes and the D01 authority approves release in a superseding decision.                                                                                                                                                                                                                                                          |
+| GAP6 | R1-R11      | GitHub publication destination unresolved.                                                                        | Q6; provide repository-ready files without creating unrelated remote records.                                                                                                                                                                                                                                                                                                                                                           |
+| GAP7 | R8-R10      | Shared const/runtime/verifier subset and public proof dependencies untested.                                      | B01/B02 and tasks 1.2.4-1.2.5; narrow representation or certified subset without substituting an unproved body.                                                                                                                                                                                                                                                                                                                         |
+| GAP8 | R11         | Polars 2-era Rust hooks, streaming/spill controls and benefit untested; final release/upgrade refresh incomplete. | PC probes, B05/B06 and task 1.2.6; document capabilities and refusal scope before eligibility.                                                                                                                                                                                                                                                                                                                                          |
+| GAP9 | R8-R9       | Specification-compatibility evidence and the proof-first evidence gate.                                           | Partly closed: authority (D01), exception policy (D02), proof-interface policy (D06), the evidence gate ([ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md), task 1.1.4), the registered Kani parser, and the trust-audit scanner are in place, so Kani evidence can reach `bounded`. Open: no Verus parser, no type-complete bound, and Q9 remains. Exceptions cannot count as proof or remove ordinary runtime safety. |
 
 Candidate ADRs cover numerical/array semantics, macro staging and stable-Rust
 application, backend/cell separation, initial feature/release scope, the shared
@@ -1211,6 +1231,16 @@ replace a Polars, SIMD, or concurrent executor by a different scalar
 implementation. A scalar reference model remains valuable when labelled as
 such, but backend refinement requires separate evidence.
 
+Profile wiring follows the same discipline. The `native-only` and
+`polars-enabled` profiles build in separate Cargo invocations, so a proof that
+holds under one feature selection is never reported for the other; a harness
+that needs the kernel states the profile it was built under, and the
+`BuildProfile` report is an observation of the build, not a certificate.
+Verifier installation is a profile concern, not a consumer one: the ordinary
+profiles contain no verifier, and `tests/workspace_boundaries.rs` asserts that
+the native dependency tree reaches no package under the `kani`, `verus`, or
+`vstd` prefix.
+
 For Kani, provide public executable observers, bounded input constructors and
 stable contract targets. Bounds remain explicit in the consumer harness; valid
 constructors must not assume the desired output or silently generate only empty
@@ -1410,11 +1440,15 @@ its checks or changing `comb!` ergonomics is not.
 The Polars 2-era material discussed in C-09 motivates the capability probes
 below [E-POLARS2-RELEASE]. The Rust package listing inspected for this revision
 identifies 0.55.2 [E-POLARS2-RUST]; Python/API and Cargo version lines are not
-interchangeable. This pack selects no production dependency and does not
-prescribe `polars = "2"`. Choose an actual compatible Rust release or commit
-and test its public interfaces. The final release/upgrade-page refresh failed,
-as recorded in `references.md`; those opportunities remain conditional inputs,
-not freshly confirmed implementation capabilities.
+interchangeable. This pack does not prescribe `polars = "2"`. Task 1.2.1
+selected a production dependency: the facade takes `polars` `0.55.2` with
+`default-features = false` and `features = ["lazy"]`, recorded in
+[ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md) and
+calibrated by the EP-M1 probe. That selection is the version the
+`polars-enabled` profile builds and the one AC-04 measures; it is not a claim
+that any Polars 2-era capability is supported. The final release/upgrade-page
+refresh failed, as recorded in `references.md`; those opportunities remain
+conditional inputs, not freshly confirmed implementation capabilities.
 
 The [capability ledger](../spec/backend-capabilities.json) identifies
 PC01-PC09, upstream evidence, probes and refusal rules. Every Rust probe

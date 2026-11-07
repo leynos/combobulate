@@ -24,16 +24,33 @@ readme = "README.md"
 keywords = ["arrays", "algebra", "polars", "verification"]
 categories = ["mathematics", "data-structures"]
 
+[features]
+# The default profile is the full published surface: the `comb!` notation's
+# macro crate and the Polars backend. `native-only` selects the opposite by
+# passing `--no-default-features`, which is the profile the kernel and the
+# native consumer are built under.
+default = ["macros", "polars"]
+# Reserved until task 2.3.1 publishes the notation; the users' guide says so.
+macros = ["dep:combobulate-macros"]
+polars = ["dep:polars"]
+
 [dependencies]
 combobulate-kernel = { path = "crates/combobulate-kernel", version = "0.1.0" }
-combobulate-macros = { path = "crates/combobulate-macros", version = "0.1.0" }
+combobulate-macros = { path = "crates/combobulate-macros", version = "0.1.0", optional = true }
+# The pinned release, not a range: the feature set is calibrated by AC-04 and
+# task 1.2.6 owns the capability record for it.
+polars = { version = "0.55.2", default-features = false, features = ["lazy"], optional = true }
 
 [dev-dependencies]
 cardinality-probe = { path = "tools/calibration/cardinality-probe" }
 camino = "1.2.0"
 cap-std = { version = "3.4.6", features = ["fs_utf8"] }
 googletest = "0.14.3"
+insta = "1.49.0"
+pretty_assertions = "1.4.1"
 rstest = { version = "0.27.0", default-features = false }
+rstest-bdd = "0.6.0"
+rstest-bdd-macros = "0.6.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.154"
 serde_yaml = "0.9.34"

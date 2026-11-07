@@ -2,16 +2,17 @@
 
 ## Status
 
-Proposed.
-
-This ADR resolves the candidate subjects CA3 (backend and cell separation) and
-CA5 (shared semantic kernel), and answers ToR Q3 with a supported-toolchain set
-rather than a single minimum-supported Rust version (MSRV). D16 in the
-[decision register](../decision-register.md) records the same proposal.
+Accepted on 2026-10-22: a facade over a `#![no_std]` semantic kernel and an
+empty procedural-macro crate, with Polars behind a crate-private module and a
+default `polars` feature; dependency edges point one way; each gate profile is
+its own Cargo invocation; and ToR Q3 is answered with a supported-toolchain set
+rather than a single minimum-supported Rust version (MSRV). Records D16 and
+resolves the candidate subjects CA3 (backend and cell separation) and CA5
+(shared semantic kernel) in the [decision register](../decision-register.md).
 
 ## Date
 
-2026-11-07.
+2026-10-22.
 
 ## Context and problem statement
 
@@ -22,7 +23,7 @@ while native-only execution remains available without Polars. None of that was
 decided: CA3 and CA5 were deferred to task 1.2.1, and ToR Q3 asks which Rust
 and feature matrix forms the baseline.
 
-Two things forced the question now rather than later. First, B01 hypothesises
+Two things forced the question now rather than later. First, B01 hypothesizes
 that one dependency-light kernel can serve production, `const`-evaluated,
 Kani-checked, and Verus-verified execution, and the kernel's dependency set is
 the precondition for that claim to be testable at all. Second, a facade with a
@@ -105,9 +106,9 @@ success criterion, which requires a Polars-enabled build to exist and be gated.
 
 _Table 1: Comparison of the crate-boundary options._
 
-## Decision outcome / proposed direction
+## Decision outcome
 
-Option B is proposed.
+Option B is accepted.
 
 The kernel is `#![no_std]` without `alloc` and declares no dependency. Its one
 item in this task is `TargetFacts`, which reports the target's `usize` width as
@@ -211,7 +212,8 @@ that.
 1. Land the three crates and the facade features, and make both ordinary
    profiles build and pass their gates.
 2. Land `spec/toolchain-profiles.json` with its schema and VO-7/VO-8 checks.
-3. Land this ADR as Proposed and D16 in the register.
+3. Land this ADR and D16 in the register, D16 accepted on the sponsor's
+   2026-10-22 answer.
 4. Make the CI shape match the profiles: a native-only `build-test`, parallel
    Polars-enabled lint and test jobs, and coverage measuring native-only.
 5. Task 1.2.4 adds the proof-dependency allowlist check and attempts B01's
@@ -235,6 +237,5 @@ that.
 
 - Acceptance of the AC-04 amendment, which registers the amended workload
   before EP-M6 measures.
-- Acceptance of this ADR and D16.
 - The final job sizing for the parallel Polars-enabled jobs, from hosted
   measurements of the facade.

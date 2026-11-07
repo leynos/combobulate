@@ -1,11 +1,12 @@
-"""Kill the matcher mutants a corpus sweep leaves alive (VO-9, VO-10).
+"""Kill the vocabulary-matching mutants a corpus sweep leaves alive (VO-9, VO-10).
 
 The mutation census over :mod:`docs_validation.trust_audit` leaves survivors in
-`matcher.py` where the mutation changes a *reported position*, a *module
-reference*, or which of two overlapping rules claims a token. The existing
-suites assert that the right words are reported; they rarely assert *where*, and
-they never spell the module-declaration forms whose token arithmetic the mutants
-move. Each case here supplies the one source the mutant needs.
+`matcher.py` where the mutation changes a *reported position*, or which of two
+overlapping rules claims a token. The existing suites assert that the right
+words are reported; they rarely assert *where*. Each case here supplies the one
+source the mutant needs. The module-walk cases live in
+:mod:`test_trust_audit_module_survivors`; the split is by what each case needs
+to know, so each module stays within the repository's module-length limit.
 
 Four families are equivalents rather than gaps, and this module records why.
 ``_refuse_opaque_macros``'s ``strict=False`` is a keyword-only default that
@@ -21,8 +22,8 @@ succeeds before the bound is reached.
 
 Examples
 --------
->>> scan('mod a;').modules
-(ModuleReference(name='a', path=None, line=1, column=5),)
+>>> scan('kani::assume(x);').items
+(TrustItem(item='assume', line=1, column=7),)
 """
 from __future__ import annotations
 
@@ -40,96 +41,6 @@ from docs_validation.trust_audit.lexer import tokenize
 def items(text: str, **options) -> tuple[tuple[str, int, int], ...]:
     """Return ``(item, line, column)`` for each item the scan reports."""
     return tuple((item.item, item.line, item.column) for item in scan(text, **options).items)
-
-
-def modules(text: str):
-    """Return the module references a scan reports, as ``(name, path)`` pairs."""
-    return tuple((reference.name, reference.path) for reference in scan(text).modules)
-
-
-class ModuleDeclarations(unittest.TestCase):
-    """Require every ``mod x;`` form to be found, and nothing else."""
-
-    def test_a_plain_declaration_is_reported(self):
-        """Require the basic ``mod x;`` reference, which the walk exists to find."""
-        self.assertEqual(modules('mod a;'), (('a', None),),
-                         'a bare module declaration must be reported')
-
-    def test_a_declaration_with_an_inline_body_is_not_a_file(self):
-        """Require ``mod x { … }`` to be skipped, since its body is already lexed.
-
-        Reporting it would send the caller looking for a file that the crate
-        does not compile, and a missing file refuses an otherwise sound proof.
-        """
-        self.assertEqual(modules('mod a { fn f() {} }'), (),
-                         'a module with an inline body compiles no separate file')
-
-    def test_a_declaration_after_an_inline_body_is_still_found(self):
-        """Require the walk to continue past a skipped declaration.
-
-        A walk that stopped at the first non-file module would never reach the
-        declarations after it, so their trust would be invisible — the failing
-        direction DL-17 exists to prevent.
-        """
-        self.assertEqual(modules('mod a { }\nmod b;'), (('b', None),),
-                         'a declaration after an inline module must still be reported')
-
-    def test_every_declaration_is_reported_rather_than_the_first(self):
-        """Require the whole list, not the first entry."""
-        self.assertEqual(modules('mod a;\nmod b;'), (('a', None), ('b', None)),
-                         'each module declaration must be reported')
-
-    def test_a_declaration_at_the_very_end_is_found(self):
-        """Require the ``mod x;`` form to be recognised when the file ends there.
-
-        The walker reads two tokens past ``mod``; reading further would drop the
-        last declaration of every file, which is where a ``#[path]`` module most
-        often sits.
-        """
-        self.assertEqual(modules('fn f() {}\nmod a;'), (('a', None),),
-                         'the last declaration in a file must be reported')
-
-    def test_a_mod_fn_name_is_not_a_declaration(self):
-        """Require the ``mod`` keyword test, so a path ending in ``mod`` is skipped."""
-        self.assertEqual(modules('a::mod;'), (),
-                         'a path segment spelled mod is not a declaration')
-
-    def test_the_declaration_position_is_the_module_name(self):
-        """Require the reported line and column to locate the name a reader edits."""
-        module, = scan('fn f() {}\nmod a;').modules
-        self.assertEqual((module.line, module.column), (2, 5),
-                         'a module reference must point at the module name')
-
-    def test_an_attribute_names_the_file_the_crate_compiles(self):
-        """Require the ``#[path]`` value, which overrides Rust's bare search."""
-        self.assertEqual(modules('#[path = "x.rs"] mod a;'), (('a', 'x.rs'),),
-                         'a path attribute must name the file the declaration compiles')
-
-    def test_an_unrelated_attribute_before_the_path_is_walked_over(self):
-        """Require the walk to continue past an attribute that is not ``#[path]``.
-
-        The corpus holds ``#[path]`` first, so the converse order — which a real
-        crate writes whenever an allow sits above the path — is what would fall
-        back to the bare search and audit the wrong file.
-        """
-        self.assertEqual(modules('#[allow(dead_code)]\n#[path = "x.rs"]\nmod a;'),
-                         (('a', 'x.rs'),),
-                         'a non-path attribute must not hide the path attribute below it')
-
-    def test_an_attribute_at_the_very_start_of_the_file_is_walked(self):
-        """Require the backwards walk to reach index zero.
-
-        A walk bounded at index 1 would stop before the attribute that opens the
-        file, so ``#[path]`` in the first position would be missed.
-        """
-        self.assertEqual(modules('#[path = "x.rs"] mod a;')[0][1], 'x.rs',
-                         'an attribute at the start of the file must be read')
-
-    def test_a_path_after_a_visibility_modifier_is_read(self):
-        """Require the visibility step, so ``pub(crate) mod x;`` keeps its path."""
-        self.assertEqual(modules('#[path = "x.rs"] pub(crate) mod a;'),
-                         (('a', 'x.rs'),),
-                         'a visibility modifier between attribute and declaration must be crossed')
 
 
 class ReportingOnce(unittest.TestCase):
@@ -150,7 +61,6 @@ class ReportingOnce(unittest.TestCase):
         self.assertEqual(items('kani::assume(a); kani::assume(b);'),
                          (('assume', 1, 7), ('assume', 1, 24)),
                          'two uses on one line must keep their own columns')
-
 
 class LiteralScanning(unittest.TestCase):
     """Require a proc-macro crate's literal to report its Kani vocabulary."""
@@ -182,7 +92,6 @@ class LiteralScanning(unittest.TestCase):
         self.assertEqual(items('let s = "a\n  kani::assume(b)";', procedural_macro=True),
                          (('assume', 2, 9),),
                          'an item after a newline must report its column within that line')
-
 
 class BareUse(unittest.TestCase):
     """Require rule (iii) to claim a bare word, and only a bare word."""
@@ -227,7 +136,6 @@ class BareUse(unittest.TestCase):
         self.assertTrue(_is_bare_use(tokens, 2),
                         'the rule must consult the token before the word, not after')
 
-
 class StatementBounds(unittest.TestCase):
     """Require a ``use`` tree's root to be read up to its own semicolon."""
 
@@ -243,6 +151,216 @@ class StatementBounds(unittest.TestCase):
         self.assertEqual(_statement_end(tokens, 0), len(tokens),
                          'a statement with no semicolon must end at the last token')
 
+class VerusRegionEdges(unittest.TestCase):
+    """Require a Verus region's bounds to include its own vocabulary and no more."""
+
+    def test_the_first_token_of_a_body_is_inside_it(self):
+        """Require the region to start at the token after ``{``, not after that one.
+
+        A region that starts one token late leaves the body's first statement
+        outside it, so ``verus! { assume(x); }`` reports nothing. That is the
+        failing direction DL-17 exists to prevent: the audit says the proof has
+        no trust in it.
+        """
+        self.assertEqual(items('verus! { assume(x); }'), (('assume', 1, 10),),
+                         'the first token of a verus! body must be inside its region')
+
+    def test_a_word_before_the_macro_is_not_inside_the_body(self):
+        """Require the region to begin after ``verus!``, so earlier code is not adopted.
+
+        A region starting before the macro would report an ordinary ``external``
+        that merely sits earlier in the file as Verus trust, at a location the
+        author would not recognise.
+        """
+        self.assertEqual(items('external verus! { assume(y); }'), (('assume', 1, 19),),
+                         'only the body of a verus! macro is a Verus region')
+
+    def test_a_bare_verus_call_is_not_a_verus_body(self):
+        """Require all three of ``verus``, ``!``, and ``{`` before a body is claimed.
+
+        ``verus(a);`` is an ordinary call. Accepting ``verus`` or ``!`` alone
+        makes it look like a macro body and then fails to find the ``{`` the
+        body needs, refusing a file that is valid Rust.
+        """
+        self.assertEqual(items('verus(a);'), (),
+                         'a call to a function named verus is not a macro body')
+
+    def test_an_attribute_region_stops_at_its_own_closer(self):
+        """Require the region to end before ``]``, not after it.
+
+        A region ending past the attribute's ``]`` adopts the item the attribute
+        decorates, so ``#[verifier(x)] external;`` reports that item as trust
+        even though the attribute says nothing about it.
+        """
+        self.assertEqual(items('#[verifier(x)] external;'), (),
+                         'an attribute region must not extend past its own bracket')
+
+    def test_a_cfg_attr_region_stops_at_its_own_closer(self):
+        """Require the same bound for the ``cfg_attr`` form that carries Verus."""
+        self.assertEqual(items('#[cfg_attr(verus_verify, x)] external;'), (),
+                         'a cfg_attr region must not extend past its own bracket')
+
+class DeduplicationIdentity(unittest.TestCase):
+    """Require the duplicate test to compare the item and the position together."""
+
+    def test_two_different_items_at_one_position_are_both_reported(self):
+        """Require the item comparison, so distinct words are not merged.
+
+        The check exists to stop one token being reported twice. Comparing only
+        the position would drop every second item sharing a location, which for
+        a literal scan is the common case: two vocabulary words in one string.
+        """
+        self.assertEqual(items('let s = "kani::assume(kani::stub(x))";', procedural_macro=True),
+                         (('assume', 1, 16), ('stub', 1, 29)),
+                         'two different items at distinct offsets must both be reported')
+
+    def test_one_item_reported_twice_keeps_its_first_position(self):
+        """Require the line and column in the duplicate test, not the item alone.
+
+        ``kani::assume`` is matched by the qualified rule and again by the word
+        rule at the same offset. Dropping the second is what keeps the report a
+        set; a test that compared only the item would also drop a *second*
+        genuine use of the same word elsewhere in the file.
+        """
+        self.assertEqual(items('kani::assume(a); kani::assume(b);'),
+                         (('assume', 1, 7), ('assume', 1, 24)),
+                         'the same item at two offsets must be reported at both')
+
+class UnrelatedTextIsNotTrust(unittest.TestCase):
+    """Require a vocabulary word to need a context before it is reported."""
+
+    def test_a_field_named_assume_is_not_a_bare_use(self):
+        """Require ``.`` to exclude the word, since a field is not a trust use.
+
+        The mutant reads the token at ``None`` rather than at the index, which
+        makes the exclusion look at the wrong token. A file that imports from a
+        trust root would then report a field or method named ``assume``.
+        """
+        self.assertEqual(items('use kani::assume;\nfn f() { x.assume; }'),
+                         (('assume', 1, 11),),
+                         'a field named assume is not a bare trust use')
+
+    def test_a_bare_use_before_no_import_is_still_reported(self):
+        """Require the positive direction of rule (iii), so the filter is not vacuous."""
+        self.assertEqual(items('use kani::assume;\nfn f() { assume(1); }'),
+                         (('assume', 1, 11), ('assume', 2, 10)),
+                         'a bare use in a file importing a trust root must be reported')
+
+class StatementAndImportBounds(unittest.TestCase):
+    """Require a ``use`` statement to be read from its own keyword onwards."""
+
+    def test_a_use_after_another_statement_is_still_read(self):
+        """Require the search to start at the statement, not at the file's first token.
+
+        Starting at index zero finds the *previous* statement's ``;`` as this
+        statement's end, so the root is never read and the import is invisible.
+        Rule (iii) then stops applying and the file's bare uses go unreported.
+        """
+        self.assertEqual(items('use a;\nuse kani::assume;\nfn f() { assume(1); }'),
+                         (('assume', 2, 11), ('assume', 3, 10)),
+                         'a use after another statement must still be read')
+
+    def test_an_import_after_code_is_still_found(self):
+        """Require the walk to continue past non-``use`` tokens rather than stop.
+
+        An import usually follows the module's opening code. Stopping at the
+        first non-``use`` token would find only imports at the very top of the
+        file and silently disable rule (iii) everywhere else.
+        """
+        self.assertEqual(items('fn f() {}\nuse kani::assume;\nfn g() { assume(1); }'),
+                         (('assume', 2, 11), ('assume', 3, 10)),
+                         'an import after code must still be discovered')
+
+class NestedAttributeRecognition(unittest.TestCase):
+    """Require a ``cfg_attr`` search to read its own contents and no further.
+
+    ``_carries_verus`` scans the tokens between a ``cfg_attr``'s predicate and
+    the attribute's closer. Its start and end are both load-bearing: starting
+    too late misses a Verus head that comes first, and ending at ``None`` runs
+    past the bracket into whatever the file writes next. Either way a Verus
+    word is reported as trust in an attribute that does not carry it, or one
+    that does is missed.
+    """
+
+    def test_a_verus_head_immediately_after_the_predicate_is_seen(self):
+        """Require the search to start at ``open_index + 2``, its documented start.
+
+        ``#[cfg_attr verus_verify assume]`` is not valid Rust attribute syntax,
+        but it is what a lexer sees if the author wrote the predicate without
+        parentheses. The Verus head is then the first token the search must
+        inspect; starting one further along skips it and the region is lost.
+        """
+        self.assertEqual(items('#[cfg_attr verus_verify assume]'),
+                         (('assume', 1, 25),),
+                         'a verus head at the search start must create a region')
+
+    def test_a_cfg_attr_without_verus_does_not_reach_a_later_attribute(self):
+        """Require the search to stop at ``close_index`` rather than run on.
+
+        A ``#[verifier]`` attribute written *after* a plain ``cfg_attr`` is a
+        separate attribute with its own region. Searching past the first
+        attribute's closer would let the second attribute's head satisfy the
+        first one's test, reporting the first attribute's words as trust even
+        though nothing in it is Verus.
+        """
+        self.assertEqual(items('#[verifier] #[cfg_attr(feature, assume)] external;'), (),
+                         'a cfg_attr region must not borrow a later attribute head')
+
+    def test_a_verus_attribute_after_a_plain_cfg_attr_is_not_attributed_to_it(self):
+        """Require the end bound in the other direction, where the Verus word is real.
+
+        The trailing ``#[verifier]`` makes ``external`` trust through its own
+        region. A search that ran to the end of the file would instead also
+        attribute the ``assume`` from the earlier attribute, reporting trust in
+        a position no Verus context covers.
+        """
+        self.assertEqual(items('#[cfg_attr(feature, assume)] #[verifier] external;'), (),
+                         'a later verifier attribute must not retroactively cover an earlier one')
+
+class RegionBoundaries(unittest.TestCase):
+    """Require a ``verus!`` body's found position and end to be the body's own."""
+
+    def test_an_unclosed_verus_body_is_refused_rather_than_ignored(self):
+        """Require the scan to reach ``verus!{`` at the end of the file.
+
+        The region finder walks up to the last token it can look three ahead
+        from. Stopping earlier would skip a ``verus!`` immediately followed by
+        the file's final token, and the unclosed body it opens would go
+        unreported instead of refusing.
+        """
+        with self.assertRaises(TrustAuditError) as raised:
+            scan('verus!{')
+        self.assertIn('unclosed', str(raised.exception),
+                      'an unclosed verus body must be refused')
+
+class PositionalReporting(unittest.TestCase):
+    """Require every reported position to be the item's own, not a nearby one."""
+
+    def test_the_same_item_on_two_lines_is_reported_twice(self):
+        """Require the line in the duplicate test, not the item alone.
+
+        Two ``kani::assume`` calls on separate lines are two trust sites and
+        must be reported separately. Comparing only the item would collapse
+        them into one, and the record would be certified against half the trust
+        the file contains.
+        """
+        self.assertEqual(items('kani::assume(a);\nkani::assume(b);'),
+                         (('assume', 1, 7), ('assume', 2, 7)),
+                         'the same item on two lines must be reported at both')
+
+    def test_a_literal_spanning_lines_locates_each_word_on_its_own_line(self):
+        """Require the *last* newline to be measured from, not the first.
+
+        The column inside a multi-line literal is counted from the newline
+        directly before the word. Measuring from the first newline in the
+        prefix would place every word after the second line at a column offset
+        by the earlier lines' lengths, so two uses in one literal could collide
+        or be reported at positions no editor shows.
+        """
+        self.assertEqual(items('let s = "a\n  kani::assume(b)\n  kani::stub(c)";',
+                               procedural_macro=True),
+                         (('assume', 2, 9), ('stub', 3, 9)),
+                         'each word in a multi-line literal must be located on its own line')
 
 class OpaqueMacroMessages(unittest.TestCase):
     """Require the refusal to name the macro and its position, not only say why."""

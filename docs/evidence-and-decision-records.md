@@ -58,10 +58,13 @@ A verifier verdict counts as parsed only when its registered adapter supplies a
 `VerifiedLogResult` for the record's exact tool, committed log path, and
 digest. Registration alone is insufficient. The adapter reads the log,
 validates its digest, derives the admission-relevant facts, and passes that
-result to the pure gate, which checks that those facts match the record. No
-parser is registered or integrated yet, so verifier records are
-`verdict-self-reported` and rejected. Tasks 1.2.1 and 1.2.4 own the parsers and
-the trust-audit scanner, with these obligations:
+result to the pure gate, which checks that those facts match the record. Task
+1.2.1 registered `kani` in `spec/evidence-reason-codes.json` after its corpus
+demonstrated every class the gate keys on, so a Kani record whose cited log the
+adapter can read and whose digest matches is decided from that log rather than
+from the record's own fields. Verus has no parser yet, so a Verus record is
+still `verdict-self-reported` and rejected. Task 1.2.4 owns the Verus parser,
+with these obligations for every parser and for the trust-audit scanner:
 
 - A parser re-derives the outcome, every `cover!` result, every negative
   control's observed failure, and the run mode from the raw log, and rejects a

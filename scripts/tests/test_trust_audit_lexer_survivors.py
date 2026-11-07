@@ -7,19 +7,24 @@ ends mid-literal, never starts a literal on the last character, and never writes
 a manifest whose bytes require the declared encoding. Each case here supplies
 the exact boundary the mutant needs.
 
-Five families are equivalents rather than gaps, and this module records why.
+Four families are equivalents rather than gaps, and this module records why.
 ``Cursor.line_before`` and ``Cursor.column_before`` are overwritten by
 ``_consume_quote_literal`` on its first line before any caller can read them, and
 the same is true of every other ``_Cursor`` field a constructor mutant touches.
-``skip_until``'s ``rfind``, ``<= 0``, and ``< 1`` variants all answer the same
-for the terminators this lexer uses, because a raw string's fence appears once
-and the search is always forward. ``_skip_trivia``'s trailing ``break`` and
-``return`` differ only in a value no caller reads, and its ``newline <= 0`` and
-``newline < 1`` variants agree with ``< 0`` when the newline is absent because
-the branch then takes the other arm. ``read_text(encoding='UTF-8')`` is
-case-insensitive in Python's codec lookup, and ``encoding=None`` selects the
+``_skip_trivia``'s ``newline <= 0`` and ``newline < 1`` variants agree with
+``< 0``: the search starts at the ``/`` of the comment marker, which is not a
+newline, so a *found* position is never ``0`` and an absent newline reports
+``-1``, which all three tests classify as absent. ``read_text(encoding='UTF-8')``
+is case-insensitive in Python's codec lookup, and ``encoding=None`` selects the
 locale's preferred encoding, which is UTF-8 here. A survivor no input can
 distinguish is not a test gap.
+
+The remaining equivalents are argued where the mutated code sits.
+``_skip_trivia``'s ``break``/``return`` pair and its ``len(text) + index`` arm
+are in :mod:`test_trust_audit_scanner_survivors`; the module name bound and the
+``_path_attribute`` walk start are in
+:mod:`test_trust_audit_attribute_survivors`; the four ``structure.py``
+survivors are in :mod:`test_trust_audit_structure_survivors`.
 
 Examples
 --------
@@ -181,6 +186,26 @@ class CursorArithmetic(unittest.TestCase):
         self.assertIn('unterminated string', str(raised.exception),
                       'an absent terminator must refuse with the caller supplied name')
 
+    def test_skip_until_stops_at_the_first_terminator(self):
+        """Require the *first* terminator, which is the one that closes the form.
+
+        ``find`` reports the earliest match from the cursor, and this cursor
+        holds two. ``rfind`` reports the later one, so the scan runs past the
+        literal's own end and the text between the two terminators is consumed
+        as part of the literal. For a raw string that is the difference between
+        two adjacent literals and one literal swallowing both:
+
+            >>> [token.text for token in tokenize('r"a" r"b"')]
+            ['r"a"', 'r"b"']
+
+        where the mutant yields the single token ``'r"a" r"b"'``. Code that
+        sat between the literals would then be invisible to the audit.
+        """
+        cursor = _Cursor('a"b"c')
+        cursor.skip_until('"', 'string')
+        self.assertEqual(cursor.index, 2,
+                         'skip_until must stop at the first terminator, not the last')
+
 
 class TokenPositions(unittest.TestCase):
     """Require a punctuator's reported position to be its own, not the one after it."""
@@ -196,7 +221,112 @@ class TokenPositions(unittest.TestCase):
                          'a punctuator must report the column it starts at')
 
 
-class ManifestAndPathBoundaries(unittest.TestCase):
+class CommentNestingBoundaries(unittest.TestCase):
+    """Require a nested comment's delimiter to be consumed by exactly two characters."""
+
+    def test_two_adjacent_openers_after_the_outer_one_are_counted(self):
+        """Require ``take(2)``, since a wider take skips an opener it must count.
+
+        ``/*/**/*/`` is an outer comment whose body holds ``/*`` and then ``*/``
+        immediately: the nested pair must open and close, leaving the final
+        ``*/`` to close the outer comment. Consuming three characters at the
+        inner ``/*`` eats the ``/`` that begins the inner terminator, so the
+        nesting is never closed and valid source is refused.
+        """
+        self.assertEqual(texts('/*/**/*/ a'), ['a'],
+                         'a comment holding an immediately closed nested comment must close')
+
+    def test_an_open_then_close_run_still_terminates(self):
+        """Require the same boundary in the direction that must refuse.
+
+        ``/*/*/*/`` never closes: the inner ``/*`` opens a level the remaining
+        ``/*/`` cannot close. Refusing it is right, and a mutant that skips a
+        character may instead accept it as a complete comment.
+        """
+        with self.assertRaises(TrustAuditError):
+            tokenize('/*/*/*/ a')
+
+
+class LiteralConsumptionBoundaries(unittest.TestCase):
+    """Require a character literal to consume its quote and its body, not more."""
+
+    def test_code_after_an_escaped_literal_is_still_lexed(self):
+        """Require the escape to close at its own quote, leaving the text after it.
+
+        ``'\\''a'`` is a literal holding an escaped quote followed by ``a``.
+        Consuming two characters at the opening quote makes the escape branch
+        read the closing quote as an escaped character, so the literal runs on
+        and the code after it is swallowed.
+        """
+        self.assertEqual(texts("'\\''a'"), ['a'],
+                         'an escaped literal must close before the code that follows it')
+
+    def test_a_trust_word_after_an_escaped_literal_is_still_seen(self):
+        """Require the audit to reach code the literal precedes, which is the consequence.
+
+        The token stream is what the matcher reads, so a literal that swallows
+        its neighbour hides an ``assume`` from the audit entirely — the failure
+        direction that makes the audit claim a proof has no trust in it.
+        """
+        self.assertIn('assume', texts("x '\\''assume(y);"),
+                      'code after an escaped literal must still be tokenised')
+
+
+class TriviaBoundaryCharacters(unittest.TestCase):
+    """Require the whitespace set to be exactly the four characters Rust skips."""
+
+    def test_the_letter_x_before_the_comment_marker_is_code(self):
+        """Require ``X`` to be lexed, since a widened literal set would skip it.
+
+        ``X`` appears in no Rust whitespace, but it is the letter a mutant that
+        bracketed the set with markers would add. A lexer that treats it as
+        trivia silently deletes an identifier, and for a proc-macro crate that
+        identifier can be the only spelling of a trust item.
+        """
+        self.assertEqual(texts('X'), ['X'],
+                         'a letter outside the whitespace set must be tokenised')
+
+    def test_the_letters_bracketing_the_set_do_not_join_a_word(self):
+        """Require ``Xfoo`` to stay one identifier, not to lose its first letter."""
+        self.assertEqual(texts('Xfoo'), ['Xfoo'],
+                         'a word beginning with a non-whitespace letter must keep it')
+
+
+class LineCommentConsumption(unittest.TestCase):
+    """Require a line comment to consume through its own newline and no further."""
+
+    def test_a_comment_at_the_first_character_is_consumed(self):
+        """Require the newline search from index zero, not to be treated as absent.
+
+        The search reports the position of the ``\\n`` it found, which is
+        greater than zero whenever the comment is not at the start of the file.
+        A guard that mistakes zero for "not found" consumes from the wrong
+        direction, and a comment opening the file is exactly where it happens.
+        """
+        self.assertEqual(texts('// c\nb'), ['b'],
+                         'a line comment at the first character must stop at its newline')
+
+    def test_a_line_comment_with_no_newline_consumes_to_the_end(self):
+        """Require the absent-terminator branch, which has no position to read."""
+        self.assertEqual(texts('//c'), [],
+                         'a line comment with no newline must consume the rest of the file')
+
+
+class EmptyCommentBodies(unittest.TestCase):
+    """Require an empty literal or comment to be consumed, not to stall the lexer."""
+
+    def test_a_string_still_reports_its_body(self):
+        """Require the body rather than ``None``, which no caller expects.
+
+        ``literal_body``'s callers slice and search the returned text, and a
+        proc-macro scan reads the literal token back through the same path. A
+        placeholder body would make that scan raise instead of reporting.
+        """
+        self.assertEqual(texts('"assume"'), ['"assume"'],
+                         'a string must be returned as one literal token')
+
+
+class CommandRefusals(unittest.TestCase):
     """Require the command layer's encoding and refusal paths to carry their reason."""
 
     def test_a_proc_macro_manifest_is_recognised(self):

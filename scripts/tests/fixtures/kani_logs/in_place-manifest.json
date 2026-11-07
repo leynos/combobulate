@@ -1,0 +1,16 @@
+{
+  "revision": "0.1",
+  "corpus": "target/epm1-native-workspace/facade",
+  "description": "The harness the in-place probe generates from scripts/verifier_probe_support.py. It is not part of the kani-corpus crate, so it has its own manifest: the probe compiles the shipped kernel into a scratch workspace and verifies one harness there.",
+  "sources": [
+    "scripts/verifier_probe_support.py"
+  ],
+  "harnesses": [
+    {
+      "name": "verification::target_facts",
+      "role": "claim",
+      "covers": ["the supported target has a reachable 64-bit width"],
+      "should_panic": false
+    }
+  ]
+}

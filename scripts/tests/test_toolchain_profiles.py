@@ -45,6 +45,7 @@ class ScratchTree(unittest.TestCase):
     """
 
     def setUp(self) -> None:
+        """Copy the toolchain inputs the check reads into a scratch directory."""
         self._directory = tempfile.TemporaryDirectory()
         self.root = Path(self._directory.name)
         record = record_at(ROOT)
@@ -75,6 +76,7 @@ class ScratchTree(unittest.TestCase):
         )
 
     def tearDown(self) -> None:
+        """Remove the scratch directory and everything copied into it."""
         self._directory.cleanup()
 
     def check(self, tracked: list[str] | None = None) -> None:
