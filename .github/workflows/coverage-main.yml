@@ -66,6 +66,10 @@ jobs:
         env:
           RUSTFLAGS: ""
         run: cargo binstall --no-confirm --locked cargo-nextest
+      - name: Build the cardinality gate's test binary
+        # The coverage run reaches tests/cardinality_probe_ui.rs, which only
+        # reads and runs the binary this target records.
+        run: make prepare-ui-gate
       - name: Log coverage linker configuration
         run: |
           echo "Coverage linker: clang"
