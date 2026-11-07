@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 104
+      "count": 103
     },
     {
       "check": "contract-examples",
@@ -139,6 +139,12 @@
       "status": "pass",
       "detail": "Cargo.toml satisfies the enforced package rules: the ISC licence (D04); publish = false (D05).",
       "count": 2
+    },
+    {
+      "check": "toolchain-profiles",
+      "status": "pass",
+      "detail": "Pins agree with every site the record names, no unlisted site repeats a pin, and every capability status that claims an observation cites its log.",
+      "count": 21
     }
   ],
   "not_run": [

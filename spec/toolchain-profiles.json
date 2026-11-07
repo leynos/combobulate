@@ -1,0 +1,389 @@
+{
+  "revision": "0.1",
+  "target": {
+    "triple": "x86_64-unknown-linux-gnu",
+    "usize_bits": 64,
+    "architecture": "x64"
+  },
+  "toolchains": {
+    "repository": {
+      "name": "rustup:nightly-2026-08-27",
+      "version": "1.100.0-nightly (bff8e12ff 2026-08-26)",
+      "role": "Builds, lints, and tests every ordinary profile, and runs the Kani and Verus probes that produce evidence.",
+      "components": [
+        "clippy",
+        "llvm-tools-preview",
+        "rustc-codegen-cranelift-preview",
+        "rust-analyzer",
+        "rustfmt"
+      ]
+    },
+    "kani": {
+      "name": "kani-verifier",
+      "version": "0.67.0",
+      "role": "Bounded model checker for the Kani proof profile and the harness corpus.",
+      "components": [
+        "CBMC 6.8.0",
+        "CaDiCaL 2.0.0"
+      ]
+    },
+    "verus": {
+      "name": "verus",
+      "version": "0.2026.09.06.8dea4a2",
+      "role": "Deductive verifier for the Verus proof profile.",
+      "components": [
+        "Rust 1.98.0",
+        "Z3 4.16.0",
+        "vstd 0.0.0-2026-09-06-0133"
+      ]
+    },
+    "polars": {
+      "name": "polars",
+      "version": "0.55.2",
+      "role": "The facade's optional backend, selected by the Rust crate release rather than the Python Polars version.",
+      "components": [
+        "lazy"
+      ]
+    }
+  },
+  "pins": {
+    "repository_channel": {
+      "value": "nightly-2026-08-27",
+      "sites": [
+        "rust-toolchain.toml",
+        "spec/acceptance-controls.json",
+        "spec/calibration/builds.json",
+        "spec/calibration/shared-workloads-local.json",
+        "spec/calibration/verifier-probe.json",
+        "tests/build_tools_preflight.rs",
+        "tests/support/build_tools_preflight.rs",
+        "scripts/tests/test_preregistration.py",
+        "scripts/tests/test_validation_report.py",
+        "scripts/tests/test_verifier_free_container.py",
+        "scripts/tests/test_verifier_free_orchestration.py",
+        "scripts/tests/test_toolchain_profiles.py"
+      ]
+    },
+    "repository_rustc_commit": {
+      "value": "bff8e12ff5e6bcd53dfb1dbccdcec80a60a856ed",
+      "sites": [
+        "tools/probes/observations/toolchains.log",
+        "spec/calibration/builds.json",
+        "spec/calibration/shared-workloads-local.json",
+        "spec/calibration/verifier-probe.json",
+        "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free.log",
+        "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free-hosted.log"
+      ]
+    },
+    "kani_release": {
+      "value": "0.67.0",
+      "sites": [
+        "tools/kani/VERSION",
+        "spec/acceptance-controls.json",
+        "spec/calibration/builds.json",
+        "spec/calibration/shared-workloads-local.json",
+        "spec/calibration/verifier-probe.json",
+        "scripts/tests/fixtures/kani_logs/provenance.json",
+        "tools/verifier-fixtures/kani-corpus/kani-list.json",
+        "scripts/verifier_probe_support.py",
+        "scripts/tests/test_preregistration.py",
+        "scripts/tests/test_preregistration_measurements.py",
+        "scripts/tests/test_validation_report.py",
+        "tests/support/prover_tools_probe.rs",
+        "scripts/tests/test_toolchain_profiles.py"
+      ]
+    },
+    "kani_toolchain": {
+      "value": "nightly-2025-11-21-x86_64-unknown-linux-gnu",
+      "sites": [
+        "scripts/tests/fixtures/kani_logs/provenance.json",
+        "tools/probes/observations/toolchains.log",
+        "scripts/verifier_probe_support.py",
+        "scripts/tests/test_kani_route_builders.py",
+        "tests/support/prover_tools_probe.rs"
+      ]
+    },
+    "kani_cbmc": {
+      "value": "6.8.0",
+      "sites": [
+        "tools/probes/observations/toolchains.log",
+        "scripts/tests/fixtures/kani_logs/counterexample.log",
+        "scripts/tests/fixtures/kani_logs/unsatisfied_cover.log"
+      ]
+    },
+    "kani_cadical": {
+      "value": "2.0.0",
+      "sites": [
+        "scripts/tests/fixtures/kani_logs/counterexample.log",
+        "scripts/tests/fixtures/kani_logs/unsatisfied_cover.log"
+      ]
+    },
+    "verus_release": {
+      "value": "0.2026.09.06.8dea4a2",
+      "sites": [
+        "tools/verus/VERSION",
+        "tools/verus/SHA256SUMS",
+        "tools/verus/README.md",
+        "tools/probes/observations/toolchains.log",
+        "spec/acceptance-controls.json",
+        "spec/calibration/builds.json",
+        "spec/calibration/shared-workloads-local.json",
+        "spec/calibration/verifier-probe.json",
+        "tools/verifier-fixtures/verus-wiring-probe/provenance.json",
+        "tests/prover_tools_contract.rs",
+        "scripts/tests/test_preregistration.py",
+        "scripts/tests/test_preregistration_measurements.py",
+        "scripts/tests/test_validation_report.py",
+        "scripts/tests/test_verifier_probe_provenance.py",
+        "scripts/tests/test_toolchain_profiles.py"
+      ]
+    },
+    "verus_rust": {
+      "value": "1.98.0",
+      "sites": [
+        "tools/probes/observations/toolchains.log",
+        "spec/acceptance-controls.json",
+        "spec/calibration/builds.json",
+        "spec/calibration/shared-workloads-local.json",
+        "spec/calibration/verifier-probe.json"
+      ]
+    },
+    "verus_z3": {
+      "value": "4.16.0",
+      "sites": [
+        "tools/probes/observations/toolchains.log",
+        "tools/verifier-fixtures/verus-wiring-probe/provenance.json",
+        "scripts/probe_provenance.py",
+        "scripts/verus_probe.py",
+        "spec/acceptance-controls.json",
+        "spec/calibration/builds.json",
+        "spec/calibration/shared-workloads-local.json",
+        "spec/calibration/verifier-probe.json",
+        "scripts/tests/test_preregistration.py",
+        "scripts/tests/test_preregistration_measurements.py",
+        "scripts/tests/test_validation_report.py",
+        "scripts/tests/test_verifier_probe_provenance.py",
+        "tests/support/prover_tools_probe.rs"
+      ]
+    },
+    "verus_vstd": {
+      "value": "=0.0.0-2026-09-06-0133",
+      "sites": [
+        "tools/verifier-fixtures/verus-wiring-probe/macro/Cargo.toml",
+        "tools/verifier-fixtures/verus-wiring-probe/attributes/Cargo.toml",
+        "tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml",
+        "tools/verifier-fixtures/verus-wiring-probe/Cargo.lock",
+        "tests/fixtures/cargo/facade-reaches-vstd.tree",
+        "scripts/tests/test_toolchain_profiles.py"
+      ]
+    },
+    "polars_release": {
+      "value": "0.55.2",
+      "sites": [
+        ".github/dependabot.yml",
+        "Cargo.toml",
+        "Cargo.lock",
+        "tools/probes/polars-profile/Cargo.toml",
+        "tools/probes/polars-profile/Cargo.lock",
+        "tools/probes/observations/polars-features.log",
+        "spec/calibration/builds.json",
+        "tools/calibration/cardinality-probe/Cargo.toml",
+        "tools/calibration/cardinality-probe/Cargo.lock",
+        "spec/backend-capabilities.json",
+        "tests/workspace_boundaries.rs",
+        "scripts/tests/test_toolchain_profiles.py"
+      ]
+    },
+    "prover_tools_ref": {
+      "value": "9c4a27a86c678ceac1155404f45d95ee4a14a172",
+      "sites": [
+        "tools/rust-prover-tools/REF",
+        "scripts/run_verifier_probes.py",
+        "scripts/tests/fixtures/kani_logs/provenance.json",
+        "tools/probes/observations/prover-tools-ref.log"
+      ]
+    }
+  },
+  "profiles": [
+    {
+      "id": "native-only",
+      "crates": [
+        "combobulate",
+        "combobulate-kernel"
+      ],
+      "features": {
+        "macros": false,
+        "polars": false
+      },
+      "toolchain": "rustup:nightly-2026-08-27",
+      "commands": [
+        "cargo test --all-targets --no-default-features",
+        "cargo test --doc --workspace --no-default-features",
+        "cargo clippy --all-targets --no-default-features -- -D warnings"
+      ]
+    },
+    {
+      "id": "polars-enabled",
+      "crates": [
+        "combobulate",
+        "combobulate-kernel",
+        "combobulate-macros",
+        "polars"
+      ],
+      "features": {
+        "macros": true,
+        "polars": true
+      },
+      "toolchain": "rustup:nightly-2026-08-27",
+      "commands": [
+        "cargo test --all-targets",
+        "cargo test --doc --workspace",
+        "cargo clippy --all-targets -- -D warnings"
+      ]
+    },
+    {
+      "id": "proof-kani",
+      "crates": [
+        "kani-corpus"
+      ],
+      "features": {
+        "macros": false,
+        "polars": false
+      },
+      "toolchain": "nightly-2025-11-21-x86_64-unknown-linux-gnu",
+      "commands": [
+        "prover-tools kani install --repo-root .",
+        "cargo kani --harness <name>"
+      ]
+    },
+    {
+      "id": "proof-verus",
+      "crates": [
+        "verus-wiring-probe"
+      ],
+      "features": {
+        "macros": false,
+        "polars": false
+      },
+      "toolchain": "1.98.0 + Z3 4.16.0 (Verus 0.2026.09.06.8dea4a2)",
+      "commands": [
+        "prover-tools verus install --repo-root .",
+        "cargo verus verify"
+      ]
+    }
+  ],
+  "supported_toolchain_set": [
+    {
+      "id": "rustup:nightly-2026-08-27",
+      "version": "1.100.0-nightly (bff8e12ff 2026-08-26)",
+      "role": "The only ordinary build toolchain. It compiles, lints, tests, and documents every shipped crate.",
+      "ordinary": true
+    },
+    {
+      "id": "nightly-2025-11-21",
+      "version": "1.93.0-nightly (53732d5e0 2025-11-20)",
+      "role": "Kani 0.67.0's pinned toolchain. It compiles harness subjects only; no shipped crate builds with it.",
+      "ordinary": false
+    },
+    {
+      "id": "1.98.0",
+      "version": "1.98.0 (88d9e12ae 2026-08-18)",
+      "role": "Verus's pinned Rust. It compiles and verifies proof subjects only.",
+      "ordinary": false
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "PC01",
+      "name": "Explicit Rust engine selection and positional ordering",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "An engine choice and ordering guarantee cannot be inferred from Python defaults."
+    },
+    {
+      "id": "PC02",
+      "name": "Streaming partition, prefix, halo, and segment contracts",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Unavailable kernel partition contracts exclude that streaming lowering."
+    },
+    {
+      "id": "PC03",
+      "name": "Spill permission, quota, control scope, and cleanup",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Default no unrequested disk; strict profile refuses an unenforceable guarantee."
+    },
+    {
+      "id": "PC04",
+      "name": "Operation-specific out-of-core execution",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Do not infer join/group-by spilling from sorting support."
+    },
+    {
+      "id": "PC05",
+      "name": "Empty/nested validity and schema semantics",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Combobulate schemas remain authoritative even when backend empty results use Null dtype."
+    },
+    {
+      "id": "PC06",
+      "name": "Dtype and extension-metadata planning specialization",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Backend plan-time callbacks are not Rust compile-time execution; extension tags are not domain proofs."
+    },
+    {
+      "id": "PC07",
+      "name": "Deterministic plugin optimizer participation",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Determinism alone cannot authorize speculation, skipped failures or merged effects."
+    },
+    {
+      "id": "PC08",
+      "name": "Physical node to source provenance",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Retain own source mapping when an optional backend hook is unavailable."
+    },
+    {
+      "id": "PC09",
+      "name": "Strict table boundary and extension representation",
+      "status": "documented-upstream-opportunity",
+      "refusal_rule": "Explicit local policies remain authoritative; Map does not replace ordered segments."
+    }
+  ],
+  "trusted_computing_base": [
+    {
+      "tool": "rustup toolchains",
+      "role": "Provide the compiler, standard library, Clippy, rustfmt, and llvm-tools for each profile.",
+      "trust_basis": "Installed by rustup from the official distribution channel named in rust-toolchain.toml; the release channel, not a digest, is the pin.",
+      "verified": false
+    },
+    {
+      "tool": "crates.io kani-verifier 0.67.0",
+      "role": "Installs the Kani driver that turns each harness into a CBMC query.",
+      "trust_basis": "Resolved from crates.io at the pinned version; the registry's own publishing controls are the only check.",
+      "verified": false
+    },
+    {
+      "tool": "Kani bundle download",
+      "role": "Supplies the Kani driver's CBMC 6.8.0 and CaDiCaL 2.0.0 binaries.",
+      "trust_basis": "Downloaded by the Kani installer rather than by this repository, and not verified against a digest here. This is recorded so no reader mistakes it for an audited input.",
+      "verified": false
+    },
+    {
+      "tool": "rust-prover-tools at 9c4a27a86c678ceac1155404f45d95ee4a14a172",
+      "role": "Installs and version-checks Kani and Verus through one pinned interface.",
+      "trust_basis": "Pinned by commit in tools/rust-prover-tools/REF and fetched by uv from the pinned Git source; the commit is the check.",
+      "verified": true
+    },
+    {
+      "tool": "Verus 0.2026.09.06.8dea4a2 archive",
+      "role": "Supplies the verifier and the matching vstd.",
+      "trust_basis": "The release archive's SHA-256 is committed in tools/verus/SHA256SUMS and must match before use.",
+      "verified": true
+    },
+    {
+      "tool": "z3-solver 4.16.0.0 distribution",
+      "role": "Supplies Z3 4.16.0, the solver Verus discharges obligations with.",
+      "trust_basis": "Resolved as a pinned Python distribution; the probe records the binary's own digest in the Verus provenance record.",
+      "verified": true
+    }
+  ]
+}
