@@ -19,7 +19,8 @@ pub use profile::BuildProfile;
 /// pinned Polars release compiles and links.
 ///
 /// The item is hidden from the documented API because it is a wiring probe,
-/// not an operation: it exists so `tests/` can execute the backend it links.
+/// not an operation: it exists so an integration test can execute the backend
+/// the build links. `tests/polars_backend.rs` is that test.
 ///
 /// ```
 /// assert_eq!(

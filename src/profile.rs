@@ -55,13 +55,16 @@ impl BuildProfile {
     #[must_use]
     pub const fn target_usize_bits(self) -> u32 { self.target_usize_bits }
 
-    /// The backend names compiled into this build, in report order.
+    /// The optional backends compiled into this build, in report order.
     ///
-    /// The native backend is always present, because it is the facade itself;
-    /// the optional backends follow in the order the profile line prints them.
-    fn backend_names(self) -> impl Iterator<Item = &'static str> {
-        core::iter::once("native")
-            .chain(self.has_macros.then_some("macros"))
+    /// The native backend is always present, because it is the facade itself,
+    /// and `Display` writes it before these. Returning only the optional names
+    /// keeps the always-present name out of the iterator, so the report cannot
+    /// be rendered with no backend at all.
+    fn optional_backend_names(self) -> impl Iterator<Item = &'static str> {
+        self.has_macros
+            .then_some("macros")
+            .into_iter()
             .chain(self.has_polars.then_some("polars"))
     }
 }
@@ -70,12 +73,8 @@ impl core::fmt::Display for BuildProfile {
     /// Renders the one-line report, e.g.
     /// `features: native, macros, polars; target usize: 64 bits`.
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("features: ")?;
-        let mut names = self.backend_names();
-        if let Some(first) = names.next() {
-            formatter.write_str(first)?;
-        }
-        for name in names {
+        formatter.write_str("features: native")?;
+        for name in self.optional_backend_names() {
             formatter.write_str(", ")?;
             formatter.write_str(name)?;
         }

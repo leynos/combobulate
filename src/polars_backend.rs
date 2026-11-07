@@ -44,18 +44,19 @@ pub(crate) fn collected_height() -> polars::prelude::PolarsResult<usize> {
 mod tests {
     //! The enabled profile must actually link the pinned Polars release.
 
-    // The body reports a failure by panicking rather than by returning Polars'
-    // error. A `Result`-returning test that also asserts is rejected by
-    // `clippy::panic_in_result_fn`, and the workspace denies that lint. So the
-    // fallible read is unwrapped once here, and the assertion is infallible.
+    // A `#[test]` that returns `Result` may contain no assertion, because the
+    // workspace denies `clippy::panic_in_result_fn`. So the test is infallible
+    // and folds the fallible read into the assertion: `as_ref().ok()` borrows
+    // Polars' error instead of unwrapping it, so there is no panic arm and no
+    // unwrap, and the single `assert_eq!` reports both the error case and the
+    // wrong-height case, with the values, through one diagnostic.
     #[test]
     fn int64_series_round_trips_through_lazy_collection() {
-        let Ok(height) = super::collected_height() else {
-            panic!("the pinned Polars release must collect the probe frame")
-        };
+        let collected = super::collected_height();
         assert_eq!(
-            height, 3,
-            "the selected feature set must preserve all three rows"
+            collected.as_ref().ok(),
+            Some(&3),
+            "the pinned Polars release must collect all three probe rows, got {collected:?}"
         );
     }
 }

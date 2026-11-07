@@ -84,6 +84,41 @@ Specification: parent plan lines 2250-2320.
 
 ### EP-M3 findings so far
 
+- **The coverage ratchet is a gate, and `main`'s 100 % baseline was vacuous.**
+  `coverage-main.yml` measured `main` at 100.00 % only because `src/lib.rs`
+  contained no items, so the first real code had to be *fully* covered to clear
+  `with-ratchet: 'true'` (±1 pp). The first hosted `build-test` run measured
+  92.06 % = **58/63 instrumented lines** and failed the ratchet while every one
+  of its 394 tests passed. The three defects, all found by lane-level coverage
+  rather than by any assertion:
+  - `src/profile.rs`: `Display::fmt` guarded the always-present `native` name
+    with `if let Some(first) = names.next()`, leaving that `None` arm
+    unreachable. The entry point is now `optional_backend_names`, which yields
+    only the conditional names, so the render cannot omit every backend and has
+    no dead branch.
+  - `src/lib.rs`: `polars_backend_probe` was documented as existing "so `tests/`
+    can execute the backend it links", but no test called it; only a doctest
+    did, and `cargo llvm-cov nextest` does not run doctests. `tests/polars_backend.rs`
+    now calls it from a dependent crate.
+  - `src/polars_backend.rs`: the unit test's `let … else { panic!(…) }` left the
+    panic arm uncovered. The test now asserts on `collected.as_ref().ok()` in
+    one infallible assertion, which reports the Polars error and the wrong
+    height through the same diagnostic and needs no panic arm.
+  After the fixes the four measured files are 60/60 = **100 %**, and the
+  native-only profile still compiles `tests/polars_backend.rs` to an empty test
+  binary because the file is `#![cfg(feature = "polars")]`.
+- **`cargo llvm-cov` reporting is unusable on this host, so reproduce the ratio
+  from the raw profile.** This toolchain writes test binaries under
+  `target/<profile>/build/<crate>/<hash>/out/` rather than `deps/`, so
+  `llvm-cov report` fails with "not found object files (searched directories:
+  …/llvm-cov-target/debug)". The working route is
+  `cargo llvm-cov nextest --no-report`, then merge the `.profraw` files with
+  the **pinned toolchain's** `llvm-profdata` and export with the same
+  toolchain's `llvm-cov`. Mixing toolchain versions fails with "no profile can
+  be merged".
+- `make coverage` cannot run on this host at all: `check-coverage-tools`
+  requires `ld.lld`, which is not installed. The lcov report does not depend on
+  which linker is selected, so measuring with `mold` reproduces CI exactly.
 - `rstest-bdd` 0.6.0 does **not** re-export its macros. `rstest-bdd-macros`
   0.6.0 is a separate direct dependency. Adding only `rstest-bdd` fails with
   `unresolved import rstest_bdd_macros`.
