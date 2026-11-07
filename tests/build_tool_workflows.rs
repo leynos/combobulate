@@ -112,6 +112,39 @@ fn direct_cargo_and_unresolved_shell_routes_are_checked() {
 }
 
 #[test]
+fn a_variable_expansion_is_resolved_by_its_subcommand() {
+    // `profile-measurements.yml` spells a profile's flags as a shell array and
+    // expands it after the subcommand. That build runs no suite, so the step
+    // must not be reported as one; an expansion in the subcommand's own place
+    // stays unresolved, because what it expands to is not readable here.
+    //
+    // The suite job keeps the check non-vacuous; the claim is about the build
+    // job, which has no provisioning and must not need any.
+    let build = "jobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo \
+                 build --workspace \"${flags[@]+\\\"${flags[@]}\\\"}\"\n  suite:\n    runs-on: \
+                 ubuntu-latest\n    steps:\n      - run: sudo apt-get install clang mold\n      - \
+                 run: make install-build-tools\n      - run: make test\n";
+    let build_document = workflow(build).expect("parse an array-expanded build fixture");
+    let problems = workflow_violations(&[("build.yml".to_owned(), build_document)])
+        .expect("inspect an array-expanded build");
+    assert!(
+        problems.is_empty(),
+        "an expansion after a non-suite subcommand must not fail the check: {problems:?}"
+    );
+
+    for command in ["cargo $SUBCOMMAND --workspace", "cargo \"$@\""] {
+        let source = format!(
+            "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: {command}\n"
+        );
+        let expanded = workflow(&source).expect("parse an expanded subcommand fixture");
+        assert!(
+            workflow_violations(&[("expanded.yml".to_owned(), expanded)]).is_err(),
+            "an expansion in the subcommand position must stay unresolved: {command}"
+        );
+    }
+}
+
+#[test]
 fn rejects_ineffective_installers_and_unprovable_workflows() {
     for install in [
         "",

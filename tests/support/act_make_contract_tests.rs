@@ -4,10 +4,15 @@ use camino::Utf8Path;
 
 use super::{
     harness::{ExecutorFailure, MakeHarness, MakeOptions},
-    records::{EnvironmentValue, GitHubToken},
+    records::{EnvironmentValue, GitHubToken, Invocation},
 };
 
 /// Checks Make selects Nextest when the controlled version probe succeeds.
+///
+/// The two gate profiles each contribute a Nextest run and a doctest run, in
+/// that order, so the four assertions share one shape: the argument vector at a
+/// known position must equal an expected one. Naming that shape once keeps the
+/// case about the expected commands rather than about the reading of them.
 #[test]
 fn available_nextest_selects_the_nextest_run_branch() {
     let harness = MakeHarness::new().expect("create the Make harness");
@@ -23,71 +28,52 @@ fn available_nextest_selects_the_nextest_run_branch() {
         output.status.success(),
         "the Nextest Make route must succeed"
     );
-    let probe_arguments = invocations.first().map(|call| {
+    let expected = [
+        (
+            0,
+            vec!["nextest", "--version"],
+            "the first Cargo call must probe Nextest",
+        ),
+        (
+            5,
+            vec!["nextest", "run", "--all-targets", "--no-default-features"],
+            "a successful Nextest probe must select its run command for the first gate profile",
+        ),
+        (
+            6,
+            vec!["test", "--doc", "--workspace", "--no-default-features"],
+            "doctests must still follow Nextest",
+        ),
+        (
+            7,
+            vec!["nextest", "run", "--all-targets"],
+            "the Polars-enabled profile must run in its own Nextest invocation",
+        ),
+        (
+            8,
+            vec!["test", "--doc", "--workspace"],
+            "the Polars-enabled profile must run in its own doctest invocation",
+        ),
+    ];
+    for (position, arguments, message) in expected {
+        assert_arguments_at(&invocations, position, &arguments, message);
+    }
+}
+
+/// Asserts the Cargo call at `position` received exactly `expected` arguments.
+fn assert_arguments_at(
+    invocations: &[Invocation],
+    position: usize,
+    expected: &[&str],
+    message: &str,
+) {
+    let actual = invocations.get(position).map(|call| {
         call.arguments
             .iter()
             .map(String::as_str)
             .collect::<Vec<_>>()
     });
-    assert_eq!(
-        probe_arguments,
-        Some(vec!["nextest", "--version"]),
-        "the first Cargo call must probe Nextest"
-    );
-    let test_arguments = invocations.get(5).map(|call| {
-        call.arguments
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-    });
-    assert_eq!(
-        test_arguments,
-        Some(vec![
-            "nextest",
-            "run",
-            "--all-targets",
-            "--no-default-features"
-        ]),
-        "a successful Nextest probe must select its run command for the first gate profile"
-    );
-    let doctest_arguments = invocations.get(6).map(|call| {
-        call.arguments
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-    });
-    assert_eq!(
-        doctest_arguments,
-        Some(vec![
-            "test",
-            "--doc",
-            "--workspace",
-            "--no-default-features"
-        ]),
-        "doctests must still follow Nextest"
-    );
-    let polars_test_arguments = invocations.get(7).map(|call| {
-        call.arguments
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-    });
-    assert_eq!(
-        polars_test_arguments,
-        Some(vec!["nextest", "run", "--all-targets"]),
-        "the Polars-enabled profile must run in its own Nextest invocation"
-    );
-    let polars_doctest_arguments = invocations.get(8).map(|call| {
-        call.arguments
-            .iter()
-            .map(String::as_str)
-            .collect::<Vec<_>>()
-    });
-    assert_eq!(
-        polars_doctest_arguments,
-        Some(vec!["test", "--doc", "--workspace"]),
-        "the Polars-enabled profile must run in its own doctest invocation"
-    );
+    assert_eq!(actual, Some(expected.to_vec()), "{message}");
 }
 
 /// Checks a failing build preflight stops before repository commands or Act.
