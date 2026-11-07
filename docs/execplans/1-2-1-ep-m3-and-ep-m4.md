@@ -270,15 +270,14 @@ Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
 - [x] `scripts/tests/fixtures/evidence/log-parsers.json`'s description updated:
   the repository registry no longer registers none.
 - [x] ADR-0009 amendment (DL-10, DL-16, DL-17), recorded as the 2026-11-07
-  entry in
-  `docs/adrs/adr-0009-proof-first-policy-and-evidence-gate.md`. The sponsor
-  approved DL-16 ("Approved at EP-M5") together with the rest of the
+  entry in `docs/adrs/adr-0009-proof-first-policy-and-evidence-gate.md`. The
+  sponsor approved DL-16 ("Approved at EP-M5") together with the rest of the
   2026-10-22 decision set; registration landed on the footing that DL-16 and
   DL-17 restate that approved technical design. The amendment states the three
   consequences rather than restating the options.
 - [x] `mutmut` over `trust_audit/` and `kani_log/`; survivors resolved. Both
-  censuses are closed: `kani_log/`'s triage is recorded in the parent plan,
-  and `trust_audit/`'s final eleven-module selection leaves 23 killed and 23
+  censuses are closed: `kani_log/`'s triage is recorded in the parent plan, and
+  `trust_audit/`'s final eleven-module selection leaves 23 killed and 23
   equivalent across 46 probes with nothing unaccounted for.
   - `kani_log/`: 1100 mutants, 986 killed, 110 survived, 4 timeouts on the
     first full run.

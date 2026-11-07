@@ -15,6 +15,9 @@ use std::{
     time::Duration,
 };
 
+use camino::Utf8Path;
+use cap_std::{ambient_authority, fs_utf8::Dir};
+
 /// Bounds the fixture's `cargo build`, which compiles the facade and kernel.
 ///
 /// The fixture is small but shares the machine's compile admission queue with
@@ -46,9 +49,18 @@ fn fixture_manifest() -> PathBuf {
 }
 
 /// The committed snapshot the fixture's output must equal.
+///
+/// The read goes through a capability handle rather than `std::fs`, per the
+/// repository's filesystem policy: the directory the test opens is the one
+/// capability it holds, and the snapshot's path is relative to it. The
+/// repository root is the ambient directory Cargo sets, and opening it here is
+/// the one place a test names an ambient path.
 fn native_only_snapshot() -> Result<String, Box<dyn Error>> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(NATIVE_ONLY_SNAPSHOT);
-    let contents = std::fs::read_to_string(&path)?;
+    let root = Dir::open_ambient_dir(
+        Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
+        ambient_authority(),
+    )?;
+    let contents = root.read_to_string(NATIVE_ONLY_SNAPSHOT)?;
     Ok(snapshot_body(&contents).to_owned())
 }
 
