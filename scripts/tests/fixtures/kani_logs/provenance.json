@@ -254,6 +254,26 @@
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/in_place.log",
       "sha256": "474067388ff3f5cee3a556ab12deeebb087c1ba68c5a1e245a20a88927b517e2"
+    },
+    {
+      "id": "default_unwind",
+      "expected_exit": 1,
+      "command": [
+        "~/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::verified",
+        "--harness",
+        "harnesses::seeded_wrapping_mutant",
+        "--exact",
+        "--verbose",
+        "--default-unwind",
+        "2"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/default_unwind.log",
+      "sha256": "39a6814c6ee7587cdc1224f9ce9ade8faee37e0d20126d5625cb67ec71db6095"
     }
   ]
 }

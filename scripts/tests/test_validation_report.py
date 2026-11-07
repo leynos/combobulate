@@ -32,8 +32,12 @@ class ValidationReport(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        # `.github` holds registered acceptance-control sources; build outputs stay behind.
-        for folder in ('.github', 'docs', 'scripts', 'spec', 'tools'):
+        # `.github` holds registered acceptance-control sources; `tests` holds
+        # pin sites the toolchain record names. `src` and `crates` are workspace
+        # members without which `cargo metadata` cannot resolve the copied
+        # manifest. The copy is otherwise complete so the pin check's own site
+        # rule — a cited site must exist — is exercised rather than relaxed.
+        for folder in ('.github', 'crates', 'docs', 'scripts', 'spec', 'src', 'tests', 'tools'):
             shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__', 'target'))
         for path in ROOT.iterdir():
             # Linked worktrees store a .git pointer file that is invalid in this fixture.

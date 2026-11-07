@@ -1,0 +1,23 @@
+{
+  "revision": "0.1",
+  "description": "The claim set the default_unwind capture actually covers. VO-11b compares a log with the manifest it was decided against, so a positive fixture must bind a manifest naming exactly the harnesses the log reports. It narrows the crate manifest rather than restating it: the roles, declared cover, and expected failure are the crate's, and only the selection is this record's.",
+  "sources": [
+    "tools/verifier-fixtures/kani-corpus/src/lib.rs",
+    "tools/verifier-fixtures/kani-corpus/src/harnesses.rs"
+  ],
+  "harnesses": [
+    {
+      "name": "harnesses::verified",
+      "role": "claim",
+      "covers": ["the boundary below saturation is reachable"],
+      "should_panic": false
+    },
+    {
+      "name": "harnesses::seeded_wrapping_mutant",
+      "role": "control",
+      "covers": [],
+      "expected_failure": "assertion.1",
+      "should_panic": false
+    }
+  ]
+}
