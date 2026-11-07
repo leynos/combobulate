@@ -6,6 +6,9 @@ edition = "2024"
 license = "ISC"
 publish = false
 
+[lints.rust]
+missing_docs = "deny"
+
 [workspace]
 
 [features]

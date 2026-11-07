@@ -1,5 +1,3 @@
-# nested-cargo-allow: lock resolves the pinned Verus release stack on purpose, not the root lock's graph
-# nested-cargo-allow: manifest the Verus crates are pinned to the verifier release that tools/verus records
 [workspace]
 members = ["macro", "attributes", "companion", "production"]
 resolver = "3"

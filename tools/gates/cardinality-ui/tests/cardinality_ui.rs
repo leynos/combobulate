@@ -15,7 +15,8 @@
 //! it. `trybuild` copies the *host package's* dependencies and development
 //! dependencies into the crate it generates, so a gate hosted in the root
 //! package would compile the whole root dependency graph inside the nested
-//! build. The first test below asserts that this manifest stays narrow.
+//! build. The `gate_declares_only_the_probe_and_trybuild` test below asserts that
+//! this manifest stays narrow.
 //!
 //! The fixtures are a synchronized copy of the repository oracle in
 //! `tests/ui/`, because `trybuild` reports an out-of-package case with an
