@@ -31,7 +31,8 @@ concurrency:
 
 jobs:
   coverage-upload:
-    runs-on: ubuntu-latest
+    # The deadline wrapper needs GNU `timeout`; ubuntu-26.04's kills only the child.
+    runs-on: ubuntu-24.04
     # Restrict this environment to main before adding CS_ACCESS_TOKEN.
     # With no token configured, the conditional CodeScene upload skips.
     environment: codescene
