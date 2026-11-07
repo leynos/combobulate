@@ -172,10 +172,11 @@ Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
 that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
 because nextest then has no process left to escalate to `SIGKILL`. Only the
-job's own `timeout-minutes` bounds it, where one is set (`build-test` has one;
-`coverage-main.yml` has none), and a local `cargo test` run, which `make test`
-falls back to when cargo-nextest is missing, has no limit at all. Ordinary
-builds and sleeping children do end under nextest.
+job's own `timeout-minutes` bounds it (`build-test` sets 8; `coverage-main.yml`
+sets none, so GitHub's 360-minute default applies, and nextest's limits do not
+cover `make prepare-ui-gate`, which runs before it), and a local `cargo test`
+run, which `make test` falls back to when cargo-nextest is missing, has no
+limit at all. Ordinary builds and sleeping children do end under nextest.
 
 `make test-ui` is the one route with its own bound. It runs the recorded gate
 binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600

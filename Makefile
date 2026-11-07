@@ -219,8 +219,8 @@ prepare-ui-gate: prepare-dependencies ## Build the cardinality gate's test binar
 	$(UI_GATE_ENVIRONMENT) $(PYTHON) $(UI_GATE_SCRIPT) prepare
 
 # The direct route for a developer who wants only the gate. It builds through
-# the same recipe and then runs the recorded binary under the same deadline the
-# root test applies, so this route is bounded on the same terms.
+# the same recipe and then runs the recorded binary under GNU `timeout`, because
+# no nextest sits behind it; the root test is bounded by nextest instead.
 test-ui: prepare-ui-gate ## Run the cardinality compile-fail gate outside the root workspace
 	$(UI_GATE_ENVIRONMENT) $(PYTHON) $(UI_GATE_SCRIPT) run
 

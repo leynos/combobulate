@@ -56,8 +56,9 @@ slow-timeout = { period = "60s", terminate-after = 10 }
 # other agents. The hosted lanes are the ones with a fixed clock, and they
 # already have one on `build-test`, which declares `timeout-minutes: 8`, so a
 # runaway suite there is ended by the job rather than by nextest.
-# `coverage-main.yml` declares none, so a hang there is bounded only by the
-# per-test `terminate-after` limits.
+# `coverage-main.yml` declares none, so GitHub's 360-minute default applies
+# there, and the per-test `terminate-after` limits do not cover steps that run
+# before nextest, such as `make prepare-ui-gate`.
 #
 # That matters for the coverage lane specifically. The shared
 # `generate-coverage` action writes a temporary nextest config (180 s /
