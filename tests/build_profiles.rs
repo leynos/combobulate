@@ -38,16 +38,17 @@ mod native {
     // these two attributes): the `allow` suppresses the lint on the expansion,
     // and the `expect` keeps `clippy::allow_attributes` satisfied for using
     // `allow` rather than `expect` on a lint that only fires in the expansion.
+    //
+    // The `expect` is not behind `cfg(clippy)`. Clippy rejects that wrapper
+    // with `unnecessary_clippy_cfg`, and the plain wrapper is also what the
+    // driver emits, so the two agree on one spelling.
     #[allow(
         unused_braces,
         reason = "fixture macro expansion triggers unused-braces on expression bodies"
     )]
-    #[cfg_attr(
-        clippy,
-        expect(
-            clippy::allow_attributes,
-            reason = "needed to allow unused_braces for fixture macro expansion"
-        )
+    #[expect(
+        clippy::allow_attributes,
+        reason = "needed to allow unused_braces for fixture macro expansion"
     )]
     #[fixture]
     fn observed() -> Observed { Observed::default() }
@@ -65,9 +66,10 @@ mod native {
 
     /// Unwraps the profile the `When` step recorded.
     fn recorded(observed: &Observed) -> BuildProfile {
-        observed
-            .profile
-            .expect("the `When` step must run before any `Then` step")
+        let Some(profile) = observed.profile else {
+            panic!("the `When` step must run before any `Then` step")
+        };
+        profile
     }
 
     #[then("the profile reports the native backend")]
@@ -155,16 +157,17 @@ mod polars {
     // these two attributes): the `allow` suppresses the lint on the expansion,
     // and the `expect` keeps `clippy::allow_attributes` satisfied for using
     // `allow` rather than `expect` on a lint that only fires in the expansion.
+    //
+    // The `expect` is not behind `cfg(clippy)`. Clippy rejects that wrapper
+    // with `unnecessary_clippy_cfg`, and the plain wrapper is also what the
+    // driver emits, so the two agree on one spelling.
     #[allow(
         unused_braces,
         reason = "fixture macro expansion triggers unused-braces on expression bodies"
     )]
-    #[cfg_attr(
-        clippy,
-        expect(
-            clippy::allow_attributes,
-            reason = "needed to allow unused_braces for fixture macro expansion"
-        )
+    #[expect(
+        clippy::allow_attributes,
+        reason = "needed to allow unused_braces for fixture macro expansion"
     )]
     #[fixture]
     fn observed() -> Observed { Observed::default() }
@@ -182,9 +185,10 @@ mod polars {
 
     /// Unwraps the profile the `When` step recorded.
     fn recorded(observed: &Observed) -> BuildProfile {
-        observed
-            .profile
-            .expect("the `When` step must run before any `Then` step")
+        let Some(profile) = observed.profile else {
+            panic!("the `When` step must run before any `Then` step")
+        };
+        profile
     }
 
     #[then("the profile reports the native backend")]
@@ -232,16 +236,17 @@ mod polars {
     }
 }
 
-/// The `Display` oracle is the single source of the rendered profile line.
-///
-/// Each route snapshots the line its own build produces, so the two snapshots
-/// are the two real profiles rather than one build imitating the other. The
-/// `native-only` route additionally checks a second spelling: the same render
-/// path with the macro feature present and Polars absent, which is a profile
-/// the gate routes never build but the reserved `macros` feature can select.
 #[cfg(not(feature = "polars"))]
 mod rendered_native {
     //! The native-only build's rendered line is a stable contract.
+    //!
+    //! The `Display` oracle is the single source of the rendered profile line.
+    //! Each route snapshots the line its own build produces, so the two
+    //! snapshots are the two real profiles rather than one build imitating the
+    //! other. The `native-only` route additionally checks a second spelling:
+    //! the same render path with the macro feature present and Polars absent,
+    //! which is a profile the gate routes never build but the reserved
+    //! `macros` feature can select.
 
     use combobulate::BuildProfile;
     use insta::assert_snapshot;

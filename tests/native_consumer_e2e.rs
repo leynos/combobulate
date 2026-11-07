@@ -20,10 +20,10 @@ use std::{
 /// The fixture is small but shares the machine's compile admission queue with
 /// every other agent, so the tier matches the repository's build tests rather
 /// than the two-minute read tier.
-const BUILD_DEADLINE: Duration = Duration::from_secs(900);
+const BUILD_DEADLINE: Duration = Duration::from_mins(15);
 
 /// Bounds the dependency-graph read, which resolves but compiles nothing.
-const READ_DEADLINE: Duration = Duration::from_secs(120);
+const READ_DEADLINE: Duration = Duration::from_mins(2);
 
 /// Package-name prefixes that may never appear in a native-only consumer.
 const FORBIDDEN_PREFIXES: &[&str] = &["polars", "glam", "kani", "verus", "vstd"];
@@ -38,7 +38,7 @@ const NATIVE_ONLY_SNAPSHOT: &str =
     "tests/snapshots/build_profiles__rendered_native__native_only.snap";
 
 /// Bounds the profile binary, which prints one line and returns.
-const RUN_DEADLINE: Duration = Duration::from_secs(60);
+const RUN_DEADLINE: Duration = Duration::from_mins(1);
 
 /// The fixture's manifest, resolved from the repository root Cargo sets.
 fn fixture_manifest() -> PathBuf {
@@ -106,14 +106,14 @@ fn run_cargo(mut command: Command, description: &str) -> Result<String, Box<dyn 
 /// Builds the fixture and returns its `cargo tree` output and rendered profile.
 fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
     let target_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("native-consumer");
-    let manifest = fixture_manifest();
-    let manifest = manifest
+    let manifest = fixture_manifest()
         .to_str()
-        .ok_or("the fixture manifest path is not UTF-8")?;
+        .ok_or("the fixture manifest path is not UTF-8")?
+        .to_owned();
 
     run_cargo(
         fixture_cargo(
-            &["build", "--locked", "--manifest-path", manifest],
+            &["build", "--locked", "--manifest-path", &manifest],
             &target_dir,
         ),
         "building the native consumer",
@@ -127,7 +127,7 @@ fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
                 "--prefix",
                 "none",
                 "--manifest-path",
-                manifest,
+                &manifest,
             ],
             &target_dir,
         ),
@@ -161,8 +161,8 @@ fn forbidden_packages(tree: &str) -> BTreeSet<String> {
 
 /// The consumer's graph carries no backend, no verifier, and no macro crate.
 #[test]
-fn native_consumer_reaches_no_optional_dependency() -> Result<(), Box<dyn Error>> {
-    let (tree, _) = build_and_inspect()?;
+fn native_consumer_reaches_no_optional_dependency() {
+    let (tree, _) = built();
     let reached = forbidden_packages(&tree);
     assert!(
         reached.is_empty(),
@@ -172,19 +172,40 @@ fn native_consumer_reaches_no_optional_dependency() -> Result<(), Box<dyn Error>
         tree.contains("combobulate v0.1.0"),
         "the graph must contain the facade by path, got:\n{tree}"
     );
-    Ok(())
 }
 
 /// The consumer's printed line equals the committed native-only snapshot.
 #[test]
-fn native_consumer_output_matches_the_native_only_snapshot() -> Result<(), Box<dyn Error>> {
-    let (_, rendered) = build_and_inspect()?;
-    let expected = native_only_snapshot()?;
+fn native_consumer_output_matches_the_native_only_snapshot() {
+    let (_, rendered) = built();
+    let expected = committed_snapshot();
     assert_eq!(
         rendered, expected,
         "the consumer must print the native-only profile line"
     );
-    Ok(())
+}
+
+/// Runs the fallible build and reports its failure as a panic.
+///
+/// A `#[test]` that returns `Result` may contain no assertion, because the
+/// workspace denies `clippy::panic_in_result_fn`. So the fallible part is
+/// confined to this helper, which returns plain values, and the tests that
+/// use it stay infallible and may assert. The Cargo diagnostics are carried
+/// into the panic message because Cargo's own failure otherwise reads as an
+/// unrelated assertion.
+fn built() -> (String, String) {
+    match build_and_inspect() {
+        Ok(values) => values,
+        Err(error) => panic!("the native consumer must build and run: {error}"),
+    }
+}
+
+/// Reads the committed native-only snapshot, reporting failure as a panic.
+fn committed_snapshot() -> String {
+    match native_only_snapshot() {
+        Ok(snapshot) => snapshot,
+        Err(error) => panic!("the committed native-only snapshot must be readable: {error}"),
+    }
 }
 
 /// The build-selector removal is real, not a comment: the child sees no flags.
