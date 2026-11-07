@@ -121,7 +121,7 @@ Specification: parent plan lines 2250-2320.
   line, so the two profiles inside one target stay ordered. Ordering between
   `lint-clippy` and `lint-whitaker` is preserved by the recursive `$(MAKE)`
   calls, not by the loop.
-- A shell loop cannot be parallelised by Make and should not be: the point of
+- A shell loop cannot be parallelized by Make and should not be: the point of
   the per-profile invocation is that feature unification cannot mask a profile,
   which holds only while each profile builds in a separate Cargo process.
 
@@ -148,7 +148,7 @@ Specification: parent plan lines 2322-2348.
   case). All pass.
 - [x] The validation report is regenerated, so the new check appears in
   `docs/validation-results.json`.
-- [ ] `docs/adrs/adr-0010-workspace-crate-boundaries-and-profiles.md` as
+- [ ] `docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md` as
   `Proposed`.
 - [ ] Proposed D16 in `spec/decisions.json`, with Q3 added to
   `in_scope_questions` and the register regenerated.
@@ -204,5 +204,5 @@ amended in place.
 ## Gate policy for this branch
 
 Run every gate on `make` targets rather than bare Cargo, sequentially, one at a
-time, and let the shared compile-admission queue serialise the rest. Do not run
+time, and let the shared compile-admission queue serialize the rest. Do not run
 a second build to speed up a queued one.

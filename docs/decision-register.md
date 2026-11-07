@@ -471,6 +471,35 @@ Answer, quoted verbatim:
 
 ADR: none yet.
 
+### D16
+
+Subject: Workspace crate boundaries, build profiles, and the
+supported-toolchain set.
+
+Terms-of-reference questions: Q3. Authority: sponsor, technical owner.
+
+Lifecycle: proposed.
+
+Options:
+
+- A. A separate `combobulate-polars` adapter crate.
+- B. A crate-private Polars module inside the facade behind
+  `cfg(feature = "polars")`, with a three-crate workspace and a
+  supported-toolchain set rather than one MSRV. (recommended)
+- C. Defer the facade Polars dependency to task 1.2.6.
+
+Recommendation rationale: Option B keeps the three crates of technical design
+§3, keeps the kernel dependency-free so B01 stays testable, and keeps a
+native-only consumer free of Polars. Adapter-crate separation saves no CI time
+because the default build pulls Polars either way, and it would force a
+premature `combobulate-core` split. Q3 is answered with a supported-toolchain
+set because three toolchains with distinct roles build this repository and no
+single MSRV describes them.
+
+Decision: pending.
+
+ADR: [ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md).
+
 ## Candidate ADR subjects
 
 - CA1. Numerical and array semantics (technical-design.md §15): recorded in

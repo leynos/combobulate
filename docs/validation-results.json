@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 22
+      "count": 23
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 108
+      "count": 110
     },
     {
       "check": "catalogue",
@@ -35,8 +35,8 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 15 of 15 decisions are accepted. Acceptance is not verification.",
-      "count": 15
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 15 of 16 decisions are accepted. Acceptance is not verification.",
+      "count": 16
     },
     {
       "check": "kernel-contract-envelope",
