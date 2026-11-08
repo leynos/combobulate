@@ -1101,6 +1101,16 @@ the digest binds the log and not the metadata, that edit leaves the evidence
 valid. The provenance test scans every committed fixture record and fails on
 any remaining account home.
 
+Each `source_digests` value is a structural digest, written
+`ast-sha256:<hex>` by `scripts/structural_digest.py`, which the writers and the
+digest test share. It hashes the parsed input rather than its bytes: TOML and
+JSON as canonical JSON, Python as its `ast` dump, and Rust as its tree-sitter
+syntax tree with plain comments dropped and doc comments kept. Shell and
+`VERSION` files have no parser here, so their comment-only and blank lines are
+dropped before hashing. A reformat or comment edit therefore leaves a record
+valid, while any change to a parsed token, including the toolchain channel,
+does not. A bare 64-digit hex value is a legacy byte digest and is rejected.
+
 Both provenance writers bind their inputs with `source_digests`. The Kani
 record covers the corpus manifest and lockfile, the harness sources, the
 harness and listing inventories, the probe modules that build and record the

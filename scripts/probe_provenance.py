@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from structural_digest import structural_digest
 from verifier_probe_support import (
     KANI_SDK_TOOLCHAIN,
     ROOT,
@@ -128,7 +129,9 @@ def _write_kani_provenance(
         "route": route,
         "prover_tools_ref": reference,
         "stream_order": "captured stdout followed by captured stderr",
-        "source_digests": {str(path.relative_to(ROOT)): _digest(path) for path in sources},
+        "source_digests": {
+            str(path.relative_to(ROOT)): structural_digest(path) for path in sources
+        },
         # The ``in_place`` route copies the repository's lint tables into a
         # scratch manifest. Binding the extracted tables rather than the whole
         # root manifest keeps an unrelated dependency edit from forcing a
@@ -183,7 +186,7 @@ def _write_verus_provenance(
                 "z3_version": banner,
                 "z3_sha256": _digest(z3_path),
                 "source_digests": {
-                    str(source.relative_to(ROOT)): _digest(source)
+                    str(source.relative_to(ROOT)): structural_digest(source)
                     for source in _verus_sources()
                 },
                 "observations": observations,

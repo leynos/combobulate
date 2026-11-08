@@ -1,7 +1,11 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
-# dependencies = ["rust-prover-tools @ git+https://github.com/leynos/rust-prover-tools.git@9c4a27a86c678ceac1155404f45d95ee4a14a172"]
+# dependencies = [
+#   "rust-prover-tools @ git+https://github.com/leynos/rust-prover-tools.git@9c4a27a86c678ceac1155404f45d95ee4a14a172",
+#   "tree-sitter==0.25.2",
+#   "tree-sitter-rust==0.24.2",
+# ]
 # ///
 """Capture tool capabilities without presenting them as product proofs.
 

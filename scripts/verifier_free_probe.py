@@ -16,7 +16,8 @@ from pathlib import Path
 
 from rust_prover_tools.commands import CommandSpec, run_command
 
-from verifier_probe_support import FIXTURES, ROOT, _capture, _digest
+from structural_digest import structural_digest
+from verifier_probe_support import FIXTURES, ROOT, _capture
 
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
 
@@ -274,7 +275,8 @@ def run_verifier_free() -> None:
     directory = ROOT / "target/epm1-verifier-free-workspace"
     _stage_verifier_free_workspace(directory)
     source_digests = {
-        str(path.relative_to(ROOT)): _digest(path) for path in staged_sources()
+        str(path.relative_to(ROOT)): structural_digest(path)
+        for path in staged_sources()
     }
     output = FIXTURES / "verus-wiring-probe/observations"
     image = "localhost/combobulate-epm1-verifier-free:20261028"

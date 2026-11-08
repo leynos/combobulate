@@ -14,7 +14,6 @@ The staging set is derived from the fixture tree rather than listed twice::
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 import tempfile
@@ -23,7 +22,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from verifier_probe_loader import load_verifier_free_probe
+from verifier_probe_loader import load_structural_digest, load_verifier_free_probe
+
+is_structural_digest = load_structural_digest().is_structural_digest
 
 FIXTURES = Path(__file__).resolve().parents[2] / 'tools/verifier-fixtures'
 
@@ -178,7 +179,6 @@ class OrchestrationTests(unittest.TestCase):
         (self.directory / 'rust-toolchain.toml').write_text(
             '[toolchain]\nchannel = "nightly-2026-08-27"\n', encoding='utf-8'
         )
-        self.module._digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
         self.module.staged_sources = Mock(return_value=[])
         self.module._stage_verifier_free_workspace = Mock()
         self.module.ensure_base_image = Mock()
@@ -236,10 +236,9 @@ class OrchestrationTests(unittest.TestCase):
             ['rust-toolchain.toml'],
             'the record must bind every staged source',
         )
-        self.assertEqual(
-            len(record['source_digests']['rust-toolchain.toml']),
-            64,
-            'each digest must be a SHA-256 hex value',
+        self.assertTrue(
+            is_structural_digest(record['source_digests']['rust-toolchain.toml']),
+            'each digest must be a versioned structural SHA-256 value',
         )
         self.assertEqual(
             self.module._capture.call_count,

@@ -39,10 +39,24 @@ def _support_stub() -> SimpleNamespace:
     )
 
 
+def load_structural_digest() -> ModuleType:
+    """Load the real digest module, which the probes import by bare name."""
+    spec = importlib.util.spec_from_file_location(
+        'structural_digest', SCRIPTS / 'structural_digest.py'
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_STRUCTURAL_DIGEST = load_structural_digest()
+
+
 def _load(name: str, path: Path, stubs: dict[str, object]) -> ModuleType:
     """Execute one module with ``stubs`` temporarily shadowing real imports."""
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
+    stubs = {'structural_digest': _STRUCTURAL_DIGEST, **stubs}
     with patch.dict(sys.modules, stubs):
         spec.loader.exec_module(module)
     return module

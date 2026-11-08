@@ -1,6 +1,8 @@
 """Bind every committed verifier record to the sources it claims to describe.
 
-A digest map is only evidence while it still matches the tree. Two directions
+A digest map is only evidence while it still matches the tree. Digests are
+structural (see ``structural_digest``), so a reformat or a comment edit does
+not break a record but a real change to a parsed input does. Two directions
 are checked here: a record must carry digests for the inputs its verdict
 depends on, and every digest it does carry must still match the working tree.
 The second direction is what makes a stale record fail loudly instead of
@@ -18,16 +20,17 @@ For example::
 
 from __future__ import annotations
 
-import hashlib
 import json
 import unittest
 
-from verifier_probe_loader import ROOT, load_verifier_free_probe
+from verifier_probe_loader import ROOT, load_structural_digest, load_verifier_free_probe
 from verifier_records import committed_record_documents
 
 # The staged set is the staging function's own answer, so the record can only
 # be compared with what the generator copies rather than a second list here.
 staged_sources = load_verifier_free_probe().staged_sources
+
+_DIGEST = load_structural_digest()
 
 HOSTED_RECORD = (
     'tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json'
@@ -67,7 +70,12 @@ class SourceDigestTests(unittest.TestCase):
         for record_path, record in committed_record_documents():
             for relative, expected in record.get('source_digests', {}).items():
                 with self.subTest(record=str(record_path), source=relative):
-                    actual = hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+                    self.assertTrue(
+                        _DIGEST.is_structural_digest(expected),
+                        f'{relative} carries a legacy byte digest; regenerate the '
+                        f'record so it carries an {_DIGEST.PREFIX} digest',
+                    )
+                    actual = _DIGEST.structural_digest(ROOT / relative)
                     recipe = (
                         'make verus-probe'
                         if 'verus-wiring-probe' in str(record_path)
