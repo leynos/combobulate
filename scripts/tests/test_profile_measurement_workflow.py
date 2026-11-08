@@ -398,6 +398,21 @@ class BuildBudgetTests(unittest.TestCase):
         self.assertNotIn('install-verus', report,
                          'the report step must observe, not install')
 
+    def test_the_verus_release_gets_the_toolchain_it_was_built_against(self) -> None:
+        """`verus --version` runs the verifier, which needs its own Rust.
+
+        The release names that toolchain in its `version.json`, so the job must
+        read the name from there. A job that installed the release but not the
+        toolchain fails at the report step, and a hard-coded name would be a
+        second pin to drift from the archive.
+        """
+        script = _step_run_matching(_job('build-budget'), 'build-budget/verus')
+
+        self.assertIn('version.json', script,
+                      'the toolchain name must come from the release metadata')
+        self.assertIn('rustup toolchain install "$verus_toolchain"', script,
+                      'the release toolchain must be installed before it is run')
+
     def test_the_solver_is_taken_from_the_pinned_distribution(self) -> None:
         """`PATH` may hold any z3; the record must name the pinned one.
 

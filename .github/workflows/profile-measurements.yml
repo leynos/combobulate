@@ -270,6 +270,13 @@ jobs:
 
           verus_root=".verus/$(cat tools/verus/VERSION)/verus"
           test -x "$verus_root/verus"
+          # `verus --version` runs the verifier, which refuses to start without
+          # the Rust toolchain its release was built against. The release names
+          # that toolchain in its own `version.json`, so it is installed from
+          # there rather than guessed or pinned a second time here.
+          verus_toolchain=$(sed -n 's/.*"toolchain": "\([^ "]*\).*/\1/p' "$verus_root/version.json")
+          test -n "$verus_toolchain"
+          rustup toolchain install "$verus_toolchain" --profile minimal --no-self-update
           "$verus_root/verus" --version > build-budget/verus
 
           # The Verus archive deliberately omits Z3; the probes take it from the
