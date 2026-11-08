@@ -84,7 +84,9 @@ fn coverage_overrides_the_effective_dev_backend_to_llvm() {
                 command.env_remove("CARGO_PROFILE_DEV_CODEGEN_BACKEND");
             }
         }
+        // Reading a profile setting never needs the network.
         let output = command
+            .env("CARGO_NET_OFFLINE", "true")
             .output()
             .expect("read Cargo's selected development backend");
         assert!(
