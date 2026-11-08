@@ -10,7 +10,15 @@
 //! [`BackendProbeError`] rather than Polars' own error: an error type in a
 //! public signature would carry a Polars path out of the module that owns it.
 
-use polars::prelude::{DataFrame, IntoColumn, IntoLazy as _, NamedFrom as _, PolarsResult, Series};
+use polars::prelude::{
+    DataFrame,
+    IntoColumn,
+    IntoLazy as _,
+    NamedFrom as _,
+    PolarsError,
+    PolarsResult,
+    Series,
+};
 
 /// The backend could not build or collect the probe's frame.
 ///
@@ -31,6 +39,23 @@ impl BackendProbeError {
     /// `Display` adds the backend's name, which is the form to log.
     #[must_use]
     pub fn detail(&self) -> &str { &self.detail }
+
+    /// Render a Polars failure into the backend's own error.
+    ///
+    /// The conversion is its own item rather than an inline closure so the
+    /// suite can exercise it directly. `collect` succeeds for every frame this
+    /// probe builds, so a closure inside `collected_height` would be code the
+    /// suite could reach only by first making Polars fail, and it would sit
+    /// outside the coverage the ratchet measures.
+    ///
+    /// A `From<PolarsError>` impl would be worse than an unreachable line: it
+    /// is public API, so it would hand every embedder a route from a Polars
+    /// type to the facade's error, which is the leak DL-19 exists to prevent.
+    fn from_polars(error: &PolarsError) -> Self {
+        Self {
+            detail: error.to_string(),
+        }
+    }
 }
 
 impl core::fmt::Display for BackendProbeError {
@@ -59,9 +84,7 @@ impl core::error::Error for BackendProbeError {}
 /// The function is crate-private; the facade's `#[doc(hidden)]` probe makes
 /// the link target reachable from an integration test and a doctest.
 pub(crate) fn collected_height() -> Result<usize, BackendProbeError> {
-    collect().map_err(|error| BackendProbeError {
-        detail: error.to_string(),
-    })
+    collect().map_err(|error| BackendProbeError::from_polars(&error))
 }
 
 /// The Polars-typed part of the probe, kept separate so the error conversion
@@ -116,6 +139,27 @@ mod tests {
                 "the Polars backend could not complete its probe: something Polars said".to_owned()
             ),
             "the backend's error must expose Polars' message and say where it came from"
+        );
+    }
+
+    /// A Polars failure crosses the boundary as Polars' own rendering.
+    ///
+    /// `collected_height` maps a live Polars error through `from_polars`, but
+    /// the probe's `collect` succeeds for every frame it builds, so the success
+    /// path alone would leave the mapping unexercised. A hand-built
+    /// `ComputeError` renders as its bare message, so the expected detail is
+    /// predictable and any future re-wrapping of Polars' text becomes a
+    /// visible decision rather than a silent change to what an embedder logs.
+    #[test]
+    fn from_polars_carries_the_polars_message_into_the_detail() {
+        let failure = polars::error::PolarsError::ComputeError(
+            polars::error::ErrString::new_static("something Polars said"),
+        );
+        let converted = super::BackendProbeError::from_polars(&failure);
+        assert_eq!(
+            converted.detail(),
+            "something Polars said",
+            "a Polars failure must arrive as Polars' own message, not a paraphrase"
         );
     }
 }
