@@ -43,10 +43,13 @@ impl BackendProbeError {
     /// Render a Polars failure into the backend's own error.
     ///
     /// The conversion is its own item rather than an inline closure so the
-    /// suite can exercise it directly. `collect` succeeds for every frame this
-    /// probe builds, so a closure inside `collected_height` would be code the
-    /// suite could reach only by first making Polars fail, and it would sit
-    /// outside the coverage the ratchet measures.
+    /// suite can exercise it directly with a hand-built failure: the probe's
+    /// own collection succeeds for every frame it builds, so the error arm is
+    /// otherwise unreachable. That is also why `collected_height` folds through
+    /// [`fold_collected`] instead of a `map_err` closure — a closure the suite
+    /// cannot run is still a function instantiation LLVM records, and it would
+    /// count against the workspace's coverage ratchet on a line no test could
+    /// turn green.
     ///
     /// A `From<PolarsError>` impl would be worse than an unreachable line: it
     /// is public API, so it would hand every embedder a route from a Polars
@@ -83,8 +86,26 @@ impl core::error::Error for BackendProbeError {}
 ///
 /// The function is crate-private; the facade's `#[doc(hidden)]` probe makes
 /// the link target reachable from an integration test and a doctest.
-pub(crate) fn collected_height() -> Result<usize, BackendProbeError> {
-    collect().map_err(|error| BackendProbeError::from_polars(&error))
+pub(crate) fn collected_height() -> Result<usize, BackendProbeError> { fold_collected(collect()) }
+
+/// Folds a collected height into the facade's own result.
+///
+/// This is a named item rather than a `map_err` closure inside
+/// [`collected_height`] because the closure would be a function instantiation
+/// the suite can never execute: `collect` succeeds for every frame the probe
+/// builds. LLVM would still record the closure's line, so it would count in
+/// `LF` and never in `LH` and the coverage ratchet would fail on it. Naming
+/// the fold makes the error arm a plain call the suite can make directly.
+///
+/// # Errors
+///
+/// Returns [`BackendProbeError`] when the collection failed, carrying Polars'
+/// own message.
+fn fold_collected(collected: PolarsResult<usize>) -> Result<usize, BackendProbeError> {
+    match collected {
+        Ok(height) => Ok(height),
+        Err(error) => Err(BackendProbeError::from_polars(&error)),
+    }
 }
 
 /// The Polars-typed part of the probe, kept separate so the error conversion
@@ -144,12 +165,13 @@ mod tests {
 
     /// A Polars failure crosses the boundary as Polars' own rendering.
     ///
-    /// `collected_height` maps a live Polars error through `from_polars`, but
-    /// the probe's `collect` succeeds for every frame it builds, so the success
-    /// path alone would leave the mapping unexercised. A hand-built
-    /// `ComputeError` renders as its bare message, so the expected detail is
-    /// predictable and any future re-wrapping of Polars' text becomes a
-    /// visible decision rather than a silent change to what an embedder logs.
+    /// `collected_height` folds a live Polars error through `fold_collected`,
+    /// but the probe's `collect` succeeds for every frame it builds, so the
+    /// success path alone would leave both the fold's error arm and `from_polars`
+    /// unexercised. A hand-built `ComputeError` renders as its bare message, so
+    /// the expected detail is predictable and any future re-wrapping of Polars'
+    /// text becomes a visible decision rather than a silent change to what an
+    /// embedder logs.
     #[test]
     fn from_polars_carries_the_polars_message_into_the_detail() {
         let failure = polars::error::PolarsError::ComputeError(
@@ -160,6 +182,25 @@ mod tests {
             converted.detail(),
             "something Polars said",
             "a Polars failure must arrive as Polars' own message, not a paraphrase"
+        );
+    }
+
+    /// A failed collection reaches the facade as the backend's own error.
+    ///
+    /// This is the arm the probe's own frame cannot reach, since `collect`
+    /// succeeds for every frame it builds. Driving it through `fold_collected`
+    /// with a hand-built failure keeps the branch a plain assertion target
+    /// instead of code the suite could only reach by first breaking Polars.
+    #[test]
+    fn a_failed_collection_crosses_the_boundary_as_the_backend_error() {
+        let failure = polars::error::PolarsError::ComputeError(
+            polars::error::ErrString::new_static("something Polars said"),
+        );
+        let folded = super::fold_collected(Err(failure));
+        assert_eq!(
+            folded.as_ref().err().map(super::BackendProbeError::detail),
+            Some("something Polars said"),
+            "a failed collection must surface as the backend's error, not a panic"
         );
     }
 }

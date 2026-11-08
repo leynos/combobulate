@@ -649,6 +649,128 @@ workflow; the plan checkboxes above record the rest.
   fixture was needed only by the withheld tick, whose record cited manifests in
   those directories. It is not part of EP-M3 and stays in the withheld patch.
 
+## Resolving the hosted coverage shortfall
+
+Hosted `build-test` reports `Current coverage: 98.92%` against a 100 % baseline
+at `59f8f2a`, and the ratchet fails. The figure is stable across runs, so it is
+a real measurement rather than noise.
+
+The measurement path is now known exactly, and three of the assumptions made
+earlier in this branch were wrong:
+
+- The percentage is `sum(LH) / sum(LF)` over every `end_of_record` in
+  `lcov.info`, computed by `get_line_coverage_percent_from_lcov` in the
+  shared-actions action pinned as `generate-coverage@dbe2e22c`. There is no
+  file filter, no path exclusion, and no `--ignore-filename-regex` anywhere in
+  the action.
+- The command is a plain `cargo llvm-cov nextest` over the manifest and
+  workspace, exporting lcov, with `with-default-features: true`,
+  `all-targets: false`, and `doctests: false`. `cucumber` is disabled, so the
+  `_merge_lcov` path never runs and `lcov.info` is exactly what
+  `cargo llvm-cov` wrote.
+- `LF` is not the number of `DA` records. A closure the suite never executes
+  still contributes an `LF` line while carrying no `DA` record at all, so that
+  line is counted in `LF` and never in `LH`. This is what produced the
+  shortfall, and it is not a property of multi-line expressions in general.
+
+Locally, reproducing the ratio needed the same codegen backend the action
+forces. `.cargo/config.toml` selects `cranelift` for the dev profile, while the
+workflow sets `CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm`; the two backends emit
+different line tables for the same source. The workflow's
+`-C link-arg=-fuse-ld=lld` cannot be reproduced on this host because `lld` is
+not installed and there is no passwordless `sudo` to add it, so local
+reproduction substitutes `mold`. The linker does not affect which source lines
+are instrumented, so the substitution is sound for this question.
+
+The arithmetic that reconciles the hosted figure, using the widest `LF` each
+production file reports in any single binary: `crates/combobulate-kernel` 10/10,
+`src/lib.rs` 3/3, `src/profile.rs` 34/34, and `src/polars_backend.rs` 45/46
+sum to 92/93, which is 98.92 % exactly. The `profile.rs` and `src/lib.rs`
+figures come from the binary that reaches their test modules; a partial union
+reports less for them, because a binary that does not link a test module cannot
+record it. `crates/combobulate-macros` contributes nothing: it is a
+`proc-macro` crate whose five lines are all `//!` documentation, so it has no
+executable line to count.
+
+The one uncovered line was line 85, the `map_err` **closure** in
+`collected_height`:
+
+```rust
+collect().map_err(|error| BackendProbeError::from_polars(&error))
+```
+
+`collect()` succeeds for every frame the probe builds, so the closure never
+runs. The earlier reading of this section was wrong on that point: it blamed a
+continuation line inside `write!` and proposed splitting the `Display` body.
+That change was applied, measured, and **falsified** — it left `LF=94 LH=93`
+untouched, and isolation probes in a scratch crate gave `gap=0` for both
+`Display` shapes. The `Display` body is unrelated to the defect and is
+unchanged.
+
+What the evidence actually shows is a property of **closures**, not of
+multi-line expressions. The raw record for the file carried 45 `DA` records,
+every one of them hit, alongside `LF:46` and `LH:45`, and
+`llvm-cov report --summary-only` named one missed line and one missed function:
+the zero-total instantiation `collected_height::{closure#0}`, with both of its
+regions on line 85. A closure the suite cannot reach is still a function
+instantiation, and llvm attributes its line to `LF` while never emitting a `DA`
+record for it, so no test can turn that line green. A scratch probe confirmed
+the mechanism directly: an inline `map_err` closure that *is* exercised still
+produced `LF=26` against 25 `DA` records, while a `match` in the same position
+produced none.
+
+The fix is therefore not a new test and not a reflowed expression: it is
+removal of the closure. The fold is now a named item that `collected_height`
+calls, and its error arm calls `from_polars` with a borrow:
+
+```rust
+fn fold_collected(collected: PolarsResult<usize>) -> Result<usize, BackendProbeError> {
+    match collected {
+        Ok(height) => Ok(height),
+        Err(error) => Err(BackendProbeError::from_polars(&error)),
+    }
+}
+```
+
+A first attempt kept `map_err` and made `from_polars` take its error by value,
+so it could be passed as a function item with no closure. That measured 100 %
+too, and was rejected by the gate: `error.to_string()` only borrows, so Clippy
+rejected the by-value parameter as `needless_pass_by_value`. The `match` shape
+has neither problem — no closure to instantiate and no unconsumed argument.
+
+`from_polars` stays its own item for the reason already recorded on it: the
+suite must be able to call it with a hand-built `ComputeError`, because the
+probe's own collection never fails. It is deliberately not a
+`From<PolarsError>` impl — that would be public API handing every embedder a
+route from a Polars type to the facade's error, which is the leak DL-19 exists
+to prevent.
+
+Measured on a full-workspace export under the hosted backend and link flags
+(`CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm`, `-C link-arg=-fuse-ld=mold` as the
+`lld` substitute), with all 398 tests passing:
+
+| file                 | before    | after     |
+| -------------------- | --------- | --------- |
+| `combobulate-kernel` | 10/10     | 10/10     |
+| `src/lib.rs`         | 3/3       | 3/3       |
+| `src/profile.rs`     | 34/34     | 34/34     |
+| `src/polars_backend` | 45/46     | 45/45     |
+| **total**            | **92/93** | **92/92** |
+
+`92/92` is 100.00 %, and `cargo llvm-cov report --summary-only` now reports
+`polars_backend.rs` with 45 lines, 0 missed, and 8 functions, 0 missed. The
+line total fell from 47 to 45 rather than from 46 to 45 because the phantom
+pair went with the closure; the executed lines were already all covered. The
+92/93 reconciliation quoted earlier in this section was therefore correct
+arithmetic built on a misidentified line, and its conclusion — that nothing
+short of a source change would close the gap — was right for the wrong reason.
+
+The lesson recorded here is about method, not about llvm: the diagnosis was
+adopted before it was measured, and three successive hypotheses were asserted
+as confirmed and then falsified. The one that survived is the one that was
+checked against llvm's own missed-line and missed-function counts before being
+written down.
+
 ## Rebase onto the target branch
 
 The branch was cut at `408aba7`; `origin/main` has since advanced to `0f41741`
