@@ -20,18 +20,34 @@ from pathlib import Path
 from verifier_probe_loader import SCRIPTS
 
 
-def components(toolchain: str) -> subprocess.CompletedProcess:
-    """Run ``pinned_components`` against a toolchain file with this text."""
+def components(toolchain: str, function: str = 'pinned_components') -> subprocess.CompletedProcess:
+    """Run a pin reader against a toolchain file with this text."""
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / 'rust-toolchain.toml'
         path.write_text(toolchain, encoding='utf-8')
         return subprocess.run(
-            ['bash', '-c', f'source "{SCRIPTS}/build-tools-common.sh"; pinned_components'],
+            ['bash', '-c', f'source "{SCRIPTS}/build-tools-common.sh"; {function}'],
             env={**os.environ, 'RUST_TOOLCHAIN_FILE': str(path)},
             capture_output=True,
             text=True,
             check=False,
         )
+
+
+class PinnedToolchainTests(unittest.TestCase):
+    """The channel reader must agree with TOML parsing, not a quote style."""
+
+    def test_both_quote_styles_and_comments_are_read(self) -> None:
+        """Single quotes, a trailing comment, and spacing are all layout."""
+        for text in (
+            '[toolchain]\nchannel = "nightly-2026-08-27"\n',
+            "[toolchain]\nchannel = 'nightly-2026-08-27'\n",
+            '[toolchain]\nchannel   =   "nightly-2026-08-27"  # pin\n',
+        ):
+            with self.subTest(text=text):
+                result = components(text, 'pinned_toolchain')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, 'nightly-2026-08-27', 'channel')
 
 
 class PinnedComponentsTests(unittest.TestCase):

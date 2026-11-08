@@ -75,7 +75,12 @@ mold_version() { read_pin "$MOLD_VERSION_FILE"; }
 pinned_toolchain() {
   local file=$RUST_TOOLCHAIN_FILE value
   [ -f "$file" ] || fail "missing version pin: $file"
-  value=$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' "$file")
+  value=$(python3 -c '
+import sys, tomllib
+with open(sys.argv[1], "rb") as handle:
+    channel = tomllib.load(handle).get("toolchain", {}).get("channel", "")
+print(channel if isinstance(channel, str) else "")
+' "$file") || fail "cannot parse toolchain pin: $file"
   [ -n "$value" ] || fail "no channel found in: $file"
   printf '%s' "$value"
 }

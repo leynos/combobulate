@@ -226,6 +226,23 @@ class StructuralDigestTests(unittest.TestCase):
         for good in ('stable', 'beta', 'nightly', 'nightly-2026-09-30', '1.94', '1.94.1'):
             self.assertTrue(DIGEST.is_rustup_channel(good), good)
 
+    def test_impossible_calendar_dates_are_not_channels(self) -> None:
+        """A dated channel needs a real date, so drift cannot hide behind one."""
+        for bad in ('nightly-2026-99-99', 'nightly-2026-02-30', 'beta-2026-13-01'):
+            self.assertFalse(DIGEST.is_rustup_channel(bad), bad)
+        self.assertTrue(DIGEST.is_rustup_channel('nightly-2026-02-28'), 'real date')
+        failures, note = self.drift(TOOLCHAIN.replace('2026-08-27', '2026-99-99'))
+        self.assertEqual(failures, ['rust-toolchain.toml'], 'impossible date fails')
+        self.assertIsNone(note, 'no warning for an impossible date')
+
+    def test_shell_lines_after_a_continuation_backslash_are_kept(self) -> None:
+        """A comment-looking line inside a continued command is not a comment."""
+        base = 'echo a \\\n  b\n'
+        with_comment = 'echo a \\\n# not a comment\n  b\n'
+        self.assertDiffers('k.sh', base, with_comment, 'continued line')
+        self.assertDiffers('k.sh', base, 'echo a \\\n\n  b\n', 'continued blank')
+        self.assertSame('k.sh', base, base + '# after\n', 'ordinary comment')
+
     def test_lint_tables_digest_follows_the_tables_only(self) -> None:
         """Dependency edits and layout leave the digest alone; a lint level moves it."""
         base = '[workspace.lints.clippy]\nunwrap_used = "deny"\n[dependencies]\na = "1"\n'

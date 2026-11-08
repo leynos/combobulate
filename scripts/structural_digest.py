@@ -38,6 +38,7 @@ For example::
 from __future__ import annotations
 
 import ast
+import datetime
 import hashlib
 import json
 import re
@@ -100,16 +101,26 @@ def _rust_form(source: bytes) -> str:
 
 
 def _shell_form(text: str) -> str:
-    """Return shell text without comment-only lines, blanks, or trailing space."""
+    """Return shell text without comment-only lines, blanks, or trailing space.
+
+    A line that follows a continuation backslash is part of the same command,
+    so it is kept verbatim even when it looks like a comment or a blank.
+    """
     kept = []
+    continued = False
     for number, line in enumerate(text.splitlines()):
         stripped = line.rstrip()
+        if continued:
+            kept.append(line)
+            continued = line.endswith('\\')
+            continue
         if not stripped.strip():
             continue
         if stripped.endswith('\\'):
             # Whitespace after a continuation backslash escapes the space
             # instead of the newline, so it changes what the shell runs.
-            stripped = line.rstrip('\r\n')
+            stripped = line
+            continued = True
         if stripped.lstrip().startswith('#') and not (
             number == 0 and stripped.startswith('#!')
         ):
@@ -270,8 +281,20 @@ _CHANNEL = re.compile(
 
 
 def is_rustup_channel(value: object) -> bool:
-    """Return whether ``value`` is a channel form rustup accepts."""
-    return isinstance(value, str) and _CHANNEL.fullmatch(value) is not None
+    """Return whether ``value`` is a channel form rustup accepts.
+
+    A dated channel must carry a real calendar date. That says nothing about
+    whether an archive exists for it; only the toolchain install can.
+    """
+    if not isinstance(value, str) or _CHANNEL.fullmatch(value) is None:
+        return False
+    dated = re.search(r'(\d{4})-(\d{2})-(\d{2})$', value)
+    if dated:
+        try:
+            datetime.date(*(int(part) for part in dated.groups()))
+        except ValueError:
+            return False
+    return True
 
 
 def _channel_only_drift(path: Path, expected: str, channel: str | None) -> bool:

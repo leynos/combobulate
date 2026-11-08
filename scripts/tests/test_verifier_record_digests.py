@@ -21,7 +21,12 @@ For example::
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
+import warnings
+from pathlib import Path
 
 from verifier_probe_loader import ROOT, load_structural_digest, load_verifier_free_probe
 from verifier_records import committed_record_documents
@@ -108,6 +113,31 @@ def emit_toolchain_warning(note: str) -> None:
     """Print a plain line and a GitHub warning annotation for toolchain drift."""
     print(note)
     print(f'::warning title=Verifier evidence behind the toolchain pin::{note}')
+    # pytest captures the prints of a passing test, so also raise a warning,
+    # which both runners show in their summaries.
+    warnings.warn(note, stacklevel=2)
+
+
+class ToolchainWarningVisibilityTests(unittest.TestCase):
+    """The drift warning must reach the output of both runners."""
+
+    def test_pytest_shows_the_warning_for_a_passing_test(self) -> None:
+        """A standalone pytest run must not swallow the drift note."""
+        here = Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory() as directory:
+            probe = Path(directory) / 'test_probe.py'
+            probe.write_text(
+                f'import sys\nsys.path.insert(0, {str(here)!r})\n'
+                'from test_verifier_record_digests import emit_toolchain_warning\n'
+                'def test_it():\n    emit_toolchain_warning("NOTE-FOR-TEST")\n',
+                encoding='utf-8',
+            )
+            result = subprocess.run(
+                [sys.executable, '-m', 'pytest', '-q', '-p', 'no:cacheprovider', str(probe)],
+                capture_output=True, text=True, check=False, cwd=directory,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('NOTE-FOR-TEST', result.stdout, 'pytest must display the note')
 
 
 class HostedRecordTests(unittest.TestCase):
