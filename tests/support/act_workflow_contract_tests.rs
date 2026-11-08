@@ -10,7 +10,9 @@ mod events;
 #[path = "act_workflow_policy_tests.rs"]
 mod step_policy;
 
-use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, contracts_hold};
+use serde_yaml::Value;
+
+use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, Read, contracts_hold};
 
 #[test]
 fn hosted_gate_and_manual_act_have_distinct_routes() {
@@ -50,7 +52,7 @@ fn workflow_mutations_break_the_contract() {
         ),
         (
             "missing installer",
-            CI_WORKFLOW.replace("- name: Install Whitaker", "- name: Missing Whitaker"),
+            CI_WORKFLOW.replacen("- name: Install Whitaker", "- name: Missing Whitaker", 1),
         ),
         (
             "suppressed failure",
@@ -130,6 +132,114 @@ fn workflow_execution_mutations_break_the_contract() {
             "contract must detect {reason}"
         );
     }
+}
+
+/// One job-scoped mutation a contract case applies before re-checking.
+///
+/// The helpers are fallible rather than panicking: they live outside a
+/// `#[test]` body, where the repository's strict `expect_used` lint applies,
+/// and a missing structure is a test-fixture fault worth reporting.
+type Mutation = fn(&mut Value) -> Read<()>;
+
+/// Each required job is contracted on its own, so moving work between them fails.
+///
+/// Every mutation below touches only a `polars-*` job. A contract that resolved
+/// its steps, actions, or profile from `build-test` alone would accept them.
+#[test]
+fn polars_job_mutations_break_the_contract() {
+    for (reason, job, mutate) in [
+        (
+            "lost Polars profile selection",
+            "polars-lint",
+            clear_profile as Mutation,
+        ),
+        (
+            "Polars job left on the native profile",
+            "polars-test",
+            native_profile,
+        ),
+        (
+            "Polars lint job loses its Whitaker installer",
+            "polars-lint",
+            drop_installer,
+        ),
+        (
+            "Polars test job gains a coverage measurement",
+            "polars-test",
+            add_coverage,
+        ),
+    ] {
+        let source = apply_mutation(CI_WORKFLOW, job, mutate)
+            .unwrap_or_else(|error| panic!("{reason}: {error}"));
+        assert_ne!(source, CI_WORKFLOW, "mutation must change source: {reason}");
+        assert!(
+            !contracts_hold(&source, ACT_VALIDATION_WORKFLOW),
+            "contract must detect {reason}"
+        );
+    }
+}
+
+/// Applies one job-scoped mutation and re-serializes the derived workflow.
+fn apply_mutation(source: &str, job: &str, mutate: Mutation) -> Read<String> {
+    let mut changed = super::document(source)?;
+    mutate(polars_job(&mut changed, job)?)?;
+    Ok(serde_yaml::to_string(&changed)?)
+}
+
+/// Selects one job mapping for a mutation scoped to that job alone.
+fn polars_job<'a>(workflow: &'a mut Value, job: &str) -> Read<&'a mut Value> {
+    workflow
+        .get_mut("jobs")
+        .and_then(|jobs| jobs.get_mut(job))
+        .ok_or_else(|| format!("the committed workflow must declare the {job} job").into())
+}
+
+/// Removes the job environment key that selects its Make profile.
+fn clear_profile(job: &mut Value) -> Read<()> {
+    job.get_mut("env")
+        .and_then(Value::as_mapping_mut)
+        .ok_or("the job must declare its environment")?
+        .remove("GATE_PROFILE");
+    Ok(())
+}
+
+/// Points one job at the profile the other job measures.
+fn native_profile(job: &mut Value) -> Read<()> {
+    job.get_mut("env")
+        .and_then(Value::as_mapping_mut)
+        .ok_or("the job must declare its environment")?
+        .insert("GATE_PROFILE".into(), "native-only".into());
+    Ok(())
+}
+
+/// Removes the step that provisions the Whitaker dependency a lint job uses.
+fn drop_installer(job: &mut Value) -> Read<()> {
+    job.get_mut("steps")
+        .and_then(Value::as_sequence_mut)
+        .ok_or("the job must declare steps")?
+        .retain(|step| {
+            !step
+                .get("uses")
+                .and_then(Value::as_str)
+                .is_some_and(|uses| uses.contains("install-whitaker"))
+        });
+    Ok(())
+}
+
+/// Gives a test-only job a measured coverage step the native job owns.
+fn add_coverage(job: &mut Value) -> Read<()> {
+    let steps = job
+        .get_mut("steps")
+        .and_then(Value::as_sequence_mut)
+        .ok_or("the job must declare steps")?;
+    let mut coverage: Value =
+        serde_yaml::from_str("uses: leynos/shared-actions/.github/actions/generate-coverage@ok")?;
+    coverage
+        .as_mapping_mut()
+        .ok_or("the coverage fixture must be a mapping")?
+        .insert("if".into(), Value::String("env.ACT != 'true'".into()));
+    steps.push(coverage);
+    Ok(())
 }
 
 #[test]

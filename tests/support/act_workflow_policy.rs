@@ -66,7 +66,9 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
             "echo \"Coverage CFLAGS: -fuse-ld=lld\"\n",
             "echo \"Coverage LDFLAGS: -fuse-ld=lld\""
         ),
-        Some("Test under Act") => "make test",
+        // `Test` is the Polars-enabled job's suite; `Test under Act` is the
+        // native-only fallback that hosted coverage replaces.
+        Some("Test" | "Test under Act") => "make test",
         _ => return false,
     };
     script.trim_end() == expected
@@ -80,7 +82,9 @@ fn valid_step_env(item: &Value, name: Option<&str>) -> bool {
             "DYLINT_DRIVER_PATH",
             "${{ runner.temp }}/combobulate-whitaker-driver",
         )],
-        Some("Test under Act") => &[("WITH_ACT", "0")],
+        // Both `make test` routes disable the nested Act pass, so neither job
+        // can recurse into Act or inherit an ambient `WITH_ACT=1`.
+        Some("Test" | "Test under Act") => &[("WITH_ACT", "0")],
         Some("Test and Measure Coverage") => &[
             ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm"),
             ("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "clang"),

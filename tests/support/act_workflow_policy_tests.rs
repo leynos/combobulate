@@ -5,16 +5,24 @@ use serde_yaml::Value;
 
 use super::super::{CI_WORKFLOW, action_inputs_match, document, policy, step, valid_actions};
 
+/// Every guarded step in every required job keeps its exact textual condition.
 #[rstest]
-#[case::linker("Install linker prerequisites")]
-#[case::audit_installer("Install cargo-audit")]
-#[case::audit_python("Setup Python for audit manifest extraction")]
-#[case::audit("Audit dependencies")]
-#[case::coverage("Test and Measure Coverage")]
-#[case::act("Test under Act")]
-fn required_conditions_reject_missing_wrong_and_nontext_values(#[case] name: &str) {
+#[case::linker("build-test", "Install linker prerequisites")]
+#[case::linker_polars_lint("polars-lint", "Install linker prerequisites")]
+#[case::linker_polars_test("polars-test", "Install linker prerequisites")]
+#[case::audit_installer("build-test", "Install cargo-audit")]
+#[case::audit_python("build-test", "Setup Python for audit manifest extraction")]
+#[case::audit("build-test", "Audit dependencies")]
+#[case::coverage("build-test", "Test and Measure Coverage")]
+#[case::act("build-test", "Test under Act")]
+fn required_conditions_reject_missing_wrong_and_nontext_values(
+    #[case] job: &str,
+    #[case] name: &str,
+) {
     let ci = document(CI_WORKFLOW).expect("parse CI steps for condition fixture");
-    let original = step(&ci, name).expect("find guarded production step").1;
+    let original = step(&ci, job, name)
+        .expect("find guarded production step")
+        .1;
     assert!(
         policy::known_step(original),
         "production guarded step must be accepted: {name}"

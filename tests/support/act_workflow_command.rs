@@ -104,7 +104,9 @@ fn committed_workflow_make_scripts_execute_exact_targets_and_fail_closed() {
         ("Lint", "lint"),
         ("Test under Act", "test"),
     ] {
-        let item = contract::step(&ci, name).expect("required step").1;
+        let item = contract::build_test_step(&ci, name)
+            .expect("required step")
+            .1;
         let script = contract::text(item, &["run"]).expect("step script");
         let with_act = contract::text(item, &["env", "WITH_ACT"]);
         let (passed, record) =

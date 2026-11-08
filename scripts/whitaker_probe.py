@@ -49,14 +49,39 @@ def document(source: str) -> dict:
     return result
 
 
-def caller_reference(workflow: dict) -> str:
-    """Resolve the single build-test installer reference, rather than a fixture pin."""
-    steps = workflow['jobs']['build-test']['steps']
-    installers = [step for step in steps if isinstance(step, dict)
+def _job_installer(job_name: str, job: object) -> str | None:
+    """Resolve one job's Whitaker installer reference; e.g. None when it installs none."""
+    steps = job.get('steps') if isinstance(job, dict) else None
+    installers = [step for step in steps or [] if isinstance(step, dict)
                   and str(step.get('uses', '')).startswith(ACTION_PATH + '@')]
+    if not installers:
+        return None
     if len(installers) != 1:
-        raise ValueError('build-test must contain exactly one Whitaker installer')
-    reference = installers[0]['uses'].split('@', 1)[1]
+        raise ValueError(f'{job_name} must contain exactly one Whitaker installer')
+    return installers[0]['uses'].split('@', 1)[1]
+
+
+def caller_reference(workflow: dict) -> str:
+    """Resolve the installer reference every calling job shares, not a fixture pin.
+
+    DL-03 puts the installer in more than one required job, and each of those
+    must run the same reviewed action. Resolving the reference per job and
+    requiring one distinct value is what keeps a second job from installing a
+    different Whitaker build behind the checks.
+
+    Examples
+    --------
+    A workflow whose two jobs both pin `a…40` returns that reference; one job
+    pinning a different commit raises ValueError.
+    """
+    jobs = workflow['jobs']
+    references = {reference for name, job in jobs.items()
+                  if (reference := _job_installer(name, job)) is not None}
+    if not references:
+        raise ValueError('no job installs the Whitaker action')
+    if len(references) != 1:
+        raise ValueError('every job must install the same Whitaker reference')
+    reference = references.pop()
     if not re.fullmatch('[0-9a-f]{40}', reference):
         raise ValueError('Whitaker must use a full lowercase hexadecimal commit SHA')
     return reference
