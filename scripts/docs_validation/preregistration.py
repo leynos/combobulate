@@ -21,14 +21,14 @@ from .acceptance_evidence import (
 )
 from .acceptance_registration import FROZEN_FIELDS, check_completeness, check_registration_declarations
 from .ci_controls import (
-    OUTCOME_VERDICTS, AcceptanceWorkflowSettings, check_acceptance_workflow, check_ci_calibration,
-    check_ci_measurement,
+    OUTCOME_VERDICTS, AcceptanceWorkflowSettings, RequiredJob, check_acceptance_workflow,
+    check_ci_calibration, check_ci_measurement,
 )
 from .context import ValidationContext, require
 
 __all__ = [
-    'AcceptanceWorkflowSettings', 'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'check_acceptance_controls',
-    'check_acceptance_workflow', 'check_calibration_record',
+    'AcceptanceWorkflowSettings', 'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'RequiredJob',
+    'check_acceptance_controls', 'check_acceptance_workflow', 'check_calibration_record',
     'check_calibration_reference', 'check_ci_calibration', 'check_ci_measurement', 'check_completeness',
     'check_control_bindings', 'check_host_identity', 'check_measurement_binding', 'check_registration_declarations',
     'verdict',
@@ -38,13 +38,25 @@ HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
 
 
 def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
-    """Adapt parsed CI YAML into AC-07 values; e.g. extract image and job timeout."""
+    """Adapt parsed CI YAML into AC-07 values; e.g. one entry per required job.
+
+    DL-14 makes every pull-request job part of the workload, so this reads the
+    whole `jobs` mapping rather than one named job. A job with no `if`
+    condition is required by definition; a conditional job is only scheduled
+    for some events and would make the per-run longest job depend on which
+    event fired.
+    """
     jobs = workflow.get('jobs', {}) if isinstance(workflow, Mapping) else {}
-    job = jobs.get('build-test') if isinstance(jobs, Mapping) else None
-    return AcceptanceWorkflowSettings(
-        runner_image=job.get('runs-on') if isinstance(job, Mapping) else None,
-        timeout_minutes=job.get('timeout-minutes') if isinstance(job, Mapping) else None,
-    )
+    required = [
+        RequiredJob(
+            name=str(name),
+            runner_image=job.get('runs-on') if isinstance(job, Mapping) else None,
+            timeout_minutes=job.get('timeout-minutes') if isinstance(job, Mapping) else None,
+        )
+        for name, job in (jobs.items() if isinstance(jobs, Mapping) else ())
+        if isinstance(job, Mapping) and 'if' not in job
+    ]
+    return AcceptanceWorkflowSettings(jobs=tuple(required))
 
 
 def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -> None:

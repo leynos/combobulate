@@ -46,7 +46,7 @@ def measurement(
         'id': 'AC-07-fixture',
         'outcome': outcome,
         'workloads': [{
-            'id': 'ci-build-test',
+            'id': 'ci-required-jobs',
             'samples': samples,
             'attempts': attempts,
         }],
@@ -87,7 +87,7 @@ class CiMeasurement(unittest.TestCase):
         """Require the full registered window before reporting a successful p90."""
         durations = [60.0] * 19
         check_ci_measurement(CI_CONTROL, measurement('inconclusive', durations))
-        with self.assertRaisesRegex(AssertionError, 'needs 20 build-test attempts',
+        with self.assertRaisesRegex(AssertionError, 'needs 20 required-job attempts',
                                     msg='a short successful window cannot pass AC-07'):
             check_ci_measurement(CI_CONTROL, measurement('pass', durations))
 
@@ -95,7 +95,7 @@ class CiMeasurement(unittest.TestCase):
         """Do not count a repeated workflow attempt twice in the latest window."""
         record = measurement('pass', [60.0] * 20)
         record['workloads'][0]['attempts'][1]['run_id'] = '1'
-        with self.assertRaisesRegex(AssertionError, 'repeats a build-test attempt',
+        with self.assertRaisesRegex(AssertionError, 'repeats a required-job attempt',
                                     msg='attempt identifiers must be unique'):
             check_ci_measurement(CI_CONTROL, record)
 
@@ -148,7 +148,7 @@ class CiMeasurement(unittest.TestCase):
             duplicate_record = measurement(expected, durations, failed_index, incomplete_index)
             attempts = duplicate_record['workloads'][0]['attempts']
             attempts[duplicate_index]['run_id'] = attempts[duplicate_index - 1]['run_id']
-            with self.assertRaisesRegex(AssertionError, 'repeats a build-test attempt',
+            with self.assertRaisesRegex(AssertionError, 'repeats a required-job attempt',
                                         msg='generated duplicate attempt IDs must be rejected'):
                 check_ci_measurement(CI_CONTROL, duplicate_record)
 

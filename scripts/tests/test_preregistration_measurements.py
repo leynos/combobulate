@@ -12,7 +12,7 @@ from jsonschema import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from docs_validation.ci_controls import AcceptanceWorkflowSettings
+from docs_validation.ci_controls import AcceptanceWorkflowSettings, RequiredJob
 from docs_validation.context import ValidationContext
 from docs_validation.preregistration import (
     OUTCOME_VERDICTS, check_acceptance_workflow, check_calibration_record, check_ci_calibration,
@@ -169,16 +169,29 @@ class WorkflowAndCi(unittest.TestCase):
 
     def test_workflow_runner_and_timeout_match_ac07(self):
         """Bind the CI workflow runner and timeout to AC-07."""
-        check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-24.04', 8), CI_CONTROL)
+        jobs = (RequiredJob('build-test', 'ubuntu-24.04', 8),
+                RequiredJob('polars-lint', 'ubuntu-24.04', 8),
+                RequiredJob('polars-test', 'ubuntu-24.04', 8))
+        check_acceptance_workflow(AcceptanceWorkflowSettings(jobs), CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'runner.*does not match AC-07'):
-            check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-latest', 8), CI_CONTROL)
+            check_acceptance_workflow(
+                AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-latest', 8),)),
+                CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'timeout.*does not match AC-07'):
-            check_acceptance_workflow(AcceptanceWorkflowSettings('ubuntu-24.04', 9), CI_CONTROL)
+            check_acceptance_workflow(
+                AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-24.04', 9),)),
+                CI_CONTROL)
+        with self.assertRaisesRegex(AssertionError, 'at least one required pull-request job'):
+            check_acceptance_workflow(AcceptanceWorkflowSettings(()), CI_CONTROL)
+        with self.assertRaisesRegex(AssertionError, 'polars-test runner'):
+            check_acceptance_workflow(
+                AcceptanceWorkflowSettings(jobs[:2] + (RequiredJob('polars-test', 'ubuntu-latest', 8),)),
+                CI_CONTROL)
 
     def test_two_timeouts_fail_even_when_fast_successes_keep_p90_low(self):
         """Fail a run when timeouts occur despite an in-budget p90."""
         attempts = [('success', 1.0)] * 18 + [('timed_out', 480.0)] * 2
-        with self.assertRaisesRegex(AssertionError, 'must fail when a build-test attempt fails'):
+        with self.assertRaisesRegex(AssertionError, 'must fail when a required-job attempt fails'):
             check_ci_measurement(CI_CONTROL, ci_record('pass', attempts))
         failed = ci_record('fail', attempts)
         check_ci_measurement(CI_CONTROL, failed)
@@ -191,7 +204,7 @@ class WorkflowAndCi(unittest.TestCase):
         failed['control_ids'] = [CI_CONTROL['id']]
         failed['recorded_on'] = CI_MEASUREMENT_DATE
         workload = failed['workloads'][0]
-        workload['id'] = 'ci-build-test'
+        workload['id'] = 'ci-required-jobs'
         workload['samples'] = []
         workload['median'] = 'not available'
         workload['attempts'] = [{
@@ -211,7 +224,7 @@ class WorkflowAndCi(unittest.TestCase):
                          'an untimed failed AC-07 attempt must remain a failed measurement')
         passing = copy.deepcopy(failed)
         passing['outcome'] = 'pass'
-        with self.assertRaisesRegex(AssertionError, 'must fail when a build-test attempt fails',
+        with self.assertRaisesRegex(AssertionError, 'must fail when a required-job attempt fails',
                                     msg='an untimed failed attempt must never be recorded as a pass'):
             check_ci_measurement(CI_CONTROL, passing)
 

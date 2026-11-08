@@ -10,6 +10,11 @@ from statistics import median
 
 from .context import require
 
+# DL-14 renamed AC-07's workload when it stopped measuring one job. The
+# calibration record keeps `ci-build-test`, which is the series it actually
+# measured before the job split; only acceptance records use this id.
+REQUIRED_JOB_WORKLOAD = 'ci-required-jobs'
+
 OUTCOME_VERDICTS = {
     'pass': 'pass', 'fail': 'fail', 'budget-exceeded': 'fail', 'resource-exhausted': 'fail',
     'inconclusive': 'inconclusive', 'missing': 'fail',
@@ -26,11 +31,19 @@ class _CiAttemptSummary:
 
 
 @dataclass(frozen=True)
-class AcceptanceWorkflowSettings:
-    """Carry the workflow values used by AC-07; e.g. `ubuntu-24.04` and eight minutes."""
+class RequiredJob:
+    """One required pull-request job; e.g. `build-test` on `ubuntu-24.04` for eight minutes."""
 
+    name: str
     runner_image: object
     timeout_minutes: object
+
+
+@dataclass(frozen=True)
+class AcceptanceWorkflowSettings:
+    """Carry AC-07's required jobs; e.g. `build-test` plus the two Polars jobs."""
+
+    jobs: tuple[RequiredJob, ...]
 
 
 def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, object]) -> None:
@@ -41,7 +54,8 @@ def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, obj
     control : Mapping[str, object]
         Registered control; non-AC-07 controls need no CI-specific checks.
     record : Mapping[str, object]
-        Acceptance record containing the build-test attempts and samples.
+        Acceptance record containing one attempt per workflow run, each carrying
+        that run's longest required job.
 
     Returns
     -------
@@ -63,27 +77,31 @@ def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, obj
     """
     if control['id'] != 'AC-07':
         return
-    workload = _ci_build_test_workload(record)
+    workload = _ci_required_jobs_workload(record)
     attempts = workload.get('attempts', [])
     _check_ci_attempt_window(attempts, record['id'])
     summary = _ci_attempt_durations(attempts, record['id'])
     require(workload['samples'] == list(summary.durations),
-            f"{record['id']} samples must retain every started build-test attempt duration")
+            f"{record['id']} samples must retain every started required-job attempt duration")
     _check_ci_measurement_outcome(control, record, summary)
 
 
-def _ci_build_test_workload(record: Mapping[str, object]) -> Mapping[str, object]:
-    """Select the single CI workload; for example, reject a missing build-test job."""
-    jobs = [workload for workload in record['workloads'] if workload['id'] == 'ci-build-test']
-    require(len(jobs) == 1, f"{record['id']} must contain exactly one ci-build-test workload")
+def _ci_required_jobs_workload(record: Mapping[str, object]) -> Mapping[str, object]:
+    """Select the single CI workload; for example, reject a missing required-jobs series."""
+    jobs = [workload for workload in record['workloads']
+            if workload['id'] == REQUIRED_JOB_WORKLOAD]
+    require(len(jobs) == 1,
+            f"{record['id']} must contain exactly one {REQUIRED_JOB_WORKLOAD} workload")
     return jobs[0]
 
 
 def _check_ci_attempt_window(attempts: list[Mapping[str, object]], record_id: str) -> None:
     """Validate the newest-first retry window; for example, reject duplicate attempts."""
-    require(len(attempts) <= 20, f"{record_id} must contain only the latest 20 build-test attempts")
+    require(len(attempts) <= 20,
+            f"{record_id} must contain only the latest 20 required-job attempts")
     attempt_ids = [(attempt['run_id'], attempt['attempt']) for attempt in attempts]
-    require(len(attempt_ids) == len(set(attempt_ids)), f"{record_id} repeats a build-test attempt")
+    require(len(attempt_ids) == len(set(attempt_ids)),
+            f"{record_id} repeats a required-job attempt")
     starts = [attempt['started_at'] for attempt in attempts if attempt['started_at'] is not None]
     require(starts == sorted(starts, reverse=True), f"{record_id} attempts are not newest first")
 
@@ -119,18 +137,16 @@ def _check_ci_measurement_outcome(
     control: Mapping[str, object], record: Mapping[str, object], summary: _CiAttemptSummary,
 ) -> None:
     """Enforce failure, sample-count, and p90 rules; failures take precedence."""
-    has_failed_attempt = any(attempt['conclusion'] != 'success' for attempt in summary.attempts)
-    if has_failed_attempt:
-        require(OUTCOME_VERDICTS[record['outcome']] == 'fail',
-                f"{record['id']} must fail when a build-test attempt fails, times out, or has no duration")
+    failed = f"{record['id']} must fail when a required-job attempt fails, times out, or has no duration"
+    if any(attempt['conclusion'] != 'success' for attempt in summary.attempts):
+        require(OUTCOME_VERDICTS[record['outcome']] == 'fail', failed)
         return
     if summary.has_incomplete_attempt:
-        require(OUTCOME_VERDICTS[record['outcome']] == 'fail',
-                f"{record['id']} must fail when a build-test attempt fails, times out, or has no duration")
+        require(OUTCOME_VERDICTS[record['outcome']] == 'fail', failed)
         return
     if len(summary.attempts) < 20:
         require(record['outcome'] == 'inconclusive',
-                f"{record['id']} needs 20 build-test attempts for a conclusive result")
+                f"{record['id']} needs 20 required-job attempts for a conclusive result")
         return
     _check_ci_p90_outcome(control, record, list(summary.durations))
 
@@ -143,7 +159,7 @@ def _check_ci_p90_outcome(
     budget_seconds = control['frozen']['decision_rule']['thresholds']['p90_minutes'] * 60
     if p90_seconds > budget_seconds:
         require(OUTCOME_VERDICTS[record['outcome']] == 'fail',
-                f"{record['id']} must fail when build-test p90 exceeds its budget")
+                f"{record['id']} must fail when required-job p90 exceeds its budget")
     else:
         require(record['outcome'] == 'pass',
                 f"{record['id']} must pass when 20 successful attempts meet the p90 budget")
@@ -280,34 +296,43 @@ def _check_ci_calibration_p90(
 
 
 def check_acceptance_workflow(settings: AcceptanceWorkflowSettings, control: Mapping[str, object]) -> None:
-    """Require the hosted build-test workflow to use the registered runner and timeout.
+    """Require every required pull-request job to use AC-07's runner and timeout.
+
+    The workload is every required job (DL-14), so a job with a different
+    runner or budget would change what the statistic measures: the per-run
+    figure is the longest required job, and a job outside the registered
+    runner class would time itself on unknown hardware.
 
     Parameters
     ----------
     settings : AcceptanceWorkflowSettings
-        Parsed runner image and timeout from the build-test job.
+        Parsed required jobs, each with its runner image and timeout.
     control : Mapping[str, object]
         Registered AC-07 control supplying the expected image and timeout.
 
     Returns
     -------
     None
-        Returns only when both workflow settings match the registration.
+        Returns only when every required job matches the registration.
 
     Raises
     ------
     AssertionError
-        If the workflow runner image or timeout differs from the control.
+        If a job's runner image or timeout differs from the control, or no job
+        is declared.
     KeyError
         If the control omits a required environment or threshold field.
 
     Examples
     --------
-    check_acceptance_workflow(settings, control) accepts ubuntu-24.04 with an eight-minute timeout.
+    check_acceptance_workflow(settings, control) accepts two jobs on
+    `ubuntu-24.04` with eight-minute timeouts.
     """
     image = control['frozen']['environment']['image']
     timeout = control['frozen']['decision_rule']['thresholds']['timeout_minutes']
-    require(settings.runner_image == image,
-            f"build-test runner {settings.runner_image!r} does not match AC-07 image {image}")
-    require(settings.timeout_minutes == timeout,
-            f"build-test timeout {settings.timeout_minutes!r} does not match AC-07 budget {timeout}")
+    require(bool(settings.jobs), 'the workflow must declare at least one required pull-request job')
+    for job in settings.jobs:
+        require(job.runner_image == image,
+                f"{job.name} runner {job.runner_image!r} does not match AC-07 image {image}")
+        require(job.timeout_minutes == timeout,
+                f"{job.name} timeout {job.timeout_minutes!r} does not match AC-07 budget {timeout}")

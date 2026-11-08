@@ -50,6 +50,9 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
         with:
           rustflags: ''
+          # DL-03 requires sccache in every hosted job; the action's default is
+          # already `true`, so this pins the dependency rather than changing it.
+          use-sccache: 'true'
       - name: Log Rust compiler configuration
         run: |-
           rustc --version
@@ -90,6 +93,12 @@ jobs:
           output-path: lcov.info
           format: lcov
           with-ratchet: 'true'
+          # DL-03: coverage keeps measuring the native-only profile, so this
+          # baseline uses the same features the pull-request lane measures.
+          # An empty `features` list adds no `--features` flag, and
+          # `--no-default-features` is what selects the profile.
+          with-default-features: 'false'
+          features: ''
       # Publishes whether the token exists, and nothing else. The token is in
       # no `env` on this workflow: the upload is a composite action whose
       # nested steps inherit the calling step's `env`. GitHub evaluates the

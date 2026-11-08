@@ -61,7 +61,7 @@ def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
     entry['control_ids'] = [CI_CONTROL['id']]
     entry['recorded_on'] = CI_MEASUREMENT_DATE
     workload = entry['workloads'][0]
-    workload['id'] = 'ci-build-test'
+    workload['id'] = 'ci-required-jobs'
     attempts = []
     newest_start = datetime(2026, 10, 12, 12, tzinfo=UTC)
     for index, (conclusion, seconds) in enumerate(conclusions):

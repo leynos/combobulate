@@ -1,6 +1,12 @@
 
 name: CI
 
+# DL-03: `build-test` keeps the native-only profile, and the Polars-enabled
+# profile is linted and tested in two parallel jobs. AC-07's amended workload
+# (DL-14) is every required pull-request job here, so all three jobs share the
+# registered runner image and timeout, and each is sized so its slowest cold
+# run stays inside six minutes.
+
 'on':
   pull_request:
     types: [opened, synchronize, reopened]
@@ -17,6 +23,9 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
+      # Make routes read this to select one profile. The native-only profile is
+      # the one AC-07 measures, and the two *-polars jobs own the other.
+      GATE_PROFILE: native-only
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -27,6 +36,10 @@ jobs:
           # An empty input leaves Cargo's configured development flags active.
           # Make gates still assign their own warning and build-standard flags.
           rustflags: ''
+          # DL-03 requires sccache in every hosted job. The action's default is
+          # already `true`, so naming it pins the dependency on that default
+          # rather than changing behaviour.
+          use-sccache: 'true'
       - name: Log Rust compiler configuration
         run: |-
           rustc --version
@@ -118,9 +131,127 @@ jobs:
           # The publisher in coverage-main.yml owns the coverage artefact and
           # the ratchet baseline; this lane only compares against it.
           publish-artefact: 'false'
+          # DL-03/DL-18: coverage measures the native-only profile, which is
+          # also the profile this job lints and tests. Naming it explicitly
+          # keeps this measurement equal to the baseline coverage-main.yml
+          # advances.
+          with-default-features: 'false'
+          features: ''
       - name: Test under Act
         # Hosted coverage is skipped under Act, so execute the ordinary suite.
         if: env.ACT == 'true'
+        env:
+          WITH_ACT: '0'
+        run: make test
+
+  # DL-03 shape B: the Polars-enabled profile is linted here rather than in
+  # `build-test`, so a cold Polars build cannot consume the native-only job's
+  # budget. The route is `build-test`'s provisioning prelude without the steps
+  # that exist to produce the native-only measured coverage artefact.
+  polars-lint:
+    runs-on: ubuntu-24.04
+    # AC-07 (DL-14) measures every required job, so this one carries the same
+    # registered budget as `build-test`.
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+      GATE_PROFILE: polars-enabled
+    steps:
+      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
+        with:
+          persist-credentials: false
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
+        with:
+          # An empty input leaves Cargo's configured development flags active.
+          rustflags: ''
+          # DL-03 requires sccache in every hosted job; the action's default is
+          # already `true`, so this pins the dependency rather than changing it.
+          use-sccache: 'true'
+      - name: Log Rust compiler configuration
+        run: |-
+          rustc --version
+          printf 'Base RUSTFLAGS: %s\n' "$RUSTFLAGS"
+      - name: Install linker prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update \
+            && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the build standard
+        # The pinned toolchain and mold must precede every local suite route.
+        run: make install-build-tools
+      - name: Setup uv
+        uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
+      - name: Verify Whitaker capability
+        timeout-minutes: 3
+        run: >-
+          uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py
+          --workflow .github/workflows/ci.yml
+      - name: Install Whitaker
+        uses: leynos/shared-actions/.github/actions/install-whitaker@5a99aed78ce68dcebd3052b75c31e6f173162b1e # shared-actions 5a99aed7 (whitaker-installer 0.2.11)
+        with:
+          cranelift: 'true'
+      - name: Lint
+        # A private path exercises Dylint's cold driver construction on each
+        # hosted run before the repository lint check.
+        env:
+          DYLINT_DRIVER_PATH: ${{ runner.temp }}/combobulate-whitaker-driver
+        run: |
+          mkdir -p "$DYLINT_DRIVER_PATH"
+          make lint
+
+  # The Polars-enabled profile's test route. `make test` is the same entry
+  # point `build-test` uses under Act, so profile selection is the only
+  # difference; measured coverage stays a native-only artefact.
+  polars-test:
+    runs-on: ubuntu-24.04
+    # AC-07 (DL-14) measures every required job, so this one carries the same
+    # registered budget as `build-test`.
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_PROFILE: debug
+      GATE_PROFILE: polars-enabled
+    steps:
+      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
+        with:
+          persist-credentials: false
+      - name: Setup Rust
+        uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
+        with:
+          # An empty input leaves Cargo's configured development flags active.
+          rustflags: ''
+          # DL-03 requires sccache in every hosted job; the action's default is
+          # already `true`, so this pins the dependency rather than changing it.
+          use-sccache: 'true'
+      - name: Log Rust compiler configuration
+        run: |-
+          rustc --version
+          printf 'Base RUSTFLAGS: %s\n' "$RUSTFLAGS"
+      - name: Install linker prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update \
+            && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the build standard
+        # The pinned toolchain and mold must precede every local suite route.
+        run: make install-build-tools
+      - name: Install test runner
+        env:
+          RUSTFLAGS: ""
+        run: cargo binstall --no-confirm --locked cargo-nextest
+      - name: Test
+        # `make test` runs `make act-validation` only under `WITH_ACT=1`; the
+        # hosted lane must never recurse into Act.
         env:
           WITH_ACT: '0'
         run: make test

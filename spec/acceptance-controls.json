@@ -405,28 +405,28 @@
       ],
       "frozen": {
         "workload": {
-          "description": "The CI build-test job, the critical path of pull request checks; every eligible attempt counts."
+          "description": "Every required pull-request job in .github/workflows/ci.yml, measured as the longest such job in each workflow run; every eligible attempt counts. Calibrated against the pre-DL-03 single build-test job, recorded as workload ci-build-test. DL-14 changed the workload to every required job, so the 20-run window restarts empty on the new CI shape and AC-07 reads inconclusive until it refills."
         },
         "control": null,
         "sizes": "Every pull request.",
         "seeds": "Not applicable.",
-        "timed_region": "Job start to completion, excluding queueing.",
-        "metric": "Job wall time.",
+        "timed_region": "Workflow run start to its last required job completing.",
+        "metric": "Longest required-job wall time per workflow run.",
         "unit": "minutes",
-        "estimand": "The 90th percentile of durations for the 20 most recent eligible build-test job attempts, regardless of conclusion.",
-        "statistic": "Nearest-rank p90 over a rolling window of 20 job attempts; reruns and failed attempts remain in the window.",
+        "estimand": "The 90th percentile of per-run longest required-job durations for the 20 most recent eligible workflow runs, regardless of conclusion.",
+        "statistic": "Nearest-rank p90 over a rolling window of 20 workflow runs, each contributing its longest required job; reruns and failed attempts remain in the window.",
         "decision_rule": {
           "thresholds": {
             "p90_minutes": 8,
             "timeout_minutes": 8
           },
-          "pass_when": "All 20 attempts conclude success and their nearest-rank p90 is within the 8-minute budget; any failed, timed-out, cancelled, resource-exhausted, or missing attempt fails independently of p90.",
-          "inconclusive": "Fewer than 20 eligible attempts is inconclusive; an unsuccessful or missing attempt is a failure, even if the p90 is within budget.",
+          "pass_when": "All 20 runs conclude with every required job successful and their nearest-rank p90 is within the 8-minute budget; any failed, timed-out, cancelled, resource-exhausted, or missing required job fails independently of p90.",
+          "inconclusive": "Fewer than 20 eligible runs is inconclusive; any unsuccessful or missing required job is a failure, even if the p90 is within budget.",
           "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
-        "samples": "The 20 most recently started build-test job attempts on main and pull requests, including every rerun and conclusion.",
+        "samples": "The 20 most recently started workflow runs on main and pull requests, each contributing its longest required job, including every rerun and conclusion.",
         "outlier_policy": "None.",
         "environment": {
           "image": "ubuntu-24.04",
@@ -439,9 +439,9 @@
             "kani": "0.67.0"
           }
         },
-        "cache_policy": "The workflow's own caches.",
+        "cache_policy": "The workflow's own caches, as created by the pinned setup-rust and generate-coverage actions; sccache saves only on main, and the coverage ratchet baseline publishes only from coverage-main.yml on main.",
         "proof_scope": "Not applicable.",
-        "measurement_tool": "GitHub Actions job timestamps from the REST API, with each workflow rerun recorded as an attempt.",
+        "measurement_tool": "GitHub Actions workflow-run and job timestamps from the REST API, with each workflow rerun recorded as an attempt and its longest required job as the sample.",
         "analysis_script": null,
         "calibration": {
           "status": "calibrated",

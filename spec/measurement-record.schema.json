@@ -136,7 +136,9 @@
           "workloads": {
             "items": {
               "if": {
-                "properties": {"id": {"const": "ci-build-test"}},
+                "properties": {
+                  "id": {"enum": ["ci-build-test", "ci-required-jobs"]}
+                },
                 "required": ["id"]
               },
               "then": {
