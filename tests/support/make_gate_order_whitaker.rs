@@ -75,9 +75,28 @@ pub(super) const RECORDING_HELPERS: &str = concat!(
 /// `--no-default-features` checks only the default features, which is the
 /// Polars-enabled profile, leaving the native-only `cfg(not(feature =
 /// "polars"))` code unlinted.
+///
+/// The library is named rather than discovered. `--all` loads every published
+/// library, and the rolling release has published a lint crate both alone and
+/// inside `whitaker_suite`; both copies register the same lint, and rustc
+/// aborts with a duplicate-specification error. `--fail-on-no-libraries` keeps
+/// a missing suite a failure instead of a silent pass over nothing.
 const WHITAKER_PROFILE_ARGUMENTS: [&[&str]; 2] = [
-    &["--all", "--", "--all-targets", "--no-default-features"],
-    &["--all", "--", "--all-targets"],
+    &[
+        "--lib",
+        "whitaker_suite",
+        "--fail-on-no-libraries",
+        "--",
+        "--all-targets",
+        "--no-default-features",
+    ],
+    &[
+        "--lib",
+        "whitaker_suite",
+        "--fail-on-no-libraries",
+        "--",
+        "--all-targets",
+    ],
 ];
 
 /// Verifies Whitaker's repository-side Cargo route and driver cache evidence.

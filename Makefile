@@ -377,6 +377,12 @@ WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
 	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
 	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -u CFLAGS -u LDFLAGS
 
+# Whitaker is named by library, not discovered with `--all`. The rolling lint
+# release may publish a crate both on its own and inside `whitaker_suite`; in
+# that state `--all` loads both copies, which register each shared lint twice
+# and abort rustc with "duplicate specification of lint ...". Naming the suite
+# explicitly loads one library that already bundles every lint crate, so the
+# checked lint set is unchanged.
 lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo defaults
 	@$(WHITAKER_CLEAN_ENV) $(CHECK_BUILD_TOOLS)
 	@echo "Whitaker binary: $(WHITAKER)"
@@ -388,7 +394,7 @@ lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo def
 		esac; \
 		$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" \
 			DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" \
-			$(WHITAKER) --all -- $(CARGO_FLAGS) $$flags; \
+			$(WHITAKER) --lib whitaker_suite --fail-on-no-libraries -- $(CARGO_FLAGS) $$flags; \
 	done
 
 typecheck: check-build-tools ## Type-check without building

@@ -255,22 +255,36 @@ Specification: parent plan lines 2322-2348.
   `From<PolarsError>` impl would have been the wrong shape twice over: it is
   public API, so it would hand every embedder a route from a Polars type to the
   facade's error, which is the leak DL-19 exists to prevent.
-- **Hosted lint now fails for a reason outside this branch.** The last green
-  run (`ad5945b`) and `abc95b8` both downloaded the rolling suite archive
-  `whitaker-lints-3a370bf`, where `libwhitaker_suite` is the only library. From
-  `2040787` the installer fetches `whitaker-lints-cfa208c`, which ships eleven
-  libraries, including a standalone `libstring_continuation_style` alongside
-  `libwhitaker_suite`. Both contain that lint's registration, so
-  `whitaker --all` loads it twice and rustc aborts with
-  `duplicate specification of lint string_continuation_style`. The failure
-  reproduces on a re-run at an identical installer pin (`0.2.11`), which rules
-  out a mid-publish race. It is upstream of this repository: the suite is a
-  rolling release and is deliberately never pinned
-  (`suite-version is refused`), so the archive cannot be selected by date. The
-  one repository-side lever, naming `--lib whitaker_suite` instead of `--all`,
-  would silently narrow the lint set to whichever crates the suite happens to
-  bundle, and that is the coverage the gate exists to provide. Recorded as a
-  known blocked gate rather than worked around by narrowing the lint set.
+- **Hosted lint failed for an upstream reason, fixed repository-side by naming
+  the suite.** The last green run (`ad5945b`) and `abc95b8` both downloaded the
+  rolling suite archive `whitaker-lints-3a370bf`, where `libwhitaker_suite` is
+  the only library. From `2040787` the installer fetches
+  `whitaker-lints-cfa208c`, which ships eleven libraries, including a standalone
+  `libstring_continuation_style` alongside `libwhitaker_suite`. Both contain
+  that lint's registration, so `whitaker --all` loads it twice and rustc aborts
+  with `duplicate specification of lint string_continuation_style`. The failure
+  reproduced on a re-run at an identical installer pin (`0.2.11`), which rules
+  out a mid-publish race. The suite is a rolling release and is deliberately
+  never pinned (`suite-version is refused`), so the archive cannot be selected
+  by date.
+
+  The `DYLINT_LIBS` value in the hosted failure log names exactly what `--all`
+  discovered: `libstring_continuation_style` and `libwhitaker_suite`. Locally
+  only the suite is installed, which is why the same target stayed green here —
+  the failure is a property of the published archive, not of this repository's
+  sources. `--all` means "load all discovered libraries"; `--lib NAME` names
+  one. A scratch crate with planted violations, run through
+  `--lib whitaker_suite`, still reported `no_expect_outside_tests` and
+  `no_std_fs_operations`, and `DYLINT_LIBS` again listed the suite alone; the
+  libraries resolved from the standard install path with no
+  `DYLINT_LIBRARY_PATH` supplied, so the recipe needs no extra environment.
+  `whitaker list --lib-path` over the suite `.so` declares all ten lint crates,
+  and upstream's installer selects the suite alone by default. Naming the suite
+  therefore loads one library that already bundles every lint, which is
+  coverage-neutral rather than a narrowing. `--fail-on-no-libraries` is added
+  so a missing suite stays a failure instead of passing over nothing. This
+  supersedes the earlier reading in this plan that called the lever a
+  coverage-narrowing workaround.
 - The pin sweep is load-bearing rather than decorative: on its first run it
   reported 15 tracked files that name a pin the record did not list. Every one
   was a genuine site — a manifest selecting the version, a lockfile resolving

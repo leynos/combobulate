@@ -91,7 +91,7 @@ jobs:
             case "$ROUTE" in
               rustdoc) command=(cargo doc --manifest-path tools/probes/polars-profile/Cargo.toml --no-deps) ;;
               clippy) command=(cargo clippy --manifest-path tools/probes/polars-profile/Cargo.toml --all-targets -- -D warnings) ;;
-              whitaker) command=(env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS DYLINT_RUSTFLAGS="-D warnings" whitaker --all -- --manifest-path tools/probes/polars-profile/Cargo.toml --all-targets) ;;
+              whitaker) command=(env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS DYLINT_RUSTFLAGS="-D warnings" whitaker --lib whitaker_suite --fail-on-no-libraries -- --manifest-path tools/probes/polars-profile/Cargo.toml --all-targets) ;;
               nextest) command=(cargo nextest run --manifest-path tools/probes/polars-profile/Cargo.toml --lib) ;;
               ui) command=(cargo test --manifest-path tools/probes/polars-profile/Cargo.toml --test ui) ;;
               coverage)

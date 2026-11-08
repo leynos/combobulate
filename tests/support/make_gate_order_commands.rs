@@ -123,12 +123,25 @@ const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 18] = [
     (
         "whitaker-native-only",
         "probe-whitaker",
-        &["--all", "--", "--all-targets", "--no-default-features"],
+        &[
+            "--lib",
+            "whitaker_suite",
+            "--fail-on-no-libraries",
+            "--",
+            "--all-targets",
+            "--no-default-features",
+        ],
     ),
     (
         "whitaker-polars-enabled",
         "probe-whitaker",
-        &["--all", "--", "--all-targets"],
+        &[
+            "--lib",
+            "whitaker_suite",
+            "--fail-on-no-libraries",
+            "--",
+            "--all-targets",
+        ],
     ),
     (
         "prepare-ui-gate",

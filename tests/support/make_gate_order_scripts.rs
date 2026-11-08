@@ -181,11 +181,13 @@ else
   mkdir -p "$DYLINT_DRIVER_PATH" && : > "$cache" || exit 1
   cache_state=cold
 fi
-if [ "$#" -eq 4 ] && [ "$1" = --all ] && [ "$2" = -- ] && \
-   [ "$3" = --all-targets ] && [ "$4" = --no-default-features ]; then
+if [ "$#" -eq 6 ] && [ "$1" = --lib ] && [ "$2" = whitaker_suite ] && \
+   [ "$3" = --fail-on-no-libraries ] && [ "$4" = -- ] && \
+   [ "$5" = --all-targets ] && [ "$6" = --no-default-features ]; then
   stage=whitaker-native-only
-elif [ "$#" -eq 3 ] && [ "$1" = --all ] && [ "$2" = -- ] && \
-   [ "$3" = --all-targets ]; then
+elif [ "$#" -eq 5 ] && [ "$1" = --lib ] && [ "$2" = whitaker_suite ] && \
+   [ "$3" = --fail-on-no-libraries ] && [ "$4" = -- ] && \
+   [ "$5" = --all-targets ]; then
   stage=whitaker-polars-enabled
 else
   record_invocation "$GATE_LOG" unexpected-whitaker "${0##*/}" "$cache_state" none '' "$@"
