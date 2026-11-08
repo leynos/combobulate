@@ -51,18 +51,20 @@
       "value": "nightly-2026-08-27",
       "sites": [
         "rust-toolchain.toml",
+        "scripts/tests/test_pinned_components.py",
+        "scripts/tests/test_preregistration.py",
+        "scripts/tests/test_structural_digest.py",
+        "scripts/tests/test_toolchain_profiles.py",
+        "scripts/tests/test_validation_report.py",
+        "scripts/tests/test_verifier_free_container.py",
+        "scripts/tests/test_verifier_free_orchestration.py",
         "spec/acceptance-controls.json",
         "spec/calibration/builds.json",
         "spec/calibration/shared-workloads-local.json",
         "spec/calibration/verifier-probe.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
         "tests/build_tools_preflight.rs",
-        "tests/support/build_tools_preflight.rs",
-        "scripts/tests/test_preregistration.py",
-        "scripts/tests/test_validation_report.py",
-        "scripts/tests/test_verifier_free_container.py",
-        "scripts/tests/test_verifier_free_orchestration.py",
-        "scripts/tests/test_toolchain_profiles.py"
+        "tests/support/build_tools_preflight.rs"
       ]
     },
     "repository_rustc_commit": {
