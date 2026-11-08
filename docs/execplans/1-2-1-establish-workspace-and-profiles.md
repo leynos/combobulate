@@ -634,7 +634,7 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
         with its probe-by-probe evidence in
         `1-2-1-ep-m3-and-ep-m4.md`'s EP-M5 checklist; log
         `/tmp/killmatrix-trust-1-2-1-profiles-and-trust-audit.out`.
-- [ ] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
+- [x] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
   - [x] (2026-11-08) AC-04 acceptance record.
         `spec/measurements/ac-04-profile-build-budgets-2026-11-08.json` is
         written from hosted run `42435047681` at `5f53ed6cc4eb`, every job
@@ -645,9 +645,14 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
         `rustc` and `kani` while AC-04 freezes five toolchains, and the Verus
         and Z3 observations each needed their own fix. Recorded in
         `1-2-1-ep-m3-and-ep-m4.md`'s EP-M4 checklist.
-  - [ ] Documents, decisions, and tick. The remaining EP-M6 work. Its last
-        external dependency was EP-M3's CI shape, which is now landed; what
-        remains is the documentation set and the tick itself.
+  - [x] (2026-11-08) Documents, decisions, and tick. `spec/task-completion.json`
+        carries a `1.2.1` record citing D16, whose session approval reference
+        names that decision alone; `docs/roadmap.md` ticks the task; the
+        export and `docs/validation-results.json` are regenerated.
+        `check_docs.py` reports `roadmap-status: pass` with 5 of 72 tasks
+        ticked. The task's detail bullet stays unticked because
+        `export_roadmap.py` refuses a ticked detail. `AC-07` reads
+        `inconclusive` on this CI shape, as DL-14 records, not `pass`.
 
 Each Red step records its log path and the names of the failing tests here. A
 Red state is never committed on its own, because it fails `make test`; it is
