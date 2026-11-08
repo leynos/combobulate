@@ -380,10 +380,11 @@ without diagnostic messages and rejects direct process-environment readers,
 iterators, and mutation functions. Warnings fail documentation, lint, test, and
 doctest gates.
 
-Run `make install-build-tools` after checking out the project. On native x86_64
-GNU Linux, it installs the pinned `mold` release and verifies its archive
-against `tools/mold/SHA256SUMS`, and installs the repository's pinned nightly
-with its required components, including rust-analyzer. On x86_64 GNU Linux,
+Run `make install-build-tools` after checking out the project (it needs
+`python3` 3.11 or later, for `tomllib`). On native x86_64 GNU Linux, it
+installs the pinned `mold` release and verifies its archive against
+`tools/mold/SHA256SUMS`, and installs the repository's pinned nightly with its
+required components, including rust-analyzer. On x86_64 GNU Linux,
 `make check-build-tools` asks Clang which `ld.mold` it will execute, checks its
 link plan and version against `tools/mold/VERSION`, and fails if Clang selects
 a different executable. It also checks that the nightly and every pinned

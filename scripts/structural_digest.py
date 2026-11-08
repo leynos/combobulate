@@ -100,27 +100,56 @@ def _rust_form(source: bytes) -> str:
     return _canonical_json(_rust_node(root))
 
 
+def _scan_shell_line(line: str, state: str | None) -> tuple[str | None, bool]:
+    """Scan one shell line, returning the quote state and a continuation flag.
+
+    A deliberately small scanner: single quotes, double quotes, backslash
+    escapes, and ``#`` comments at a word start. It does not understand
+    here-documents or ``$(...)`` nesting; where it is unsure it errs towards
+    treating text as quoted, which keeps more lines and so is the safe side.
+    """
+    index = 0
+    while index < len(line):
+        char = line[index]
+        if state == "'":
+            state = None if char == "'" else state
+        elif char == '\\':
+            if index + 1 == len(line):
+                return state, True
+            index += 1
+        elif state == '"':
+            state = None if char == '"' else state
+        elif char in '\'"':
+            state = char
+        elif char == '#' and (index == 0 or line[index - 1] in ' \t;&|()'):
+            break
+        index += 1
+    return state, False
+
+
 def _shell_form(text: str) -> str:
     """Return shell text without comment-only lines, blanks, or trailing space.
 
-    A line that follows a continuation backslash is part of the same command,
-    so it is kept verbatim even when it looks like a comment or a blank.
+    Only lines that start outside any quote and any continuation are
+    normalised. A line inside a quoted string or after a continuation backslash
+    is part of a command, so it is kept verbatim even when it looks like a
+    comment or a blank.
     """
     kept = []
+    state: str | None = None
     continued = False
     for number, line in enumerate(text.splitlines()):
-        stripped = line.rstrip()
-        if continued:
+        at_boundary = state is None and not continued
+        state, continued = _scan_shell_line(line, state)
+        if not at_boundary or state is not None or continued:
             kept.append(line)
-            continued = line.endswith('\\')
             continue
-        if not stripped.strip():
+        stripped = line.rstrip()
+        if not stripped:
             continue
         if stripped.endswith('\\'):
-            # Whitespace after a continuation backslash escapes the space
-            # instead of the newline, so it changes what the shell runs.
+            # Space after a backslash escapes the space, not the newline.
             stripped = line
-            continued = True
         if stripped.lstrip().startswith('#') and not (
             number == 0 and stripped.startswith('#!')
         ):
@@ -153,7 +182,7 @@ def _python_form(text: str) -> str:
     block = ''
     if metadata:
         block = '\n'.join(
-            line.removeprefix('# ').removeprefix('#')
+            line[2:] if line.startswith('# ') else ''
             for line in metadata.group('body').splitlines()
         )
     return _canonical_json([block, ast.dump(ast.parse(text))])

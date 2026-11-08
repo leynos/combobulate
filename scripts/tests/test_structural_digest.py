@@ -243,6 +243,19 @@ class StructuralDigestTests(unittest.TestCase):
         self.assertDiffers('k.sh', base, 'echo a \\\n\n  b\n', 'continued blank')
         self.assertSame('k.sh', base, base + '# after\n', 'ordinary comment')
 
+    def test_commenting_out_a_script_dependency_is_detected(self) -> None:
+        """Only the PEP 723 line prefix is removed, so a hidden pin still moves it."""
+        header = '# /// script\n# dependencies = [\n#   "tool==1",\n# ]\n# ///\nx = 1\n'
+        hidden = header.replace('#   "tool==1"', '# #  "tool==1"')
+        self.assertDiffers('s.py', header, hidden, 'commented-out dependency')
+
+    def test_comment_like_text_inside_a_shell_quote_is_content(self) -> None:
+        """A quoted line that starts with a hash is not a comment."""
+        base = "echo 'a\nb'\n"
+        self.assertDiffers('q.sh', base, "echo 'a\n# x\nb'\n", 'single quote')
+        self.assertDiffers('q.sh', 'echo "a\nb"\n', 'echo "a\n# x\nb"\n', 'double quote')
+        self.assertSame('q.sh', "echo 'a'\n", "# it's fine\necho 'a'\n", 'apostrophe in comment')
+
     def test_lint_tables_digest_follows_the_tables_only(self) -> None:
         """Dependency edits and layout leave the digest alone; a lint level moves it."""
         base = '[workspace.lints.clippy]\nunwrap_used = "deny"\n[dependencies]\na = "1"\n'
