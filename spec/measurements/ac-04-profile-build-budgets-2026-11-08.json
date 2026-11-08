@@ -1,0 +1,131 @@
+{
+  "id": "ac-04-profile-build-budgets-2026-11-08",
+  "purpose": "acceptance",
+  "control_ids": [
+    "AC-04"
+  ],
+  "recorded_on": "2026-11-08",
+  "runner_image": "ubuntu-24.04",
+  "runner_metadata": {
+    "image_os": "ubuntu24",
+    "image_version": "20261101.360.1"
+  },
+  "outcome": "pass",
+  "hardware": {
+    "class": "github-hosted-runner",
+    "cpu_model": "GitHub-hosted standard Linux runner (x64)",
+    "cores": 4,
+    "threads": 4,
+    "vcpus": 4,
+    "memory_gib": 16,
+    "architecture": "x64",
+    "os_family": "Ubuntu 24.04",
+    "kernel_major": 6
+  },
+  "toolchains": {
+    "rust": "rustc 1.100.0-nightly (bff8e12ff 2026-08-26) (channel nightly-2026-08-27 per rust-toolchain.toml)",
+    "codegen_backend": "Cranelift for dev builds (cargo 1.100.0-nightly), LLVM for the proof profile",
+    "linker": "mold 2.41.0 (7c4c0addcb833120bf41cc3db7b2652694e0d814; compatible with GNU ld)",
+    "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+    "kani": "cargo-kani 0.67.0"
+  },
+  "conditions": "Hosted GitHub Actions ubuntu-24.04 runner, 4 vCPU and 16 GiB, x64. CARGO_BUILD_JOBS=4, CARGO_INCREMENTAL=0, no sccache. Five samples per profile and phase, profiles interleaved run by run, medians selected.",
+  "workloads": [
+    {
+      "id": "native-cold",
+      "description": "Cold build of the shipped workspace with no default features.",
+      "command": "cargo build --workspace --no-default-features",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.61,
+        0.32,
+        0.29,
+        0.3,
+        0.3
+      ],
+      "median": 0.3,
+      "notes": "Run cold, native-only profile, from .github/workflows/profile-measurements.yml build-budget in run 42435047681. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each incremental sample follows one discarded warm-up build."
+    },
+    {
+      "id": "polars-cold",
+      "description": "Cold build of the shipped workspace with default (Polars) features.",
+      "command": "cargo build --workspace",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        69.68,
+        65.24,
+        64.87,
+        64.98,
+        65.08
+      ],
+      "median": 65.08,
+      "notes": "Run cold, polars-enabled profile, from .github/workflows/profile-measurements.yml build-budget in run 42435047681. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each incremental sample follows one discarded warm-up build."
+    },
+    {
+      "id": "proof-cold",
+      "description": "Cold Kani codegen of combobulate-kernel.",
+      "command": "kani-driver kani --only-codegen --manifest-path crates/combobulate-kernel/Cargo.toml",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.39,
+        0.37,
+        0.36,
+        0.37,
+        0.37
+      ],
+      "median": 0.37,
+      "notes": "Run cold, proof profile, from .github/workflows/profile-measurements.yml build-budget in run 42435047681. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each incremental sample follows one discarded warm-up build."
+    },
+    {
+      "id": "native-incremental",
+      "description": "Incremental rebuild with no default features after touching the crate root.",
+      "command": "touch src/lib.rs; cargo build --workspace --no-default-features",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.13,
+        0.15,
+        0.15,
+        0.15,
+        0.15
+      ],
+      "median": 0.15,
+      "notes": "Run incremental, native-only profile, from .github/workflows/profile-measurements.yml build-budget in run 42435047681. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each incremental sample follows one discarded warm-up build."
+    },
+    {
+      "id": "polars-incremental",
+      "description": "Incremental rebuild with default features after touching the crate root.",
+      "command": "touch src/lib.rs; cargo build --workspace",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.31,
+        0.33,
+        0.34,
+        0.33,
+        0.34
+      ],
+      "median": 0.33,
+      "notes": "Run incremental, polars-enabled profile, from .github/workflows/profile-measurements.yml build-budget in run 42435047681. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each incremental sample follows one discarded warm-up build."
+    },
+    {
+      "id": "proof-incremental",
+      "description": "Incremental Kani codegen after touching the kernel crate root.",
+      "command": "touch crates/combobulate-kernel/src/lib.rs; kani-driver kani --only-codegen --manifest-path crates/combobulate-kernel/Cargo.toml",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.31,
+        0.28,
+        0.28,
+        0.28,
+        0.28
+      ],
+      "median": 0.28,
+      "notes": "Run incremental, proof profile, from .github/workflows/profile-measurements.yml build-budget in run 42435047681. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each incremental sample follows one discarded warm-up build."
+    }
+  ]
+}

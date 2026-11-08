@@ -47,6 +47,7 @@ facade features select. The array algebra in the
 | `spec/macro-grammar.json`                       | The `comb!` precedence table and grammar corpus.                                               |
 | `spec/acceptance-controls.json`                 | Pre-registered acceptance controls `AC-01` onward.                                             |
 | `spec/calibration/`                             | Calibration measurement records behind the control thresholds.                                 |
+| `spec/measurements/`                            | Acceptance measurement records; calibration evidence belongs in `spec/calibration/`.           |
 | `spec/exceptions.json`                          | Trusted-boundary exception register (D02).                                                     |
 | `spec/evidence-reason-codes.json`               | Evidence-gate levels, reason codes, and registered log parsers.                                |
 | `spec/task-completion.json`                     | Completion records for ticked roadmap tasks.                                                   |

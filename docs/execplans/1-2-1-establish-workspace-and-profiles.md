@@ -628,6 +628,18 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
         `1-2-1-ep-m3-and-ep-m4.md`'s EP-M5 checklist; log
         `/tmp/killmatrix-trust-1-2-1-profiles-and-trust-audit.out`.
 - [ ] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
+  - [x] (2026-11-08) AC-04 acceptance record.
+        `spec/measurements/ac-04-profile-build-budgets-2026-11-08.json` is
+        written from hosted run `42435047681` at `5f53ed6cc4eb`, every job
+        green, and the artefact carries the `ImageOS`/`ImageVersion` pair the
+        schema requires. All six medians are inside their registered
+        thresholds; the record's verdict is `pass`. Making the job able to
+        produce a bindable record took three hosted failures: it observed only
+        `rustc` and `kani` while AC-04 freezes five toolchains, and the Verus
+        and Z3 observations each needed their own fix. Recorded in
+        `1-2-1-ep-m3-and-ep-m4.md`'s EP-M4 checklist.
+  - [ ] Documents, decisions, and tick. The remaining EP-M6 work, and it
+        depends on EP-M3's sponsor-blocked CI shape.
 
 Each Red step records its log path and the names of the failing tests here. A
 Red state is never committed on its own, because it fails `make test`; it is

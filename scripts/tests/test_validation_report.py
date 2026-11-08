@@ -201,7 +201,9 @@ class ValidationReport(unittest.TestCase):
         control = next(item for item in register['controls'] if item['id'] == 'AC-01')
         recorded_on = (date.fromisoformat(control['frozen']['registered_on']) + timedelta(days=1)).isoformat()
         measurements = self.root / 'spec/measurements'
-        measurements.mkdir()
+        # The fixture copies `spec` wholesale, so this directory exists as soon
+        # as the repository commits its first acceptance record.
+        measurements.mkdir(exist_ok=True)
         measurement_path = measurements / 'escaped-identity.json'
         original_measurement = self.acceptance_record(
             'escaped-identity', 'AC-01', recorded_on,

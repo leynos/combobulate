@@ -198,16 +198,45 @@ Specification: parent plan lines 2322-2348.
   the `build-budget` job that records `ImageOS` and `ImageVersion`, and
   `registered_on` moves to 2026-11-07 so a later acceptance record cannot
   predate the amendment. Every threshold is unchanged.
-- [ ] The AC-04 acceptance record in `spec/measurements/`. **Not run.** No
-  `profile-measurements.yml` `build-budget` run exists (`gh run list` shows only
-  `skipped` conclusions on unrelated branches), and without a hosted run the
-  record cannot supply `runner_metadata.image_os` or `image_version`, which
-  `spec/measurement-record.schema.json` requires. The EP-M6 checkpoint for
-  AC-04 therefore stays unchecked; the record must be written from a real run
-  rather than from the local calibration.
+- [x] The AC-04 acceptance record in
+  `spec/measurements/ac-04-profile-build-budgets-2026-11-08.json`, written from
+  hosted run `42435047681` at `5f53ed6cc4eb`. Every job concluded `success` and
+  the artefact supplied `image_os` (`ubuntu24`) and `image_version`
+  (`20261101.360.1`), which is what the schema requires and what no local
+  calibration can produce. All six medians sit far inside their ceilings:
+  native cold 0.30 s, native incremental 0.15 s, proof cold 0.37 s, proof
+  incremental 0.28 s, Polars cold 65.08 s, Polars incremental 0.33 s, against 1
+  / 1 / 1 / 1 / 10 min / 1 min. `acceptance_evidence.verdict` reads `pass` and
+  `check_measurement_binding` accepts the record.
 
 ### EP-M4 findings so far
 
+- The frozen environment covers **five** toolchains, and the `build-budget` job
+  observed only two. It reported `rustc` and `cargo kani` while AC-04 registers
+  `rust`, `codegen_backend`, `linker`, `verus`, and `kani`, so no record the
+  job produced could ever bind. Each of the three missing observations then
+  cost a separate hosted failure to get right: the Verus release must be
+  installed before it can be reported; `verus --version` runs the verifier and
+  so needs the Rust the release was built against
+  (`1.98.0-x86_64-unknown-linux-gnu`, read from the release's own
+  `version.json`), not the repository nightly; and Z3 is not in the Verus
+  archive, so the run takes it from the pinned `Z3_DISTRIBUTION` in
+  `scripts/probe_provenance.py`. `mold` was already on the runner through
+  `make install-build-tools`.
+- The record is a further pin site, and the sweep found it: it names
+  `nightly-2026-08-27`, `0.67.0`, `0.2026.09.06.8dea4a2`, and `4.16.0`, so it
+  is listed under `repository_channel`, `kani_release`, `verus_release`, and
+  `verus_z3`. That is the same coupling as every other site: a pin bump must
+  edit the record, because the frozen environment the record registered is what
+  the acceptance was measured against.
+- Committing the first acceptance record broke
+  `test_validation_report`'s identity case, which called
+  `(spec/measurements).mkdir()` unconditionally in a fixture that copies
+  `spec/` wholesale. It passed only while the directory did not exist, so the
+  suite had encoded "the repository has no acceptance records" as a
+  precondition rather than as a fact it could tolerate. `exist_ok=True` is the
+  honest form; the alternative — letting the test assert absence — would make
+  every committed record a test failure.
 - The pin sweep is load-bearing rather than decorative: on its first run it
   reported 15 tracked files that name a pin the record did not list. Every one
   was a genuine site — a manifest selecting the version, a lockfile resolving
