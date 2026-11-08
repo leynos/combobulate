@@ -91,8 +91,11 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
    longest required job; nearest-rank p90 over the 20 most recent runs, with
    any failed, timed-out, cancelled, or missing job failing the control; the
    window restarts empty on the new shape, so AC-07 is inconclusive when task
-   1.2.1 is ticked. The sponsor approves the final text, with measured job
-   sizes, at the EP-M3 checkpoint and before the first attempt on the new shape.
+   1.2.1 is ticked. **Amendment (2026-11-08):** the EP-M3 approval checkpoint
+   was withdrawn. ADR-0008's 2026-10-31 amendment (`684f687`) made an
+   acceptance control "an ordinary reviewed file", so the amended text lands
+   through a pull request and Git history is the record. The text above is the
+   one registered, and no separate approval precedes it.
 3. AC-04 amendment (DL-15). AC-04 registers "the 1.2.1 foundational probe in
    its three feature profiles" with the calibration probe's manifest as its
    only source. Recommended: rebind its sources to the workspace manifests and
@@ -154,8 +157,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   under ADR-0008; newer releases (for example Kani 0.68.0) are not adopted by
   this task.
 - `.github/workflows/ci.yml` is a frozen AC-07 source (sha256 `a7df0545…`).
-  It must not change until the AC-07 amendment is sponsor-approved, and the
-  amendment and the change land in one commit.
+  It must not change until the AC-07 amendment is approved, and the amendment
+  and the change land in one commit. Under ADR-0008's 2026-10-31 amendment,
+  review of that pull request is the approval, so the one-commit rule is what
+  remains binding.
 - Every hosted `build-test` attempt counts towards AC-07, and any failed,
   timed-out, or cancelled attempt fails it. No push may add the Polars
   dependency to the facade until the approved CI shape lands in the same push.
@@ -570,18 +575,20 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     Gate profiles (DL-18) are present in the Makefile as `GATE_PROFILE` and
     per-profile Cargo invocations. Neither is marked done: the milestone
     closes only when its own gates and conformance check pass together.
-  - [ ] CI shape (DL-03, DL-14). **BLOCKED on the sponsor checkpoint.** `ci.yml`
-    still has a single `build-test` job, `coverage-main.yml` names no profile
-    features, the AC-07 amendment is absent from `spec/acceptance-controls.json`,
-    and `ci_controls.py`/`preregistration.py` still assume one required job.
-    That is the correct state, not an omission: `Constraints` and DL-03 make
-    `.github/workflows/ci.yml` a frozen AC-07 source that "must not change until
-    the AC-07 amendment is sponsor-approved, and the amendment and the change
-    land in one commit", and EP-M3's checkpoint requires the sponsor to approve
-    that amendment text *with measured job sizes* first. Those sizes come from a
-    hosted measurement on the new shape, so the dependency is circular until the
-    sponsor approves. Implementing the shape before that approval would breach a
-    pre-registered control. Status: `BLOCKED`; owner: sponsor (`leynos`).
+  - [x] (2026-11-08) CI shape (DL-03, DL-14). Earlier drafts recorded this as
+    blocked on a sponsor checkpoint. That checkpoint no longer existed:
+    ADR-0008's 2026-10-31 amendment (`684f687`, on `main`) retired the
+    acceptance-control approval ceremony, so the amendment is an ordinary
+    reviewed file and the shape and the amendment land in one commit as DL-03
+    requires. `ci.yml` now has three required jobs — `build-test` on
+    `GATE_PROFILE: native-only`, `polars-lint` and `polars-test` on
+    `GATE_PROFILE: polars-enabled` — all on `ubuntu-24.04` with an eight-minute
+    timeout. `coverage-main.yml` names the same native-only features so the
+    ratchet compares like with like. `spec/acceptance-controls.json` registers
+    the amended workload as `ci-required-jobs`, and
+    `ci_controls.py`/`preregistration.py` accept one required job per
+    unconditioned `ci.yml` job. Because DL-14 restarts the 20-run window,
+    `AC-07` reads `inconclusive` when task 1.2.1 is ticked, not `pass`.
   - Note (2026-11-07): `make lint` and `make test` iterate `GATE_PROFILES`, so
     running them is what verifies DL-18's two-profile isolation. There is no
     separate profile gate to run.
@@ -638,8 +645,9 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
         `rustc` and `kani` while AC-04 freezes five toolchains, and the Verus
         and Z3 observations each needed their own fix. Recorded in
         `1-2-1-ep-m3-and-ep-m4.md`'s EP-M4 checklist.
-  - [ ] Documents, decisions, and tick. The remaining EP-M6 work, and it
-        depends on EP-M3's sponsor-blocked CI shape.
+  - [ ] Documents, decisions, and tick. The remaining EP-M6 work. Its last
+        external dependency was EP-M3's CI shape, which is now landed; what
+        remains is the documentation set and the tick itself.
 
 Each Red step records its log path and the names of the failing tests here. A
 Red state is never committed on its own, because it fails `make test`; it is
@@ -673,13 +681,16 @@ committed together with its Green change.
 - Observation: Polars 0.55.2 is the newest Rust release and declares no
   `rust-version`. Evidence: `cargo info polars@0.55.2`. Impact: its supported
   compilers are established only by building it in each profile.
-- Observation: control AC-07 freezes `.github/workflows/ci.yml` by digest, and
-  the checker accepts exactly one `ci-build-test` workload and reads only the
-  `build-test` job's runner and timeout. Evidence:
+- Observation: control AC-07 once froze `.github/workflows/ci.yml` by digest
+  and the checker accepted exactly one `ci-build-test` workload, reading only
+  the `build-test` job's runner and timeout. Evidence:
   `scripts/docs_validation/acceptance_registration.py`,
   `scripts/docs_validation/ci_controls.py`,
-  `scripts/docs_validation/preregistration.py`. Impact: any CI change needs an
-  amendment and checker changes (DL-14).
+  `scripts/docs_validation/preregistration.py`. Impact: DL-14 changed the
+  workload to every required job, so the checker now reads one `RequiredJob`
+  per unconditioned job and the calibration check still reads the registered
+  `ci-build-test` record, which is the evidence behind the 220 s threshold. No
+  source digest is bound by the control: source identity is Git's job.
 - Observation: hosted CI never runs `make test`; its test step is the shared
   `generate-coverage` action with default features. Evidence:
   `.github/workflows/ci.yml` lines 105-126. Impact: profile checks need their

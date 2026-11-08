@@ -73,14 +73,49 @@ Specification: parent plan lines 2250-2320.
   `tests/support/make_gate_order_whitaker.rs`,
   `tests/support/make_gate_order_caller_environment.rs`,
   `tests/make_gate_order.rs`, and `tests/build_standard_contract.rs`.
-- [ ] CI shape (DL-03, DL-14): parallel Polars-enabled lint and test jobs in
-  `ci.yml`, `coverage-main.yml` features set to the native-only profile
-  explicitly, GitHub Actions sccache enabled and saved on `main` only.
-- [ ] `ci_controls.py`, `preregistration.py`, and their tests accept the
-  amended AC-07 workload; `spec/acceptance-controls.json` records the amendment
-  with its new `ci.yml` digest.
-- [ ] **Checkpoint, sponsor-owned:** approval of the AC-07 amendment text and
-  the measured job sizes. EP-M3 is `BLOCKED` until that approval exists.
+- [x] (2026-11-08) CI shape (DL-03, DL-14): parallel Polars-enabled lint and
+  test jobs in `ci.yml`, `coverage-main.yml` features set to the native-only
+  profile explicitly, GitHub Actions sccache enabled and saved on `main` only.
+  `ci.yml` now declares three required jobs on the same `ubuntu-24.04` runner
+  and eight-minute timeout. `build-test` keeps `GATE_PROFILE: native-only`;
+  `polars-lint` and `polars-test` set `GATE_PROFILE: polars-enabled`. The shared
+  `setup-rust` action already enables sccache through its `use-sccache`
+  default, which this workflow states explicitly, and the only cache the caller
+  controls is `generate-coverage`'s baseline publish; it is pinned to
+  `publish-artefact: 'false'` and its ratchet baseline saves only from
+  `coverage-main.yml` on `main`. `coverage-main.yml` names the same native-only
+  features, so the ratchet compares like with like.
+- [x] (2026-11-08) `ci_controls.py`, `preregistration.py`, and their tests
+  accept the amended AC-07 workload; `spec/acceptance-controls.json` records
+  the amended workload as an ordinary reviewed file, per ADR-0008's 2026-10-31
+  amendment. The workload id is `ci-required-jobs`, the settings value carries
+  one `RequiredJob` per unconditioned job, and `check_ci_calibration` still
+  reads the registered `ci-build-test` record because that is the evidence the
+  220 s threshold came from.
+- [x] (2026-11-08) Both workflow contracts are re-keyed to the new shape.
+  `tests/support/act_workflow_contract.rs` now contracts each job's ordered
+  steps, actions, and environment separately; four typed mutation cases prove a
+  step, action, or profile moved into or out of a `polars-*` job fails.
+  `tests/coverage_backend_workflows.rs` asserts exactly one measuring job per
+  workflow file, and `tests/whitaker_workflow.rs` checks a job that lints or
+  installs Whitaker, so renaming the installer cannot exempt a lint job.
+  `scripts/whitaker_probe.py` resolves the installer per job and requires one
+  shared, full-length, lowercase SHA across all of them.
+- [x] ~~Checkpoint, sponsor-owned: approval of the AC-07 amendment text and the
+  measured job sizes.~~ **Withdrawn.** ADR-0008's 2026-10-31 amendment
+  (`684f687`, on `main`) retired the acceptance-control approval ceremony: a
+  control "is an ordinary reviewed file: a change goes through a pull request
+  and Git history is the record". This checkpoint was written on 2026-11-07,
+  five weeks after the retirement landed, so it asserted an authority that no
+  longer existed. The sponsor confirmed on 2026-11-08 that the work proceeds
+  without it.
+- [x] (2026-11-08) Documentation and control text brought to the amended shape.
+  `docs/acceptance-calibration.md` now describes the run-level sample and
+  records that the registered `ci-build-test` evidence predates DL-14;
+  `docs/developers-guide.md` describes the three required jobs, the per-job
+  `RequiredJob` settings value, and the eight-minute timeout on every required
+  job. `AC-07` reads `inconclusive`, not `pass`, once the 20-run window
+  restarts.
 
 ### EP-M3 findings so far
 
@@ -378,11 +413,13 @@ alone is the safer record than a transcript in which seven other approvals
 could be read as conditioning it.
 
 D16 acceptance does not tick anything by itself. A roadmap tick also needs the
-EP-M3 CI shape and its AC-07 amendment (sponsor-blocked on measured job sizes
-that require the new shape to exist first), the EP-M5 ADR-0009 amendment and
-its mutation triage, and the AC-04 acceptance record from a hosted run. The
-tick is withheld until those close; `roadmap_status.py` validates a claim's
-shape, not its truth.
+EP-M3 CI shape and its AC-07 amendment (both now landed as ordinary reviewed
+files; the withdrawn sponsor checkpoint had made them look blocked), the EP-M5
+ADR-0009 amendment and its mutation triage, and the AC-04 acceptance record
+from a hosted run. The tick is withheld until those close; `roadmap_status.py`
+validates a claim's shape, not its truth. Ticking 1.2.1 does **not** claim
+AC-07 passes: DL-14 restarts the 20-run window on the new three-job shape, so
+the control reads `inconclusive` until the window refills.
 
 ## EP-M5 status: in progress
 
