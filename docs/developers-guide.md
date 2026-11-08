@@ -72,12 +72,16 @@ generated file with the change. The gate derives it from the shared dictionary
 and `typos.local.toml`, so add repository-specific exceptions to the local
 overlay instead of editing generated output.
 
-Every pull request runs the hosted `build-test` job as the authoritative
-repository gate. Its Rust test suite includes workflow-structure and command
-contract tests: workflow YAML and pins are checked from source, while real Make
-recipes and shell scripts run with controlled external executors. These tests
-prove invocation shape, configuration, ordering, and failure propagation
-without compiling the repository again for each contract.
+Every pull request runs three required hosted jobs: `build-test` on the
+native-only profile, and `polars-lint` and `polars-test` on the Polars-enabled
+profile. `build-test` is the authoritative repository gate. Its Rust test suite
+includes workflow-structure and command contract tests: workflow YAML and pins
+are checked from source, while real Make recipes and shell scripts run with
+controlled external executors. These tests prove invocation shape,
+configuration, ordering, and failure propagation without compiling the
+repository again for each contract. Each job is contracted on its own, so a
+step, action, or `GATE_PROFILE` moved between jobs fails the contract rather
+than being satisfied by another job's prelude.
 
 Table-driven contract regressions use the `rstest` dev dependency with its
 optional asynchronous-timeout and crate-renaming features disabled. Private
@@ -172,11 +176,12 @@ Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
 that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
 because nextest then has no process left to escalate to `SIGKILL`. Only the
-job's own `timeout-minutes` bounds it (`build-test` sets 8; `coverage-main.yml`
-sets none, so GitHub's 360-minute default applies, and nextest's limits do not
-cover `make prepare-ui-gate`, which runs before it), and a local `cargo test`
-run, which `make test` falls back to when cargo-nextest is missing, has no
-limit at all. Ordinary builds and sleeping children do end under nextest.
+job's own `timeout-minutes` bounds it (all three required jobs set 8;
+`coverage-main.yml` sets none, so GitHub's 360-minute default applies, and
+nextest's limits do not cover `make prepare-ui-gate`, which runs before it),
+and a local `cargo test` run, which `make test` falls back to when
+cargo-nextest is missing, has no limit at all. Ordinary builds and sleeping
+children do end under nextest.
 
 `make test-ui` is the one route with its own bound. It runs the recorded gate
 binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600
@@ -1024,9 +1029,16 @@ loading in the composition path rooted at `check_acceptance_controls` in
 `scripts/docs_validation/preregistration.py` and its shared `ValidationContext`.
 `ValidationContext.load_yaml` converts parser failures into checker errors.
 The composition path passes the small `AcceptanceWorkflowSettings` value to the
-pure rules. The original named imports remain re-exported from preregistration
-for focused tests; these helpers are not general GitHub Actions parsers,
-measurement libraries, or repository file APIs.
+pure rules; it carries one `RequiredJob` (name, runner image, timeout) per
+unconditioned `ci.yml` job, because DL-14 makes every required pull-request job
+part of `AC-07`'s workload. Each job is checked against the registered runner
+and timeout, so adding, renaming, or resizing a required job fails the control
+until `spec/acceptance-controls.json` records the same shape. The calibration
+check in `ci_controls.py` still reads the single `ci-build-test` workload,
+because that is the record the registered threshold was derived from. The
+original named imports remain re-exported from preregistration for focused
+tests; these helpers are not general GitHub Actions parsers, measurement
+libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
 documentation-pack validation. The control register is
@@ -1038,9 +1050,9 @@ Keep calibration records in `spec/calibration/` and acceptance measurements in
 control. Validation checks that every control defines the registered fields and
 that each measurement record binds to its control, registration date, runner
 and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner,
-and `build-test` has an eight-minute timeout. The matching
-`make act-validation` target maps that job to the configured `ubuntu-24.04` Act
-runner image. See the
+and every required pull-request job has an eight-minute timeout. The matching
+`make act-validation` target maps `build-test` to the configured `ubuntu-24.04`
+Act runner image; the two Polars jobs are not run under Act. See the
 [acceptance calibration report](acceptance-calibration.md) for methodology,
 tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
