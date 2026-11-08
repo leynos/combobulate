@@ -14,11 +14,11 @@
     "tools/verifier-fixtures/kani-corpus/kani-list.json": "ast-sha256:69e5ae2f473227735a936ed1626aa006f1755ed28512a32e46498190e597f0a2",
     "scripts/run_verifier_probes.py": "ast-sha256:9fc54a226e52d0cebc06088446213e01e4f47ac262a58d65a541f1bc96f67320",
     "scripts/kani_probe.py": "ast-sha256:6fb6116274dd37372f39eaf3244336709ba40dd4e042c1c3d5d3464970226c89",
-    "scripts/verifier_probe_support.py": "ast-sha256:c83ad05e1551afb73930c844772f6b6beaf1cca32c5a0618e2e8a861b4a557dc",
+    "scripts/verifier_probe_support.py": "ast-sha256:2f81d931126efee1773aac289bd8f2cf6396f4b94b7054f178da2a6e0651e713",
     "scripts/probe_provenance.py": "ast-sha256:e55854154a04a208fbde5b53873e73ac22391b9d980f9af2486d75b7f801b973",
     ".cargo/config.toml": "ast-sha256:86fd4d25887b99f3537cd51893b65122f3bd4a18222bad2d30e2bed8efab4bfc"
   },
-  "lint_tables_sha256": "ast-sha256:e0b03ea9a14d0937bd54f1541a4e332444ad09056519d7559bb1e83f6d6d66cf",
+  "lint_tables_sha256": "ast-sha256:d722fcdc6905b4906f4ecdd34a2792bce1eca39ef2839f9c6e01842d37ff6e65",
   "observations": [
     {
       "id": "verified",

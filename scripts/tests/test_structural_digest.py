@@ -214,6 +214,18 @@ class StructuralDigestTests(unittest.TestCase):
                 self.assertEqual(failures, ['rust-toolchain.toml'], 'must fail')
                 self.assertIsNone(note, 'a failure must not be softened')
 
+    def test_an_invalid_current_channel_fails_instead_of_warning(self) -> None:
+        """Only a channel rustup accepts may be softened to a warning."""
+        for bad in ('channel = 42\n', 'channel = "not a channel"\n', 'channel = ""\n'):
+            with self.subTest(channel=bad):
+                failures, note = self.drift(
+                    '[toolchain]\n' + bad + 'components = ["clippy", "rustfmt"]\n'
+                )
+                self.assertEqual(failures, ['rust-toolchain.toml'], 'must fail')
+                self.assertIsNone(note, 'no warning for an invalid channel')
+        for good in ('stable', 'beta', 'nightly', 'nightly-2026-09-30', '1.94', '1.94.1'):
+            self.assertTrue(DIGEST.is_rustup_channel(good), good)
+
     def test_lint_tables_digest_follows_the_tables_only(self) -> None:
         """Dependency edits and layout leave the digest alone; a lint level moves it."""
         base = '[workspace.lints.clippy]\nunwrap_used = "deny"\n[dependencies]\na = "1"\n'

@@ -57,7 +57,7 @@
     "tools/verifier-fixtures/verus-wiring-probe/single-root.rs": "ast-sha256:ae70e7b13996de5692488bee2414016257f8419a33da880f51d23bad69aa6daf",
     ".cargo/config.toml": "ast-sha256:86fd4d25887b99f3537cd51893b65122f3bd4a18222bad2d30e2bed8efab4bfc",
     "scripts/native-clang-linker.sh": "ast-sha256:c5dcf71ad17d3045e64c34a5d1044e4f6d81eee6a3f8414b044c874e7bc1bf83",
-    "scripts/build-tools-common.sh": "ast-sha256:c8370be424fc94c0c58e6bf6ba110dd73653dc4f364fe90489e9f7c402accbe8",
+    "scripts/build-tools-common.sh": "ast-sha256:6d4ba74583a96cabbeeabd35a9b1c71fb67b00d5cf32eb63ea53623bd48f5daf",
     "tools/mold/VERSION": "ast-sha256:2256ae287bec654ed6cfe9e603d3f3dd9b4172155b6fa7fdab63cb106bc43699",
     "rust-toolchain.toml": "ast-sha256:8eadef742627e7ed47daa37b32c41faa4afc1594dbf12bc31aeaab59de3910eb"
   },

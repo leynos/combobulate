@@ -186,17 +186,69 @@ def structural_digest(path: Path) -> str:
     return PREFIX + hashlib.sha256(form.encode('utf-8')).hexdigest()
 
 
+def lint_tables(manifest_text: str) -> dict[str, dict]:
+    """Return the manifest's lint tables by name, from one parse.
+
+    Both ``[lints.<name>]`` and ``[workspace.lints.<name>]`` spellings are
+    accepted. The scratch workspace text and the recorded digest are both made
+    from this value, so the copy and the digest cannot disagree.
+
+    Raises
+    ------
+    RuntimeError
+        When no lint table exists, or a name is defined under both spellings.
+    """
+    document = tomllib.loads(manifest_text)
+    workspace = document.get('workspace', {}).get('lints', {})
+    # ``[lints] workspace = true`` is inheritance, not a table of lints.
+    plain = {k: v for k, v in document.get('lints', {}).items() if isinstance(v, dict)}
+    if set(workspace) & set(plain):
+        raise RuntimeError('a lint table is defined under both lint spellings')
+    tables = {**workspace, **plain}
+    if not tables:
+        raise RuntimeError('the root manifest must define at least one lint table')
+    return tables
+
+
+def _toml_key(key: str) -> str:
+    """Return ``key`` as a bare TOML key when it can be, else quoted."""
+    return key if re.fullmatch(r'[A-Za-z0-9_-]+', key) else json.dumps(key)
+
+
+def _toml_value(value: object) -> str:
+    """Render a parsed TOML value as TOML text."""
+    if isinstance(value, bool):
+        return 'true' if value else 'false'
+    if isinstance(value, dict):
+        inner = ', '.join(f'{_toml_key(k)} = {_toml_value(v)}' for k, v in value.items())
+        return '{ ' + inner + ' }' if inner else '{}'
+    if isinstance(value, list):
+        return '[' + ', '.join(_toml_value(item) for item in value) + ']'
+    if isinstance(value, (str, int, float)):
+        return json.dumps(value)
+    raise ValueError(f'cannot render a {type(value).__name__} lint value')
+
+
+def render_lint_tables(tables: dict[str, dict]) -> str:
+    """Render lint tables as ``[workspace.lints.<name>]`` TOML text.
+
+    Each table is followed by a blank line, so tables can be concatenated.
+    """
+    chunks = []
+    for name, table in tables.items():
+        lines = [f'[workspace.lints.{_toml_key(name)}]']
+        lines += [f'{_toml_key(k)} = {_toml_value(v)}' for k, v in table.items()]
+        chunks.append('\n'.join(lines) + '\n\n')
+    return ''.join(chunks)
+
+
 def lint_tables_digest(manifest_text: str) -> str:
     """Return the structural digest of a manifest's lint tables.
 
-    Only the ``[workspace.lints]`` and ``[lints]`` tables, parsed, are hashed,
-    so an unrelated dependency edit or a reformat leaves the digest alone.
+    Only the parsed lint tables are hashed, so an unrelated dependency edit or
+    a reformat leaves the digest alone.
     """
-    document = tomllib.loads(manifest_text)
-    tables = {
-        'workspace.lints': document.get('workspace', {}).get('lints', {}),
-        'lints': document.get('lints', {}),
-    }
+    tables = lint_tables(manifest_text)
     return PREFIX + hashlib.sha256(_canonical_json(tables).encode('utf-8')).hexdigest()
 
 
@@ -212,13 +264,23 @@ def recorded_channel(command: list[str]) -> str | None:
     return None
 
 
+_CHANNEL = re.compile(
+    r'(?:stable|beta|nightly)(?:-\d{4}-\d{2}-\d{2})?|\d+\.\d+(?:\.\d+)?(?:-beta(?:\.\d+)?)?'
+)
+
+
+def is_rustup_channel(value: object) -> bool:
+    """Return whether ``value`` is a channel form rustup accepts."""
+    return isinstance(value, str) and _CHANNEL.fullmatch(value) is not None
+
+
 def _channel_only_drift(path: Path, expected: str, channel: str | None) -> bool:
     """Return whether only ``toolchain.channel`` separates ``path`` from the record."""
-    if channel is None:
+    if not is_rustup_channel(channel):
         return False
     document = tomllib.loads(path.read_text(encoding='utf-8'))
     toolchain = document.get('toolchain')
-    if not isinstance(toolchain, dict) or 'channel' not in toolchain:
+    if not isinstance(toolchain, dict) or not is_rustup_channel(toolchain.get('channel')):
         return False
     toolchain['channel'] = channel
     rebuilt = PREFIX + hashlib.sha256(_canonical_json(document).encode('utf-8')).hexdigest()

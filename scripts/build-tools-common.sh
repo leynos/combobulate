@@ -80,13 +80,18 @@ pinned_toolchain() {
   printf '%s' "$value"
 }
 
-# Read the component list from the same rustup pin used by Cargo. This file
-# has one quoted component per line; reject an empty list rather than passing
+# Read the component list from the same rustup pin used by Cargo, parsed as
+# TOML (the verifier-record digest reads the file the same way), so layout and
+# comments cannot change the answer. Reject an empty list rather than passing
 # a bare compiler installation off as a complete development toolchain.
 pinned_components() {
   local file=$RUST_TOOLCHAIN_FILE components
   [ -f "$file" ] || fail "missing toolchain pin: $file"
-  components=$(awk -F '"' '/^[[:space:]]*"[^"]+",?[[:space:]]*$/ { print $2 }' "$file")
+  components=$(python3 -c '
+import sys, tomllib
+with open(sys.argv[1], "rb") as handle:
+    print("\n".join(tomllib.load(handle).get("toolchain", {}).get("components", [])))
+' "$file") || fail "cannot parse toolchain pin: $file"
   [ -n "$components" ] || fail "no components found in: $file"
   printf '%s\n' "$components"
 }
