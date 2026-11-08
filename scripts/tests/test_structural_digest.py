@@ -143,6 +143,34 @@ class StructuralDigestTests(unittest.TestCase):
         self.assertDiffers('a.sh', base, '#!/bin/bash\nexec true\n', 'shebang')
         self.assertDiffers('a.sh', base, '#!/bin/sh\nexec false\n', 'command')
 
+    def test_python_script_metadata_is_content_not_a_comment(self) -> None:
+        """``uv run --script`` reads dependencies from a comment block."""
+        header = '# /// script\n# dependencies = ["tool==1"]\n# ///\nx = 1\n'
+        self.assertDiffers('s.py', header, header.replace('tool==1', 'tool==2'), 'pin')
+        self.assertSame('s.py', header, header + '# trailing note\n', 'other comment')
+
+    def test_shell_whitespace_after_a_continuation_backslash_matters(self) -> None:
+        """A space after the backslash changes the command, so it is kept."""
+        self.assertDiffers('c.sh', 'echo a \\\n  b\n', 'echo a \\ \n  b\n', 'backslash')
+
+    def test_a_version_file_must_hold_one_line(self) -> None:
+        """The build's pin reader rejects extra lines, so the digest does too."""
+        self.assertSame('VERSION', '2.41.0\n', '2.41.0', 'trailing newline')
+        self.assertDiffers('VERSION', '2.41.0\n', '2.42.0\n', 'pin')
+        with self.assertRaises(ValueError):
+            self.digest('VERSION', '2.41.0\n\n')
+
+    def test_doc_comment_trailing_whitespace_is_kept(self) -> None:
+        """A doc comment's text is content, trailing whitespace included."""
+        self.assertDiffers('d.rs', '/// one\nfn f() {}\n', '/// one \nfn f() {}\n', 'doc')
+
+    def test_parse_failures_name_the_input(self) -> None:
+        """A failing generator or test must say which file and why."""
+        path = self.directory / 'broken.toml'
+        path.write_text('a = = 1', encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'cannot digest .*broken.toml'):
+            DIGEST.structural_digest(path)
+
     def test_unknown_suffix_has_no_byte_fallback(self) -> None:
         """An unsupported file type is an error, never a byte hash."""
         path = self.directory / 'a.bin'

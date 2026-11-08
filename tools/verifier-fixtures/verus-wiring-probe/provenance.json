@@ -5,21 +5,21 @@
   "z3_version": "Z3 version 4.16.0 - 64 bit",
   "z3_sha256": "a06c2a851d58c5f5a7c1e5de188fd0e1b1135e778112aee83ffd1a433685516b",
   "source_digests": {
-    "tools/verifier-fixtures/verus-wiring-probe/macro.rs": "ast-sha256:3d192e5c3f3cbd86cd93200fc4a3b91adb9fbf66546ee8b5fd5079054e5f5d10",
-    "tools/verifier-fixtures/verus-wiring-probe/attributes.rs": "ast-sha256:90a279ef3ac5a581a125398f3517af11199afad2935604fa793467720682795b",
-    "tools/verifier-fixtures/verus-wiring-probe/companion.rs": "ast-sha256:b5ff65ae2270816c268cac514f389e1e702ecab41bb15f886401c516e33c0fb9",
-    "tools/verifier-fixtures/verus-wiring-probe/single-root.rs": "ast-sha256:437cf9b6b13be90e5b4dc8012bf83b41b0cf0248bb407f7b671679bdc1f404b9",
-    "tools/verifier-fixtures/verus-wiring-probe/production.rs": "ast-sha256:d41093e8e9ea60c99cba2a32dc86fa472592742124222b4230432b23d82969be",
+    "tools/verifier-fixtures/verus-wiring-probe/macro.rs": "ast-sha256:bf98ce716cbd9d094029d72c732498ebdcb3a10d49ce36f9473b237bf4b9f049",
+    "tools/verifier-fixtures/verus-wiring-probe/attributes.rs": "ast-sha256:d405eca08f13fe1de4fa0404cd9799a4184831739a841ddf115880b6010f4ca4",
+    "tools/verifier-fixtures/verus-wiring-probe/companion.rs": "ast-sha256:4d41ea72ff5cfb1a129885d740f68c2fd6249feb96ca24b20404521361d0449c",
+    "tools/verifier-fixtures/verus-wiring-probe/single-root.rs": "ast-sha256:ae70e7b13996de5692488bee2414016257f8419a33da880f51d23bad69aa6daf",
+    "tools/verifier-fixtures/verus-wiring-probe/production.rs": "ast-sha256:8e1a22f67c8b8cd536a950e63cfe1bd8a3fcd52d48e9e7ac2a26f9ec96ea0b37",
     "tools/verifier-fixtures/verus-wiring-probe/Cargo.toml": "ast-sha256:adf37a82216a5956c960b960c0b4963c5d0d84036aaca6bd81d96328392ee887",
     "tools/verifier-fixtures/verus-wiring-probe/Cargo.lock": "ast-sha256:9449c8bfc20b2cb09266cabea86a1bcd72585e71e190bc3fff68154386eb241b",
     "tools/verifier-fixtures/verus-wiring-probe/macro/Cargo.toml": "ast-sha256:1ef2e885d33ad9d55f0065984ef99c4813ed981edc59f94c439c586f399f6ba7",
     "tools/verifier-fixtures/verus-wiring-probe/attributes/Cargo.toml": "ast-sha256:8cd24444b8cd2410b8d02965bbceec9ce253016b10892da6ef16506f1607f51c",
     "tools/verifier-fixtures/verus-wiring-probe/companion/Cargo.toml": "ast-sha256:0ddb5c20d5f34a074bea006d0e0f8e9df8de5c71a21dfaf56356fc283a4bb3c2",
     "tools/verifier-fixtures/verus-wiring-probe/production/Cargo.toml": "ast-sha256:87fd584e1d1e735b421c9379a3e1bf6782581420543519d34a41a0db362f5039",
-    "scripts/run_verifier_probes.py": "ast-sha256:b8d5b490dedb62e97ab06386b791f0ee309be5a019baec26fef92a7db731b210",
-    "scripts/verus_probe.py": "ast-sha256:0fe38fc275a380134b1f9d0820b463a89b1ba9f20346937fc98d345719911c67",
-    "scripts/probe_provenance.py": "ast-sha256:5b528c447b2600f61df4e8a213fe7f89d4203ddde47223c363a77c1c04eb2543",
-    "scripts/verifier_probe_support.py": "ast-sha256:033891ceeb2c7a1bb38218cbc49ceba24cd746ff27829f92243ed66898897f8c"
+    "scripts/run_verifier_probes.py": "ast-sha256:9fc54a226e52d0cebc06088446213e01e4f47ac262a58d65a541f1bc96f67320",
+    "scripts/verus_probe.py": "ast-sha256:d911305eb3692deb395b2d0a7d89b5578df01a5410b54a7596cba16b5ecd2781",
+    "scripts/probe_provenance.py": "ast-sha256:8bb16aa2bf68b204bd3866ed1395369b0bafff982849145d75c54462e6e44a27",
+    "scripts/verifier_probe_support.py": "ast-sha256:c83ad05e1551afb73930c844772f6b6beaf1cca32c5a0618e2e8a861b4a557dc"
   },
   "observations": [
     {
