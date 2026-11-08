@@ -198,6 +198,13 @@ jobs:
         run: make install-kani
       - name: Require the calibrated Kani release
         run: make kani-check
+      - name: Install the checksum-verified Verus release
+        # AC-04's frozen environment registers Verus and Z3 alongside rustc,
+        # Kani, and mold, and the acceptance binding refuses a record that
+        # omits any of them. Installing them here is what lets the tool-identity
+        # step below report a version it actually observed rather than one
+        # copied from the control.
+        run: make install-verus
       - name: Resolve the installed Kani release root
         run: |
           set -euo pipefail
@@ -251,9 +258,37 @@ jobs:
       - name: Record the tool identities
         run: |
           set -euo pipefail
+          # AC-04 registers five toolchains and the acceptance binding refuses a
+          # record that omits any of them, so each is observed here rather than
+          # copied from the control. Every pin is read from the file that
+          # already owns it — `tools/*/VERSION` for Kani, Verus, and mold, and
+          # `Z3_DISTRIBUTION` for the solver — so this step cannot drift from
+          # the version the build actually uses.
           rustc -vV > build-budget/rustc
           cargo -V > build-budget/cargo
           cargo kani --version > build-budget/kani
+
+          verus_root=".verus/$(cat tools/verus/VERSION)/verus"
+          test -x "$verus_root/verus"
+          "$verus_root/verus" --version > build-budget/verus
+
+          # The Verus archive deliberately omits Z3; the probes take it from the
+          # pinned `z3-solver` distribution instead, and the solver is reported
+          # from the binary that distribution installed rather than from
+          # whichever `z3` happens to be on `PATH`.
+          z3_distribution=$(sed -n 's/^Z3_DISTRIBUTION = "\(.*\)"$/\1/p' scripts/probe_provenance.py)
+          test -n "$z3_distribution"
+          z3_path=$(uv tool run --from "$z3_distribution" python \
+            -c "import shutil; print(shutil.which('z3') or '')")
+          test -n "$z3_path"
+          "$z3_path" --version > build-budget/z3
+
+          mold --version > build-budget/mold
+          # The dev profile's backend is Cranelift and the proof profile's is
+          # LLVM; both are asserted from the files that select them, so the
+          # record describes the configuration that ran.
+          grep -qF 'codegen-backend = "cranelift"' .cargo/config.toml
+          grep -qF 'CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm"' "$PWD/build-budget/kani-codegen"
           date +%s > build-budget/setup-end
       - name: Fetch dependencies once, untimed
         run: cargo fetch --locked

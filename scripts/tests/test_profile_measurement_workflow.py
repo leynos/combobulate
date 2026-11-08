@@ -375,6 +375,43 @@ class BuildBudgetTests(unittest.TestCase):
         for capture in ('nproc', 'free -b', '"$ImageOS" "$ImageVersion"'):
             self.assertIn(capture, script, f'the job must record {capture}')
 
+    def test_every_registered_toolchain_is_observed_not_assumed(self) -> None:
+        """AC-04's binding refuses a record that omits a registered toolchain.
+
+        Verus and Z3 are registered alongside rustc, Kani, and mold, so a job
+        that installed only the build tools and Kani could never produce a
+        bindable record. Each is read from the binary the job installed.
+        """
+        script = _step_run_matching(_job('build-budget'), 'setup-end')
+
+        for recorded in ('build-budget/rustc', 'build-budget/kani',
+                         'build-budget/verus', 'build-budget/z3', 'build-budget/mold'):
+            self.assertIn(recorded, script, f'the job must observe {recorded}')
+
+    def test_the_verus_release_is_installed_before_it_is_reported(self) -> None:
+        """A version report is worthless unless the release was installed first."""
+        install = _step_run_matching(_job('build-budget'), 'install-verus')
+        report = _step_run_matching(_job('build-budget'), 'build-budget/verus')
+
+        self.assertIn('make install-verus', install,
+                      'the job must install the pinned Verus release')
+        self.assertNotIn('install-verus', report,
+                         'the report step must observe, not install')
+
+    def test_the_solver_is_taken_from_the_pinned_distribution(self) -> None:
+        """`PATH` may hold any z3; the record must name the pinned one.
+
+        The Verus archive omits Z3, so the probes resolve it from the
+        `z3-solver` distribution. Reporting a `z3` found on `PATH` would record
+        a binary the proof route never uses.
+        """
+        script = _step_run_matching(_job('build-budget'), 'build-budget/z3')
+
+        self.assertIn('Z3_DISTRIBUTION', script,
+                      'the solver pin must come from the repository record')
+        self.assertIn('uv tool run --from "$z3_distribution"', script,
+                      'the solver must be resolved through its pinned distribution')
+
 
 class VerifierFreeJobTests(unittest.TestCase):
     """Keep the hosted verifier-free run free of the admission wrapper."""
