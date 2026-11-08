@@ -33,9 +33,11 @@ fn newly_added_linux_suite_cannot_escape_provisioning() {
             "Linux runner {runner} must require provisioning"
         );
     }
-    let matrix = "jobs:\n  new-suite:\n    runs-on: '${{ matrix.os }}'\n    strategy:\n      \
-                  matrix:\n        os: [ubuntu-latest, windows-latest]\n    steps:\n      - run: \
-                  make test\n";
+    let matrix = concat!(
+        "jobs:\n  new-suite:\n    runs-on: '${{ matrix.os }}'\n    strategy:\n      ",
+        "matrix:\n        os: [ubuntu-latest, windows-latest]\n    steps:\n      - run: ",
+        "make test\n",
+    );
     let document = workflow(matrix).expect("parse a matrix suite job");
     let problems = workflow_violations(&[("matrix.yml".to_owned(), document)])
         .expect("inspect a matrix suite");
@@ -43,10 +45,12 @@ fn newly_added_linux_suite_cannot_escape_provisioning() {
         !problems.is_empty(),
         "a Linux matrix case must require provisioning"
     );
-    let mapped_matrix = "jobs:\n  suite:\n    runs-on: {labels: [self-hosted, '${{ matrix.os \
-                         }}']}\n    strategy:\n      matrix:\n        include:\n          - os: \
-                         ubuntu-latest\n          - os: windows-latest\n    steps:\n      - run: \
-                         cargo test\n";
+    let mapped_matrix = concat!(
+        "jobs:\n  suite:\n    runs-on: {labels: [self-hosted, '${{ matrix.os ",
+        "}}']}\n    strategy:\n      matrix:\n        include:\n          - os: ",
+        "ubuntu-latest\n          - os: windows-latest\n    steps:\n      - run: ",
+        "cargo test\n",
+    );
     let mapped_document = workflow(mapped_matrix).expect("parse a mapped matrix runner");
     let mapped_problems = workflow_violations(&[("mapped-matrix.yml".to_owned(), mapped_document)])
         .expect("inspect a mapped matrix suite");
@@ -58,9 +62,11 @@ fn newly_added_linux_suite_cannot_escape_provisioning() {
 
 #[test]
 fn ordered_linux_installation_allows_a_new_suite() {
-    let source = "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo \
-                  apt-get install clang mold\n      - run: make install-build-tools\n      - run: \
-                  make test\n";
+    let source = concat!(
+        "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo ",
+        "apt-get install clang mold\n      - run: make install-build-tools\n      - run: ",
+        "make test\n",
+    );
     let document = workflow(source).expect("parse an ordered suite fixture");
     let problems =
         workflow_violations(&[("new.yml".to_owned(), document)]).expect("inspect an ordered suite");
@@ -120,10 +126,12 @@ fn a_variable_expansion_is_resolved_by_its_subcommand() {
     //
     // The suite job keeps the check non-vacuous; the claim is about the build
     // job, which has no provisioning and must not need any.
-    let build = "jobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo \
-                 build --workspace \"${flags[@]+\\\"${flags[@]}\\\"}\"\n  suite:\n    runs-on: \
-                 ubuntu-latest\n    steps:\n      - run: sudo apt-get install clang mold\n      - \
-                 run: make install-build-tools\n      - run: make test\n";
+    let build = concat!(
+        "jobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - run: cargo ",
+        "build --workspace \"${flags[@]+\\\"${flags[@]}\\\"}\"\n  suite:\n    runs-on: ",
+        "ubuntu-latest\n    steps:\n      - run: sudo apt-get install clang mold\n      - ",
+        "run: make install-build-tools\n      - run: make test\n",
+    );
     let build_document = workflow(build).expect("parse an array-expanded build fixture");
     let problems = workflow_violations(&[("build.yml".to_owned(), build_document)])
         .expect("inspect an array-expanded build");
@@ -152,9 +160,15 @@ fn rejects_ineffective_installers_and_unprovable_workflows() {
         "      - run: make install-build-tools\n        if: false\n",
         "      - run: make install-build-tools\n        continue-on-error: true\n",
     ] {
+        // `format_args!` cannot capture from the scope when the format string
+        // comes from `concat!`, so this argument stays named.
         let source = format!(
-            "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo apt-get \
-             install clang mold\n      - run: cargo test\n{install}"
+            concat!(
+                "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo \
+                 apt-get ",
+                "install clang mold\n      - run: cargo test\n{install}",
+            ),
+            install = install
         );
         let document = workflow(&source).expect("parse an ineffective installer fixture");
         let problems = workflow_violations(&[("new.yml".to_owned(), document)])
@@ -173,10 +187,10 @@ fn rejects_ineffective_installers_and_unprovable_workflows() {
         !problems.is_empty(),
         "an empty suite reading must be rejected"
     );
-    let unknown = workflow(
-        "jobs:\n  suite:\n    runs-on: '${{ matrix.missing }}'\n    steps:\n      - run: cargo \
-         test\n",
-    )
+    let unknown = workflow(concat!(
+        "jobs:\n  suite:\n    runs-on: '${{ matrix.missing }}'\n    steps:\n      - run: cargo ",
+        "test\n",
+    ))
     .expect("parse an unresolved runner fixture");
     let unknown_problems = workflow_violations(&[("unknown.yml".to_owned(), unknown)])
         .expect("inspect an unresolved runner");
@@ -184,10 +198,10 @@ fn rejects_ineffective_installers_and_unprovable_workflows() {
         !unknown_problems.is_empty(),
         "an unresolved suite runner must be rejected"
     );
-    let coverage = workflow(
-        "jobs:\n  coverage:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo apt-get \
-         install clang mold\n      - run: make install-build-tools\n      - run: make coverage\n",
-    )
+    let coverage = workflow(concat!(
+        "jobs:\n  coverage:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo apt-get ",
+        "install clang mold\n      - run: make install-build-tools\n      - run: make coverage\n",
+    ))
     .expect("parse a coverage fixture without lld");
     let coverage_problems = workflow_violations(&[("coverage.yml".to_owned(), coverage)])
         .expect("inspect coverage prerequisites");
@@ -205,9 +219,14 @@ fn mutation_setup_rejects_missing_late_and_masked_installers() {
         "sudo apt-get install clang lld mold\nmake install-build-tools || true",
         "sudo apt-get install clang lld mold\ncargo-mutants run\nmake install-build-tools",
     ] {
+        // `format_args!` cannot capture from the scope when the format string
+        // comes from `concat!`, so the setup text stays a positional argument.
         let source = format!(
-            "jobs:\n  mutation:\n    uses: example/.github/workflows/mutation-cargo.yml@123\n    \
-             with:\n      setup-commands: |\n{}\n",
+            concat!(
+                "jobs:\n  mutation:\n",
+                "    uses: example/.github/workflows/mutation-cargo.yml@123\n    ",
+                "with:\n      setup-commands: |\n{}\n",
+            ),
             setup
                 .lines()
                 .map(|line| format!("        {line}"))
@@ -222,11 +241,11 @@ fn mutation_setup_rejects_missing_late_and_masked_installers() {
             "ineffective mutation setup must fail: {setup}"
         );
     }
-    let continued = workflow(
-        "jobs:\n  mutation:\n    uses: example/.github/workflows/mutation-cargo.yml@123\n    \
-         continue-on-error: true\n    with:\n      setup-commands: |\n        sudo apt-get \
-         install clang lld mold\n        make install-build-tools\n",
-    )
+    let continued = workflow(concat!(
+        "jobs:\n  mutation:\n    uses: example/.github/workflows/mutation-cargo.yml@123\n    ",
+        "continue-on-error: true\n    with:\n      setup-commands: |\n        sudo apt-get ",
+        "install clang lld mold\n        make install-build-tools\n",
+    ))
     .expect("parse a continued mutation fixture");
     let problems = workflow_violations(&[("mutation.yml".to_owned(), continued)])
         .expect("inspect continued mutation setup");
@@ -238,8 +257,10 @@ fn mutation_setup_rejects_missing_late_and_masked_installers() {
 
 #[test]
 fn non_linux_suite_does_not_require_mold() {
-    let source = "jobs:\n  windows-suite:\n    runs-on: windows-latest\n    steps:\n      - run: \
-                  cargo test\n";
+    let source = concat!(
+        "jobs:\n  windows-suite:\n    runs-on: windows-latest\n    steps:\n      - run: ",
+        "cargo test\n",
+    );
     let document = workflow(source).expect("parse a Windows suite fixture");
     let problems = workflow_violations(&[("windows.yml".to_owned(), document)])
         .expect("inspect a Windows suite");

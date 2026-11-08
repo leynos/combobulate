@@ -36,13 +36,17 @@ fn gate_declares_its_own_workspace() {
         .expect("the cardinality gate manifest must be readable");
     assert!(
         manifest.contains("[workspace]"),
-        "the gate must declare `[workspace]` so it does not inherit the root package's \
-         dev-dependencies into a nested trybuild build"
+        concat!(
+            "the gate must declare `[workspace]` so it does not inherit the root package's ",
+            "dev-dependencies into a nested trybuild build"
+        )
     );
     assert!(
         !manifest.contains("polars"),
-        "the gate manifest must never name polars: it is a forward-looking guard so the \
-         measurement stack cannot be pulled into a compile check"
+        concat!(
+            "the gate manifest must never name polars: it is a forward-looking guard so the ",
+            "measurement stack cannot be pulled into a compile check"
+        )
     );
 }
 

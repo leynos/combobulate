@@ -242,7 +242,9 @@ fn fixture_cargo_removes_the_caller_build_selectors() {
 fn the_fixture_build_deadline_clears_a_shared_admission_queue() {
     assert!(
         BUILD_DEADLINE > READ_DEADLINE && READ_DEADLINE > RUN_DEADLINE,
-        "the build compiles the facade, so its tier must exceed the read tier, which must exceed \
-         the one-line run"
+        concat!(
+            "the build compiles the facade, so its tier must exceed the read tier, which must ",
+            "exceed the one-line run"
+        )
     );
 }

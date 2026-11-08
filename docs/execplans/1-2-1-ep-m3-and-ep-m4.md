@@ -285,6 +285,35 @@ Specification: parent plan lines 2322-2348.
   so a missing suite stays a failure instead of passing over nothing. This
   supersedes the earlier reading in this plan that called the lever a
   coverage-narrowing workaround.
+- **The stale local suite had been hiding a lint class.** The suite installed
+  on this workstation lists nine lints; the rolling `cfa208c` archive lists
+  ten, the extra one being `string_continuation_style`. Because `make lint` ran
+  the older suite, it could not report that lint at all, so a green local lint
+  was not evidence that hosted lint would pass. Once the duplicate-registration
+  panic was gone, hosted lint reported the real finding the panic had masked,
+  and running the repository check against the downloaded `cfa208c` suite
+  reproduced it here: fourteen sites across `tests/build_tool_workflows.rs`,
+  `tests/cardinality_gate_scope.rs`, `tests/native_clang_wrapper.rs`,
+  `tests/native_consumer_e2e.rs`, and `tests/support/cargo_probe.rs`.
+
+  All were the same shape — a cooked string joined with a trailing `\` and
+  re-indented continuation. That is the pattern `AGENTS.md` already forbids
+  ("Use `concat!()` to combine long string literals rather than escaping
+  newlines with a backslash"), so this is a lint catching an existing
+  convention breach rather than a new rule. Each site is now `concat!`.
+
+  Two traps are worth recording. `.rustfmt.toml` sets `format_strings = true`,
+  so rustfmt reflows string *contents*; on one fixture it split a line with a
+  trailing `\`, produced its own instability (a follow-up `--check` asked for a
+  different split), and silently changed a YAML fixture's indentation. Keeping
+  each `concat!` fragment short enough that rustfmt has no reason to reflow
+  leaves it untouched, and the fixture was verified byte-identical to the
+  original. And `format_args!` cannot capture from scope when the format string
+  is produced by `concat!`, so the `format!` call sites keep their named or
+  positional arguments.
+
+  Local lint now checks against the same archive hosted uses, which is what
+  makes the local gate evidence for the hosted one.
 - The pin sweep is load-bearing rather than decorative: on its first run it
   reported 15 tracked files that name a pin the record did not list. Every one
   was a genuine site — a manifest selecting the version, a lockfile resolving
