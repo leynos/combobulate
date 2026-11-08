@@ -106,11 +106,70 @@ class RevisitedFiles(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             write(root, 'src/lib.rs', 'mod p;\n')
+            # `x` is a child of the non-root module `p`, so Rust puts it under
+            # `src/p/`. Placing it beside `src/p.rs` would have resolved only
+            # under the sibling search this module's cases no longer allow.
             write(root, 'src/p.rs', 'mod x;\n#[path = "lib.rs"] mod again;\n')
-            write(root, 'src/x.rs', 'fn f() { kani::assume(a); }\n')
+            write(root, 'src/p/x.rs', 'fn f() { kani::assume(a); }\n')
             self.assertEqual([entry.path for entry in audit_tree(root, ['src/lib.rs'])],
-                             ['src/x.rs'],
+                             ['src/p/x.rs'],
                              'a revisited file must not stop the walk before its neighbours')
+
+
+class NestedModuleResolution(unittest.TestCase):
+    """Require a child module to resolve under its parent's own directory.
+
+    Rust does not search a module file's sibling directory for its children: a
+    child of ``src/foo.rs`` lives in ``src/foo/``. Searching ``src/`` instead
+    finds an unrelated file of the same name -- a decoy, or a sibling module --
+    and audits it as though it were compiled into the module that declared it.
+    """
+
+    def test_a_child_of_a_non_root_module_resolves_under_it(self):
+        """Require `src/foo.rs`'s `mod bar;` to find `src/foo/bar.rs`."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write(root, 'src/lib.rs', 'mod foo;\n')
+            write(root, 'src/foo.rs', 'mod bar;\n')
+            write(root, 'src/bar.rs', 'fn decoy() { kani::assume(a); }\n')
+            write(root, 'src/foo/bar.rs', 'fn real() { kani::assume(b); }\n')
+            self.assertEqual([entry.path for entry in audit_tree(root, ['src/lib.rs'])],
+                             ['src/foo/bar.rs'],
+                             'a child of a non-root module must resolve under that module')
+
+    def test_a_child_of_a_mod_root_module_resolves_beside_it(self):
+        """Require `src/foo/mod.rs`'s `mod bar;` to find `src/foo/bar.rs`."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write(root, 'src/lib.rs', 'mod foo;\n')
+            write(root, 'src/foo/mod.rs', 'mod bar;\n')
+            write(root, 'src/foo/bar.rs', 'fn f() { kani::assume(a); }\n')
+            self.assertEqual([entry.path for entry in audit_tree(root, ['src/lib.rs'])],
+                             ['src/foo/bar.rs'],
+                             'a `mod.rs` root must search its own directory')
+
+    def test_a_crate_root_child_resolves_beside_it(self):
+        """Require `src/lib.rs`'s `mod foo;` to keep finding `src/foo.rs`."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write(root, 'src/lib.rs', 'mod foo;\n')
+            write(root, 'src/foo.rs', 'fn f() { kani::assume(a); }\n')
+            self.assertEqual([entry.path for entry in audit_tree(root, ['src/lib.rs'])],
+                             ['src/foo.rs'],
+                             'a crate root must still search its own directory')
+
+    def test_a_deeply_nested_child_resolves_under_its_own_stem(self):
+        """Require `src/foo/bar.rs`'s `mod baz;` to find `src/foo/bar/baz.rs`."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write(root, 'src/lib.rs', 'mod foo;\n')
+            write(root, 'src/foo.rs', 'mod bar;\n')
+            write(root, 'src/foo/bar.rs', 'mod baz;\n')
+            write(root, 'src/foo/baz.rs', 'fn decoy() { kani::assume(a); }\n')
+            write(root, 'src/foo/bar/baz.rs', 'fn real() { kani::assume(c); }\n')
+            self.assertEqual([entry.path for entry in audit_tree(root, ['src/lib.rs'])],
+                             ['src/foo/bar/baz.rs'],
+                             'each non-root module contributes its own directory')
 
 
 if __name__ == '__main__':

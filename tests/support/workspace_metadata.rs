@@ -5,60 +5,62 @@ use serde::Deserialize;
 use super::tree::BACKEND_PREFIXES;
 
 /// The facade package that ships to consumers.
-pub(super) const FACADE: &str = "combobulate";
+pub(crate) const FACADE: &str = "combobulate";
+
 /// The `#![no_std]` kernel package.
-pub(super) const KERNEL: &str = "combobulate-kernel";
+pub(crate) const KERNEL: &str = "combobulate-kernel";
+
 /// The procedural-macro package.
-pub(super) const MACROS: &str = "combobulate-macros";
+pub(crate) const MACROS: &str = "combobulate-macros";
 
 /// Every member package declared by the workspace root.
-pub(super) const MEMBERS: &[&str] = &[FACADE, KERNEL, MACROS];
+pub(crate) const MEMBERS: &[&str] = &[FACADE, KERNEL, MACROS];
 
 /// A package declared by `cargo metadata --no-deps`.
 #[derive(Debug, Deserialize)]
-pub(super) struct Package {
+pub(crate) struct Package {
     /// Cargo package name.
-    pub(super) name: String,
+    pub(crate) name: String,
     /// Build targets, used to recognize procedural-macro crates.
     #[serde(default)]
-    pub(super) targets: Vec<Target>,
+    pub(crate) targets: Vec<Target>,
     /// Declared dependencies of every kind and target.
     #[serde(default)]
-    pub(super) dependencies: Vec<Dependency>,
+    pub(crate) dependencies: Vec<Dependency>,
 }
 
 /// A build target declared by a package.
 #[derive(Debug, Deserialize)]
-pub(super) struct Target {
+pub(crate) struct Target {
     /// Cargo target kinds such as `lib` or `proc-macro`.
     #[serde(default)]
-    pub(super) kind: Vec<String>,
+    pub(crate) kind: Vec<String>,
 }
 
 /// A declared dependency edge.
 #[derive(Debug, Deserialize)]
-pub(super) struct Dependency {
+pub(crate) struct Dependency {
     /// Dependency package name.
-    pub(super) name: String,
+    pub(crate) name: String,
     /// Cargo kind: absent for normal, otherwise `dev` or `build`.
     #[serde(default)]
-    pub(super) kind: Option<String>,
+    pub(crate) kind: Option<String>,
 }
 
 /// The `packages` projection of `cargo metadata --no-deps`.
 #[derive(Debug, Deserialize)]
-pub(super) struct Metadata {
+pub(crate) struct Metadata {
     /// Every workspace member and path dependency.
-    pub(super) packages: Vec<Package>,
+    pub(crate) packages: Vec<Package>,
 }
 
 /// Parses `cargo metadata --no-deps` output.
-pub(super) fn parse_metadata(text: &str) -> Result<Metadata, serde_json::Error> {
+pub(crate) fn parse_metadata(text: &str) -> Result<Metadata, serde_json::Error> {
     serde_json::from_str(text)
 }
 
 /// Finds one declared package by name.
-pub(super) fn package<'a>(metadata: &'a Metadata, name: &str) -> Option<&'a Package> {
+pub(crate) fn package<'a>(metadata: &'a Metadata, name: &str) -> Option<&'a Package> {
     metadata
         .packages
         .iter()
@@ -66,7 +68,7 @@ pub(super) fn package<'a>(metadata: &'a Metadata, name: &str) -> Option<&'a Pack
 }
 
 /// Returns every declared package name in order.
-pub(super) fn package_names(metadata: &Metadata) -> Vec<String> {
+pub(crate) fn package_names(metadata: &Metadata) -> Vec<String> {
     metadata
         .packages
         .iter()
@@ -78,7 +80,7 @@ pub(super) fn package_names(metadata: &Metadata) -> Vec<String> {
 ///
 /// A target-specific or backend edge still appears here, so an empty result is
 /// the kernel-isolation claim VO-1 asks for.
-pub(super) fn kernel_dependency_names(metadata: &Metadata) -> Vec<String> {
+pub(crate) fn kernel_dependency_names(metadata: &Metadata) -> Vec<String> {
     package(metadata, KERNEL)
         .into_iter()
         .flat_map(|kernel| {
@@ -91,7 +93,7 @@ pub(super) fn kernel_dependency_names(metadata: &Metadata) -> Vec<String> {
 }
 
 /// Reports backend dependencies the kernel declares.
-pub(super) fn kernel_backend_dependencies(metadata: &Metadata) -> Vec<String> {
+pub(crate) fn kernel_backend_dependencies(metadata: &Metadata) -> Vec<String> {
     kernel_dependency_names(metadata)
         .into_iter()
         .filter(|name| {
@@ -107,7 +109,7 @@ pub(super) fn kernel_backend_dependencies(metadata: &Metadata) -> Vec<String> {
 /// The graph is shallow: `--no-deps` still lists each package's declared edges
 /// of every kind and target, which is exactly what VO-2 constrains. A
 /// dev-dependency cycle back to the facade is deliberately permitted.
-pub(super) fn direction_violations(metadata: &Metadata) -> Vec<String> {
+pub(crate) fn direction_violations(metadata: &Metadata) -> Vec<String> {
     let mut violations = Vec::new();
     for package in &metadata.packages {
         for dependency in &package.dependencies {
@@ -120,7 +122,7 @@ pub(super) fn direction_violations(metadata: &Metadata) -> Vec<String> {
 }
 
 /// Reports whether the facade declares a normal dependency on `name`.
-pub(super) fn facade_depends_normally_on(metadata: &Metadata, name: &str) -> bool {
+pub(crate) fn facade_depends_normally_on(metadata: &Metadata, name: &str) -> bool {
     package(metadata, FACADE).is_some_and(|facade| {
         facade
             .dependencies

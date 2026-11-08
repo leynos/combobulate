@@ -13,6 +13,14 @@ mod profile;
 #[cfg(feature = "polars")]
 pub(crate) mod polars_backend;
 
+/// The Polars backend could not complete its wiring probe.
+///
+/// The type is the facade's own, and names no Polars item: DL-19 confines the
+/// dependency to `polars_backend`, and VO-14 fails the build of the design
+/// pack if a `polars::` path reaches any other module. Re-exporting Polars'
+/// error here would leak that path into this file's public signature.
+#[cfg(feature = "polars")]
+pub use polars_backend::BackendProbeError;
 pub use profile::BuildProfile;
 
 /// Builds an `Int64` series and collects a trivial frame, proving that the
@@ -28,15 +36,15 @@ pub use profile::BuildProfile;
 ///     3,
 ///     "the pinned Polars release must collect all three rows"
 /// );
-/// # Ok::<(), polars::error::PolarsError>(())
+/// # Ok::<(), combobulate::BackendProbeError>(())
 /// ```
 ///
 /// # Errors
 ///
-/// Returns Polars' own error when the frame cannot be constructed or
-/// collected.
+/// Returns [`BackendProbeError`] when the frame cannot be constructed or
+/// collected, carrying Polars' own message as text.
 #[cfg(feature = "polars")]
 #[doc(hidden)]
-pub fn polars_backend_probe() -> polars::prelude::PolarsResult<usize> {
+pub fn polars_backend_probe() -> Result<usize, BackendProbeError> {
     polars_backend::collected_height()
 }

@@ -22,6 +22,7 @@ result with the record.
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -31,9 +32,16 @@ from .matcher import ModuleReference, ScanResult, TrustItem, scan
 
 RUST_SUFFIX = '.rs'
 # A proc-macro crate can turn a literal into code, so its literals are scanned.
-PROCEDURAL_MACRO_DIRECTIVE = 'proc-macro = true'
+# The directive is matched as a pattern rather than as text because TOML does
+# not fix the spacing: `proc-macro = true`, `proc-macro=true`, and
+# `proc-macro   =   true` all declare the same crate, and a manifest written
+# with the last two would otherwise be audited as an ordinary library.
+PROCEDURAL_MACRO_DIRECTIVE = re.compile(r'^[ \t]*proc-macro[ \t]*=[ \t]*true[ \t]*$', re.MULTILINE)
 # The file a bare `mod x;` resolves to inside a `src/`-style module.
 MODULE_FILE_CANDIDATES = ('{directory}/{name}{suffix}', '{directory}/{name}/mod{suffix}')
+# The stems that own their directory's children directly rather than a
+# subdirectory named after themselves.
+ROOT_MODULE_STEMS = frozenset({'lib', 'main', 'mod'})
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,7 +171,7 @@ def is_procedural_macro_crate(manifest: Path) -> bool:
     ordinary library manifest returns False.
     """
     try:
-        return PROCEDURAL_MACRO_DIRECTIVE in manifest.read_text(encoding='utf-8')
+        return PROCEDURAL_MACRO_DIRECTIVE.search(manifest.read_text(encoding='utf-8')) is not None
     except (OSError, UnicodeDecodeError):
         return False
 
@@ -269,7 +277,34 @@ def _path_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
 
 
 def _search_candidates(relative: str, name: str) -> tuple[str, ...]:
-    """Return the paths Rust searches for a bare ``mod name;``."""
-    directory = PurePosixPath(relative).parent.as_posix()
+    """Return the paths Rust searches for a bare ``mod name;``.
+
+    The directory is not simply the declaring file's own: Rust puts a child of
+    a *non-root* module in a directory named after that module. So
+    ``src/lib.rs`` declaring ``mod foo;`` searches ``src/foo.rs``, while
+    ``src/foo.rs`` declaring ``mod bar;`` searches ``src/foo/bar.rs``.
+
+    Reading the declaring file's own directory for the second case would find
+    an unrelated ``src/bar.rs`` — a decoy, or a sibling module of another name —
+    and audit it as though it were compiled into the module that declared it.
+    That is the failure this rule exists to prevent, so the child directory is
+    derived from the module path rather than from the file's parent.
+    """
+    directory = _module_directory(relative)
     return tuple(template.format(directory=directory, name=name, suffix=RUST_SUFFIX)
                  for template in MODULE_FILE_CANDIDATES)
+
+
+def _module_directory(relative: str) -> str:
+    """Return the directory Rust searches for a module declared in ``relative``.
+
+    A crate root (``lib.rs`` or ``main.rs``, and an ``mod.rs``) owns its
+    directory's children directly. Any other file is a module whose children
+    live in a directory named after it, so ``src/foo.rs`` contributes
+    ``src/foo`` and ``src/foo/bar.rs`` contributes ``src/foo/bar``.
+    """
+    path = PurePosixPath(relative)
+    stem = path.stem
+    if stem in ROOT_MODULE_STEMS:
+        return path.parent.as_posix()
+    return (path.parent / stem).as_posix()

@@ -318,9 +318,18 @@ lint: prepare-dependencies prepare-ui-gate ## Run rustdoc, Clippy, Whitaker, and
 # `lint` or `test` run to a single shell, so a caller's exported flags reach
 # every profile unchanged.
 #
-# `lint-whitaker` below stays profile-independent: Whitaker inspects Dylint
-# drivers and repository crates, not feature selections. Rustdoc runs once for
-# the same reason; `lint-clippy` first builds it, then lints every gate profile.
+# `lint-whitaker` below follows the same rule. Whitaker shells out to `cargo
+# check` and forwards every argument after `--`, so it type-checks whatever
+# feature selection those arguments name. Running it once with no profile flags
+# would check only the default features, which is exactly the Polars-enabled
+# profile: the `cfg(not(feature = "polars"))` code the native-only profile
+# exists to cover would never reach a lint, and a Whitaker finding that lives
+# only there would go unreported. Rustdoc runs once, because it documents the
+# default feature set rather than checking conditional compilation.
+#
+# Both route contracts change with it: Whitaker appears twice in the stage order
+# (`whitaker-native-only`, `whitaker-polars-enabled`) and its argv carries the
+# profile's flags after `--`.
 #
 # `--all-features` could never reach the native-only profile's
 # `cfg(not(feature = "polars"))` code, and a plain default-feature run repeats
@@ -371,7 +380,16 @@ WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
 lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo defaults
 	@$(WHITAKER_CLEAN_ENV) $(CHECK_BUILD_TOOLS)
 	@echo "Whitaker binary: $(WHITAKER)"
-	$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== Whitaker profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+		esac; \
+		$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" \
+			DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" \
+			$(WHITAKER) --all -- $(CARGO_FLAGS) $$flags; \
+	done
 
 typecheck: check-build-tools ## Type-check without building
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)

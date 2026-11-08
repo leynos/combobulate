@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 151
+      "count": 156
     },
     {
       "check": "contract-examples",
@@ -163,6 +163,12 @@
       "status": "pass",
       "detail": "Every registered log parser has a committed corpus whose parsed decisions cover the outcomes and the unsatisfied-witness class VO-13 requires.",
       "count": 1
+    },
+    {
+      "check": "polars-confinement",
+      "status": "pass",
+      "detail": "Polars paths appear only in src/polars_backend.rs; a seeded violation in a copy of the facade is still reported.",
+      "count": 3
     }
   ],
   "not_run": [

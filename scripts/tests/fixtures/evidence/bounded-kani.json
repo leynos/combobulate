@@ -84,7 +84,7 @@
   "result_artefacts": [
     {
       "path": "scripts/tests/fixtures/evidence/default-unwind-manifest.json",
-      "sha256": "776a8f75ff220af34914d9740351efabcc84ac396a38080fb3995c9d5c6a0c7f"
+      "sha256": "25e5e60227a5388faea4580dca7d0af368e7c8c49a690ff01b06989f182b8620"
     }
   ]
 }

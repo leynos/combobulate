@@ -1,0 +1,9 @@
+combobulate v0.1.0 (/repo)
+combobulate-kernel feature "default"
+combobulate-kernel v0.1.0 (/repo/crates/combobulate-kernel)
+polars feature "lazy"
+polars v0.55.2
+polars feature "polars-lazy"
+polars-lazy v0.55.2
+polars-buffer feature "default"
+polars-buffer v0.55.2

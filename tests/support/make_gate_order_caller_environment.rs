@@ -43,15 +43,18 @@ pub(super) fn assert_coverage_contamination(invocations: &[Invocation]) {
 }
 
 /// Confirms target-specific lld flags stop at the repository build boundary.
+///
+/// Each lint run checks every gate profile, so the two recorded runs across the
+/// cold and warm caches produce one invocation per profile each.
 pub(super) fn assert_target_rustflags_isolated(invocations: &[Invocation]) {
     let checks = invocations
         .iter()
-        .filter(|invocation| invocation.stage == "whitaker")
+        .filter(|invocation| invocation.stage.starts_with("whitaker-"))
         .collect::<Vec<_>>();
     assert_eq!(
         checks.len(),
-        2,
-        "cold and warm Whitaker runs must both be recorded"
+        4,
+        "both lint runs must record every gate profile's Whitaker invocation"
     );
     for invocation in checks {
         assert_eq!(

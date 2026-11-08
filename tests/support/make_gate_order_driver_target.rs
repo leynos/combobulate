@@ -12,7 +12,7 @@ use super::{
 fn whitaker_driver_target_stops_after_first_failure_and_cleans_cache() {
     let probe = GateProbe::new().expect("create private gate probes");
     let output = probe
-        .run_in_private_scratch("whitaker-driver-integration", Some("whitaker"))
+        .run_in_private_scratch("whitaker-driver-integration", Some("whitaker-native-only"))
         .expect("run real Make target in private scratch");
     assert!(
         !output.status.success(),
@@ -23,13 +23,13 @@ fn whitaker_driver_target_stops_after_first_failure_and_cleans_cache() {
         .expect("parse integration target records");
     assert_eq!(
         probe.stages().expect("read target invocation order"),
-        ["mktemp", "preflight", "whitaker"],
-        "a failed first Whitaker run must prevent the warm run"
+        ["mktemp", "preflight", "whitaker-native-only"],
+        "a failed native-only Whitaker run must prevent the next profile and the warm run"
     );
     assert_mktemp_command(&probe, &invocations);
     let whitaker_run = invocations
         .iter()
-        .find(|invocation| invocation.stage == "whitaker")
+        .find(|invocation| invocation.stage == "whitaker-native-only")
         .expect("record the first controlled Whitaker run");
     assert_eq!(
         whitaker_run.cache_state, "cold",

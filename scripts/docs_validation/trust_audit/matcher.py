@@ -48,6 +48,7 @@ from .structure import (
     previous_closer,
     skip_visibility,
 )
+from .use_tree import alias_bindings, use_root
 
 # ADR-0009 plus DL-17's stated additions. `any_where` is Kani's own assumption
 # surface; the Verus list gains the three forms DL-17 names.
@@ -163,6 +164,10 @@ class _Context:
         """Record the tokens and the file-scoped facts the rules depend on."""
         self.tokens = tokens
         self.imported_roots = _imported_roots(tokens)
+        # A trust root may be in scope under another name. `use kani as k;`
+        # makes `k::assume` the same call as `kani::assume`, and a scan that
+        # only matched the literal root would report nothing for the file.
+        self.kani_names = alias_bindings(tokens, KANI_ROOT)
         self.verus_regions = _verus_regions(tokens)
         self.items: list[TrustItem] = []
         self._procedural_macro = procedural_macro
@@ -195,11 +200,16 @@ class _Context:
             self._report_if_vocabulary(token.text, token)
 
     def _is_kani_path(self, index: int) -> bool:
-        """Report whether this token is the last segment of a ``kani::`` path."""
+        """Report whether this token is the last segment of a ``kani::`` path.
+
+        A ``use kani as k;`` in the file makes ``k::`` the same qualified path,
+        so the root position is matched against the literal root and against
+        every local name the file binds that root to.
+        """
         token = self.tokens[index]
         return (token.text in KANI_VOCABULARY and index >= 2
                 and self.tokens[index - 1].text == '::'
-                and self.tokens[index - 2].text == KANI_ROOT)
+                and self.tokens[index - 2].text in self.kani_names)
 
     def _is_verus_context(self, index: int) -> bool:
         """Report whether this index sits in a Verus body or attribute."""
@@ -276,31 +286,10 @@ def _imported_roots(tokens: tuple[Token, ...]) -> frozenset[str]:
     for index, token in enumerate(tokens):
         if token.kind is not Kind.IDENT or token.text != 'use':
             continue
-        root = _use_root(tokens, index + 1)
+        root = use_root(tokens, index + 1)
         if root in TRUST_ROOTS:
             roots.add(root)
     return frozenset(roots)
-
-
-def _use_root(tokens: tuple[Token, ...], start: int) -> str | None:
-    """Return the crate a ``use`` statement takes its paths from.
-
-    A leading ``::`` means an absolute path, so the root is the first identifier
-    after it. Anything else is the first identifier in the statement.
-    """
-    for index in range(start, _statement_end(tokens, start)):
-        token = tokens[index]
-        if token.kind is Kind.IDENT:
-            return token.text
-    return None
-
-
-def _statement_end(tokens: tuple[Token, ...], start: int) -> int:
-    """Return the index of the ``;`` closing the statement opened at ``start``."""
-    for index in range(start, len(tokens)):
-        if tokens[index].text == ';':
-            return index
-    return len(tokens)
 
 
 def _verus_regions(tokens: tuple[Token, ...]) -> tuple[tuple[int, int], ...]:

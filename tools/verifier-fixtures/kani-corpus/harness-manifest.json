@@ -3,14 +3,22 @@
   "corpus": "tools/verifier-fixtures/kani-corpus",
   "description": "The corpus inventory: every harness, its role, its declared covers, and, for a control, the property it must fail. VO-11b reads this instead of the run labels in harnesses.json, because a label is a test intention and a decision must come from a log. A record asserts a subset of these harnesses; the subset is the record's claim set, so a run that selects one harness is verified only when it claims one harness.",
   "sources": [
-    "tools/verifier-fixtures/kani-corpus/src/lib.rs",
-    "tools/verifier-fixtures/kani-corpus/src/harnesses.rs"
+    {
+      "path": "tools/verifier-fixtures/kani-corpus/src/lib.rs",
+      "sha256": "a732985c6ad4dafdd8dcaf525b71d1339a2778794708cb1dc7380ca5e7f3735e"
+    },
+    {
+      "path": "tools/verifier-fixtures/kani-corpus/src/harnesses.rs",
+      "sha256": "6a928eabe2a87634235daeaec0fb9a368ab6f00643e48a8d92f9de30fd6761f8"
+    }
   ],
   "harnesses": [
     {
       "name": "harnesses::verified",
       "role": "claim",
-      "covers": ["the boundary below saturation is reachable"],
+      "covers": [
+        "the boundary below saturation is reachable"
+      ],
       "should_panic": false
     },
     {
@@ -22,7 +30,9 @@
     {
       "name": "harnesses::unsatisfied_cover",
       "role": "claim",
-      "covers": ["this deliberately impossible witness must be rejected"],
+      "covers": [
+        "this deliberately impossible witness must be rejected"
+      ],
       "should_panic": false
     },
     {
@@ -40,7 +50,9 @@
     {
       "name": "harnesses::vacuous_assumption",
       "role": "claim",
-      "covers": ["the contradictory assumption makes this unreachable"],
+      "covers": [
+        "the contradictory assumption makes this unreachable"
+      ],
       "should_panic": false
     },
     {

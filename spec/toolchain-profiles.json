@@ -192,7 +192,8 @@
         "tools/calibration/cardinality-probe/Cargo.toml",
         "tools/calibration/cardinality-probe/Cargo.lock",
         "spec/backend-capabilities.json",
-        "tests/workspace_boundaries.rs",
+        "tests/workspace_profiles.rs",
+        "tests/fixtures/cargo/facade-polars-features.tree",
         "scripts/tests/test_toolchain_profiles.py"
       ]
     },

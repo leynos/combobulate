@@ -14,7 +14,8 @@ one refusal's class still refuses; ``manifest_from_document``'s
 ``should_panic`` default is unobservable because ``bool`` of ``()``, ``None``,
 and ``False`` are all false; ``_manifest_sources``'s ``()`` and omitted-argument
 defaults are unobservable because ``None`` is not a ``Sequence`` and so returns
-the same empty tuple; and ``tracked_paths``'s ``subprocess.run(check=False)``
+the same empty tuple — its own cases live in
+``test_kani_manifest_source_list``; and ``tracked_paths``'s ``subprocess.run(check=False)``
 is unobservable because the function tests ``returncode`` on the next line and
 returns the same empty set whether the command failed or raised. The
 ``(control.expected_failure or '')`` default in
@@ -47,7 +48,7 @@ from docs_validation.kani_log import (
 )
 from docs_validation.kani_log.decide import _Observed, _rejected_as_intended
 from docs_validation.kani_log.shell import (
-    MissingEvidence, UNNAMED_RECORD, _manifest_sources, bind_verdict, bound_sources,
+    MissingEvidence, UNNAMED_RECORD, bind_verdict, bound_sources,
     tracked_paths,
 )
 from git_fixtures import run_git
@@ -335,41 +336,6 @@ class LogDecoding(unittest.TestCase):
         result = bind_verdict(checkout.root, checkout.record())
         self.assertNotIsInstance(result, MissingEvidence,
                                  'a log with a stray trailing byte must still bind')
-
-
-class ManifestSourceList(unittest.TestCase):
-    """Require a manifest's source list to be a list of names or nothing at all.
-
-    ``_manifest_sources`` hands its result to the scanner, which opens each
-    path in turn. A ``str`` is a ``Sequence``, so a manifest writing
-    ``"sources": "src/lib.rs"`` would otherwise be read as one path per
-    *character* and the scanner would look for a file called ``s``.
-    """
-
-    def test_a_string_source_list_yields_no_paths(self):
-        """Require the ``str`` exclusion, which is the whole reason it is written out.
-
-        A single string is not a list of sources, and splitting it into
-        characters would make every one of them a path the scanner tries to
-        open. Reporting nothing refuses the manifest downstream instead.
-        """
-        self.assertEqual(_manifest_sources({'sources': 'abc'}), (),
-                         'a string source list must not be read as one path per character')
-
-    def test_a_non_sequence_source_list_yields_no_paths(self):
-        """Require the ``Sequence`` test, since a number cannot be iterated at all.
-
-        A manifest is producer-adjacent JSON, so a wrong type here is plausible.
-        Without the test the caller raises ``TypeError`` out of the gate instead
-        of refusing the manifest.
-        """
-        self.assertEqual(_manifest_sources({'sources': 5}), (),
-                         'a source field that is not a sequence must yield no paths')
-
-    def test_a_list_of_names_is_returned(self):
-        """Require the positive case, so the guards are not vacuously empty."""
-        self.assertEqual(_manifest_sources({'sources': ['a.rs', 2, 'b.rs']}), ('a.rs', 'b.rs'),
-                         'a list of names must be returned with its non-names dropped')
 
 
 class TrackedPathListings(unittest.TestCase):

@@ -73,14 +73,39 @@ def check_trust_audit(context: ValidationContext) -> None:
 
 
 def _shipped_items(root: Path) -> list[tuple[str, str]]:
-    """Return every trust item in the workspace members' sources."""
+    """Return every trust item in the workspace members' sources.
+
+    Each member's target sources come from ``cargo metadata``, so a target
+    Cargo builds is audited even when no crate root reaches it.
+    """
     items = []
-    for crate_root in _workspace_roots(root):
-        for driver in _entry_points(crate_root):
+    metadata = _metadata(root)
+    for crate_root, targets in _workspace_members(root, metadata):
+        for driver in _entry_points(crate_root, targets):
             relative = driver.relative_to(root).as_posix()
             items.extend((entry['item'], str(entry['location']))
                          for entry in items_of(audit_tree(root, [relative])))
     return items
+
+
+def _workspace_members(root: Path, metadata: dict) -> tuple[tuple[Path, tuple[str, ...]], ...]:
+    """Pair each workspace member's directory with its target source paths.
+
+    ``targets[].src_path`` is absolute, and is made relative to the repository
+    root here so :func:`_entry_points` can join it back. An absolute path
+    outside the root would be a dependency's source, which this audit does not
+    own; ``relative_to`` raises there rather than auditing it silently.
+    """
+    members = []
+    for package in metadata['packages']:
+        crate_root = Path(package['manifest_path']).parent
+        sources = tuple(
+            str(Path(target['src_path']).relative_to(root))
+            for target in package.get('targets', ())
+            if str(Path(target['src_path'])).startswith(str(root))
+        )
+        members.append((crate_root, sources))
+    return tuple(sorted(members, key=lambda member: str(member[0])))
 
 
 def _require_seeded_fixtures(root: Path) -> None:
@@ -122,27 +147,56 @@ def _workspace_roots(root: Path) -> tuple[Path, ...]:
     Metadata is read with ``--no-deps`` because dependency sources are not this
     repository's code and are not shipped from it.
     """
+    return tuple(sorted({Path(package['manifest_path']).parent
+                         for package in _metadata(root)['packages']}))
+
+
+def _metadata(root: Path) -> dict:
+    """Read the workspace metadata once, refusing rather than raising.
+
+    Every caller needs the same document, so it is parsed here once and the
+    parsed form is what the target and member walks iterate.
+    """
     completed = subprocess.run(
         ['cargo', 'metadata', '--no-deps', '--format-version', '1'],
         cwd=root, capture_output=True, text=True, check=False,
     )
     require(completed.returncode == 0,
             f'cargo metadata --no-deps failed: {completed.stderr.strip()}')
-    metadata = json.loads(completed.stdout)
-    return tuple(sorted({Path(package['manifest_path']).parent
-                         for package in metadata['packages']}))
+    return json.loads(completed.stdout)
 
 
-def _entry_points(crate_root: Path) -> Iterable[Path]:
-    """Yield the Rust files that start a crate's module tree."""
+def _entry_points(crate_root: Path, targets: Iterable[str] = ()) -> Iterable[Path]:
+    """Yield the Rust files that start a crate's module tree.
+
+    ``targets`` is Cargo's own list of that member's target source paths. Using
+    it rather than a filename convention is what keeps ``build.rs``,
+    ``src/bin/*``, and a target declared with an explicit ``path`` in scope:
+    none of them is reachable from a crate root by following ``mod``, yet all
+    of them are compiled and can carry trust vocabulary.
+
+    The conventional roots are still yielded, because metadata names a crate
+    root as a target anyway and a second visit is harmless: the audit reports
+    each file's items once and they are collected into a set.
+    """
+    seen = set()
+    for source in targets:
+        candidate = crate_root / source
+        if candidate.is_file() and candidate not in seen:
+            seen.add(candidate)
+            yield candidate
     for name in CRATE_ROOTS:
         candidate = crate_root / 'src' / name
-        if candidate.is_file():
+        if candidate.is_file() and candidate not in seen:
+            seen.add(candidate)
             yield candidate
     for directory in COMPILED_DIRECTORIES:
         nested = crate_root / directory
         if nested.is_dir():
-            yield from sorted(nested.rglob(f'*{RUST_SUFFIX}'))
+            for candidate in sorted(nested.rglob(f'*{RUST_SUFFIX}')):
+                if candidate not in seen:
+                    seen.add(candidate)
+                    yield candidate
 
 
 __all__ = ['SEEDED_ITEMS', 'check_trust_audit']

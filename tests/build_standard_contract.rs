@@ -190,8 +190,17 @@ fn whitaker_clears_driver_overrides_and_checks_with_repository_defaults() {
          {whitaker}"
     );
     assert!(
-        whitaker.ends_with("--all -- --all-targets"),
-        "the repository check must retain all targets: {whitaker}"
+        whitaker.contains(" --all -- --all-targets $flags"),
+        "the repository check must retain all targets and forward the profile selection: \
+         {whitaker}"
+    );
+    // DL-18: the loop is what makes the check profile-complete. A recipe that
+    // ran Whitaker once, even with a correct argument list, would lint only the
+    // default features and leave the native-only `cfg(not(feature = "polars"))`
+    // code unchecked.
+    assert!(
+        whitaker.contains("for profile in native-only polars-enabled"),
+        "Whitaker must check every gate profile, not the default one only: {whitaker}"
     );
 }
 

@@ -433,6 +433,103 @@ Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
   needs the workspace members. Weakening either rule would have made the
   fixture easier and the check weaker.
 
+## EP-M4 review round: the AC-04 workload and the profile splits
+
+The 2026-11-07 CodeRabbit ExecPlan assessment raised seven findings. This
+section records the four that changed production code or the measurement
+workflow; the plan checkboxes above record the rest.
+
+- **F4, the AC-04 job measured the wrong thing.** `build-budget` was a matrix
+  over the two Cargo profiles, so AC-04's "Profiles alternate run by run" could
+  not happen — each leg is a separate machine — and the proof profile was not
+  measured at all. It is now a single leg with no `strategy`, and each of five
+  passes measures `native-only`, `polars-enabled`, then `proof`, in both
+  phases. An `alternates within one runner` case pins the absent `strategy`, so
+  reintroducing a matrix fails rather than silently un-interleaving the record.
+- The pre-repair workflow was proved wrong by a hosted run rather than by
+  reading. Dispatch run
+  [42426500134](https://github.com/leynos/combobulate/actions/runs/42426500134)
+  on head `ad5945b` failed only at `build-budget (proof)`: the other nine legs
+  passed. Its log shows
+  `prover-tools kani exec --cwd crates/combobulate-kernel` stopped with
+  `Command "kani exec" parameter --installation requires an argument`, exit 2,
+  before any compilation. So the proof profile supplied no sample at all under
+  the old shape, and the helper route was not merely unreachable for this
+  repository's backend but under-specified in the workflow.
+- The proof profile could not use the helper's `kani exec` route.
+  `prover-tools kani exec` fails with
+  `Kani exec cannot prove isolation of Cargo backend configuration`
+  (`rust_prover_tools/kani_release_config.py`'s `_UNPROVED_BACKEND`) because
+  `.cargo/config.toml` selects Cranelift for the dev profile. That is DL-24's
+  recorded behaviour, not a defect to repair: the accepted route for this
+  repository is the direct driver, which is also what the corpus uses. The job
+  now writes a `build-budget/kani-codegen` launcher that invokes
+  `"$KANI_HOME/bin/kani-driver" kani --only-codegen` with the environment the
+  driver needs — the release's own SDK toolchain via `RUSTUP_TOOLCHAIN`,
+  `RUSTFLAGS="-D warnings"`, an LLVM `CARGO_PROFILE_DEV_CODEGEN_BACKEND`, and
+  the release's `bin` and `toolchain/bin` ahead of `PATH`. The launcher is
+  written once and its text is preserved in the artefact upload, so five
+  samples cannot drift apart. `KANI_HOME` is derived from `tools/kani/VERSION`,
+  and the comment deliberately does not restate the version: doing so would
+  duplicate the pin and had already tripped the pin sweep.
+- The kernel was not a legal Kani codegen subject. `combobulate-kernel` is
+  `#![no_std]` and has no harness until task 1.2.4, so Kani refused it with
+  `Failed to detect Kani functions`. `#[cfg(kani)] extern crate kani;` is
+  Kani's own prescribed fix. It adds no dependency edge, `cfg(kani)` is false
+  in every ordinary build, and the workspace already declares `cfg(kani)` in its
+  `unexpected_cfgs` table. It replaces no production body, which is the
+  substitution technical design §17.7 forbids; the code comment records that
+  distinction.
+- Cold and incremental semantics were not actually enforced. Cold targets are
+  now emptied before every timed invocation and deleted afterwards (ten live
+  targets would exhaust the runner's disk), and one warm-up is discarded per
+  phase *including the proof profile* — without that, the measured first
+  incremental sample would include the initial compile. The incremental phase
+  touches each profile's own crate root and reverts it afterwards.
+- **F6/F7, the gate profiles reached only Clippy.** `make lint` linted per
+  profile for Clippy but ran Whitaker once with no flags, so Whitaker checked
+  only the default features — which are the Polars-enabled profile. The
+  `cfg(not(feature = "polars"))` code the native-only profile exists to cover
+  never reached any lint. `lint-whitaker` now loops over `GATE_PROFILES` and
+  forwards each profile's flags after `--`; Whitaker shells out to
+  `cargo check`, so that selection is what it type-checks.
+- Polars leaked its own error type out of the module that owns it.
+  `polars_backend_probe` returned `polars::prelude::PolarsResult`, putting a
+  `polars::` path in the facade's public signature, which DL-19's confinement
+  and the new `polars-confinement` gate (VO-14) reject. The backend now reports
+  its own `BackendProbeError` carrying Polars' message as text, converted once
+  in a private `collect()`, and the facade re-exports that type only under the
+  feature.
+- The outward-facing checks moved to `tests/workspace_profiles.rs`. Adding
+  VO-4's resolved-feature assertion to `tests/workspace_boundaries.rs` pushed
+  it past the 400-line limit, so the profile contracts split out and the shared
+  read layer became `tests/support/live_cargo.rs`. Both binaries declare it, so
+  it carries an `#[expect(dead_code)]` naming the reason rather than an
+  `allow`; the exception fails loudly once the split is no longer needed.
+- `bound_sources` no longer restates a source's refusal. It used to replace
+  `read_tracked`'s reason with "it is not a tracked file inside the repository"
+  for every failure, which made an untracked source, a digest drift, and an
+  unreadable file indistinguishable to the record's author and hid the digest
+  check DL-16 requires. It now propagates `read_artefact`'s refusal, and the
+  scanner cases pin the untracked and drifted classes separately. The
+  empty-source refusal still belongs to the manifest: a manifest whose sources
+  carry no digest names nothing auditable, which is a defect in the manifest.
+- **F2's alias rule is a module, not a method on the matcher.** Teaching
+  `matcher.py` about `use kani as k;` pushed it from 399 to 451 lines, past the
+  400-line limit. The `use`-tree reader — root, alias, and statement end —
+  moved to `trust_audit/use_tree.py` (91 lines), which is a coherent unit: it
+  reads what the source says and decides nothing about vocabulary. The matcher
+  imports `alias_bindings` and `use_root` and keeps its own rules. Its cases
+  moved with it to `test_trust_audit_use_tree.py`, which exercises the reader
+  directly rather than through `scan`, so a mutant there is caught by the
+  function it lives in.
+- The manifest source-list cases moved to `test_kani_manifest_source_list.py`.
+  They test `shell._manifest_sources`'s *input shape*, while
+  `test_kani_binding_survivors.py` tests the decision and binding surfaces
+  built on top, and the combined module had grown to 439 lines. The equivalence
+  argument for the moved defaults stays in the survivor module's docstring with
+  a pointer to the new home, so the mutation-census record is still complete.
+
 ## Ruled out
 
 - Ticking 1.2.1 before EP-M3 to EP-M6 complete. The parent plan's EP-M6 binds

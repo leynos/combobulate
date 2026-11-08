@@ -16,9 +16,7 @@ and is mutated in the *second* line of an implicitly concatenated literal, which
 the corpus sweep reports without the case being a gap. ``_is_verus_context``'s
 ``start <= index`` versus ``start < index`` cannot differ because a region's
 first index is always the token after ``verus!``'s ``{`` or after an attribute's
-``[``, and neither is an identifier. ``_statement_end``'s ``start`` bound cannot
-matter either: a ``use`` is lexed with its ``;`` present, so the first search
-succeeds before the bound is reached.
+``[``, and neither is an identifier.
 
 Examples
 --------
@@ -34,8 +32,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.trust_audit import TrustAuditError, scan
-from docs_validation.trust_audit.matcher import _is_bare_use, _statement_end
 from docs_validation.trust_audit.lexer import tokenize
+from docs_validation.trust_audit.matcher import _is_bare_use
 
 
 def items(text: str, **options) -> tuple[tuple[str, int, int], ...]:
@@ -135,21 +133,6 @@ class BareUse(unittest.TestCase):
         tokens = tokenize('f(assume::x)')
         self.assertTrue(_is_bare_use(tokens, 2),
                         'the rule must consult the token before the word, not after')
-
-class StatementBounds(unittest.TestCase):
-    """Require a ``use`` tree's root to be read up to its own semicolon."""
-
-    def test_the_semicolon_ends_the_search(self):
-        """Require the search to report the first ``;`` so a later statement is not read."""
-        tokens = tokenize('use a; b;')
-        self.assertEqual(_statement_end(tokens, 0), 2,
-                         'the first semicolon must end the statement')
-
-    def test_a_statement_without_a_semicolon_ends_at_end_of_file(self):
-        """Require the end of file to be the bound when no ``;`` appears."""
-        tokens = tokenize('use a')
-        self.assertEqual(_statement_end(tokens, 0), len(tokens),
-                         'a statement with no semicolon must end at the last token')
 
 class VerusRegionEdges(unittest.TestCase):
     """Require a Verus region's bounds to include its own vocabulary and no more."""

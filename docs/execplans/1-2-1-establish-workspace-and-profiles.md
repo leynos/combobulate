@@ -616,9 +616,17 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - Status (2026-11-07): `scripts/docs_validation/trust_audit/`, `kani_log/`,
     `verified_evidence.py`, the evidence-binding shell, and the `"kani"`
     registry entry exist.
-  - [ ] `trust_audit/` triage: 39 of the 75 survivors remain open after the
-        four survivor modules were added to the census selection; each must be
-        killed or classified before the milestone closes.
+  - [x] (2026-11-07) `trust_audit/` triage complete: the widened
+        eleven-module census is 23 killed and 23 equivalent across 46 probes,
+        with nothing unaccounted for. Eleven modules is every
+        `scripts/tests/test_trust_audit*.py`; the earlier selection named only
+        seven, so six suites never ran under mutation and 42 mutants survived
+        on that alone. Two production defects and four real test gaps fell out
+        of the triage; the residual equivalents are argued in
+        `test_trust_audit_structure_survivors.py`'s module docstring. Recorded
+        with its probe-by-probe evidence in
+        `1-2-1-ep-m3-and-ep-m4.md`'s EP-M5 checklist; log
+        `/tmp/killmatrix-trust-1-2-1-profiles-and-trust-audit.out`.
 - [ ] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
 
 Each Red step records its log path and the names of the failing tests here. A
@@ -2488,11 +2496,20 @@ Feature: Build profiles report what was compiled
   target; an untimed `cargo fetch --locked`; `CARGO_BUILD_JOBS=4`; one step per
   timed invocation; `nproc`, memory, and image version recorded; partial
   results uploaded with `if: always()`. The proof profile is Kani codegen of
-  the kernel through `make install-kani`, `make kani-check`, and
-  `prover-tools kani exec --cwd crates/combobulate-kernel` with
-  `--extra-arg=--only-codegen` (plus `-Z unstable-options` if Kani 0.67.0
-  requires it), timing only the `kani exec` step. Commit the acceptance record
-  to `spec/measurements/` and report its verdict honestly.
+  the kernel through `make install-kani`, `make kani-check`, and the **direct
+  driver** —
+  `kani-driver kani --only-codegen --manifest-path
+  crates/combobulate-kernel/Cargo.toml` —
+  timing only that step. The helper's `prover-tools kani exec` route cannot be
+  used: it refuses this repository's
+  `[profile.dev] codegen-backend = "cranelift"` with
+  `Kani exec cannot prove isolation of Cargo backend configuration`, which is
+  DL-24's recorded behaviour and the route the corpus already takes.
+  `--only-codegen` is a stable driver option, so `-Z unstable-options` is not
+  required. The kernel also needs `#[cfg(kani)] extern crate kani;` — Kani
+  refuses a `#![no_std]` input that never names it, and the kernel has no
+  harness until task 1.2.4. Commit the acceptance record to
+  `spec/measurements/` and report its verdict honestly.
 - Add `.github/workflows/formal.yml` (DL-23), not required for merging,
   triggered weekly and by manual dispatch, which runs `make install-kani`,
   `make kani-check`, `make kani-log-corpus`, `make install-verus`, and

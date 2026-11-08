@@ -44,6 +44,7 @@ from docs_validation.roadmap_status import check_roadmap_status
 from docs_validation.semantic_contracts import check_macro_grammar, check_semantic_contracts
 from docs_validation.semantics import check_examples
 from docs_validation.log_parser_registration import check_log_parser_registration
+from docs_validation.polars_confinement import check_polars_confinement
 from docs_validation.toolchain_profiles import check_toolchain_profiles
 from docs_validation.trust_audit_check import check_trust_audit
 
@@ -110,6 +111,7 @@ def collect_checks(context: ValidationContext) -> None:
         check_candidate_deferral, check_roadmap_status,
         check_package_policy, check_toolchain_profiles,
         check_trust_audit, check_log_parser_registration,
+        check_polars_confinement,
     ):
         check(context)
 

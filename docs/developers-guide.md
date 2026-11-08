@@ -439,8 +439,18 @@ profile is therefore its own Cargo invocation.
 
 Because `make lint` and `make test` already iterate the profile list, running
 them is the profile-isolation check; there is no separate profile target.
-Whitaker and rustdoc stay profile-independent: they inspect Dylint drivers and
-repository crates rather than a feature selection, and rustdoc runs once.
+
+`lint-whitaker` iterates the same list. Whitaker forwards every argument after
+`--` to `cargo check`, so an unflagged run type-checks only the default
+features — the `polars-enabled` profile — and the native-only
+`cfg(not(feature = "polars"))` code never reaches a lint. Each profile is
+therefore its own Whitaker invocation, and the stage order records
+`whitaker-native-only` then `whitaker-polars-enabled`. Both profiles in one run
+share a single `DYLINT_DRIVER_PATH`, so the first builds the driver and the
+second reuses it.
+
+Rustdoc stays profile-independent: it documents the default feature set rather
+than checking conditional compilation, so it runs once.
 
 ## Workspace layout and module ownership
 

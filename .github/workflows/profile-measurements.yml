@@ -141,25 +141,32 @@ jobs:
   # compilation disabled, one untimed `cargo fetch --locked`, and a single
   # timed invocation per step. Nothing here decides the verdict; it records the
   # evidence the acceptance record is written from.
+  #
+  # The profiles alternate *within one runner*, so this job is a single leg
+  # rather than a matrix. Three parallel legs would each be a separate machine
+  # and the interleaving the control requires — native, proof, Polars, native,
+  # proof, Polars … — would never happen. The loop below is the interleaving.
+  #
+  # The proof profile's timed region is Kani codegen of the kernel, not
+  # `cargo build`. It runs through the installed driver directly rather than
+  # through the helper's `kani exec` route, because that route refuses this
+  # repository's `[profile.dev] codegen-backend = "cranelift"`: it cannot prove
+  # isolation of a backend it does not control, and the accepted route for the
+  # repository is the direct driver (DL-24). The driver is selected by the
+  # environment `kani-driver` needs — the release's bundled SDK toolchain,
+  # warnings-as-errors through both rustflags spellings, LLVM for the verifier,
+  # and the release's own `bin` and `toolchain/bin` ahead of `PATH`.
   build-budget:
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'measure-profiles'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      # Profiles alternate run by run, so the budget job measures them in one
-      # runner rather than in parallel matrix legs: a second leg on the same
-      # host would contend for the CPU the timing is measuring.
-      matrix:
-        profile: [native-only, proof, polars-enabled]
     env:
       CARGO_BUILD_JOBS: '4'
       CARGO_INCREMENTAL: '0'
       CARGO_TERM_COLOR: never
       RUSTDOCFLAGS: '-D warnings'
-      PROFILE: ${{ matrix.profile }}
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -188,91 +195,151 @@ jobs:
       - name: Install the pinned build standard
         run: make install-build-tools
       - name: Install the pinned Kani release
-        if: matrix.profile == 'proof'
         run: make install-kani
+      - name: Require the calibrated Kani release
+        run: make kani-check
+      - name: Resolve the installed Kani release root
+        run: |
+          set -euo pipefail
+          # The Makefile derives the release root from the same pin, so naming it
+          # here from that pin keeps the workflow's driver selection and the
+          # installer's target in agreement rather than duplicating a path.
+          root="$HOME/.kani/kani-$(cat tools/kani/VERSION)"
+          test -x "$root/bin/kani-driver"
+          printf 'KANI_HOME=%s\n' "$root" >> "$GITHUB_ENV"
+          printf '%s\n' "$root" > build-budget/kani-release-root
+      - name: Write the recorded Kani codegen launcher
+        run: |
+          set -euo pipefail
+          # The proof profile runs the installed driver directly, so its
+          # environment has to be spelled out for every sample. Writing it once
+          # keeps each timed step a single invocation of a script whose text the
+          # artefact upload preserves, rather than repeating five environment
+          # assignments where one copy could drift from the others.
+          launcher="$PWD/build-budget/kani-codegen"
+          cat > "$launcher" <<'LAUNCHER'
+          #!/usr/bin/env bash
+          # Cold or incremental Kani codegen of the kernel, through the installed
+          # driver. `RUSTUP_TOOLCHAIN` selects the SDK toolchain the release
+          # bundles; `RUSTFLAGS` carries the repository's warnings-as-errors
+          # policy, and `CARGO_ENCODED_RUSTFLAGS` carries it too because Cargo
+          # prefers the encoded form when both are set: an inherited value would
+          # otherwise replace the policy silently rather than being overridden
+          # by it. The LLVM backend is the verifier's own and must displace the
+          # Cranelift the repository selects for dev builds; and the release's
+          # `toolchain/bin` and `bin` come first on `PATH` so the driver finds
+          # its bundled rustc and CBMC. The version is not named here: the
+          # release root comes from `tools/kani/VERSION`, so the pin has one
+          # source and this file cannot drift from it.
+          set -euo pipefail
+          exec env \
+            RUSTUP_TOOLCHAIN="$(cat "$KANI_HOME/rust-toolchain-version")" \
+            RUSTFLAGS="-D warnings" \
+            CARGO_ENCODED_RUSTFLAGS="-D"$'\x1f'"warnings" \
+            CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm" \
+            LD_LIBRARY_PATH="$KANI_HOME/toolchain/lib" \
+            PATH="$KANI_HOME/toolchain/bin:$KANI_HOME/bin:$PATH" \
+            "$KANI_HOME/bin/kani-driver" kani --only-codegen \
+              --manifest-path crates/combobulate-kernel/Cargo.toml
+          LAUNCHER
+          chmod +x "$launcher"
+          # Prove the launcher carries the arguments the control's workload
+          # names, so a passing parse cannot hide a launcher that measures
+          # something else.
+          grep -qF -- '--only-codegen' "$launcher"
+          grep -qF -- '--manifest-path crates/combobulate-kernel/Cargo.toml' "$launcher"
       - name: Record the tool identities
         run: |
           set -euo pipefail
           rustc -vV > build-budget/rustc
           cargo -V > build-budget/cargo
+          cargo kani --version > build-budget/kani
           date +%s > build-budget/setup-end
       - name: Fetch dependencies once, untimed
         run: cargo fetch --locked
-      - name: Measure five cold builds
+      - name: Measure five cold builds per profile, alternating
         run: |
           set -euo pipefail
-          case "$PROFILE" in
-            native-only) flags=(--no-default-features) ;;
-            proof) flags=(--no-default-features) ;;
-            polars-enabled) flags=() ;;
-          esac
+          # Each pass is one "run" in the control's sense and measures all three
+          # profiles, so no profile's five samples are taken back to back.
           for run in 1 2 3 4 5; do
-            export CARGO_TARGET_DIR="$PWD/build-budget/cold-target-$run"
-            rm -rf -- "$CARGO_TARGET_DIR"
-            output="$PWD/build-budget/cold-$PROFILE-$run"
-            /usr/bin/time -v -o "$output.time" \
-              cargo build --workspace "${flags[@]+"${flags[@]}"}" \
-              2>&1 | tee "$output.log"
-            du -sb "$CARGO_TARGET_DIR" > "$output.target-bytes"
-            # The cold target is deleted afterwards: keeping five of them would
-            # hold several gigabytes and could exhaust the runner's disk before
-            # the warm phase starts.
-            rm -rf -- "$CARGO_TARGET_DIR"
+            for profile in native-only polars-enabled; do
+              case "$profile" in
+                native-only) flags=(--no-default-features) ;;
+                polars-enabled) flags=() ;;
+              esac
+              export CARGO_TARGET_DIR="$PWD/build-budget/cold-target-$profile-$run"
+              rm -rf -- "$CARGO_TARGET_DIR"
+              output="$PWD/build-budget/cold-$profile-$run"
+              /usr/bin/time -v -o "$output.time" \
+                cargo build --workspace "${flags[@]+"${flags[@]}"}" \
+                2>&1 | tee "$output.log"
+              du -sb "$CARGO_TARGET_DIR" > "$output.target-bytes" || true
+              # The cold target is deleted afterwards: keeping ten of them would
+              # hold several gigabytes and could exhaust the runner's disk before
+              # the warm phase starts.
+              rm -rf -- "$CARGO_TARGET_DIR"
+            done
+            proof_target="$PWD/build-budget/cold-target-proof-$run"
+            rm -rf -- "$proof_target"
+            proof_output="$PWD/build-budget/cold-proof-$run"
+            /usr/bin/time -v -o "$proof_output.time" \
+              env CARGO_TARGET_DIR="$proof_target" \
+                "$PWD/build-budget/kani-codegen" 2>&1 | tee "$proof_output.log"
+            du -sb "$proof_target" > "$proof_output.target-bytes" || true
+            rm -rf -- "$proof_target"
           done
-      - name: Discard one warm-up build
+      - name: Discard one warm-up build per profile
         run: |
           set -euo pipefail
-          case "$PROFILE" in
-            native-only) flags=(--no-default-features) ;;
-            proof) flags=(--no-default-features) ;;
-            polars-enabled) flags=() ;;
-          esac
-          export CARGO_TARGET_DIR="$PWD/build-budget/warm-target"
+          for profile in native-only polars-enabled; do
+            case "$profile" in
+              native-only) flags=(--no-default-features) ;;
+              polars-enabled) flags=() ;;
+            esac
+            export CARGO_TARGET_DIR="$PWD/build-budget/warm-target-$profile"
+            rm -rf -- "$CARGO_TARGET_DIR"
+            cargo build --workspace "${flags[@]+"${flags[@]}"}"
+          done
+      - name: Discard one warm-up Kani codegen
+        run: |
+          set -euo pipefail
+          export CARGO_TARGET_DIR="$PWD/build-budget/warm-target-proof"
           rm -rf -- "$CARGO_TARGET_DIR"
-          cargo build --workspace "${flags[@]+"${flags[@]}"}"
-      - name: Measure five incremental builds
+          "$PWD/build-budget/kani-codegen"
+      - name: Measure five incremental builds per profile, alternating
         run: |
           set -euo pipefail
-          case "$PROFILE" in
-            native-only) flags=(--no-default-features) ;;
-            proof) flags=(--no-default-features) ;;
-            polars-enabled) flags=() ;;
-          esac
           source_file=src/lib.rs
+          kernel_file=crates/combobulate-kernel/src/lib.rs
           for run in 1 2 3 4 5; do
-            export CARGO_TARGET_DIR="$PWD/build-budget/warm-target"
-            output="$PWD/build-budget/incremental-$PROFILE-$run"
-            # The control's timed region begins after the touch; touching the
-            # crate root is what makes the rebuild incremental rather than a
-            # no-op.
-            printf '\n' >> "$source_file"
-            /usr/bin/time -v -o "$output.time" \
-              cargo build --workspace "${flags[@]+"${flags[@]}"}" \
-              2>&1 | tee "$output.log"
-            git checkout -- "$source_file"
+            for profile in native-only polars-enabled; do
+              case "$profile" in
+                native-only) flags=(--no-default-features) ;;
+                polars-enabled) flags=() ;;
+              esac
+              export CARGO_TARGET_DIR="$PWD/build-budget/warm-target-$profile"
+              output="$PWD/build-budget/incremental-$profile-$run"
+              # The control's timed region begins after the touch; touching the
+              # crate root is what makes the rebuild incremental rather than a
+              # no-op.
+              printf '\n' >> "$source_file"
+              /usr/bin/time -v -o "$output.time" \
+                cargo build --workspace "${flags[@]+"${flags[@]}"}" \
+                2>&1 | tee "$output.log"
+              git checkout -- "$source_file"
+            done
+            export CARGO_TARGET_DIR="$PWD/build-budget/warm-target-proof"
+            proof_output="$PWD/build-budget/incremental-proof-$run"
+            printf '\n' >> "$kernel_file"
+            /usr/bin/time -v -o "$proof_output.time" \
+              "$PWD/build-budget/kani-codegen" 2>&1 | tee "$proof_output.log"
+            git checkout -- "$kernel_file"
           done
-      - name: Measure the proof profile's Kani codegen
-        if: matrix.profile == 'proof'
-        run: |
-          set -euo pipefail
-          output="$PWD/build-budget/proof-codegen"
-          # The helper is pinned to the commit in tools/rust-prover-tools/REF,
-          # which is the same source the Makefile's PROVER_TOOLS resolves. It is
-          # read here rather than through Make so the timed step has one
-          # invocation instead of a Make wrapper around it.
-          ref=$(awk '/^ref:/ { print $2 }' tools/rust-prover-tools/REF)
-          # The proof profile's timed region is the codegen of the kernel, not
-          # a full verification: --only-codegen skips CBMC, which is what the
-          # control's proof_cold_minutes budget describes.
-          /usr/bin/time -v -o "$output.time" \
-            uv tool run --from "git+https://github.com/leynos/rust-prover-tools.git@$ref" \
-              prover-tools kani exec --cwd crates/combobulate-kernel \
-              --extra-arg=--only-codegen --extra-arg=-Z --extra-arg=unstable-options \
-            2>&1 | tee "$output.log"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: build-budget-${{ matrix.profile }}
+          name: build-budget
           path: build-budget/
 
   verifier-free:

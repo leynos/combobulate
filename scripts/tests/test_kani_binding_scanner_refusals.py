@@ -35,6 +35,7 @@ from docs_validation.kani_log.shell import (
     read_tracked,
 )
 from kani_binding_fixtures import (
+    LOG,
     MANIFEST,
     ROOT,
     TOOL,
@@ -148,16 +149,59 @@ class ScannerRefusals(CheckoutFixture):
                       captured_against(checkout.root, trust_audit, checkout.record()),
                       'a manifest naming no sources must be refused as unauditable')
 
-    def test_a_source_git_does_not_track_is_reported_by_its_own_class(self):
-        """Require a source refusal to be reported as a source, not as the manifest."""
+    def test_a_manifest_naming_sources_without_digests_is_unauditable(self):
+        """Require an unbound source list to refuse the manifest, not to audit nothing.
+
+        DL-16 binds the audit to the digests a manifest records, so a source
+        named without one cannot be checked against the file the audit reads.
+        ``_manifest_sources`` drops such an entry, and the scanner must then
+        refuse the manifest rather than report an audit of zero files.
+        """
         checkout = self.checkout(manifest=json.dumps({
             'harnesses': [{'name': 'h::x', 'role': 'claim'}],
             'sources': ['manifest.json', 'missing.rs'],
         }))
-        self.assertIn("source 'missing.rs' was refused: "
-                      'it is not a tracked file inside the repository',
+        self.assertIn("manifest 'manifest.json' was refused: "
+                      'it names no source files to audit',
+                      captured_against(checkout.root, trust_audit, checkout.record()),
+                      'a source list without digests must refuse the manifest as unauditable')
+
+    def test_a_source_git_does_not_track_is_reported_by_its_own_class(self):
+        """Require a source refusal to be reported as a source, not as the manifest.
+
+        ``run.log`` is tracked and carries its real digest, so the first source
+        reads cleanly and only ``missing.rs`` can produce a refusal. Without
+        that first entry a failure here would not distinguish an untracked
+        source from a manifest the scanner never got as far as reading.
+        """
+        checkout = self.checkout(manifest=json.dumps({
+            'harnesses': [{'name': 'h::x', 'role': 'claim'}],
+            'sources': [
+                {'path': 'run.log', 'sha256': file_digest(LOG)},
+                {'path': 'missing.rs', 'sha256': '0' * 64},
+            ],
+        }))
+        self.assertIn("source 'missing.rs' was refused: it is not tracked by Git",
                       captured_against(checkout.root, trust_audit, checkout.record()),
                       'an untracked source must be reported as a source refusal')
+
+    def test_a_source_whose_digest_drifted_is_reported_by_its_own_class(self):
+        """Require a stale manifest to refuse its source, not the record's binding.
+
+        ``run.log`` is tracked and readable, so only the per-source digest check
+        can refuse it. Reporting this as a manifest refusal would send the
+        record's author to re-bind the manifest when the source is what moved,
+        and would let a source be audited against a manifest it no longer
+        matches — the drift DL-16 binds the digest to catch.
+        """
+        checkout = self.checkout(manifest=json.dumps({
+            'harnesses': [{'name': 'h::x', 'role': 'claim'}],
+            'sources': [{'path': 'run.log', 'sha256': '0' * 64}],
+        }))
+        self.assertIn("source 'run.log' was refused: "
+                      'its digest differs from the one the record binds',
+                      captured_against(checkout.root, trust_audit, checkout.record()),
+                      'a source whose digest drifted must be reported as a source refusal')
 
     def test_a_scanner_that_cannot_read_its_manifest_reports_the_manifest(self):
         """Require the scanner to report a manifest refusal rather than raise."""

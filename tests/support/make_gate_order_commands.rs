@@ -40,7 +40,8 @@ pub(super) const ALL_STAGES: &[&str] = &[
     "clippy-native-only",
     "clippy-polars-enabled",
     "preflight",
-    "whitaker",
+    "whitaker-native-only",
+    "whitaker-polars-enabled",
     "interrogate",
     "preflight",
     "prepare-dependencies",
@@ -57,7 +58,7 @@ pub(super) const ALL_STAGES: &[&str] = &[
 ///
 /// Kept out of the assertion function so the table stays readable: the
 /// expectations are data, and the function that walks them is three lines.
-const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 17] = [
+const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 18] = [
     (
         "prepare-dependencies",
         "probe-cargo",
@@ -120,7 +121,12 @@ const EXPECTED_COMMANDS: [(&str, &str, &[&str]); 17] = [
         &["clippy", "--all-targets", "--", "-D", "warnings"],
     ),
     (
-        "whitaker",
+        "whitaker-native-only",
+        "probe-whitaker",
+        &["--all", "--", "--all-targets", "--no-default-features"],
+    ),
+    (
+        "whitaker-polars-enabled",
         "probe-whitaker",
         &["--all", "--", "--all-targets"],
     ),

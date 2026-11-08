@@ -107,7 +107,8 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
             "clippy-native-only",
             "clippy-polars-enabled",
             "preflight",
-            "whitaker",
+            "whitaker-native-only",
+            "whitaker-polars-enabled",
             "interrogate"
         ],
         "nothing may run after a failing Interrogate gate; both Clippy profiles must precede \
@@ -125,7 +126,8 @@ fn parallel_all_stops_after_the_first_failing_gate() {
         "preflight",
         "clippy-native-only",
         "clippy-polars-enabled",
-        "whitaker",
+        "whitaker-native-only",
+        "whitaker-polars-enabled",
         "interrogate",
         "nextest-native-only",
         "doctest-native-only",
@@ -250,7 +252,8 @@ fn assert_contaminated_lint_run(
             "clippy-native-only",
             "clippy-polars-enabled",
             "preflight",
-            "whitaker",
+            "whitaker-native-only",
+            "whitaker-polars-enabled",
             "interrogate"
         ]
         .map(str::to_owned),

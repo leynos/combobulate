@@ -278,6 +278,37 @@ class ProceduralMacroCrateDetection(unittest.TestCase):
         self.assertFalse(is_procedural_macro_crate(self.root / 'absent/Cargo.toml'),
                          'a missing manifest must not be read as a proc-macro crate')
 
+    def test_the_directive_is_recognised_however_it_is_spaced(self):
+        """Require TOML's spacing freedom to reach the same answer.
+
+        TOML does not fix the whitespace around ``=``, so ``proc-macro=true``
+        and ``proc-macro   =   true`` declare exactly the same crate as the
+        spaced form. Matching the directive as text would audit the first two
+        as ordinary libraries and silently stop scanning their literals, which
+        are the tokens their macros emit.
+        """
+        for directive in ('proc-macro = true', 'proc-macro=true',
+                          'proc-macro   =   true', 'proc-macro\t=\ttrue'):
+            with self.subTest(directive=directive):
+                manifest = self.root / 'spaced/Cargo.toml'
+                manifest.parent.mkdir(parents=True, exist_ok=True)
+                manifest.write_text(f'[lib]\n{directive}\n', encoding='utf-8')
+                self.assertTrue(is_procedural_macro_crate(manifest),
+                                f'{directive!r} must be read as the directive')
+
+    def test_a_commented_out_directive_is_not_procedural(self):
+        """Require a commented directive to be ignored.
+
+        A manifest may keep the line as a comment while the crate is ordinary.
+        Reading it as a declaration would scan an ordinary crate's data as code
+        and invent trust items the author never wrote.
+        """
+        manifest = self.root / 'commented/Cargo.toml'
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text('[lib]\n# proc-macro = true\n', encoding='utf-8')
+        self.assertFalse(is_procedural_macro_crate(manifest),
+                         'a commented-out directive must not make a crate procedural')
+
 
 class ManifestDiscoveryFailsClosed(unittest.TestCase):
     """Require the manifest lookup to fail closed when no crate owns the file.

@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/profile-measurements.yml'
 
 ROUTES = ('rustdoc', 'clippy', 'whitaker', 'nextest', 'coverage', 'ui')
+MEASUREMENT_JOBS = ('measure-profile', 'build-budget', 'verifier-free')
 LABEL_GATE = "github.event.label.name == 'measure-profiles'"
 DISPATCH_GATE = "github.event_name == 'workflow_dispatch'"
 
@@ -86,9 +87,9 @@ class TriggerTests(unittest.TestCase):
             'the pull request trigger must be limited to the labeled action',
         )
 
-    def test_both_jobs_require_the_measurement_label(self) -> None:
-        """Labelling a pull request for another reason must skip both jobs."""
-        for name in ('measure-profile', 'verifier-free'):
+    def test_every_measurement_job_requires_the_label(self) -> None:
+        """Labelling a pull request for another reason must skip every job."""
+        for name in MEASUREMENT_JOBS:
             with self.subTest(job=name):
                 condition = _job(name)['if']
                 self.assertIn(LABEL_GATE, condition, f'{name} must name the measurement label')
@@ -225,18 +226,154 @@ class ArtefactTests(unittest.TestCase):
         """An upload limited to success discards the failing route's evidence."""
         uploads = [
             step
-            for name in ('measure-profile', 'verifier-free')
+            for name in MEASUREMENT_JOBS
             for step in _job(name)['steps']
             if 'upload-artifact' in step.get('uses', '')
         ]
 
-        self.assertEqual(len(uploads), 2, 'both jobs must publish their evidence')
+        self.assertEqual(
+            len(uploads),
+            len(MEASUREMENT_JOBS),
+            'every measurement job must publish its evidence',
+        )
         for step in uploads:
             self.assertEqual(
                 step['if'],
                 'always()',
                 'an artefact upload must run even when the measurement failed',
             )
+
+
+class BuildBudgetTests(unittest.TestCase):
+    """Keep the AC-04 job measuring the protocol its control registers."""
+
+    def test_the_profiles_alternate_within_one_runner(self) -> None:
+        """Parallel matrix legs would never interleave the three profiles."""
+        job = _job('build-budget')
+
+        self.assertNotIn(
+            'strategy',
+            job,
+            'AC-04 requires profiles to alternate run by run, which parallel matrix legs cannot do',
+        )
+        for phase in ('cold', 'incremental'):
+            with self.subTest(phase=phase):
+                script = _step_run_matching(job, f'build-budget/{phase}-proof-$run')
+                self.assertIn(
+                    'for run in 1 2 3 4 5',
+                    script,
+                    f'each {phase} pass must measure all three profiles before advancing the run',
+                )
+
+    def test_the_job_measures_all_three_profiles(self) -> None:
+        """A profile dropped from the job silently shrinks the record."""
+        job = _job('build-budget')
+
+        for phase in ('cold', 'incremental'):
+            with self.subTest(phase=phase):
+                self.assertIn(
+                    f'build-budget/{phase}-proof-$run',
+                    _step_run_matching(job, f'{phase}-proof-$run'),
+                    f'the {phase} phase must measure the proof profile',
+                )
+        cold = _step_run_matching(job, 'cold-target-$profile-$run')
+        self.assertIn('for profile in native-only polars-enabled', cold, 'the loop must name both Cargo profiles')
+
+    def test_each_cold_run_starts_from_an_empty_target(self) -> None:
+        """A reused cold target measures a warm build."""
+        job = _job('build-budget')
+        cold = _step_run_matching(job, 'cold-target-$profile-$run')
+        proof_cold = _step_run_matching(job, 'cold-target-proof-$run')
+
+        for script, label in ((cold, 'Cargo'), (proof_cold, 'Kani')):
+            self.assertIn(
+                'rm -rf -- "$CARGO_TARGET_DIR"' if label == 'Cargo' else 'rm -rf -- "$proof_target"',
+                script,
+                f'the {label} cold target must be empty before the timed region',
+            )
+
+    def test_one_warm_up_is_discarded_per_phase(self) -> None:
+        """A measured first incremental build would include the initial compile."""
+        job = _job('build-budget')
+        warm_up = _step_run_matching(job, 'warm-target-$profile')
+
+        self.assertIn('rm -rf -- "$CARGO_TARGET_DIR"', warm_up, 'the warm phase must start from an empty target')
+        self.assertIn(
+            'Discard one warm-up Kani codegen',
+            '\n'.join(step.get('name', '') for step in job['steps']),
+            'the proof profile must discard its own warm-up',
+        )
+
+    def test_each_incremental_run_touches_its_own_crate_root(self) -> None:
+        """Touching another crate cannot make the measured profile rebuild."""
+        job = _job('build-budget')
+        incremental = _step_run_matching(job, 'incremental-$profile-$run')
+
+        self.assertIn('source_file=src/lib.rs', incremental, 'the facade profile must touch its own crate root')
+        self.assertIn(
+            'kernel_file=crates/combobulate-kernel/src/lib.rs',
+            incremental,
+            'the proof profile must touch the kernel, not the facade',
+        )
+        self.assertIn('git checkout -- "$source_file"', incremental, 'the touch must be reverted after timing')
+        self.assertIn('git checkout -- "$kernel_file"', incremental, 'the kernel touch must be reverted too')
+
+    def test_the_caching_policy_matches_the_control(self) -> None:
+        """A warm sccache or incremental compile would shorten every sample."""
+        environment = _job('build-budget')['env']
+
+        self.assertEqual(environment['CARGO_INCREMENTAL'], '0', 'incremental state must not shorten a run')
+        self.assertEqual(environment['CARGO_BUILD_JOBS'], '4', 'the measured parallelism must stay fixed')
+        self.assertNotIn('SCCACHE_RECACHE', environment, 'the control measures with no sccache at all')
+        self.assertIn(
+            'test -z "${RUSTC_WRAPPER-}"',
+            _step_run_matching(_job('build-budget'), 'RUSTC_WRAPPER'),
+            'the job must reject an inherited cache wrapper',
+        )
+
+    def test_the_proof_profile_runs_the_installed_driver_directly(self) -> None:
+        """The helper's `kani exec` refuses this repository's backend table."""
+        launcher = _step_run_matching(_job('build-budget'), 'kani-codegen')
+
+        self.assertIn('"$KANI_HOME/bin/kani-driver" kani --only-codegen', launcher, 'the launcher must invoke the installed driver')
+        self.assertIn('--manifest-path crates/combobulate-kernel/Cargo.toml', launcher, 'codegen must target the kernel')
+        self.assertIn('CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm"', launcher, 'the verifier needs its own backend')
+        self.assertIn('RUSTUP_TOOLCHAIN=', launcher, 'the driver needs the SDK toolchain it bundles')
+        self.assertNotIn('kani exec', launcher, 'the helper route cannot isolate the repository backend')
+
+    def test_the_launcher_sets_both_rustflags_spellings(self) -> None:
+        """Cargo prefers the encoded form, so setting only `RUSTFLAGS` is not enough.
+
+        ``CARGO_ENCODED_RUSTFLAGS`` wins over ``RUSTFLAGS`` whenever both are
+        set, which was confirmed against Cargo directly. A launcher that named
+        only the space-separated spelling would let an inherited encoded value
+        replace the warnings-as-errors policy while the launcher text still
+        looked correct, so the sample would measure a different compiler
+        configuration from the one the record describes.
+        """
+        launcher = _step_run_matching(_job('build-budget'), 'kani-codegen')
+
+        self.assertIn('RUSTFLAGS="-D warnings"', launcher, 'the shared spelling must carry the policy')
+        self.assertIn(
+            'CARGO_ENCODED_RUSTFLAGS="-D"$\'\\x1f\'"warnings"',
+            launcher,
+            'the encoded spelling must carry it too, or an inherited value wins',
+        )
+
+    def test_the_proof_phase_is_timed_not_merely_run(self) -> None:
+        """An untimed proof build supplies no sample to the median."""
+        job = _job('build-budget')
+        cold = _step_run_matching(job, 'cold-target-proof-$run')
+
+        self.assertIn('/usr/bin/time -v -o "$proof_output.time"', cold, 'the cold proof sample must be timed')
+        self.assertIn('build-budget/kani-codegen', cold, 'the cold proof sample must run the launcher')
+
+    def test_the_runner_metadata_the_record_requires_is_captured(self) -> None:
+        """The acceptance record cannot be written without the image identity."""
+        script = _step_run_matching(_job('build-budget'), 'setup-start')
+
+        for capture in ('nproc', 'free -b', '"$ImageOS" "$ImageVersion"'):
+            self.assertIn(capture, script, f'the job must record {capture}')
 
 
 class VerifierFreeJobTests(unittest.TestCase):
