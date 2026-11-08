@@ -237,6 +237,40 @@ Specification: parent plan lines 2322-2348.
   precondition rather than as a fact it could tolerate. `exist_ok=True` is the
   honest form; the alternative — letting the test assert absence — would make
   every committed record a test failure.
+- **The coverage ratchet caught a real regression the local gates could not.**
+  `357d9ef` moved the probe's error handling into a `map_err` closure in
+  `collected_height`; the probe's `collect` succeeds for every frame it builds,
+  so the closure never ran, and the existing error test constructed
+  `BackendProbeError` from a struct literal and so bypassed it too. Hosted
+  `build-test` failed the ratchet at `357d9ef` and at `5f53ed6` with 97.53 %
+  against a 100 % baseline. `make lint` and `make test` both passed throughout:
+  Clippy does not report unreachable-on-the-happy-path code, and the test that
+  "covered" the error path asserted on a value it had built itself. Only the
+  ratchet names the lines, so a green local suite is not evidence that a
+  refactor kept its coverage. The reproduction route above resolves the ratio
+  to the line, which is what made the two dead lines findable. The fix is
+  `BackendProbeError::from_polars`, an ordinary item the suite calls directly
+  with a hand-built `PolarsError::ComputeError`. Borrowing the error is what
+  `clippy::needless_pass_by_value` requires of a value that is only rendered. A
+  `From<PolarsError>` impl would have been the wrong shape twice over: it is
+  public API, so it would hand every embedder a route from a Polars type to the
+  facade's error, which is the leak DL-19 exists to prevent.
+- **Hosted lint now fails for a reason outside this branch.** The last green
+  run (`ad5945b`) and `abc95b8` both downloaded the rolling suite archive
+  `whitaker-lints-3a370bf`, where `libwhitaker_suite` is the only library. From
+  `2040787` the installer fetches `whitaker-lints-cfa208c`, which ships eleven
+  libraries, including a standalone `libstring_continuation_style` alongside
+  `libwhitaker_suite`. Both contain that lint's registration, so
+  `whitaker --all` loads it twice and rustc aborts with
+  `duplicate specification of lint string_continuation_style`. The failure
+  reproduces on a re-run at an identical installer pin (`0.2.11`), which rules
+  out a mid-publish race. It is upstream of this repository: the suite is a
+  rolling release and is deliberately never pinned
+  (`suite-version is refused`), so the archive cannot be selected by date. The
+  one repository-side lever, naming `--lib whitaker_suite` instead of `--all`,
+  would silently narrow the lint set to whichever crates the suite happens to
+  bundle, and that is the coverage the gate exists to provide. Recorded as a
+  known blocked gate rather than worked around by narrowing the lint set.
 - The pin sweep is load-bearing rather than decorative: on its first run it
   reported 15 tracked files that name a pin the record did not list. Every one
   was a genuine site — a manifest selecting the version, a lockfile resolving
