@@ -18,7 +18,7 @@
     "tools/verifier-fixtures/verus-wiring-probe/production/Cargo.toml": "ast-sha256:87fd584e1d1e735b421c9379a3e1bf6782581420543519d34a41a0db362f5039",
     "scripts/run_verifier_probes.py": "ast-sha256:9fc54a226e52d0cebc06088446213e01e4f47ac262a58d65a541f1bc96f67320",
     "scripts/verus_probe.py": "ast-sha256:d911305eb3692deb395b2d0a7d89b5578df01a5410b54a7596cba16b5ecd2781",
-    "scripts/probe_provenance.py": "ast-sha256:8bb16aa2bf68b204bd3866ed1395369b0bafff982849145d75c54462e6e44a27",
+    "scripts/probe_provenance.py": "ast-sha256:e55854154a04a208fbde5b53873e73ac22391b9d980f9af2486d75b7f801b973",
     "scripts/verifier_probe_support.py": "ast-sha256:c83ad05e1551afb73930c844772f6b6beaf1cca32c5a0618e2e8a861b4a557dc"
   },
   "observations": [

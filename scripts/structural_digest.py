@@ -184,3 +184,76 @@ def structural_digest(path: Path) -> str:
         # so a failing generator or test says which input and why.
         raise ValueError(f'cannot digest {path}: {error}') from error
     return PREFIX + hashlib.sha256(form.encode('utf-8')).hexdigest()
+
+
+def lint_tables_digest(manifest_text: str) -> str:
+    """Return the structural digest of a manifest's lint tables.
+
+    Only the ``[workspace.lints]`` and ``[lints]`` tables, parsed, are hashed,
+    so an unrelated dependency edit or a reformat leaves the digest alone.
+    """
+    document = tomllib.loads(manifest_text)
+    tables = {
+        'workspace.lints': document.get('workspace', {}).get('lints', {}),
+        'lints': document.get('lints', {}),
+    }
+    return PREFIX + hashlib.sha256(_canonical_json(tables).encode('utf-8')).hexdigest()
+
+
+def recorded_channel(command: list[str]) -> str | None:
+    """Return the toolchain channel a recorded container command selected.
+
+    The hosted record keeps the channel it built with as a ``RUSTUP_TOOLCHAIN=``
+    environment entry of its command; the digest map alone cannot name it.
+    """
+    for argument in command:
+        if argument.startswith('RUSTUP_TOOLCHAIN='):
+            return argument.removeprefix('RUSTUP_TOOLCHAIN=')
+    return None
+
+
+def _channel_only_drift(path: Path, expected: str, channel: str | None) -> bool:
+    """Return whether only ``toolchain.channel`` separates ``path`` from the record."""
+    if channel is None:
+        return False
+    document = tomllib.loads(path.read_text(encoding='utf-8'))
+    toolchain = document.get('toolchain')
+    if not isinstance(toolchain, dict) or 'channel' not in toolchain:
+        return False
+    toolchain['channel'] = channel
+    rebuilt = PREFIX + hashlib.sha256(_canonical_json(document).encode('utf-8')).hexdigest()
+    return rebuilt == expected
+
+
+def classify_drift(
+    root: Path, digests: dict[str, str], command: list[str]
+) -> tuple[list[str], str | None]:
+    """Split a record's digest mismatches into failures and a toolchain note.
+
+    A mismatch on ``rust-toolchain.toml`` that disappears when the file's
+    channel is set back to the recorded one is channel-only drift: it yields a
+    note, not a failure. Every other mismatch, including a toolchain change
+    beyond the channel, is a failure.
+
+    Returns the failing source names and the note (or ``None``).
+    """
+    failures: list[str] = []
+    note = None
+    for relative, expected in digests.items():
+        path = root / relative
+        if is_structural_digest(expected) and structural_digest(path) == expected:
+            continue
+        channel = recorded_channel(command)
+        if (
+            relative == 'rust-toolchain.toml'
+            and is_structural_digest(expected)
+            and _channel_only_drift(path, expected, channel)
+        ):
+            current = tomllib.loads(path.read_text(encoding='utf-8'))['toolchain']['channel']
+            note = (
+                f'Evidence captured for toolchain {channel}; '
+                f'evidence missing for the current pin {current}.'
+            )
+            continue
+        failures.append(relative)
+    return failures, note

@@ -1111,13 +1111,19 @@ A reformat or comment edit therefore leaves a record valid, while any change to
 a parsed token, including the toolchain channel, does not. A bare 64-digit hex
 value is a legacy byte digest and is rejected.
 
+The one soft case is the toolchain: when the only mismatch in a record is
+`rust-toolchain.toml`, and setting its `channel` back to the one the record
+built with (its `RUSTUP_TOOLCHAIN=` entry) reproduces the recorded digest, the
+digest test passes and prints a `::warning::` annotation naming both channels.
+A change to components or targets, or to any other input, still fails.
+
 Both provenance writers bind their inputs with `source_digests`. The Kani
 record covers the corpus manifest and lockfile, the harness sources, the
 harness and listing inventories, the probe modules that build and record the
 run, and `.cargo/config.toml`, because Cargo reads the repository's profile and
 target configuration during the corpus build. It additionally records
-`lint_tables_sha256`, the digest of the `[workspace.lints.*]` tables the
-`in_place` route copies into its scratch workspace. Binding the extracted
+`lint_tables_sha256`, the structural digest of the `[workspace.lints.*]` tables
+the `in_place` route copies into its scratch workspace. Binding the extracted
 tables rather than the whole root manifest keeps an unrelated dependency edit
 from forcing a recapture while still covering the lints the run applied. The
 Verus record covers the four candidate proof files, the shared production

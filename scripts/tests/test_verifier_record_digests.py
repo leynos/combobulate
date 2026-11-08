@@ -65,25 +65,35 @@ class SourceDigestTests(unittest.TestCase):
     """Require every digest a record carries to describe the current tree."""
 
     def test_recorded_source_digests_match_the_working_tree(self) -> None:
-        """Fail when a recorded source changed after its record was written."""
+        """Fail when a recorded source changed after its record was written.
+
+        Channel-only toolchain drift is the one exception: it passes with a
+        visible warning, because only a verifier recapture can close it.
+        """
         checked = 0
         for record_path, record in committed_record_documents():
-            for relative, expected in record.get('source_digests', {}).items():
+            digests = record.get('source_digests', {})
+            for relative, expected in digests.items():
+                self.assertTrue(
+                    _DIGEST.is_structural_digest(expected),
+                    f'{relative} carries a legacy byte digest; regenerate the '
+                    f'record so it carries an {_DIGEST.PREFIX} digest',
+                )
+            failures, note = _DIGEST.classify_drift(
+                ROOT, digests, record.get('command', [])
+            )
+            if note:
+                emit_toolchain_warning(note)
+            recipe = (
+                'make verus-probe'
+                if 'verus-wiring-probe' in str(record_path)
+                else 'make kani-log-corpus'
+            )
+            for relative in digests:
                 with self.subTest(record=str(record_path), source=relative):
-                    self.assertTrue(
-                        _DIGEST.is_structural_digest(expected),
-                        f'{relative} carries a legacy byte digest; regenerate the '
-                        f'record so it carries an {_DIGEST.PREFIX} digest',
-                    )
-                    actual = _DIGEST.structural_digest(ROOT / relative)
-                    recipe = (
-                        'make verus-probe'
-                        if 'verus-wiring-probe' in str(record_path)
-                        else 'make kani-log-corpus'
-                    )
-                    self.assertEqual(
-                        actual,
-                        expected,
+                    self.assertNotIn(
+                        relative,
+                        failures,
                         f'{relative} changed after {record_path.name} recorded it; '
                         f'regenerate the record with `{recipe}`',
                     )
@@ -92,6 +102,12 @@ class SourceDigestTests(unittest.TestCase):
         self.assertGreater(
             checked, 0, 'a committed record must bind at least one source'
         )
+
+
+def emit_toolchain_warning(note: str) -> None:
+    """Print a plain line and a GitHub warning annotation for toolchain drift."""
+    print(note)
+    print(f'::warning title=Verifier evidence behind the toolchain pin::{note}')
 
 
 class HostedRecordTests(unittest.TestCase):

@@ -171,6 +171,62 @@ class StructuralDigestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'cannot digest .*broken.toml'):
             DIGEST.structural_digest(path)
 
+    def drift(self, toolchain_now: str, other: str = 'a = 1\n'):
+        """Record against a recorded toolchain, then classify the current tree."""
+        recorded_toolchain = TOOLCHAIN
+        (self.directory / 'rust-toolchain.toml').write_text(recorded_toolchain)
+        (self.directory / 'other.toml').write_text('a = 1\n')
+        digests = {
+            name: DIGEST.structural_digest(self.directory / name)
+            for name in ('rust-toolchain.toml', 'other.toml')
+        }
+        (self.directory / 'rust-toolchain.toml').write_text(toolchain_now)
+        (self.directory / 'other.toml').write_text(other)
+        command = ['podman', 'RUSTUP_TOOLCHAIN=nightly-2026-08-27']
+        return DIGEST.classify_drift(self.directory, digests, command)
+
+    def test_channel_only_toolchain_drift_warns_and_passes(self) -> None:
+        """A bumped channel is a note naming both values, not a failure."""
+        failures, note = self.drift(TOOLCHAIN.replace('2026-08-27', '2026-09-30'))
+        self.assertEqual(failures, [], 'channel-only drift must not fail')
+        self.assertEqual(
+            note,
+            'Evidence captured for toolchain nightly-2026-08-27; '
+            'evidence missing for the current pin nightly-2026-09-30.',
+            'the note must name the recorded and current channels',
+        )
+
+    def test_another_input_changing_fails(self) -> None:
+        """Only the toolchain is soft; any other input still fails."""
+        failures, note = self.drift(TOOLCHAIN, other='a = 2\n')
+        self.assertEqual(failures, ['other.toml'], 'other input must fail')
+        self.assertIsNone(note, 'an unchanged toolchain needs no note')
+
+    def test_non_channel_toolchain_change_fails(self) -> None:
+        """Components or targets changing is a real change, even with a new channel."""
+        for changed in (
+            TOOLCHAIN.replace('"rustfmt"', '"rustfmt", "miri"'),
+            TOOLCHAIN.replace('2026-08-27', '2026-09-30').replace('"rustfmt"', '"miri"'),
+            TOOLCHAIN + 'targets = ["wasm32-unknown-unknown"]\n',
+        ):
+            with self.subTest(changed=changed):
+                failures, note = self.drift(changed)
+                self.assertEqual(failures, ['rust-toolchain.toml'], 'must fail')
+                self.assertIsNone(note, 'a failure must not be softened')
+
+    def test_lint_tables_digest_follows_the_tables_only(self) -> None:
+        """Dependency edits and layout leave the digest alone; a lint level moves it."""
+        base = '[workspace.lints.clippy]\nunwrap_used = "deny"\n[dependencies]\na = "1"\n'
+        same = '[dependencies]\na = "2"  # bumped\n\n[workspace.lints.clippy]\nunwrap_used   = "deny"\n'
+        self.assertEqual(
+            DIGEST.lint_tables_digest(base), DIGEST.lint_tables_digest(same), 'unrelated edit'
+        )
+        self.assertNotEqual(
+            DIGEST.lint_tables_digest(base),
+            DIGEST.lint_tables_digest(base.replace('"deny"', '"warn"')),
+            'lint level',
+        )
+
     def test_unknown_suffix_has_no_byte_fallback(self) -> None:
         """An unsupported file type is an error, never a byte hash."""
         path = self.directory / 'a.bin'

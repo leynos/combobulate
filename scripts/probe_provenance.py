@@ -11,16 +11,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from structural_digest import structural_digest
+from structural_digest import lint_tables_digest, structural_digest
 from verifier_probe_support import (
     KANI_SDK_TOOLCHAIN,
     ROOT,
     _digest,
-    _digest_text,
     _installation_toolchain,
     portable_argument,
     _require_command_statuses,
-    workspace_lint_tables,
 )
 
 Z3_DISTRIBUTION = "z3-solver==4.16.0.0"
@@ -136,8 +134,8 @@ def _write_kani_provenance(
         # scratch manifest. Binding the extracted tables rather than the whole
         # root manifest keeps an unrelated dependency edit from forcing a
         # recapture while still covering the lints the probe actually applied.
-        "lint_tables_sha256": _digest_text(
-            workspace_lint_tables((ROOT / "Cargo.toml").read_text())
+        "lint_tables_sha256": lint_tables_digest(
+            (ROOT / "Cargo.toml").read_text()
         ),
         "observations": observations,
     }
