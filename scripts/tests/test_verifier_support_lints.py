@@ -1,8 +1,13 @@
 """Guard the scratch workspace's lint tables against weaker inherited rules."""
 
+import tomllib
 import unittest
 
-from verifier_probe_loader import ROOT, load_verifier_probe_support
+from verifier_probe_loader import (
+    ROOT,
+    load_structural_digest,
+    load_verifier_probe_support,
+)
 
 
 class WorkspaceLintTableTests(unittest.TestCase):
@@ -34,8 +39,43 @@ class WorkspaceLintTableTests(unittest.TestCase):
 
         self.assertEqual(
             tables,
-            '[workspace.lints.rust]\nunsafe_code = "forbid"\n',
+            '[workspace.lints.rust]\nunsafe_code = "forbid"\n\n',
             'workspace lint tables must survive unchanged',
+        )
+
+    def test_a_header_with_a_trailing_comment_is_extracted_and_digested(self) -> None:
+        """The copy and the digest come from one parse, so they cannot disagree."""
+        digest = load_structural_digest()
+        plain = '[lints.clippy]\nlint = "deny"\n'
+        commented = '[lints.clippy]  # strict\nlint = "deny"  # never warn\n'
+        support = load_verifier_probe_support()
+
+        self.assertEqual(
+            support.workspace_lint_tables(commented),
+            support.workspace_lint_tables(plain),
+            'a comment on a header must not drop or alter the table',
+        )
+        self.assertEqual(
+            digest.lint_tables_digest(commented),
+            digest.lint_tables_digest(plain),
+            'the digest must see the same table as the copy',
+        )
+        self.assertNotEqual(
+            digest.lint_tables_digest(plain),
+            digest.lint_tables_digest(plain.replace('deny', 'warn')),
+            'a weakened lint must move the digest',
+        )
+
+    def test_the_repository_copy_parses_back_to_the_same_tables(self) -> None:
+        """Rendering must not change what the scratch workspace applies."""
+        manifest = (ROOT / 'Cargo.toml').read_text(encoding='utf-8')
+        copied = tomllib.loads(
+            load_verifier_probe_support().workspace_lint_tables(manifest)
+        )['workspace']['lints']
+        self.assertEqual(
+            copied,
+            load_structural_digest().lint_tables(manifest),
+            'the scratch tables must equal the parsed repository tables',
         )
 
     def test_missing_lint_table_is_reported(self) -> None:

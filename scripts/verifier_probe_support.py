@@ -10,9 +10,9 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
-import re
 
 from rust_prover_tools.commands import CommandSpec, run_command
+from structural_digest import lint_tables, render_lint_tables
 from rust_prover_tools.versions import parse_tool_version
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,10 +24,6 @@ OUTPUT = ROOT / "scripts/tests/fixtures/kani_logs"
 # and recorded in the provenance: a pin bump must move both values together,
 # and the record then shows which SDK actually compiled the harnesses.
 KANI_SDK_TOOLCHAIN = "nightly-2025-11-21"
-LINT_TABLE = re.compile(
-    r"(?m)^\[(?:workspace\.)?lints\.(?P<name>[A-Za-z0-9_-]+)\]\n"
-    r"(?P<body>(?:(?!^\[)[^\n]*\n?)*)"
-)
 
 
 def workspace_lint_tables(manifest: str) -> str:
@@ -57,13 +53,7 @@ def workspace_lint_tables(manifest: str) -> str:
     RuntimeError
         When the manifest defines no lint table at all.
     """
-    tables = [
-        f"[workspace.lints.{match.group('name')}]\n{match.group('body')}"
-        for match in LINT_TABLE.finditer(manifest)
-    ]
-    if not tables:
-        raise RuntimeError("the root manifest must define at least one lint table")
-    return "".join(tables)
+    return render_lint_tables(lint_tables(manifest))
 
 
 def _digest(path: Path) -> str:

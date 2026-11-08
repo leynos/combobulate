@@ -1,6 +1,8 @@
 """Bind every committed verifier record to the sources it claims to describe.
 
-A digest map is only evidence while it still matches the tree. Two directions
+A digest map is only evidence while it still matches the tree. Digests are
+structural (see ``structural_digest``), so a reformat or a comment edit does
+not break a record but a real change to a parsed input does. Two directions
 are checked here: a record must carry digests for the inputs its verdict
 depends on, and every digest it does carry must still match the working tree.
 The second direction is what makes a stale record fail loudly instead of
@@ -18,16 +20,22 @@ For example::
 
 from __future__ import annotations
 
-import hashlib
 import json
+import subprocess
+import sys
+import tempfile
 import unittest
+import warnings
+from pathlib import Path
 
-from verifier_probe_loader import ROOT, load_verifier_free_probe
+from verifier_probe_loader import ROOT, load_structural_digest, load_verifier_free_probe
 from verifier_records import committed_record_documents
 
 # The staged set is the staging function's own answer, so the record can only
 # be compared with what the generator copies rather than a second list here.
 staged_sources = load_verifier_free_probe().staged_sources
+
+_DIGEST = load_structural_digest()
 
 HOSTED_RECORD = (
     'tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json'
@@ -62,20 +70,35 @@ class SourceDigestTests(unittest.TestCase):
     """Require every digest a record carries to describe the current tree."""
 
     def test_recorded_source_digests_match_the_working_tree(self) -> None:
-        """Fail when a recorded source changed after its record was written."""
+        """Fail when a recorded source changed after its record was written.
+
+        Channel-only toolchain drift is the one exception: it passes with a
+        visible warning, because only a verifier recapture can close it.
+        """
         checked = 0
         for record_path, record in committed_record_documents():
-            for relative, expected in record.get('source_digests', {}).items():
+            digests = record.get('source_digests', {})
+            for relative, expected in digests.items():
+                self.assertTrue(
+                    _DIGEST.is_structural_digest(expected),
+                    f'{relative} carries a legacy byte digest; regenerate the '
+                    f'record so it carries an {_DIGEST.PREFIX} digest',
+                )
+            failures, note = _DIGEST.classify_drift(
+                ROOT, digests, record.get('command', [])
+            )
+            if note:
+                emit_toolchain_warning(note)
+            recipe = (
+                'make verus-probe'
+                if 'verus-wiring-probe' in str(record_path)
+                else 'make kani-log-corpus'
+            )
+            for relative in digests:
                 with self.subTest(record=str(record_path), source=relative):
-                    actual = hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
-                    recipe = (
-                        'make verus-probe'
-                        if 'verus-wiring-probe' in str(record_path)
-                        else 'make kani-log-corpus'
-                    )
-                    self.assertEqual(
-                        actual,
-                        expected,
+                    self.assertNotIn(
+                        relative,
+                        failures,
                         f'{relative} changed after {record_path.name} recorded it; '
                         f'regenerate the record with `{recipe}`',
                     )
@@ -84,6 +107,37 @@ class SourceDigestTests(unittest.TestCase):
         self.assertGreater(
             checked, 0, 'a committed record must bind at least one source'
         )
+
+
+def emit_toolchain_warning(note: str) -> None:
+    """Print a plain line and a GitHub warning annotation for toolchain drift."""
+    print(note)
+    print(f'::warning title=Verifier evidence behind the toolchain pin::{note}')
+    # pytest captures the prints of a passing test, so also raise a warning,
+    # which both runners show in their summaries.
+    warnings.warn(note, stacklevel=2)
+
+
+class ToolchainWarningVisibilityTests(unittest.TestCase):
+    """The drift warning must reach the output of both runners."""
+
+    def test_pytest_shows_the_warning_for_a_passing_test(self) -> None:
+        """A standalone pytest run must not swallow the drift note."""
+        here = Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory() as directory:
+            probe = Path(directory) / 'test_probe.py'
+            probe.write_text(
+                f'import sys\nsys.path.insert(0, {str(here)!r})\n'
+                'from test_verifier_record_digests import emit_toolchain_warning\n'
+                'def test_it():\n    emit_toolchain_warning("NOTE-FOR-TEST")\n',
+                encoding='utf-8',
+            )
+            result = subprocess.run(
+                [sys.executable, '-m', 'pytest', '-q', '-p', 'no:cacheprovider', str(probe)],
+                capture_output=True, text=True, check=False, cwd=directory,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('NOTE-FOR-TEST', result.stdout, 'pytest must display the note')
 
 
 class HostedRecordTests(unittest.TestCase):

@@ -6,3 +6,5 @@ PyYAML==6.0.3
 wenmode==0.15.2
 cyclopts==5.2.0
 pytest==9.1.1
+tree-sitter==0.25.2
+tree-sitter-rust==0.24.2

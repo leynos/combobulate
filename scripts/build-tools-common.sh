@@ -75,18 +75,28 @@ mold_version() { read_pin "$MOLD_VERSION_FILE"; }
 pinned_toolchain() {
   local file=$RUST_TOOLCHAIN_FILE value
   [ -f "$file" ] || fail "missing version pin: $file"
-  value=$(awk -F'"' '/^[[:space:]]*channel[[:space:]]*=/ { print $2; exit }' "$file")
+  value=$(python3 -c '
+import sys, tomllib
+with open(sys.argv[1], "rb") as handle:
+    channel = tomllib.load(handle).get("toolchain", {}).get("channel", "")
+print(channel if isinstance(channel, str) else "")
+' "$file") || fail "cannot parse toolchain pin: $file"
   [ -n "$value" ] || fail "no channel found in: $file"
   printf '%s' "$value"
 }
 
-# Read the component list from the same rustup pin used by Cargo. This file
-# has one quoted component per line; reject an empty list rather than passing
+# Read the component list from the same rustup pin used by Cargo, parsed as
+# TOML (the verifier-record digest reads the file the same way), so layout and
+# comments cannot change the answer. Reject an empty list rather than passing
 # a bare compiler installation off as a complete development toolchain.
 pinned_components() {
   local file=$RUST_TOOLCHAIN_FILE components
   [ -f "$file" ] || fail "missing toolchain pin: $file"
-  components=$(awk -F '"' '/^[[:space:]]*"[^"]+",?[[:space:]]*$/ { print $2 }' "$file")
+  components=$(python3 -c '
+import sys, tomllib
+with open(sys.argv[1], "rb") as handle:
+    print("\n".join(tomllib.load(handle).get("toolchain", {}).get("components", [])))
+' "$file") || fail "cannot parse toolchain pin: $file"
   [ -n "$components" ] || fail "no components found in: $file"
   printf '%s\n' "$components"
 }

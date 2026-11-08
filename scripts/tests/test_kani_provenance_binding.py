@@ -6,12 +6,12 @@ scripts, and to record the child toolchain that compiled the harnesses, so a
 premature record cannot pass as bound evidence.
 """
 
-import hashlib
 import json
 import unittest
 
 from verifier_probe_loader import (
     ROOT,
+    load_structural_digest,
     load_verifier_probe_support,
 )
 
@@ -71,13 +71,13 @@ class KaniSourceBindingTests(unittest.TestCase):
         weakened lint could pass while the record keeps describing the old
         boundary.
         """
-        support = load_verifier_probe_support()
         path = ROOT / 'scripts/tests/fixtures/kani_logs/provenance.json'
         record = json.loads(path.read_text(encoding='utf-8'))
-        tables = support.workspace_lint_tables((ROOT / 'Cargo.toml').read_text())
 
         self.assertEqual(
             record.get('lint_tables_sha256'),
-            hashlib.sha256(tables.encode('utf-8')).hexdigest(),
+            load_structural_digest().lint_tables_digest(
+                (ROOT / 'Cargo.toml').read_text(encoding='utf-8')
+            ),
             'the record must bind the lint tables the scratch workspace applied',
         )

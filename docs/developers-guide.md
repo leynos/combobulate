@@ -380,10 +380,11 @@ without diagnostic messages and rejects direct process-environment readers,
 iterators, and mutation functions. Warnings fail documentation, lint, test, and
 doctest gates.
 
-Run `make install-build-tools` after checking out the project. On native x86_64
-GNU Linux, it installs the pinned `mold` release and verifies its archive
-against `tools/mold/SHA256SUMS`, and installs the repository's pinned nightly
-with its required components, including rust-analyzer. On x86_64 GNU Linux,
+Run `make install-build-tools` after checking out the project (it needs
+`python3` 3.11 or later, for `tomllib`). On native x86_64 GNU Linux, it
+installs the pinned `mold` release and verifies its archive against
+`tools/mold/SHA256SUMS`, and installs the repository's pinned nightly with its
+required components, including rust-analyzer. On x86_64 GNU Linux,
 `make check-build-tools` asks Clang which `ld.mold` it will execute, checks its
 link plan and version against `tools/mold/VERSION`, and fails if Clang selects
 a different executable. It also checks that the nightly and every pinned
@@ -1101,13 +1102,29 @@ the digest binds the log and not the metadata, that edit leaves the evidence
 valid. The provenance test scans every committed fixture record and fails on
 any remaining account home.
 
+Each `source_digests` value is a structural digest, written `ast-sha256:<hex>`
+by `scripts/structural_digest.py`, which the writers and the digest test share.
+It hashes the parsed input rather than its bytes: TOML and JSON as canonical
+JSON, Python as its `ast` dump, and Rust as its tree-sitter syntax tree with
+plain comments dropped and doc comments kept. Shell and `VERSION` files have no
+parser here, so their comment-only and blank lines are dropped before hashing.
+A reformat or comment edit therefore leaves a record valid, while any change to
+a parsed token, including the toolchain channel, does not. A bare 64-digit hex
+value is a legacy byte digest and is rejected.
+
+The one soft case is the toolchain: when the only mismatch in a record is
+`rust-toolchain.toml`, and setting its `channel` back to the one the record
+built with (its `RUSTUP_TOOLCHAIN=` entry) reproduces the recorded digest, the
+digest test passes and prints a `::warning::` annotation naming both channels.
+A change to components or targets, or to any other input, still fails.
+
 Both provenance writers bind their inputs with `source_digests`. The Kani
 record covers the corpus manifest and lockfile, the harness sources, the
 harness and listing inventories, the probe modules that build and record the
 run, and `.cargo/config.toml`, because Cargo reads the repository's profile and
 target configuration during the corpus build. It additionally records
-`lint_tables_sha256`, the digest of the `[workspace.lints.*]` tables the
-`in_place` route copies into its scratch workspace. Binding the extracted
+`lint_tables_sha256`, the structural digest of the `[workspace.lints.*]` tables
+the `in_place` route copies into its scratch workspace. Binding the extracted
 tables rather than the whole root manifest keeps an unrelated dependency edit
 from forcing a recapture while still covering the lints the run applied. The
 Verus record covers the four candidate proof files, the shared production
