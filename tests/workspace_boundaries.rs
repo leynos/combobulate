@@ -29,31 +29,31 @@ use metadata::{FACADE, KERNEL, MACROS, Metadata};
 /// inherited `CARGO_BUILD_TARGET` would silently resolve a different target
 /// than the one under test, and inherited flags would make the recorded graph
 /// depend on how the suite happened to be invoked.
-fn configure_cargo(command: &mut Command) {
-    command.current_dir(env!("CARGO_MANIFEST_DIR"));
-    for name in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
-        command.env_remove(name);
-    }
-}
-
-/// Builds a Cargo child with the caller's build selectors removed.
-fn cargo_command(arguments: &[&str]) -> Command {
+///
+/// Every live read is offline: the suite never reaches the network, and a cold
+/// cache fails with the recovery message below rather than fetching mid-test.
+fn live_cargo(arguments: &[&str]) -> Command {
     let mut command = Command::new(env!("CARGO"));
-    command.args(arguments);
-    configure_cargo(&mut command);
+    command
+        .args(arguments)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env("CARGO_NET_OFFLINE", "true")
+        .env_remove("RUSTFLAGS")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("CARGO_BUILD_TARGET");
     command
 }
 
-/// Builds the `cargo fetch` invocation that populates every target's packages.
+/// The `cargo fetch` arguments that populate every target's packages.
 ///
-/// The suite no longer runs this; `make prepare-dependencies` does. The
-/// contract below still pins its shape, so the preparation step and the
-/// offline checks cannot drift apart.
+/// The suite never runs this; `make prepare-dependencies` does. The contract
+/// below still pins its shape, so the preparation step and the offline checks
+/// cannot drift apart.
 ///
 /// `--target` takes a target triple, not `all`, so it must not appear here:
 /// a plain `cargo fetch --locked` already resolves the whole lockfile graph,
 /// including the platform packages that `cargo tree --target all` reads.
-fn fetch_command() -> Command { cargo_command(&["fetch", "--locked"]) }
+const FETCH_ARGUMENTS: [&str; 2] = ["fetch", "--locked"];
 
 /// Returns the `cargo tree` argv for a package and edge selection.
 ///
@@ -66,7 +66,7 @@ fn tree_arguments<'a>(arguments: &'a [&'a str]) -> Vec<&'a str> {
 }
 
 /// Builds the `cargo tree` invocation for a package and edge selection.
-fn tree_command(arguments: &[&str]) -> Command { cargo_command(&tree_arguments(arguments)) }
+fn tree_command(arguments: &[&str]) -> Command { live_cargo(&tree_arguments(arguments)) }
 
 /// Explains how to recover when the offline tree cannot resolve a package.
 ///
@@ -90,10 +90,7 @@ fn offline_recovery(detail: &str) -> String {
 
 /// Runs a live Cargo read; under nextest, nextest bounds the test that calls it.
 fn run_read(arguments: &[&str]) -> Result<Output, Box<dyn Error>> {
-    let mut command = Command::new(env!("CARGO"));
-    command.args(arguments);
-    configure_cargo(&mut command);
-    Ok(command.output()?)
+    Ok(live_cargo(arguments).output()?)
 }
 
 /// Runs `cargo metadata --no-deps` against the live workspace.
@@ -135,7 +132,7 @@ fn live_tree(arguments: &[&str]) -> Result<String, Box<dyn Error>> {
 
 /// Contract: the live checks stay lockfile-pinned, offline, and flag-neutral.
 ///
-/// No caller build selector survives into either child, and the fetch that
+/// No caller build selector survives into the live child, and the fetch that
 /// makes the offline tree calls resolvable is stated here so it cannot drift
 /// away from the Make preparation step that actually runs it.
 #[test]
@@ -152,9 +149,9 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
         );
     }
 
-    let fetch_arguments: Vec<String> = fetch_command()
-        .get_args()
-        .map(|argument| argument.to_string_lossy().into_owned())
+    let fetch_arguments: Vec<String> = FETCH_ARGUMENTS
+        .iter()
+        .map(|argument| (*argument).to_owned())
         .collect();
     assert!(
         fetch_arguments
@@ -170,18 +167,16 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
          target's packages: {fetch_arguments:?}"
     );
 
-    for command in [tree, fetch_command()] {
-        let cleared: Vec<String> = command
-            .get_envs()
-            .filter(|(_, value)| value.is_none())
-            .map(|(name, _)| name.to_string_lossy().into_owned())
-            .collect();
-        for expected in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
-            assert!(
-                cleared.iter().any(|name| name == expected),
-                "{expected} must not reach the Cargo child: {cleared:?}"
-            );
-        }
+    let cleared: Vec<String> = tree
+        .get_envs()
+        .filter(|(_, value)| value.is_none())
+        .map(|(name, _)| name.to_string_lossy().into_owned())
+        .collect();
+    for expected in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
+        assert!(
+            cleared.iter().any(|name| name == expected),
+            "{expected} must not reach the Cargo child: {cleared:?}"
+        );
     }
 }
 
