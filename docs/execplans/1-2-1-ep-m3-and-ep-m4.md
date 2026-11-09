@@ -883,7 +883,7 @@ tests the artisan deliberately wrote.
 Hosted CI ran three Makefile-contract tests red that pass locally. The cause
 was not the contracts: each hosted job exports `GATE_PROFILE` for the single
 profile it was scheduled to measure, and every probe shelled out to a child
-`make` without neutralising it. The Makefile honours the inherited value, so an
+`make` without neutralizing it. The Makefile honours the inherited value, so an
 asserted two-profile route collapsed to one — `9` recorded executors became
 `7`, and `nextest run --all-targets --no-default-features` became
 `nextest run --all-targets`. nextest cancels the remaining tests after a first
@@ -907,7 +907,7 @@ exported route; together they cover both. The regression in
 `tests/make_gate_order.rs` injects each route separately and was confirmed to
 fail with the pin removed, so it tests the defect rather than passing vacuously.
 
-The lesson generalises past `GATE_PROFILE`: a contract probe that shells out to
+The lesson generalizes past `GATE_PROFILE`: a contract probe that shells out to
 a build tool inherits whatever the measuring job exported, so the probe must
 state the routing it assumes rather than accept the caller's. A local pass is
 not evidence about the hosted route for this class of test.
