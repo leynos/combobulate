@@ -220,3 +220,71 @@ fn act_setup_preserves_cranelift_defaults() {
         "Act Rust setup must leave Cargo's defaults active"
     );
 }
+
+/// The cache write mode that permits a save, and the one that forbids it.
+const WRITE_MODE: &str = "${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}";
+
+/// `coverage-main.yml` may save only from `main`, including on dispatch.
+///
+/// The workflow declares `workflow_dispatch` beside its main-only push filter,
+/// and a dispatch may select any branch. An earlier revision set `READ_WRITE`
+/// outright on the reasoning that the workflow ran only on pushes to `main`,
+/// which its own trigger list contradicted. The mode is therefore tested from
+/// the ref: `main` writes, and every other ref reads without saving.
+#[test]
+fn coverage_main_saves_only_from_main() {
+    let document = parse_workflow(MAIN).expect("parse the coverage workflow");
+    assert_eq!(
+        string(
+            &document,
+            &["jobs", "coverage-upload", "env", "SCCACHE_GHA_RW_MODE"]
+        ),
+        Some(WRITE_MODE),
+        "coverage-main.yml must select its cache mode from the ref, so a dispatch from a branch \
+         cannot save"
+    );
+}
+
+/// A dropped, unconditional, or event-keyed mode must each fail the contract.
+#[test]
+fn coverage_main_cache_mutations_break_the_contract() {
+    for (reason, mutated) in [
+        (
+            "cache write mode dropped",
+            MAIN.replace(&format!("      SCCACHE_GHA_RW_MODE: {WRITE_MODE}\n"), ""),
+        ),
+        (
+            "cache writes unconditionally",
+            MAIN.replace(WRITE_MODE, "READ_WRITE"),
+        ),
+        (
+            // The round-2 spelling: a branch dispatch reads as eligible.
+            "cache mode keyed on the event",
+            MAIN.replace(
+                "github.ref == 'refs/heads/main'",
+                "github.event_name == 'push'",
+            ),
+        ),
+    ] {
+        assert_ne!(mutated, MAIN, "mutation must change source: {reason}");
+        assert!(
+            !coverage_main_saves_from_main_only(&mutated),
+            "contract must detect {reason}"
+        );
+    }
+}
+
+/// Re-checks the mode condition after a mutation, without re-reading the file.
+fn coverage_main_saves_from_main_only(source: &str) -> bool {
+    parse_workflow(source)
+        .ok()
+        .and_then(|document| {
+            string(
+                &document,
+                &["jobs", "coverage-upload", "env", "SCCACHE_GHA_RW_MODE"],
+            )
+            .map(str::to_owned)
+        })
+        .as_deref()
+        == Some(WRITE_MODE)
+}
