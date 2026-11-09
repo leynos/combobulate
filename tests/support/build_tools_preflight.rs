@@ -18,6 +18,21 @@ use cap_std::{
 type Read<T> = Result<T, Box<dyn Error>>;
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// Reads the pinned toolchain channel from `rust-toolchain.toml`.
+pub(super) fn pinned_channel() -> Read<String> {
+    let root = Dir::open_ambient_dir(
+        Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
+        ambient_authority(),
+    )?;
+    let document: toml::Value = toml::from_str(&root.read_to_string("rust-toolchain.toml")?)?;
+    let channel = document
+        .get("toolchain")
+        .and_then(|toolchain| toolchain.get("channel"))
+        .and_then(toml::Value::as_str)
+        .ok_or("toolchain channel must be a string")?;
+    Ok(channel.to_owned())
+}
+
 /// Owns fake build tools in a private scratch directory.
 pub(super) struct ToolFixture {
     parent: Dir,
@@ -46,7 +61,7 @@ impl ToolFixture {
         )?;
         directory.write(
             "toolchains",
-            "nightly-2026-08-27-x86_64-unknown-linux-gnu (default)\n",
+            format!("{}-x86_64-unknown-linux-gnu (default)\n", pinned_channel()?),
         )?;
         directory.create_dir("bin")?;
         directory.write(

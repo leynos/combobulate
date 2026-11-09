@@ -80,14 +80,14 @@ pub(super) fn package_names(metadata: &Metadata) -> Vec<String> {
 /// the kernel-isolation claim VO-1 asks for.
 pub(super) fn kernel_dependency_names(metadata: &Metadata) -> Vec<String> {
     package(metadata, KERNEL)
-        .map(|kernel| {
+        .into_iter()
+        .flat_map(|kernel| {
             kernel
                 .dependencies
                 .iter()
                 .map(|dependency| dependency.name.clone())
-                .collect()
         })
-        .unwrap_or_default()
+        .collect()
 }
 
 /// Reports backend dependencies the kernel declares.
