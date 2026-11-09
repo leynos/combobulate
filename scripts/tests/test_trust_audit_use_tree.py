@@ -36,7 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from docs_validation.trust_audit.matcher import scan
 from docs_validation.trust_audit.lexer import tokenize
 from docs_validation.trust_audit.use_tree import (
-    alias_bindings, statement_end, use_alias, use_aliases, use_root,
+    alias_bindings, statement_end, use_alias, use_aliases, use_root, use_roots,
 )
 
 
@@ -205,6 +205,65 @@ class AliasReadingAgreesBetweenItsForms(unittest.TestCase):
                                  f'{statement!r} must bind exactly k')
                 self.assertEqual(use_alias(tokens, 1, end), 'k',
                                  f'{statement!r} must report k to the single-name reader')
+
+
+class AGroupedRootListKeepsEveryRoot(unittest.TestCase):
+    """Require each crate of a brace-rooted import to be read with its alias.
+
+    ``use {std::mem, kani as k};`` is two imports. Reading only the leading
+    identifier made the alias disappear whenever another crate came first, and
+    ``use {kani as k, std::mem};`` still worked — an answer that depended on
+    member order rather than on the source. Both orders are asserted together
+    so a future first-root shortcut fails here instead of silently narrowing
+    the audit.
+    """
+
+    def test_the_reader_reports_each_root_and_its_own_alias(self):
+        """Require both orders of the same import to report the same bindings."""
+        for statement in ('use {std::mem, kani as k};',
+                          'use {kani as k, std::mem};'):
+            with self.subTest(statement=statement):
+                self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                                 frozenset({'kani', 'k'}),
+                                 f'{statement!r} must bind k regardless of member order')
+
+    def test_a_grouped_root_without_an_alias_is_still_a_root(self):
+        """Require the unaliased grouping to name its root for rule (iii)."""
+        tokens = tokenize('use {std::mem, kani};')
+        self.assertEqual(use_roots(tokens, 1, statement_end(tokens, 1)),
+                         (('std', None), ('kani', None)),
+                         'an unaliased grouped import must still report every root')
+
+    def test_a_nested_self_alias_renames_the_crate(self):
+        """Require `{kani::{self as k}, ..}` not to be read as a crate named self."""
+        self.assertEqual(alias_bindings(tokenize('use {kani::{self as k}, std::mem};'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a nested grouped self alias must rename kani')
+
+    def test_a_grouped_member_alias_beside_a_root_alias_renames_only_the_root(self):
+        """Keep a member rename from becoming a second crate name."""
+        tokens = tokenize('use {kani::{assume as a}, std::mem};')
+        self.assertEqual(alias_bindings(tokens, 'kani'), frozenset({'kani'}),
+                         'a nested member rename must not rename the crate')
+
+    def test_a_grouped_import_makes_a_qualified_path_trust(self):
+        """Report `k::assume` when kani is the second root of a grouped import."""
+        self.assertEqual(
+            [item.item for item in scan('use {std::mem, kani as k};\nfn f() { k::assume(x); }').items],
+            ['assume'],
+            'a grouped crate alias must reach rule (i) whatever its position')
+
+    def test_a_grouped_import_enables_the_bare_use_rule(self):
+        """Require `kani` to count as imported when it is not the leading root.
+
+        Rule (iii) is gated on the file importing from a trust root. Reading
+        only the first identifier left the set empty here, so a bare
+        vocabulary word was never reported and the file looked trust-free.
+        """
+        reported = scan('use {std::mem, kani};\nfn f() { assume(x); }').items
+        self.assertEqual([item.item for item in reported], ['assume'],
+                         'a grouped import must enable rule (iii) for its root')
+
 
     def test_a_statement_with_no_crate_alias_reports_none_through_both(self):
         """Require both readers to stay silent on a member-only rename."""

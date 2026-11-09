@@ -57,10 +57,86 @@ def alias_bindings(tokens: tuple[Token, ...], root: str) -> frozenset[str]:
         if token.kind is not Kind.IDENT or token.text != 'use':
             continue
         end = statement_end(tokens, index + 1)
-        if use_root(tokens, index + 1) != root:
-            continue
-        names.update(use_aliases(tokens, index + 1, end))
+        aliases = [alias for named, alias in use_roots(tokens, index + 1, end) if named == root]
+        names.update(alias for alias in aliases if alias is not None)
     return frozenset(names)
+
+
+def use_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tuple[str, str | None], ...]:
+    """Return every crate a ``use`` statement takes paths from, and its alias.
+
+    One statement can name several crates. ``use {std::mem, kani as k};`` is the
+    same pair of imports as two statements, and each half carries its own alias,
+    so a reader that reported a single root lost ``k`` entirely: with ``std``
+    first, ``k::assume`` was never matched and the audit described a file as
+    trust-free while it assumed exactly what the vocabulary names. Taking the
+    first identifier also made the answer depend on member order, and
+    ``use {kani as k, std::mem};`` *was* read correctly — which is what showed
+    the first-root rule was a defect rather than a stated limitation.
+
+    A statement that *starts* with a brace names several roots; one that starts
+    with an identifier names one root, and any later brace lists that root's
+    members. The two forms are separate because only the first can rename the
+    crate away from the statement's leading word.
+
+    Examples
+    --------
+    >>> use_roots(tokenize('use kani as k;'), 1, 5)
+    (('kani', 'k'),)
+    >>> use_roots(tokenize('use {std::mem, kani as k};'), 1, 10)
+    (('std', None), ('kani', 'k'))
+    """
+    if _is_grouped(tokens, start, end):
+        return _grouped_roots(tokens, start, end)
+    root = use_root(tokens, start)
+    if root is None:
+        return ()
+    return ((root, use_alias(tokens, start, end)),)
+
+
+def _is_grouped(tokens: tuple[Token, ...], start: int, end: int) -> bool:
+    """Report whether the statement opens with a brace of roots.
+
+    A leading ``::`` is path syntax rather than a root, so it is stepped over
+    before asking what the statement starts with.
+    """
+    index = start
+    while index < end and tokens[index].text == '::':
+        index += 1
+    return index < end and tokens[index].text == '{'
+
+
+def _grouped_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tuple[str, str | None], ...]:
+    """Read each top-level member of ``use {..}`` as its own rooted path."""
+    roots = []
+    for member_start, member_end in _top_level_members(tokens, start, end):
+        root = use_root(tokens, member_start)
+        if root is not None:
+            roots.append((root, use_alias(tokens, member_start, member_end)))
+    return tuple(roots)
+
+
+def _top_level_members(tokens: tuple[Token, ...], start: int, end: int) -> Iterator[tuple[int, int]]:
+    """Yield the token span of each comma-separated member inside the brace.
+
+    Only depth 1 splits: a nested ``use {kani::{assume, self as k}, std};`` must
+    keep ``kani::`` together, and splitting on every comma would read ``self``
+    as a crate named ``self``.
+    """
+    depth = 0
+    member_start = None
+    for index in range(start, end):
+        text = tokens[index].text
+        if text == '{':
+            depth += 1
+            member_start = index + 1 if depth == 1 else member_start
+        elif text == '}':
+            if depth == 1 and member_start is not None:
+                yield member_start, index
+            depth -= 1
+        elif text == ',' and depth == 1 and member_start is not None:
+            yield member_start, index
+            member_start = index + 1
 
 
 def use_aliases(tokens: tuple[Token, ...], start: int, end: int) -> frozenset[str]:
@@ -120,7 +196,10 @@ def _renames_crate(tokens: tuple[Token, ...], start: int, as_index: int) -> bool
     if target < start or tokens[target].kind is not Kind.IDENT:
         return False
     if tokens[target].text == 'self':
-        return True
+        # In a whole statement, bare `self` is invalid at the root and only
+        # appears as `root::{self as name}`. A member span begins *after* its
+        # opening brace, so `self` first there is the grouped-spelling root.
+        return target > start or tokens[start - 1].text == '::'
     return _is_root_reference(tokens, start, target)
 
 
@@ -157,9 +236,15 @@ def use_root(tokens: tuple[Token, ...], start: int) -> str | None:
 
     A leading ``::`` means an absolute path, so the root is the first identifier
     after it. Anything else is the first identifier in the statement.
+
+    A leading ``{`` is a group rather than a root, so it is not read as one:
+    ``use {std::mem, kani};`` is two paths and neither is named ``std`` alone —
+    :func:`use_roots` splits it before this function is asked about a member.
     """
     for index in range(start, statement_end(tokens, start)):
         token = tokens[index]
+        if token.text == '{':
+            continue
         if token.kind is Kind.IDENT:
             return token.text
     return None

@@ -116,6 +116,22 @@ class ConfinementViolations(ScratchFacade):
         with self.assertRaises(AssertionError):
             self.run_check()
 
+    def test_a_grouped_root_list_hides_no_aliased_polars_path(self) -> None:
+        """A brace-rooted import must not launder an alias by ordering.
+
+        ``use {std::mem, polars as p};`` binds ``p`` exactly as the ungrouped
+        spelling does. Resolving through a reader that reported only the
+        statement's first identifier made this pass while
+        ``use {polars as p, std::mem};`` failed — the control depended on
+        member order rather than on the source.
+        """
+        for statement in ('use {std::mem, polars as p};',
+                          'use {polars as p, std::mem};'):
+            with self.subTest(statement=statement):
+                self.write('src/profile.rs', f'{statement}\nfn f() -> p::Series {{ }}\n')
+                with self.assertRaises(AssertionError):
+                    self.run_check()
+
     def test_an_alias_of_a_member_is_not_the_crate(self) -> None:
         """A rename below the root binds a name, not the crate.
 

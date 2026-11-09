@@ -48,7 +48,7 @@ from .structure import (
     previous_closer,
     skip_visibility,
 )
-from .use_tree import alias_bindings, use_root
+from .use_tree import alias_bindings, statement_end, use_roots
 
 # ADR-0009 plus DL-17's stated additions. `any_where` is Kani's own assumption
 # surface; the Verus list gains the three forms DL-17 names.
@@ -281,15 +281,20 @@ def _is_bare_use(tokens: tuple[Token, ...], index: int) -> bool:
 
 
 def _imported_roots(tokens: tuple[Token, ...]) -> frozenset[str]:
-    """Return the trust roots this file imports from a ``use`` tree."""
+    """Return the trust roots this file imports from a ``use`` tree.
+
+    Every root of every statement counts, not just its leading word.
+    ``use {std::mem, kani};`` imports ``kani`` as surely as the ungrouped form
+    does, and reading only the first identifier would leave it out — which
+    quietly disables rule (iii) for that file.
+    """
     roots = set()
     for index, token in enumerate(tokens):
         if token.kind is not Kind.IDENT or token.text != 'use':
             continue
-        root = use_root(tokens, index + 1)
-        if root in TRUST_ROOTS:
-            roots.add(root)
-    return frozenset(roots)
+        end = statement_end(tokens, index + 1)
+        roots.update(root for root, _ in use_roots(tokens, index + 1, end))
+    return frozenset(roots & TRUST_ROOTS)
 
 
 def _verus_regions(tokens: tuple[Token, ...]) -> tuple[tuple[int, int], ...]:
