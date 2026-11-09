@@ -45,7 +45,7 @@
         0.25
       ],
       "median": 0.25,
-      "notes": "Run cold, native-only profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each measured 485671 bytes by `du -sb` apparent size. The earlier record (2026-11-08) omits sizes, though its artefact in run 42435047681 reports 485632, so the two differ by 39 bytes of metadata rather than matching; apparent size is not a content hash either way. The first sample includes a cold filesystem and is retained rather than discarded; the median is the third of the five sorted samples, 0.25 s, and that first sample alone rose from 0.61 s."
+      "notes": "Run cold, native-only profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each measured 485671 bytes by `du -sb` apparent size. The earlier record (2026-11-08) omits sizes, though its artefact in run 42435047681 reports 485632, so the two differ by 39 bytes of apparent size rather than matching. These figures do not identify what accounts for the difference, and apparent size is not a content hash either way. The first sample includes a cold filesystem and is retained rather than discarded; the median is the third of the five sorted samples, 0.25 s, and that first sample alone rose from 0.61 s."
     },
     {
       "id": "polars-cold",
@@ -61,7 +61,7 @@
         50.5
       ],
       "median": 50.15,
-      "notes": "Run cold, polars-enabled profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each measured 826044445 bytes by `du -sb` apparent size, identical across the five runs. The earlier record (2026-11-08) omits sizes, though its artefact in run 42435047681 reports 826044432, so the two differ by 13 bytes of metadata rather than matching; apparent size is not a content hash either way."
+      "notes": "Run cold, polars-enabled profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each measured 826044445 bytes by `du -sb` apparent size, identical across the five runs. The earlier record (2026-11-08) omits sizes, though its artefact in run 42435047681 reports 826044432, so the two differ by 13 bytes of apparent size rather than matching. These figures do not identify what accounts for the difference, and apparent size is not a content hash either way."
     },
     {
       "id": "proof-cold",

@@ -1549,7 +1549,11 @@ the cache's own report of itself:
 
 ```json
 {"stats":{"compile_requests":1493,"compilations":1039,"cache_writes":0,
- "cache_write_errors":1039,"cache_misses":{"Rust":828},"cache_hits":{}},
+  "cache_write_errors":1039,
+  "cache_misses":{"counts":{"Assembler":5,"Rust":828,"C/C++":206},
+                  "adv_counts":{"c [gcc]":206,"rust":828,
+                                "assemblerToPreprocess [gcc]":5}},
+  "cache_hits":{"counts":{},"adv_counts":{}}},
  "effective_cache_mode":"ReadOnly"}
 ```
 
@@ -1561,11 +1565,13 @@ references, the read-only wrapper's `put` returns
 `Ok` increments `cache_writes`. Distinguishing "no attempts" from "no
 successes" matters here, because only the latter is what the mode guarantees.
 
-It does not prove a successful *hit*. The same report has 828 Rust cache misses
-and an empty `cache_hits` map, so every lookup missed: the read path was
-exercised and found nothing, which is different from not being exercised. The
-GHA cache held no entry for these compilation keys. `polars-test` and
-`polars-lint` report the same `ReadOnly` mode independently.
+It does not prove a successful *hit*. Both counters nest a `counts` map:
+`cache_hits.counts` is empty and `cache_misses.counts` holds 828 Rust, 206
+C/C++ and 5 assembler entries, which sum to exactly the 1,039 compilations.
+Every compilation looked the cache up and missed, so the read path was
+exercised and found nothing — different from not being exercised. The GHA cache
+held no entry for these compilation keys. `polars-test` and `polars-lint`
+report the same `ReadOnly` mode independently.
 
 Two limits on this evidence, because they matter for reuse:
 
