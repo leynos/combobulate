@@ -1319,3 +1319,64 @@ declared trigger without enumerating them: `refs/heads/main` writes, everything
 else reads. The contract gains a mutation that swaps the ref test for the event
 test, so returning to the round-2 spelling fails rather than silently
 reintroducing the gap.
+
+## Round 4: what the repair held and what it still dropped
+
+Both findings in this round sit at the same two seams the earlier rounds
+touched, one increment further out. One of them was mine to prove rather than
+accept: the observation about cache writes had no stated cause, so I traced it.
+
+### Every alias of a renamed crate — fixed
+
+`use_roots` reported one alias per root, because it called `use_alias`, which
+returns the first. Rust binds every one, and I compiled the shape before
+changing the reader:
+
+```rust
+use std::{self as first, self as second};
+
+fn main() {
+    let _: Option<first::fmt::Arguments> = None;
+    let _: Option<second::fmt::Arguments> = None;
+}
+```
+
+That builds under `rustc --edition 2024`, and both names resolve. So
+`use kani::{self as first, self as second};` followed by `second::assume` is a
+trust path the round-3 reader reported clean.
+
+`use_roots` and `_grouped_roots` now emit one `(root, alias)` pair per alias,
+falling back to `(root, None)` when a statement binds no alias at all. The
+deliberate rejection of *member* renames is untouched:
+`use kani::{assume as a};` still binds no crate alias, which `use_aliases`
+continues to pin.
+
+### The coverage workflow's cache mode — fixed
+
+The round-3 contract covered `ci.yml` only. `coverage-main.yml` sets the same
+mode and had no test, so a later edit could have dropped or weakened it with
+every gate still green. `coverage_backend_workflows` now pins the value and
+fails three mutations: the variable removed, a literal `READ_WRITE`, and the
+ref test replaced by the event test.
+
+### The unverified cache-write observation
+
+The assessment reported `build-test` and `polars-lint` as `ReadOnly` with zero
+cache writes and fifteen cache-write errors each, and said the cause was not
+verified. I read the run rather than the summary. Both jobs show
+`"effective_cache_mode":"ReadOnly"`, `"cache_misses":{"Rust":15}`,
+`"cache_write_errors":15`, `"cache_writes":0`, `"cache_errors":0` and
+`"compile_fails":0`.
+
+The fifteens are the same fifteen, and `sccache` makes the pairing structural
+rather than incidental. At v0.19.0 the read-only wrapper refuses the write
+locally — `ReadOnlyStorage::put` returns
+`Err("Cannot write to read-only storage")` (`src/cache/readonly.rs:40-42`)
+without contacting the backend — and the server's accounting increments
+`cache_write_errors` on every `Err` while only an `Ok` increments `cache_writes`
+(`src/server.rs:1731-1748`). One cacheable miss therefore yields exactly one
+write error, by construction. The counter that would move for a genuine backend
+fault is `cache_errors`, and it is zero; no compilation failed either. The mode
+is doing what DL-03 declares, and the number is bookkeeping rather than a fault.
+`build-test` shows the same shape independently, which is what rules out an
+accident of one job.
