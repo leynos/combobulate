@@ -132,6 +132,21 @@ class ConfinementViolations(ScratchFacade):
                 with self.assertRaises(AssertionError):
                     self.run_check()
 
+    def test_a_nested_root_group_hides_no_aliased_polars_path(self) -> None:
+        """A group inside a group must not launder the alias either.
+
+        ``use {{polars as p}};`` compiles and binds ``p``. Reading one root per
+        outer member found whatever identifier came first and lost the alias,
+        so the confinement control reported a file as clean while it held a
+        Polars path.
+        """
+        for statement in ('use {{std::mem, polars as p}};',
+                          'use {{polars as p}};'):
+            with self.subTest(statement=statement):
+                self.write('src/profile.rs', f'{statement}\nfn f() -> p::Series {{ }}\n')
+                with self.assertRaises(AssertionError):
+                    self.run_check()
+
     def test_an_alias_of_a_member_is_not_the_crate(self) -> None:
         """A rename below the root binds a name, not the crate.
 

@@ -264,6 +264,38 @@ class AGroupedRootListKeepsEveryRoot(unittest.TestCase):
         self.assertEqual([item.item for item in reported], ['assume'],
                          'a grouped import must enable rule (iii) for its root')
 
+    def test_a_nested_root_group_still_reports_every_root(self):
+        """Require a group inside a group to be read as the same set of roots.
+
+        The Rust reference permits nested use trees, and
+        `use {{std::mem, kani as k}};` compiles: it is the flat pair one brace
+        deeper. Reading one root per outer member found `std` and stopped, so
+        `k::assume` was unreported again — the same defect one level down,
+        which is why each member is asked what form it is rather than assumed
+        to be a path.
+        """
+        for statement in ('use {{std::mem, kani as k}};',
+                          'use {{{kani as k}}};'):
+            with self.subTest(statement=statement):
+                self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                                 frozenset({'kani', 'k'}),
+                                 f'{statement!r} must bind k at any nesting depth')
+
+    def test_a_nested_root_group_reaches_the_qualified_path_rule(self):
+        """Require a doubly-braced import to make `k::assume` reach rule (i)."""
+        self.assertEqual(
+            [item.item for item in
+             scan('use {{std::mem, kani as k}};\nfn f() { k::assume(x); }').items],
+            ['assume'],
+            'a nested root group must not hide its crate from the audit')
+
+    def test_a_nested_root_group_without_an_alias_is_still_a_root(self):
+        """Require the unaliased nested spelling to name its root for rule (iii)."""
+        tokens = tokenize('use {{std::mem, kani}};')
+        self.assertEqual(use_roots(tokens, 1, statement_end(tokens, 1)),
+                         (('std', None), ('kani', None)),
+                         'a nested unaliased group must still report every root')
+
 
     def test_a_statement_with_no_crate_alias_reports_none_through_both(self):
         """Require both readers to stay silent on a member-only rename."""

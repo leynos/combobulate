@@ -79,11 +79,16 @@ def use_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tuple[st
     members. The two forms are separate because only the first can rename the
     crate away from the statement's leading word.
 
+    Groups nest, so a member may itself be a brace list. The answer is the same
+    set of roots however deeply the braces are nested.
+
     Examples
     --------
     >>> use_roots(tokenize('use kani as k;'), 1, 5)
     (('kani', 'k'),)
     >>> use_roots(tokenize('use {std::mem, kani as k};'), 1, 10)
+    (('std', None), ('kani', 'k'))
+    >>> use_roots(tokenize('use {{std::mem, kani as k}};'), 1, 12)
     (('std', None), ('kani', 'k'))
     """
     if _is_grouped(tokens, start, end):
@@ -107,9 +112,19 @@ def _is_grouped(tokens: tuple[Token, ...], start: int, end: int) -> bool:
 
 
 def _grouped_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tuple[str, str | None], ...]:
-    """Read each top-level member of ``use {..}`` as its own rooted path."""
+    """Read each top-level member of ``use {..}`` as its own rooted path.
+
+    A member can itself be a group. The reference permits nested use trees, so
+    ``use {{std::mem, kani as k}};`` is the same two imports one brace deeper
+    than a flat list. Reading one root per member found ``std`` there and lost
+    ``kani``, which hid ``k::assume`` again; recursing keeps every crate and
+    its alias at any depth.
+    """
     roots = []
     for member_start, member_end in _top_level_members(tokens, start, end):
+        if _is_grouped(tokens, member_start, member_end):
+            roots.extend(_grouped_roots(tokens, member_start, member_end))
+            continue
         root = use_root(tokens, member_start)
         if root is not None:
             roots.append((root, use_alias(tokens, member_start, member_end)))
