@@ -96,7 +96,7 @@ def use_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tuple[st
     root = use_root(tokens, start)
     if root is None:
         return ()
-    return ((root, use_alias(tokens, start, end)),)
+    return tuple((root, alias) for alias in use_aliases(tokens, start, end)) or ((root, None),)
 
 
 def _is_grouped(tokens: tuple[Token, ...], start: int, end: int) -> bool:
@@ -119,6 +119,11 @@ def _grouped_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tup
     than a flat list. Reading one root per member found ``std`` there and lost
     ``kani``, which hid ``k::assume`` again; recursing keeps every crate and
     its alias at any depth.
+
+    A crate may also be renamed more than once, as in
+    ``use kani::{self as first, self as second};``, which binds both names.
+    Each alias is reported as its own pair, so a reader that kept only the
+    first would drop ``second`` and miss ``second::assume``.
     """
     roots = []
     for member_start, member_end in _top_level_members(tokens, start, end):
@@ -126,8 +131,10 @@ def _grouped_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tup
             roots.extend(_grouped_roots(tokens, member_start, member_end))
             continue
         root = use_root(tokens, member_start)
-        if root is not None:
-            roots.append((root, use_alias(tokens, member_start, member_end)))
+        if root is None:
+            continue
+        aliases = use_aliases(tokens, member_start, member_end)
+        roots.extend((root, alias) for alias in aliases or (None,))
     return tuple(roots)
 
 

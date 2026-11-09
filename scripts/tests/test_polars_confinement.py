@@ -147,6 +147,21 @@ class ConfinementViolations(ScratchFacade):
                 with self.assertRaises(AssertionError):
                     self.run_check()
 
+    def test_a_crate_renamed_twice_hides_no_aliased_polars_path(self) -> None:
+        """Both names a Polars import binds must reach the confinement check.
+
+        ``use polars::{self as first, self as second};`` compiles and binds both.
+        A reader that kept one alias per crate reported the file as clean while
+        ``second::Series`` was a Polars path.
+        """
+        for statement in ('use polars::{self as first, self as second};',
+                          'use {polars::{self as first, self as second}, std};'):
+            with self.subTest(statement=statement):
+                self.write('src/profile.rs',
+                           f'{statement}\nfn f() -> second::Series {{ }}\n')
+                with self.assertRaises(AssertionError):
+                    self.run_check()
+
     def test_an_alias_of_a_member_is_not_the_crate(self) -> None:
         """A rename below the root binds a name, not the crate.
 

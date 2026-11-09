@@ -206,6 +206,15 @@ class AliasReadingAgreesBetweenItsForms(unittest.TestCase):
                 self.assertEqual(use_alias(tokens, 1, end), 'k',
                                  f'{statement!r} must report k to the single-name reader')
 
+    def test_a_statement_with_no_crate_alias_reports_none_through_both(self):
+        """Require both readers to stay silent on a member-only rename."""
+        tokens = tokenize('use kani::{assume as a};')
+        end = statement_end(tokens, 1)
+        self.assertEqual(use_aliases(tokens, 1, end), frozenset(),
+                         'a member rename must bind no crate alias')
+        self.assertIsNone(use_alias(tokens, 1, end),
+                          'the single-name reader must not report a member rename')
+
 
 class AGroupedRootListKeepsEveryRoot(unittest.TestCase):
     """Require each crate of a brace-rooted import to be read with its alias.
@@ -296,15 +305,34 @@ class AGroupedRootListKeepsEveryRoot(unittest.TestCase):
                          (('std', None), ('kani', None)),
                          'a nested unaliased group must still report every root')
 
+    def test_a_crate_renamed_twice_keeps_both_names(self):
+        """Require both aliases of one crate to reach the matcher.
 
-    def test_a_statement_with_no_crate_alias_reports_none_through_both(self):
-        """Require both readers to stay silent on a member-only rename."""
-        tokens = tokenize('use kani::{assume as a};')
-        end = statement_end(tokens, 1)
-        self.assertEqual(use_aliases(tokens, 1, end), frozenset(),
-                         'a member rename must bind no crate alias')
-        self.assertIsNone(use_alias(tokens, 1, end),
-                          'the single-name reader must not report a member rename')
+        `use kani::{self as first, self as second};` compiles and binds both
+        names. A reader that reported one alias per crate kept `first` and
+        dropped `second`, so `second::assume` was unreported — the file looked
+        trust-free while it assumed what the vocabulary names.
+        """
+        statement = 'use kani::{self as first, self as second};'
+        self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                         frozenset({'kani', 'first', 'second'}),
+                         'a crate renamed twice must bind both names')
+
+    def test_a_crate_renamed_twice_reaches_the_qualified_path_rule(self):
+        """Require the second alias to make `second::assume` reach rule (i)."""
+        self.assertEqual(
+            [item.item for item in scan(
+                'use kani::{self as first, self as second};\n'
+                'fn f() { second::assume(x); }').items],
+            ['assume'],
+            'the second alias of a crate must not be dropped')
+
+    def test_a_grouped_crate_renamed_twice_keeps_both_names(self):
+        """Require both renames inside a grouped root to be reported."""
+        statement = 'use {kani::{self as a, self as b}, std};'
+        self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                         frozenset({'kani', 'a', 'b'}),
+                         'a grouped crate renamed twice must bind both names')
 
 
 if __name__ == '__main__':
