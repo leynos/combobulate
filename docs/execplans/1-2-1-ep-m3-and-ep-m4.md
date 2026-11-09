@@ -1192,13 +1192,12 @@ is worth keeping: the first native-cold sample rose from 0.61 s to 1.10 s. That
 sample is the cold-filesystem one, so the medians are the comparison the budget
 uses and the samples are not.
 
-The earlier record carries no target-size field at all, so nothing in this
-repository supports a claim that the new sizes match it. The new artefact
-records 485671 bytes for the native cold target and 826044445 for Polars, and
-those are stated for what they are: `du -sb` apparent sizes within this run,
-not a comparison with the 2026-11-08 measurement. They are also not a content
-hash, so equal sizes across runs would not prove an identical build even if an
-earlier figure existed to compare against. `build-environment` recorded an empty
+The earlier *record* carries no target-size field at all. Its *artefact* does:
+run 42435047681 reports 485632 bytes for the native cold target and 826044432
+for Polars. The new artefact reports 485671 and 826044445, so the sizes are
+close but not equal — 39 and 13 bytes apart. Whether that is metadata drift or
+a different build is not settled by these numbers, because `du -sb` reports
+apparent size and not a content hash. `build-environment` recorded an empty
 `RUSTC_WRAPPER` and `CARGO_INCREMENTAL=0`, so `build-budget` still measured
 with no cache.
 
@@ -1550,14 +1549,22 @@ the cache's own report of itself:
 
 ```json
 {"stats":{"compile_requests":1493,"compilations":1039,"cache_writes":0,
- "cache_write_errors":1039,"effective_cache_mode":"ReadOnly"}}
+ "cache_write_errors":1039,"cache_misses":{"Rust":828},"cache_hits":{}},
+ "effective_cache_mode":"ReadOnly"}
 ```
 
-So 1,039 compilations produced zero writes, and sccache attempted none — the
-1,039 write errors are the read-only mode refusing them, not failures. That is
-the behaviour DL-03 promises, measured by the cache rather than restated from
-its configuration. It does not prove a successful *hit*: the same JSON reports
-zero cache hits, so the read path was not exercised here. `polars-test` and
+So 1,039 compilations produced zero successful writes. The 1,039 write errors
+are writes that were attempted and rejected, not writes that were never tried:
+as "The unverified cache-write observation" above sets out with source
+references, the read-only wrapper's `put` returns
+`Cannot write to read-only storage` without contacting the backend, and only an
+`Ok` increments `cache_writes`. Distinguishing "no attempts" from "no
+successes" matters here, because only the latter is what the mode guarantees.
+
+It does not prove a successful *hit*. The same report has 828 Rust cache misses
+and an empty `cache_hits` map, so every lookup missed: the read path was
+exercised and found nothing, which is different from not being exercised. The
+GHA cache held no entry for these compilation keys. `polars-test` and
 `polars-lint` report the same `ReadOnly` mode independently.
 
 Two limits on this evidence, because they matter for reuse:
@@ -1580,11 +1587,14 @@ Two limits on this evidence, because they matter for reuse:
   why the evidence survives.
 - This run is **not** an AC-07 observation and must not be entered as one.
   AC-07's frozen workload is "every required pull-request job in
-  `.github/workflows/ci.yml`" over the sample "every pull request", and this is
-  a `workflow_dispatch` from a branch. An earlier revision of this section
-  called the cancellation a "failed AC-07 timing observation", which was wrong:
-  the run is outside the registered scope, so it says nothing about AC-07 in
-  either direction.
+  `.github/workflows/ci.yml`", and its registered sample is "the 20 most
+  recently started workflow runs on `main` and pull requests, each contributing
+  its longest required job, including every rerun and conclusion". Both halves
+  of that sample matter: runs on `main` count, and reruns of every conclusion
+  count. This run is a `workflow_dispatch` from a branch, so it is in neither
+  half. An earlier revision of this section called the cancellation a "failed
+  AC-07 timing observation", which was wrong: the run is outside the registered
+  scope, so it says nothing about AC-07 in either direction.
 
 What the stall left unverified, and its state now:
 
@@ -1594,8 +1604,9 @@ What the stall left unverified, and its state now:
   `check-fmt` clean, `markdownlint` 0 issues, `spelling` clean, `scripts/tests`
   1174 passed with 2596 subtests, and `check_docs` exit 0.
 - The read-only direction of DL-03 is observed: sccache reported
-  `effective_cache_mode: ReadOnly` with 1,039 compilations and zero writes. See
-  "DL-03's read-only direction is now observed, not inferred" above.
+  `effective_cache_mode: ReadOnly` with 1,039 compilations, 1,039 rejected
+  write attempts and zero successful writes. See "DL-03's read-only direction
+  is now observed, not inferred" above.
 - The main-writes direction of DL-03 cannot be observed before merge in any
   case, because `main` does not carry the ref expression yet.
 - AC-04's re-measurement (run 42650004173, dispatched at `9835151`) completed
