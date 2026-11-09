@@ -1267,3 +1267,55 @@ One constraint shaped where the switch lives: `profile-measurements.yml` asserts
 That lane must keep neither a wrapper nor a cache backend, so the switch
 belongs to the three gate jobs in `ci.yml` and to `coverage-main.yml`, never to
 the measurement workflows.
+
+## Round 3: the same defects one level down
+
+The third assessment accepted both round-2 repairs and found the same two
+shapes again, each one step further out. Both were real. The first was
+established by compiling the source rather than reasoning about it; the second
+by reading the triggers against the comment that described them.
+
+### Nested root groups
+
+The Rust reference permits a use tree inside a use tree, so
+`use {{std::mem, kani as k}};` is the flat pair one brace deeper. I compiled it
+to be sure rather than trusting the reference:
+
+```rust
+use {{std::mem, std::fmt as f}};
+
+fn main() {
+    let _ = mem::size_of::<u8>();
+    let _: Option<f::Arguments> = None;
+}
+```
+
+That builds with `rustc --edition 2024`, so the syntax is real source a
+repository can contain. The round-2 reader took one root from each *outer*
+member and stopped, so the nested form reported `std` and lost `kani` again —
+the same defect the round-2 repair had just removed, one level down.
+
+`_grouped_roots` now asks each member what form it is and recurses when the
+member is itself a group, so depth no longer changes the answer. Three deep,
+mixed with a flat sibling, and the nested `self as k` spelling all report the
+same roots. The regressions cover the reader and both consumers, and were run
+against the pre-fix code to confirm they fail there.
+
+### A dispatch was not a pull request
+
+`coverage-main.yml` declared `workflow_dispatch` beside its main-only `push`
+filter while setting `READ_WRITE` unconditionally, and its own comment claimed
+the workflow "runs only on pushes to `main`" — which the dispatch contradicted
+sixteen lines above. A dispatch may select any branch, so a branch run could
+write.
+
+The same hole existed in `ci.yml`, which the assessment did not name: it also
+declares `workflow_dispatch`, and its round-2 test keyed on
+`github.event_name == 'push'`. A dispatch there reads as "not a pull request"
+and gets `READ_WRITE`.
+
+Both now key on `github.ref`, which is the only test that holds across every
+declared trigger without enumerating them: `refs/heads/main` writes, everything
+else reads. The contract gains a mutation that swaps the ref test for the event
+test, so returning to the round-2 spelling fails rather than silently
+reintroducing the gap.

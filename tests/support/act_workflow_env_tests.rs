@@ -63,6 +63,11 @@ fn workflow_environment_mutations_break_the_contract() {
 /// And saves are permitted only on `main`, which sccache expresses as a read
 /// mode that defaults to `READ_WRITE`. Each failure is invisible in a green job,
 /// so each gets its own mutation.
+///
+/// The save test keys on the ref rather than the event because both workflows
+/// also declare `workflow_dispatch`, which may run from any branch. An event
+/// test would read a branch dispatch as "not a pull request" and let it write,
+/// so that regression has its own case.
 fn cache_mutations_break_the_contract() {
     for (reason, changed) in [
         (
@@ -79,16 +84,26 @@ fn cache_mutations_break_the_contract() {
         (
             "pull requests save to the cache",
             CI_WORKFLOW.replace(
-                "'push' && 'READ_WRITE' || 'READ_ONLY'",
+                "'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY'",
                 "true && 'READ_WRITE'",
             ),
         ),
         (
             "cache write mode dropped",
             CI_WORKFLOW.replace(
-                "      SCCACHE_GHA_RW_MODE: ${{ github.event_name == 'push' && 'READ_WRITE' || \
-                 'READ_ONLY' }}\n",
+                "      SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' \
+                 || 'READ_ONLY' }}\n",
                 "",
+            ),
+        ),
+        (
+            // `workflow_dispatch` is declared beside `pull_request`, so an
+            // event test that only guards pull requests would let a branch
+            // dispatch write.
+            "a dispatch may save from a branch",
+            CI_WORKFLOW.replace(
+                "github.ref == 'refs/heads/main'",
+                "github.event_name == 'push'",
             ),
         ),
         (

@@ -105,7 +105,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("SCCACHE_GHA_ENABLED", "true"),
             (
                 "SCCACHE_GHA_RW_MODE",
-                "${{ github.event_name == 'push' && 'READ_WRITE' || 'READ_ONLY' }}",
+                "${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}",
             ),
         ],
     },
@@ -138,7 +138,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("SCCACHE_GHA_ENABLED", "true"),
             (
                 "SCCACHE_GHA_RW_MODE",
-                "${{ github.event_name == 'push' && 'READ_WRITE' || 'READ_ONLY' }}",
+                "${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}",
             ),
         ],
     },
@@ -167,7 +167,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("SCCACHE_GHA_ENABLED", "true"),
             (
                 "SCCACHE_GHA_RW_MODE",
-                "${{ github.event_name == 'push' && 'READ_WRITE' || 'READ_ONLY' }}",
+                "${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}",
             ),
         ],
     },

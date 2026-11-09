@@ -100,18 +100,21 @@ rustc command line, so an instrumented object never shares a cache key with an
 uninstrumented one.
 
 DL-03 allows cache saves only on `main`, which is a policy the backend has no
-default for: `sccache` writes unless `SCCACHE_GHA_RW_MODE` says otherwise. The
-three `ci.yml` jobs therefore set it from the event, taking `READ_WRITE` on a
-push and `READ_ONLY` on a pull request, while `coverage-main.yml` states
-`READ_WRITE` outright because that workflow runs only on `main`. Leaving the
-default cost something measurable: cache entries are scoped to the ref that
-wrote them, so a pull request's entries sit under `refs/pull/N/merge`, which no
-later run of the branch reads once that ref advances. One pull request had
-written 1.02 GB that way against 154 MB on `main`, in a repository whose whole
-cache budget is 10 GB. The mode requires sccache 0.16.0 or later; the hosted
-action installs 0.19.0. `profile-measurements.yml` is deliberately excluded —
-AC-04 measures with no cache at all, and its `build-budget` job asserts that
-`RUSTC_WRAPPER` is unset before the timed loop.
+default for: `sccache` writes unless `SCCACHE_GHA_RW_MODE` says otherwise.
+Every hosted job that compiles therefore sets it, and the test is the ref
+rather than the event: both `ci.yml` and `coverage-main.yml` also declare
+`workflow_dispatch`, which may run from any branch, so an event test would read
+a branch dispatch as eligible and let it write. Keying on `github.ref` gives
+`READ_WRITE` to `refs/heads/main` alone and `READ_ONLY` everywhere else, which
+holds for every declared trigger without enumerating them. Leaving the default
+cost something measurable: cache entries are scoped to the ref that wrote them,
+so a pull request's entries sit under `refs/pull/N/merge`, which no later run
+of the branch reads once that ref advances. One pull request had written 1.02
+GB that way against 154 MB on `main`, in a repository whose whole cache budget
+is 10 GB. The mode requires sccache 0.16.0 or later; the hosted action installs
+0.19.0. `profile-measurements.yml` is deliberately excluded — AC-04 measures
+with no cache at all, and its `build-budget` job asserts that `RUSTC_WRAPPER`
+is unset before the timed loop.
 
 Table-driven contract regressions use the `rstest` dev dependency with its
 optional asynchronous-timeout and crate-renaming features disabled. Private

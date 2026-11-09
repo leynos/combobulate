@@ -51,11 +51,14 @@ jobs:
       # compiles through to disk and shares nothing with the pull-request lane,
       # which is the half of the clause that makes main's cache reachable there.
       SCCACHE_GHA_ENABLED: "true"
-      # This workflow runs only on pushes to `main`, which is the one ref
-      # DL-03 permits to save, so it states the write explicitly rather than
-      # relying on sccache's default. The pull-request jobs in `ci.yml` set
-      # READ_ONLY instead.
-      SCCACHE_GHA_RW_MODE: READ_WRITE
+      # The push trigger is main-only, but `workflow_dispatch` is not: a
+      # dispatch may run from any branch, so the ref decides the mode rather
+      # than the workflow name. DL-03 permits saves on `main` alone, and
+      # sccache writes unless told otherwise, so a non-main dispatch states
+      # `READ_ONLY` and reads what main wrote without adding entries under
+      # `refs/heads/<branch>`. The pull-request jobs in `ci.yml` key on the
+      # event because a pull-request run cannot be on `main`.
+      SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
