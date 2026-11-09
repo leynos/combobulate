@@ -88,6 +88,7 @@
         "docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md",
         "docs/decision-register.md#d16",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
         "scripts/docs_validation/toolchain_profiles.py",
         "scripts/docs_validation/polars_confinement.py",
         "scripts/docs_validation/trust_audit_check.py",

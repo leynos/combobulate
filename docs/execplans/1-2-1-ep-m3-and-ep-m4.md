@@ -1174,13 +1174,36 @@ it, and it was not run: the lane is reserved, takes about 90 minutes, and its
 result would replace a record `check_measurement_binding` currently accepts.
 Recorded so the inference is visible rather than mistaken for proof.
 
-**Open decision: AC-04 closure.** Two facts settle what closing this needs. The
-recorded run is `workflow_dispatch` 42435047681 on this branch at `5f53ed6`, so
-a re-measurement is the same operation and not a new lane. And
+**Decision taken: AC-04 is closed by a re-measurement.** The choices were to
+accept the inference above or to measure the candidate, and the second was
+chosen because the first asks the record to stand for a build it never
+described. The recorded run is `workflow_dispatch` 42435047681 on this branch at
+`5f53ed6`, so re-measuring is the same operation and not a new lane.
 `check_measurement_binding` validates the runner, hardware, toolchains and
-dates but never a revision, so the record binds to a build of a revision this
-branch does not contain while the task tick cites it. The omission is the
-upstream weakness; two options close it:
+dates but never a revision, so the old record bound to a revision this branch
+does not contain while the task tick cited it.
+
+The measurement was taken as run 42650004173 on `9835151` and transcribed to
+`spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. Every sample
+improved or held: native cold median 0.26 s against a recorded 0.30 s, Polars
+cold median 50.15 s against a recorded 65.08 s, and the four incremental and
+proof medians inside 0.06 s of their predecessors. The cold native and Polars
+targets were byte-identical to the earlier record's, so the workload is the
+same build. `build-environment` recorded an empty `RUSTC_WRAPPER` and
+`CARGO_INCREMENTAL=0`, so `build-budget` still measured with no cache.
+
+`build-budget` succeeded; the run's overall conclusion is `failure` because
+`measure-profile (whitaker)` failed in `install-whitaker`. That job is not one
+AC-04 registers, and the failure is in a pinned shared action rather than in
+this repository.
+
+The superseded record is retained rather than deleted: it is a dated
+measurement of a real run, and `spec/toolchain-profiles.json` still cites it
+for the pins it verifies. The new record is added beside it in the pin sites
+that it also satisfies and in `spec/task-completion.json`.
+
+**The decision as originally posed.** For the record, the two closing options
+were:
 
 1. Accept the documented inference. The record then stands as measured at
    `5f53ed6` and the tick cites an inference, which is what this section says
@@ -1189,9 +1212,9 @@ upstream weakness; two options close it:
    `build-budget` artefact into a new record the way `3b0e976` produced the
    current one, and replace the binding.
 
-The owner chooses, because option 1 accepts a budget on an inference while
-option 2 spends a reserved lane. Neither changes the code under review, which
-is why this is recorded here rather than blocking a technical finding.
+The owner would have chosen, because option 1 accepts a budget on an inference
+while option 2 spends a reserved lane; neither changes the code under review.
+Option 2 was taken as recorded above.
 
 One weakness is real and deliberately left for its own change. The
 `RUSTC_WRAPPER` assertion sits before the `setup-rust` step rather than after
@@ -1465,6 +1488,8 @@ What this leaves unverified, and what verifies it once runners return:
   record.
 - The main-writes direction of DL-03 cannot be observed before merge in any
   case, because `main` does not carry the ref expression yet.
-- AC-04's re-measurement (run 42650004173, dispatched at `9835151`) is queued,
-  so the medians at this candidate are still unmeasured. They are the last
-  acceptance evidence this PR needs.
+- AC-04's re-measurement (run 42650004173, dispatched at `9835151`) completed
+  once runners returned, and its `build-budget` artefact is transcribed into
+  `spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. So the last
+  acceptance evidence this PR needed is in hand; what the stall delayed was the
+  measurement, not its verdict.
