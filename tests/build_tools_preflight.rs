@@ -206,11 +206,12 @@ fn preflight_matches_preview_components_by_their_installed_aliases() {
 #[test]
 fn preflight_rejects_a_prefixed_but_different_toolchain() {
     let fixture = ToolFixture::new().expect("create fake build tools");
+    let channel = support::pinned_channel().expect("read the pinned channel");
     fixture
         .directory
         .write(
             "toolchains",
-            "nightly-2026-08-27-extra-x86_64-unknown-linux-gnu\n",
+            format!("{channel}-extra-x86_64-unknown-linux-gnu\n"),
         )
         .expect("replace the exact toolchain with a prefixed neighbour");
     let output = fixture
@@ -222,7 +223,7 @@ fn preflight_rejects_a_prefixed_but_different_toolchain() {
         "a prefixed neighbour must not satisfy the pinned toolchain"
     );
     assert!(
-        stderr.contains("toolchain nightly-2026-08-27 is not installed"),
+        stderr.contains(&format!("toolchain {channel} is not installed")),
         "missing exact toolchain needs an actionable diagnostic: {stderr}"
     );
 }
