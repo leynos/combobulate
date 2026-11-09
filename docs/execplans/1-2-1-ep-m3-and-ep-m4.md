@@ -1480,6 +1480,33 @@ diagnostic.
 Nothing in this repository can clear the condition. The action is to wait, and
 to report the stall to GitHub support if it outlasts the work.
 
+### The stall recurs, and clears twice
+
+The shortage was not a single event. Runners returned in a window around
+17:50–18:10 UTC — `e99e134`'s `build-test`, `polars-test` and `polars-lint` all
+completed between 18:01 and 18:09 — and then stalled again from about 19:30.
+The second stall repeats the first's signature and adds one datum the first
+lacked: at 19:43 the same comparison held, with a `leynos/netsuke` job on a
+custom label `in_progress` while its `ubuntu-latest` jobs and this branch's
+were queued. An `in_progress` job somewhere on the account is therefore not
+evidence that the hosted pool is serving `ubuntu-latest`; the labels are what
+distinguish the two pools, and comparing them is the only test that works.
+
+The important consequence for a successor is that a stalled run must be
+re-polled rather than pronounced dead. Both stalls cleared on their own within
+a few hours, and no repository change preceded either recovery.
+
+### Rate limits can masquerade as a terminal state
+
+Polling through this stall cost more API calls than expected, and the core
+limit was exhausted at 19:55 with 8 minutes to reset. That mattered because of
+how a naive poll loop fails: `gh run list --jq` printed a 403 to standard error
+and produced no rows, and a loop testing "no run is `queued` or `in_progress`"
+reads empty output as "nothing is pending" and breaks early. The design run was
+in fact still `in_progress`. A poll must therefore require a positive terminal
+status for every expected run, not merely the absence of a pending one; an API
+error is a failed observation, never a conclusion.
+
 What this leaves unverified, and what verifies it once runners return:
 
 - `check-fmt`, `test`, `lint` and `design-check` all pass locally at
@@ -1490,6 +1517,9 @@ What this leaves unverified, and what verifies it once runners return:
   case, because `main` does not carry the ref expression yet.
 - AC-04's re-measurement (run 42650004173, dispatched at `9835151`) completed
   once runners returned, and its `build-budget` artefact is transcribed into
-  `spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. So the last
-  acceptance evidence this PR needed is in hand; what the stall delayed was the
-  measurement, not its verdict.
+  `spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. The run's
+  overall conclusion is `failure`, because `measure-profile (whitaker)` failed
+  in `install-whitaker`; `build-budget` itself succeeded, and Whitaker is not a
+  job AC-04 registers. So the last acceptance evidence this PR needed is in
+  hand, and reading the run badge instead of the job would have reported the
+  opposite.
