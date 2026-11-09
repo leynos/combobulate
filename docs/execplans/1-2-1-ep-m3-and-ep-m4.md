@@ -964,12 +964,26 @@ fn display_names_each_compiled_backend(/* ... */) { /* ... */ }
 
 Measuring the fix on the narrowed target
 (`-p combobulate --lib --no-default-features`) gave `src/profile.rs` 34/34, so
-the workspace figure becomes 44/44 = 100.00 %. The added lines are not free —
-the report instrumented them and every one is hit — but they are all
-test-module lines whose assertions run, so the denominator grows only with
-lines that execute. `make test` exercises the same cases under the
-polars-enabled profile too, where `case::both` and `case::polars` cover a loop
-that already ran.
+the workspace figure becomes 44/44 = 100.00 %, and hosted `build-test` at the
+pushed head reported `Current coverage: 100.00%` against the same 100.0
+baseline.
+
+The denominator did not grow, which is worth recording because the opposite is
+the natural guess. `LF` stayed at 34 and only `LH` moved, 32 to 34. The new
+test body carries **no `DA` records at all**; the report's instrumented lines
+skip the whole span the function occupies. That is the same `LF`-versus-`DA`
+asymmetry recorded earlier in this document, running in the opposite direction:
+there, a line counted toward `LF` with no `DA` record; here, the `rstest`
+expansion is attributed no line at all, so adding it costs the ratio nothing.
+The two lines it does cover were already in the denominator, because they
+belong to the production `Display` body rather than to the test.
+
+This is a property of this expansion, not a general licence to assume tests are
+free. A handwritten test module's own statements *are* instrumented — the `DA`
+records at lines 128-149 are the pre-existing unit tests — so a new `#[test]`
+written by hand can lower the ratio if part of it does not run. The cases here
+land in an expansion llvm attributes no line to, which is why the measurement
+moved in one direction only.
 
 The broader lesson is the one this branch keeps relearning: a profile is a
 different program. Code that is unreachable under `--no-default-features` is
