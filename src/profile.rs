@@ -86,7 +86,41 @@ impl core::fmt::Display for BuildProfile {
 mod tests {
     //! Checks the report against the features this test binary was built with.
 
+    use rstest::rstest;
+
     use super::BuildProfile;
+
+    /// Renders the report for each combination of the two optional backends.
+    ///
+    /// `Display` walks an iterator over the compiled optional backends, so the
+    /// loop body is reached only when at least one feature is enabled. A
+    /// native-only build compiles both flags to `false`, which would leave the
+    /// separator and name writes unexecuted — and that is the profile the
+    /// coverage gate measures. Constructing each combination here renders the
+    /// loop in every profile, including the one that compiles it unreachable.
+    #[rstest]
+    #[case::native(false, false, "native")]
+    #[case::macros(true, false, "native, macros")]
+    #[case::polars(false, true, "native, polars")]
+    #[case::both(true, true, "native, macros, polars")]
+    fn display_names_each_compiled_backend(
+        #[case] has_macros: bool,
+        #[case] has_polars: bool,
+        #[case] expected_backends: &str,
+    ) {
+        let profile = BuildProfile {
+            has_macros,
+            has_polars,
+            target_usize_bits: usize::BITS,
+        };
+        let bits = profile.target_usize_bits();
+        let expected = format!("features: {expected_backends}; target usize: {bits} bits");
+        assert_eq!(
+            profile.to_string(),
+            expected,
+            "the report must name exactly the optional backends the profile records"
+        );
+    }
 
     #[test]
     fn current_reports_the_compiled_features() {
