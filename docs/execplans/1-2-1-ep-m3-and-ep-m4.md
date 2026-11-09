@@ -1076,12 +1076,13 @@ The remedy is threefold and each part is separately contracted:
   `RUSTC_WRAPPER: sccache` and `SCCACHE_GHA_ENABLED: "true"` in the job `env`,
   so the provisioning steps and the gate routes inherit them;
 - each job runs `Report sccache wiring`, which resolves the wrapper on `PATH`
-  with `command -v` and prints `sccache --show-config`. `--show-config` needs
-  no compile, so the evidence exists before a gate can fail and hide it;
+  with `command -v` and prints `sccache --show-stats`, whose cache-location
+  line names the backend the server is using. `--show-stats` needs no compile,
+  so the evidence exists before a gate can fail and hide it;
 - `tests/support/act_workflow_jobs.rs` pins both variables per job and the
   wiring step's position, `act_workflow_policy.rs` pins the step's exact
   script, and three new mutations in `act_workflow_contract_tests.rs` prove a
-  lost wrapper, a lost backend, and a lost `--show-config` each fail the
+  lost wrapper, a lost backend, and a lost `--show-stats` each fail the
   contract.
 
 Wrapping measured coverage was the part worth checking before it was done,
@@ -1094,14 +1095,42 @@ entry. Wrapping the coverage step therefore cannot serve a wrong object.
 
 The Act smoke needed a matching change, because the derived job now runs the
 wiring step before `make install-build-tools` and the fixture PATH carried no
-`sccache`. A stub that answers `--show-config` is written beside the existing
+`sccache`. A stub that answers `--show-stats` is written beside the existing
 `make`/`cargo`/`rustc` stubs, and the stub's trace line records it like any
 other executor.
 
-The lesson is narrower than "check your action's inputs". An action can provide
-a tool without making it reachable, and a tool that is silently optional will
-not report its own absence. Where a claim is load-bearing, the pipeline needs a
-step whose failure is observable.
+### The evidence step first named a flag that does not exist
+
+The first version of the wiring step called `sccache --show-config`. No sccache
+release has that flag; 0.19.0's own usage line lists `--dist-auth`,
+`--debug-preprocessor-cache`, `--dist-status`, `--show-stats`,
+`--show-adv-stats`, `--start-server`, `--stop-server`, `--zero-stats`,
+`--package-toolchain`, and a compiler command, and `--show-config` is not among
+them. The step exited 2 and failed `build-test`, `polars-test`, and
+`polars-lint` on the first hosted run at `71e5ea1`, which is the run that was
+supposed to prove the wiring.
+
+The failure is worth recording for two reasons. First, it is the mirror image
+of the defect the step was added to catch: a claim about a tool's behaviour
+made from its name rather than from its interface. The remedy that worked for
+the missing wrapper — make the claim observable — is what exposed this one,
+because a step that silently did nothing could not have failed. Second, the
+contract pin did not help: `act_workflow_policy.rs` pinned the exact script,
+including the bad flag, so the tests were green and the suite asserted the
+mistake rather than catching it. Pinning a command's text proves the workflow
+says what was intended; only running the command against the real binary proves
+the text works.
+
+`--show-stats` is the substitute, chosen because it is present in both the
+pinned 0.19.0 and older releases and its `Cache location` line reports the
+backend the server is actually using, which is the fact the step exists to
+record. The local host's 0.14.0 prints the same line, so the diagnostic does
+not depend on the version. The lesson is narrower than "check your action's
+inputs". An action can provide a tool without making it reachable, a tool that
+is silently optional will not report its own absence, and a flag named from
+memory rather than from the binary's usage is a claim that needs the same
+evidence as any other. Where a claim is load-bearing, the pipeline needs a step
+whose failure is observable — and the step's own commands need to be real.
 
 ## AC-04 stays representative after the cache change
 

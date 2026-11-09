@@ -291,7 +291,7 @@ fn workflow_environment_mutations_break_the_contract() {
         ),
         (
             "lost wiring evidence",
-            CI_WORKFLOW.replace("          sccache --show-config", "          echo wired"),
+            CI_WORKFLOW.replace("          sccache --show-stats", "          echo wired"),
         ),
     ] {
         assert_ne!(

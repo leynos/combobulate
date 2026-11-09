@@ -72,15 +72,16 @@ jobs:
         # DL-03's cache clause is about compilation that actually reaches
         # sccache, and a wrapper Cargo cannot run is silently ignored rather
         # than reported. So this step resolves the configured wrapper on PATH
-        # and prints the cache's own server configuration, which is the
-        # observable evidence that builds from here on are wrapped. It runs
-        # before the suite routes so a later failure cannot leave the question
-        # unanswered, and `--show-config` needs no compile to answer it.
+        # and prints the cache's own statistics, whose cache-location line names
+        # the backend the server is actually using. That is the observable
+        # evidence that builds from here on are wrapped. It runs before the
+        # suite routes so a later failure cannot leave the question unanswered,
+        # and `--show-stats` needs no compile to answer it.
         run: |
           set -euo pipefail
           wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
           command -v "$wrapper"
-          sccache --show-config
+          sccache --show-stats
       - name: Install the build standard
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools
@@ -221,7 +222,7 @@ jobs:
           set -euo pipefail
           wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
           command -v "$wrapper"
-          sccache --show-config
+          sccache --show-stats
       - name: Install the build standard
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools
@@ -291,7 +292,7 @@ jobs:
           set -euo pipefail
           wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
           command -v "$wrapper"
-          sccache --show-config
+          sccache --show-stats
       - name: Install the build standard
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools

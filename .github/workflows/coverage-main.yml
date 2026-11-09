@@ -81,7 +81,7 @@ jobs:
           set -euo pipefail
           wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
           command -v "$wrapper"
-          sccache --show-config
+          sccache --show-stats
       - name: Install the build standard
         # Coverage excludes mold, but its test suite reaches Make targets that check it.
         run: make install-build-tools
