@@ -1184,14 +1184,21 @@ dates but never a revision, so the old record bound to a revision this branch
 does not contain while the task tick cited it.
 
 The measurement was taken as run 42650004173 on `9835151` and transcribed to
-`spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. Every sample
-improved or held: native cold median 0.25 s against a recorded 0.30 s, Polars
-cold median 50.15 s against a recorded 65.08 s, and the four incremental and
-proof medians inside 0.06 s of their predecessors. The cold native and Polars
-targets measured the same apparent sizes as the earlier record's (485671 and
-826044445 bytes), which is consistent with the same build but does not prove
-it: the workflow records `du -sb` apparent size, not a content hash, and the
-sizes are not independently meaningful. `build-environment` recorded an empty
+`spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. All six
+medians improved: native cold 0.25 s against a recorded 0.30 s, Polars cold
+50.15 s against a recorded 65.08 s, and the four incremental and proof medians
+inside 0.06 s of their predecessors. Not every *sample* did, and the difference
+is worth keeping: the first native-cold sample rose from 0.61 s to 1.10 s. That
+sample is the cold-filesystem one, so the medians are the comparison the budget
+uses and the samples are not.
+
+The earlier record carries no target-size field at all, so nothing in this
+repository supports a claim that the new sizes match it. The new artefact
+records 485671 bytes for the native cold target and 826044445 for Polars, and
+those are stated for what they are: `du -sb` apparent sizes within this run,
+not a comparison with the 2026-11-08 measurement. They are also not a content
+hash, so equal sizes across runs would not prove an identical build even if an
+earlier figure existed to compare against. `build-environment` recorded an empty
 `RUSTC_WRAPPER` and `CARGO_INCREMENTAL=0`, so `build-budget` still measured
 with no cache.
 
@@ -1537,21 +1544,47 @@ the expression that would have been wrong: the round-2 spelling
 this observation alone cannot tell the two spellings apart. What it does
 establish is the behaviour DL-03 promises, which had only been inferred.
 
+The environment dump is the weakest form of this evidence, and the run carries
+stronger. `sccache-action`'s post-job JSON, printed at `Post Setup Rust`, is
+the cache's own report of itself:
+
+```json
+{"stats":{"compile_requests":1493,"compilations":1039,"cache_writes":0,
+ "cache_write_errors":1039,"effective_cache_mode":"ReadOnly"}}
+```
+
+So 1,039 compilations produced zero writes, and sccache attempted none — the
+1,039 write errors are the read-only mode refusing them, not failures. That is
+the behaviour DL-03 promises, measured by the cache rather than restated from
+its configuration. It does not prove a successful *hit*: the same JSON reports
+zero cache hits, so the read path was not exercised here. `polars-test` and
+`polars-lint` report the same `ReadOnly` mode independently.
+
 Two limits on this evidence, because they matter for reuse:
 
-- `sccache --show-stats` prints
+- The text form of `sccache --show-stats` prints
   `Cache location   ghac, name: …, prefix: /sccache/` and a count of zero
-  compile requests. It does **not** print the effective read mode. The mode in
-  the log above comes from the job's environment dump, not from the cache's own
-  statistics. A successor looking for the mode in `--show-stats` will not find
-  it there.
+  compile requests. It does **not** print the effective read mode. The mode
+  appears in the job's environment dump and in the action's post-job JSON, not
+  in the text statistics. A successor looking for it in `--show-stats` will not
+  find it.
 - The run did not finish. `build-test` and `polars-lint` were cancelled at
-  8m16s and 8m18s, against `timeout-minutes: 8`, because this dispatch ran
-  concurrently with the same head's pull-request CI on the same cold targets.
-  The wiring step precedes the suite, which is why the evidence survives. Treat
-  the cancellation as a failed AC-07 timing observation caused by running two
-  CI runs at once, not as a defect, and do not dispatch a branch run beside a
-  pull-request run when a timing budget is being measured.
+  8m16s and 8m18s, against `timeout-minutes: 8`. **The cause of the
+  cancellation is unverified.** An earlier revision of this section attributed
+  it to concurrency with the same head's pull-request run, which was wrong:
+  `build-test` ran on runner `1000453972` in this run and `1000454003` in the
+  pull-request run, so the two did not share a runner. Contention between
+  separate VMs on shared host hardware would produce the same symptom and is
+  plausible, but nothing observed establishes it. What is established is the
+  duration, the limit, and that the wiring step precedes the suite, which is
+  why the evidence survives.
+- This run is **not** an AC-07 observation and must not be entered as one.
+  AC-07's frozen workload is "every required pull-request job in
+  `.github/workflows/ci.yml`" over the sample "every pull request", and this is
+  a `workflow_dispatch` from a branch. An earlier revision of this section
+  called the cancellation a "failed AC-07 timing observation", which was wrong:
+  the run is outside the registered scope, so it says nothing about AC-07 in
+  either direction.
 
 What the stall left unverified, and its state now:
 
@@ -1560,7 +1593,8 @@ What the stall left unverified, and its state now:
   with design still queued at the time of writing. The local gates agreed:
   `check-fmt` clean, `markdownlint` 0 issues, `spelling` clean, `scripts/tests`
   1174 passed with 2596 subtests, and `check_docs` exit 0.
-- The read-only direction of DL-03 is observed; see
+- The read-only direction of DL-03 is observed: sccache reported
+  `effective_cache_mode: ReadOnly` with 1,039 compilations and zero writes. See
   "DL-03's read-only direction is now observed, not inferred" above.
 - The main-writes direction of DL-03 cannot be observed before merge in any
   case, because `main` does not carry the ref expression yet.

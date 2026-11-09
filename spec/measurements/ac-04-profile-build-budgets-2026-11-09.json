@@ -45,7 +45,7 @@
         0.25
       ],
       "median": 0.25,
-      "notes": "Run cold, native-only profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR; each target measured the same 485671-byte apparent size as the 2026-11-08 record. The first sample includes a cold filesystem and is retained rather than discarded; the median is the third of the five sorted samples, 0.25 s."
+      "notes": "Run cold, native-only profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each measured a 485671-byte target by `du -sb` apparent size, which is not a content hash and has no earlier figure to compare against. The first sample includes a cold filesystem and is retained rather than discarded; the median is the third of the five sorted samples, 0.25 s, and the first sample alone rose against the 2026-11-08 measurement."
     },
     {
       "id": "polars-cold",
@@ -61,7 +61,7 @@
         50.5
       ],
       "median": 50.15,
-      "notes": "Run cold, polars-enabled profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR; each target measured the same 826044445-byte apparent size on every run."
+      "notes": "Run cold, polars-enabled profile, from .github/workflows/profile-measurements.yml build-budget in run 42650004173. Profiles alternate run by run within one runner; each cold sample starts from an empty CARGO_TARGET_DIR and each measured a 826044445-byte target by `du -sb` apparent size, consistent across the five runs but not a content hash and with no earlier figure to compare against."
     },
     {
       "id": "proof-cold",
