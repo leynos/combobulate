@@ -1185,12 +1185,23 @@ does not contain while the task tick cited it.
 
 The measurement was taken as run 42650004173 on `9835151` and transcribed to
 `spec/measurements/ac-04-profile-build-budgets-2026-11-09.json`. Every sample
-improved or held: native cold median 0.26 s against a recorded 0.30 s, Polars
+improved or held: native cold median 0.25 s against a recorded 0.30 s, Polars
 cold median 50.15 s against a recorded 65.08 s, and the four incremental and
 proof medians inside 0.06 s of their predecessors. The cold native and Polars
-targets were byte-identical to the earlier record's, so the workload is the
-same build. `build-environment` recorded an empty `RUSTC_WRAPPER` and
-`CARGO_INCREMENTAL=0`, so `build-budget` still measured with no cache.
+targets measured the same apparent sizes as the earlier record's (485671 and
+826044445 bytes), which is consistent with the same build but does not prove
+it: the workflow records `du -sb` apparent size, not a content hash, and the
+sizes are not independently meaningful. `build-environment` recorded an empty
+`RUSTC_WRAPPER` and `CARGO_INCREMENTAL=0`, so `build-budget` still measured
+with no cache.
+
+Two numbers in the first transcription of this artefact were wrong and are
+corrected here. The native-cold median was given as 0.26 s; the five samples
+sort to 0.25, 0.25, 0.25, 0.26, 1.10, so the median is 0.25 s — I had taken the
+second value of the unsorted series. The Polars cold target was given as
+2382256 bytes, which appears nowhere in the artefact; the recorded value is
+826044445. Both were errors of transcription rather than of measurement, and
+the remaining five medians were checked against the artefact and were right.
 
 `build-budget` succeeded; the run's overall conclusion is `failure` because
 `measure-profile (whitaker)` failed in `install-whitaker`. That job is not one
