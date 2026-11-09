@@ -81,7 +81,7 @@ def _shipped_items(root: Path) -> list[tuple[str, str]]:
     items = []
     metadata = _metadata(root)
     for crate_root, targets in _workspace_members(root, metadata):
-        for driver in _entry_points(crate_root, targets):
+        for driver in _entry_points(root, crate_root, targets):
             relative = driver.relative_to(root).as_posix()
             items.extend((entry['item'], str(entry['location']))
                          for entry in items_of(audit_tree(root, [relative])))
@@ -92,9 +92,10 @@ def _workspace_members(root: Path, metadata: dict) -> tuple[tuple[Path, tuple[st
     """Pair each workspace member's directory with its target source paths.
 
     ``targets[].src_path`` is absolute, and is made relative to the repository
-    root here so :func:`_entry_points` can join it back. An absolute path
-    outside the root would be a dependency's source, which this audit does not
-    own; ``relative_to`` raises there rather than auditing it silently.
+    root here, because that is the form :func:`_entry_points` resolves against
+    and the form the rest of the audit speaks. An absolute path outside the
+    root would be a dependency's source, which this audit does not own;
+    ``relative_to`` raises there rather than auditing it silently.
     """
     members = []
     for package in metadata['packages']:
@@ -166,14 +167,21 @@ def _metadata(root: Path) -> dict:
     return json.loads(completed.stdout)
 
 
-def _entry_points(crate_root: Path, targets: Iterable[str] = ()) -> Iterable[Path]:
+def _entry_points(root: Path, crate_root: Path, targets: Iterable[str] = ()) -> Iterable[Path]:
     """Yield the Rust files that start a crate's module tree.
 
-    ``targets`` is Cargo's own list of that member's target source paths. Using
-    it rather than a filename convention is what keeps ``build.rs``,
-    ``src/bin/*``, and a target declared with an explicit ``path`` in scope:
-    none of them is reachable from a crate root by following ``mod``, yet all
-    of them are compiled and can carry trust vocabulary.
+    ``targets`` is Cargo's own list of that member's target source paths,
+    written repository-relative by :func:`_workspace_members`, so each is
+    resolved against ``root``. Joining it to ``crate_root`` instead would
+    repeat the member's own directory for a nested member — ``crates/foo`` plus
+    ``crates/foo/src/lib.rs`` — and the path would not exist. The conventional
+    root fallback below would then still find ``src/lib.rs``, which is exactly
+    what made the bug invisible: only the targets no fallback covers, such as
+    ``build.rs`` and ``src/bin/*``, would go unaudited.
+
+    Using Cargo's list rather than a filename convention is what keeps those
+    targets in scope: none is reachable from a crate root by following ``mod``,
+    yet all are compiled and can carry trust vocabulary.
 
     The conventional roots are still yielded, because metadata names a crate
     root as a target anyway and a second visit is harmless: the audit reports
@@ -181,7 +189,7 @@ def _entry_points(crate_root: Path, targets: Iterable[str] = ()) -> Iterable[Pat
     """
     seen = set()
     for source in targets:
-        candidate = crate_root / source
+        candidate = root / source
         if candidate.is_file() and candidate not in seen:
             seen.add(candidate)
             yield candidate

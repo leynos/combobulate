@@ -34,6 +34,16 @@ pub(crate) struct JobContract {
     /// Ordered action revisions, matched by [`matches_action_revision`].
     pub(super) actions: &'static [&'static str],
     /// The complete job environment; `GATE_PROFILE` selects the profile.
+    ///
+    /// Every job also declares `RUSTC_WRAPPER: sccache` and
+    /// `SCCACHE_GHA_ENABLED: "true"`, because DL-03's cache clause is about
+    /// compilation that actually reaches sccache. The pinned `setup-rust`
+    /// action installs the binary and exports `SCCACHE_PATH` but sets neither
+    /// variable, and Cargo silently ignores a wrapper it cannot run — so a job
+    /// without them compiled uncached while reporting nothing wrong. They are
+    /// job-level rather than per-step so the provisioning steps all inherit
+    /// them, and `Report sccache wiring` resolves the wrapper on `PATH` to make
+    /// the wiring observable rather than merely asserted.
     pub(super) env: &'static [(&'static str, &'static str)],
 }
 
@@ -50,6 +60,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Setup Rust"),
             Some("Log Rust compiler configuration"),
             Some("Install linker prerequisites"),
+            Some("Report sccache wiring"),
             Some("Install the build standard"),
             Some("Install mdtablefix"),
             Some("Format"),
@@ -82,6 +93,8 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("CARGO_TERM_COLOR", "always"),
             ("BUILD_PROFILE", "debug"),
             ("GATE_PROFILE", "native-only"),
+            ("RUSTC_WRAPPER", "sccache"),
+            ("SCCACHE_GHA_ENABLED", "true"),
         ],
     },
     JobContract {
@@ -91,6 +104,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Setup Rust"),
             Some("Log Rust compiler configuration"),
             Some("Install linker prerequisites"),
+            Some("Report sccache wiring"),
             Some("Install the build standard"),
             Some("Setup uv"),
             Some("Verify Whitaker capability"),
@@ -108,6 +122,8 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("CARGO_TERM_COLOR", "always"),
             ("BUILD_PROFILE", "debug"),
             ("GATE_PROFILE", "polars-enabled"),
+            ("RUSTC_WRAPPER", "sccache"),
+            ("SCCACHE_GHA_ENABLED", "true"),
         ],
     },
     JobContract {
@@ -117,6 +133,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Setup Rust"),
             Some("Log Rust compiler configuration"),
             Some("Install linker prerequisites"),
+            Some("Report sccache wiring"),
             Some("Install the build standard"),
             Some("Install test runner"),
             Some("Test"),
@@ -130,6 +147,8 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("CARGO_TERM_COLOR", "always"),
             ("BUILD_PROFILE", "debug"),
             ("GATE_PROFILE", "polars-enabled"),
+            ("RUSTC_WRAPPER", "sccache"),
+            ("SCCACHE_GHA_ENABLED", "true"),
         ],
     },
 ];

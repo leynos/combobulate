@@ -163,7 +163,10 @@ impl ActSmoke {
     /// Writes the derived YAML and rejecting shell tools into a scratch checkout.
     fn write_tools(&self, directory: &Dir, workflow: &Value) -> Read<()> {
         directory.write(".github/workflows/ci.yml", serde_yaml::to_string(workflow)?)?;
-        for executable in ["make", "cargo", "rustc", "sudo", "uv"] {
+        // `sccache` is here because DL-03's wiring report resolves the wrapper
+        // on `PATH` before any gate runs. Without a stub the derived job would
+        // fail at that step and the smoke would never reach the suite routes.
+        for executable in ["make", "cargo", "rustc", "sccache", "sudo", "uv"] {
             directory.write(format!("fixture-bin/{executable}"), STUB)?;
             directory.set_permissions(
                 format!("fixture-bin/{executable}"),
@@ -249,6 +252,7 @@ const STUB: &str = concat!(
     "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm \
      cargo-audit') ;;\n",
     "  'rustc:--version') printf '%s\\n' 'rustc fixture'; exit 0 ;;\n",
+    "  'sccache:--show-config') printf '%s\\n' 'cache.disk.dir = /fixture'; exit 0 ;;\n",
     "  'uv:run --with PyYAML==6.0.3 python scripts/whitaker_probe.py --workflow \
      .github/workflows/ci.yml') ;;\n",
     "  'sudo:apt-get update'|'sudo:apt-get install --yes --no-install-recommends clang lld mold') \

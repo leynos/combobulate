@@ -309,6 +309,72 @@ class ProceduralMacroCrateDetection(unittest.TestCase):
         self.assertFalse(is_procedural_macro_crate(manifest),
                          'a commented-out directive must not make a crate procedural')
 
+    def test_a_directive_carrying_a_comment_is_procedural(self):
+        """Require a trailing comment not to hide the declaration.
+
+        TOML lets an author explain a key on its own line. A reader that
+        matched the declaration as text would reject it, audit a real proc-macro
+        crate as an ordinary library, and leave the literals its macros emit
+        unscanned.
+        """
+        manifest = self.root / 'explained/Cargo.toml'
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text('[lib]\nproc-macro = true  # emits the harness\n', encoding='utf-8')
+        self.assertTrue(is_procedural_macro_crate(manifest),
+                        'a trailing comment must not hide the directive')
+
+    def test_a_dotted_directive_is_procedural(self):
+        """Require the dotted spelling TOML defines for the same table.
+
+        ``lib.proc-macro = true`` before any table header declares exactly the
+        crate that ``[lib]`` followed by ``proc-macro = true`` declares, so the
+        two must reach the same answer.
+        """
+        manifest = self.root / 'dotted/Cargo.toml'
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text('lib.proc-macro = true\n', encoding='utf-8')
+        self.assertTrue(is_procedural_macro_crate(manifest),
+                        'the dotted spelling of the directive must be read')
+
+    def test_a_directive_under_another_table_is_not_procedural(self):
+        """Require the key to be read from ``[lib]``, not from anywhere in the document.
+
+        ``proc-macro`` is only meaningful under ``[lib]``. A reader that scanned
+        the parsed document for the key would call a crate procedural because a
+        dev-dependency or a feature happened to be named the same.
+        """
+        manifest = self.root / 'elsewhere/Cargo.toml'
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text('[features]\nproc-macro = true\n', encoding='utf-8')
+        self.assertFalse(is_procedural_macro_crate(manifest),
+                         'only the [lib] table may declare a proc-macro target')
+
+    def test_a_non_boolean_directive_is_not_procedural(self):
+        """Require the value to be the boolean ``true``, not merely present.
+
+        TOML permits a quoted string where a boolean belongs. That manifest is
+        invalid for Cargo, and the audit must not read it as a declaration; the
+        loud direction reports a literal as data rather than inventing trust.
+        """
+        manifest = self.root / 'quoted/Cargo.toml'
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text('[lib]\nproc-macro = "true"\n', encoding='utf-8')
+        self.assertFalse(is_procedural_macro_crate(manifest),
+                         'a quoted value is not the boolean the directive needs')
+
+    def test_an_unparsable_manifest_is_not_procedural(self):
+        """Refuse to guess proc-macro mode when the manifest is not valid TOML.
+
+        The audit reads manifests it did not write. Text that merely contains
+        the directive is not a manifest Cargo would accept, and reading it as
+        one would scan an unknown crate's data as code.
+        """
+        manifest = self.root / 'broken/Cargo.toml'
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text('[lib\nproc-macro = true\n', encoding='utf-8')
+        self.assertFalse(is_procedural_macro_crate(manifest),
+                         'a manifest that cannot be parsed must not select proc-macro mode')
+
 
 class ManifestDiscoveryFailsClosed(unittest.TestCase):
     """Require the manifest lookup to fail closed when no crate owns the file.

@@ -176,33 +176,41 @@ def _first_mismatch(record: Mapping[str, object]) -> str | None:
     return None
 
 
-def _manifest_sources(document: Mapping[str, object]) -> tuple[tuple[str, str], ...]:
-    """Return the ``(path, sha256)`` pairs one manifest binds, refusing a malformed list.
+def _manifest_sources(document: Mapping[str, object]) -> tuple[tuple[str, str], ...] | None:
+    """Return the ``(path, sha256)`` pairs one manifest binds, or None if it cannot.
 
-    A manifest that names a source without a digest cannot be bound to the file
-    the audit reads, so it is dropped here and the caller refuses the manifest
-    for naming no auditable source. That is the fail-closed direction DL-16
-    takes: a changed file audited against a stale manifest would otherwise
-    report on source the record's claim never described.
+    The list is all-or-nothing. A manifest that names a source without a digest
+    cannot be bound to the file the audit reads, and keeping the other entries
+    would audit exactly the sources the author remembered to bind while the
+    unbound one went unread. The audit would then describe a proof whose scope
+    the record never established, which is the failure DL-16 exists to prevent.
+    So one malformed entry rejects the whole list rather than shrinking it.
+
+    ``None`` distinguishes "this list is unusable" from ``()``, "this manifest
+    declares no source at all", because the two refusals call the author to
+    different repairs.
 
     Examples
     --------
     >>> _manifest_sources({'sources': [{'path': 'a.rs', 'sha256': '00'}]})
     (('a.rs', '00'),)
-    >>> _manifest_sources({'sources': ['a.rs']})
+    >>> _manifest_sources({'sources': ['a.rs']}) is None
+    True
+    >>> _manifest_sources({'sources': []})
     ()
     """
     sources = document.get('sources', ())
     if not isinstance(sources, Sequence) or isinstance(sources, str):
-        return ()
-    return tuple(
-        (str(item['path']), str(item['sha256']))
-        for item in sources
-        if isinstance(item, Mapping)
-        and isinstance(item.get('path'), str)
-        and isinstance(item.get('sha256'), str)
-        and item['sha256']
-    )
+        return None
+    bound = []
+    for item in sources:
+        if not isinstance(item, Mapping):
+            return None
+        path, sha256 = item.get('path'), item.get('sha256')
+        if not isinstance(path, str) or not isinstance(sha256, str) or not sha256:
+            return None
+        bound.append((path, sha256))
+    return tuple(bound)
 
 
 def _verified_result(decision, log_path: str, log_sha256: str) -> VerifiedLogResult:
@@ -278,6 +286,11 @@ def bound_sources(root: Path, record: Mapping[str, object]) -> tuple[str, ...] |
     DL-16 takes. The count is checked here as well as in the verdict adapter
     because the scanner runs first and independently of it.
 
+    A manifest whose source list is unusable is refused whole. Auditing only
+    the entries that happened to be well formed would leave sources the record
+    claims to have covered silently unread, so the audit would certify a scope
+    the record never established.
+
     Each source's digest is checked against the file as it exists now, so a
     manifest cannot outlive the source it was written for (DL-16). The check is
     :func:`read_artefact`'s rather than a bare read, so a drift is reported for
@@ -295,6 +308,9 @@ def bound_sources(root: Path, record: Mapping[str, object]) -> tuple[str, ...] |
     if isinstance(document, MissingEvidence):
         return document
     sources = _manifest_sources(document)
+    if sources is None:
+        return MissingEvidence('manifest', str(artefact['path']),
+                               'it binds a source that names no path and digest')
     if not sources:
         return MissingEvidence('manifest', str(artefact['path']), 'it names no source files to audit')
     for relative, sha256 in sources:

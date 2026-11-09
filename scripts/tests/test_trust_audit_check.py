@@ -25,10 +25,61 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
 from docs_validation.trust_audit import AuditedFile, TrustItem, audit_tree, scan
-from docs_validation.trust_audit_check import SEEDED_ITEMS, check_trust_audit
+from docs_validation.trust_audit_check import (
+    SEEDED_ITEMS, _entry_points, _shipped_items, check_trust_audit,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 CORPUS = 'tools/verifier-fixtures/kani-corpus/src/harnesses.rs'
+
+
+class NestedMemberTargets(unittest.TestCase):
+    """Require Cargo's target list to resolve for a member below the root.
+
+    ``cargo metadata`` reports ``targets[].src_path`` as an absolute path under
+    the workspace root, and the check makes it repository-relative before
+    joining it back. Joining it to the *member's* directory instead repeats the
+    member's own path and the target does not exist — silently, because the
+    conventional ``src/lib.rs`` fallback still finds that file. Only the
+    targets no fallback covers, such as an integration test or a ``build.rs``,
+    would be dropped, and their trust vocabulary with them.
+    """
+
+    def setUp(self):
+        """Create a workspace whose only member sits below the root."""
+        import tempfile
+        self._directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self._directory.cleanup)
+        self.root = Path(self._directory.name)
+        self._write('Cargo.toml', '[workspace]\nmembers = ["crates/inner"]\nresolver = "3"\n')
+        self._write('crates/inner/Cargo.toml',
+                    '[package]\nname = "inner"\nversion = "0.1.0"\nedition = "2024"\n')
+        self._write('crates/inner/src/lib.rs', 'pub fn lib() {}\n')
+        self._write('crates/inner/build.rs', 'fn main() { kani::assume(x); }\n')
+        self._write('crates/inner/tests/probe.rs', 'fn f() { kani::stub(a, b); }\n')
+
+    def _write(self, relative, text):
+        """Write one scratch file, creating its directories."""
+        target = self.root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding='utf-8')
+
+    def test_a_nested_target_resolves_once_not_twice(self):
+        """Require each target path to be joined to the repository root."""
+        crate_root = self.root / 'crates' / 'inner'
+        resolved = {path.relative_to(self.root).as_posix()
+                    for path in _entry_points(self.root, crate_root, ('crates/inner/build.rs',))}
+        self.assertIn('crates/inner/build.rs', resolved,
+                      'a nested member\'s target must resolve against the repository root')
+
+    def test_a_nested_members_non_conventional_targets_are_audited(self):
+        """Require ``build.rs`` and integration tests of a nested member to be read."""
+        reported = {location for item, location in _shipped_items(self.root)}
+        self.assertIn('crates/inner/build.rs:1:19', reported,
+                      'a nested member\'s build script must reach the audit')
+        self.assertIn('crates/inner/tests/probe.rs:1:16', reported,
+                      'a nested member\'s integration test must reach the audit')
+
 
 class ShippedCratesAreAudited(unittest.TestCase):
     """Require the check to pass against the repository as committed (VO-10).

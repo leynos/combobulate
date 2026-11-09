@@ -9,10 +9,16 @@ reader hands it.
 
 Two families are equivalents rather than gaps. ``statement_end``'s ``start``
 bound cannot matter: a ``use`` is lexed with its ``;`` present, so the first
-search succeeds before the bound is reached. ``use_alias``'s brace check before
-``as`` is the guard that keeps a grouped import from renaming its crate; a
-mutant that dropped it is killed here rather than argued, since
+search succeeds before the bound is reached. ``use_alias``'s exclusion of a
+rename below the root is the guard that keeps a member import from renaming its
+crate; a mutant that dropped it is killed here rather than argued, since
 ``use kani::{assume as a};`` is a real way to write the import.
+
+The grouped spelling ``use kani::{self as k};`` is the same renaming written
+with a brace, and a reader that treated every brace as "a member alias" left
+``k::assume`` unreported — a file described as trust-free while it assumed
+exactly what the vocabulary names. That case is why the brace is no longer what
+the reader keys on.
 
 Examples
 --------
@@ -27,8 +33,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from docs_validation.trust_audit.matcher import scan
 from docs_validation.trust_audit.lexer import tokenize
-from docs_validation.trust_audit.use_tree import alias_bindings, statement_end, use_alias, use_root
+from docs_validation.trust_audit.use_tree import (
+    alias_bindings, statement_end, use_alias, use_aliases, use_root,
+)
 
 
 class StatementBounds(unittest.TestCase):
@@ -95,6 +104,116 @@ class ImportedRootAliases(unittest.TestCase):
         self.assertEqual(alias_bindings(tokenize('use kani::{assume as a};'), 'kani'),
                          frozenset({'kani'}),
                          'a grouped member alias must not rename the crate')
+
+    def test_a_grouped_self_alias_binds_the_crate(self):
+        """Require `use kani::{self as k};` to bind ``k`` for the crate.
+
+        ``self`` inside a grouped import names the crate itself, so ``self as
+        k`` is the same renaming the plain form makes. Reading the brace before
+        the ``as`` as "this is a member alias" made the matcher report nothing
+        for ``k::assume``, and the audit described a file as trust-free while
+        it assumed exactly what the vocabulary names.
+        """
+        self.assertEqual(alias_bindings(tokenize('use kani::{self as k};'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a grouped self alias must rename the crate')
+
+    def test_a_grouped_self_alias_beside_a_member_alias_binds_both_names(self):
+        """Require the two grouped aliases in one statement to stay distinguishable.
+
+        Only ``self`` renames the crate; the sibling member rename does not. A
+        reader that took the statement's last ``as`` would report ``a`` here and
+        miss ``k``.
+        """
+        tokens = tokenize('use kani::{assume as a, self as k};')
+        self.assertEqual(alias_bindings(tokens, 'kani'), frozenset({'kani', 'k'}),
+                         'only the self member of a grouped import renames the crate')
+
+    def test_a_path_alias_past_the_root_binds_no_crate_alias(self):
+        """Require `use kani::assume as a;` to stay a member alias.
+
+        The qualified path is the same renaming the grouped form writes with
+        braces, so the rule that excludes it must cover both spellings. A rule
+        that only excluded a brace would report ``a`` here and make every
+        ``a::`` path trust.
+        """
+        self.assertEqual(alias_bindings(tokenize('use kani::assume as a;'), 'kani'),
+                         frozenset({'kani'}),
+                         'a rename of a name below the root must not rename the crate')
+
+    def test_an_absolute_root_alias_is_still_read(self):
+        """Require `use ::kani as k;` to bind the alias, since the leading `::` is syntax.
+
+        An edition-2015-style absolute path names the same crate. A reader that
+        required the root to be the statement's *first* token would miss it.
+        """
+        self.assertEqual(alias_bindings(tokenize('use ::kani as k;'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a leading :: must not hide the crate being renamed')
+
+
+class GroupedAliasReachesTheMatcher(unittest.TestCase):
+    """Require a grouped crate alias to make a qualified path report (DL-17).
+
+    The reader's own cases establish what it returns. These establish that the
+    matcher, which is what the audit records, acts on it: rule (i) resolves a
+    path through the name the file binds the root to, and the grouped spelling
+    is one of the ways to bind it.
+    """
+
+    def test_a_grouped_alias_makes_a_qualified_path_trust(self):
+        """Report `k::assume` after `use kani::{self as k};`."""
+        self.assertEqual([item.item for item in scan('use kani::{self as k};\nfn f() { k::assume(x); }').items],
+                         ['assume'],
+                         'a grouped crate alias must reach rule (i)')
+
+    def test_a_grouped_member_alias_makes_no_qualified_path_trust(self):
+        """Leave the `a::assume` on the use line's successor alone.
+
+        The fail-closed reading does not stretch to a name the statement did not
+        bind to the crate: rule (i) is about a path rooted at the trust root, and
+        ``a`` is a member of it, not the root under another name.
+
+        Only line 2 is asserted. Rule (iii) still reports the ``assume`` named in
+        the import on line 1, because a file importing from a trust root is
+        scanned fail-closed — a documented superset that is not what this case
+        is about.
+        """
+        reported = scan('use kani::{assume as a};\nfn f() { a::assume(x); }').items
+        self.assertEqual([item.line for item in reported], [1],
+                         'a member alias must not make a qualified path on a later line trust')
+
+
+class AliasReadingAgreesBetweenItsForms(unittest.TestCase):
+    """Require the single-name reader and the set reader to agree.
+
+    Both are public, and both answer the same question about the same statement.
+    A case where they disagree would make the audit depend on which one a caller
+    happened to reach for.
+    """
+
+    def test_each_spelling_reports_one_alias_through_both_readers(self):
+        """Require ``use_alias`` to report the name ``use_aliases`` returns."""
+        for statement in ('use kani as k;',
+                          'use kani::{self as k};',
+                          'use kani::{assume, self as k};',
+                          'use ::kani as k;'):
+            with self.subTest(statement=statement):
+                tokens = tokenize(statement)
+                end = statement_end(tokens, 1)
+                self.assertEqual(use_aliases(tokens, 1, end), frozenset({'k'}),
+                                 f'{statement!r} must bind exactly k')
+                self.assertEqual(use_alias(tokens, 1, end), 'k',
+                                 f'{statement!r} must report k to the single-name reader')
+
+    def test_a_statement_with_no_crate_alias_reports_none_through_both(self):
+        """Require both readers to stay silent on a member-only rename."""
+        tokens = tokenize('use kani::{assume as a};')
+        end = statement_end(tokens, 1)
+        self.assertEqual(use_aliases(tokens, 1, end), frozenset(),
+                         'a member rename must bind no crate alias')
+        self.assertIsNone(use_alias(tokens, 1, end),
+                          'the single-name reader must not report a member rename')
 
 
 if __name__ == '__main__':

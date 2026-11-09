@@ -83,6 +83,19 @@ repository again for each contract. Each job is contracted on its own, so a
 step, action, or `GATE_PROFILE` moved between jobs fails the contract rather
 than being satisfied by another job's prelude.
 
+All four hosted jobs declare `RUSTC_WRAPPER: sccache` and
+`SCCACHE_GHA_ENABLED: "true"` at job level and run `Report sccache wiring`
+after installing the linker, which resolves the wrapper on `PATH` and prints
+`sccache --show-config`. DL-03 requires the GitHub Actions cache backend, and
+the pinned `setup-rust` action only provisions the binary: it exports
+`SCCACHE_PATH` and sets neither variable. Cargo ignores a `RUSTC_WRAPPER` it
+cannot run rather than failing, so a job that omitted them compiled uncached
+and reported nothing. The wiring step is the observable half of that
+declaration; `--show-config` needs no compile, so it answers before any gate
+can fail and obscure the question. The coverage steps are wrapped too, which is
+safe because sccache hashes the full rustc command line, so an instrumented
+object never shares a cache key with an uninstrumented one.
+
 Table-driven contract regressions use the `rstest` dev dependency with its
 optional asynchronous-timeout and crate-renaming features disabled. Private
 test-support helpers remain owned by their named contract modules. Workflow

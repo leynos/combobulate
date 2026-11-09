@@ -22,7 +22,7 @@ result with the record.
 """
 from __future__ import annotations
 
-import re
+import tomllib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -32,11 +32,13 @@ from .matcher import ModuleReference, ScanResult, TrustItem, scan
 
 RUST_SUFFIX = '.rs'
 # A proc-macro crate can turn a literal into code, so its literals are scanned.
-# The directive is matched as a pattern rather than as text because TOML does
-# not fix the spacing: `proc-macro = true`, `proc-macro=true`, and
-# `proc-macro   =   true` all declare the same crate, and a manifest written
-# with the last two would otherwise be audited as an ordinary library.
-PROCEDURAL_MACRO_DIRECTIVE = re.compile(r'^[ \t]*proc-macro[ \t]*=[ \t]*true[ \t]*$', re.MULTILINE)
+# The manifest is parsed rather than pattern-matched because TOML gives an
+# author many spellings of one declaration: `proc-macro=true`, a comment after
+# the value, and the dotted `lib.proc-macro = true` all declare the same crate.
+# Reading the text instead would audit any of them as an ordinary library and
+# silently stop scanning the tokens that crate's macros emit.
+PROCEDURAL_MACRO_TABLE = 'lib'
+PROCEDURAL_MACRO_KEY = 'proc-macro'
 # The file a bare `mod x;` resolves to inside a `src/`-style module.
 MODULE_FILE_CANDIDATES = ('{directory}/{name}{suffix}', '{directory}/{name}/mod{suffix}')
 # The stems that own their directory's children directly rather than a
@@ -155,6 +157,19 @@ def scan_tree(root: Path, relative: str, procedural_macro: bool = False) -> Scan
 def is_procedural_macro_crate(manifest: Path) -> bool:
     """Report whether a crate's manifest declares a proc-macro target.
 
+    The manifest is parsed as TOML and ``[lib] proc-macro`` is read from the
+    document, rather than the directive being searched for in the text. TOML
+    lets the same declaration be written with any spacing, with a trailing
+    comment, or dotted as ``lib.proc-macro = true``; matching the text would
+    read the last two as ordinary libraries. A false negative here is the
+    unsound direction: the crate's literals are what its macros emit, so their
+    vocabulary would go unreported.
+
+    A manifest that cannot be read or parsed is *not* procedural. That is the
+    loud direction — a literal is reported as data — and it is the correct one:
+    guessing True would invent trust items for a crate nothing establishes is a
+    macro crate.
+
     Parameters
     ----------
     manifest
@@ -163,17 +178,20 @@ def is_procedural_macro_crate(manifest: Path) -> bool:
     Returns
     -------
     bool
-        True when the manifest declares ``proc-macro = true``.
+        True when the manifest declares ``[lib] proc-macro = true``.
 
     Examples
     --------
-    A manifest containing ``[lib]`` and ``proc-macro = true`` returns True; an
-    ordinary library manifest returns False.
+    A manifest containing ``[lib]`` and ``proc-macro = true`` returns True,
+    including when the value carries a comment; an ordinary library manifest,
+    a commented-out directive, and a missing file all return False.
     """
     try:
-        return PROCEDURAL_MACRO_DIRECTIVE.search(manifest.read_text(encoding='utf-8')) is not None
-    except (OSError, UnicodeDecodeError):
+        document = tomllib.loads(manifest.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
         return False
+    library = document.get(PROCEDURAL_MACRO_TABLE)
+    return isinstance(library, Mapping) and library.get(PROCEDURAL_MACRO_KEY) is True
 
 
 def resolve_repository_path(root: Path, relative: str) -> Path:

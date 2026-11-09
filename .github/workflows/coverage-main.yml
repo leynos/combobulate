@@ -42,6 +42,15 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
+      # DL-03: route every rustc invocation through the cache sccache-action
+      # installed. The action installs the binary and exports `SCCACHE_PATH`
+      # but never sets this variable, and Cargo silently ignores a wrapper it
+      # cannot run, so the cache stayed unreachable until it was named here.
+      RUSTC_WRAPPER: sccache
+      # The GitHub Actions cache backend DL-03 names. Without it sccache
+      # compiles through to disk and shares nothing with the pull-request lane,
+      # which is the half of the clause that makes main's cache reachable there.
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -64,6 +73,15 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Report sccache wiring
+        # See ci.yml's `build-test`. The cache this job writes is the one
+        # pull-request runs restore, so this lane's wrapper is load-bearing for
+        # the whole repository and not only for its own run.
+        run: |
+          set -euo pipefail
+          wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
+          command -v "$wrapper"
+          sccache --show-config
       - name: Install the build standard
         # Coverage excludes mold, but its test suite reaches Make targets that check it.
         run: make install-build-tools

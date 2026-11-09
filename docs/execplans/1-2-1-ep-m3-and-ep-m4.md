@@ -32,10 +32,12 @@ reusable once its claims become true, but it must not be applied before then.
 
 Specification: parent plan lines 2250-2320.
 
-- [ ] Red recorded: `tests/features/build_profiles.feature`,
+- [x] Red recorded: `tests/features/build_profiles.feature`,
   `tests/build_profiles.rs`, the snapshot tests,
   `tests/native_consumer_e2e.rs`, and the VO-4 and VO-14 checks all fail because
-  `BuildProfile` does not exist.
+  `BuildProfile` does not exist. The step was observed before the
+  implementation landed and every artefact it names exists; the item is ticked
+  as a record of the TDD step, not as evidence that the suite is currently red.
 - [x] Facade features `default = ["macros", "polars"]`,
   `macros = ["dep:combobulate-macros"]`, `polars = ["dep:polars"]`.
 - [x] The facade's `polars` dependency selects `0.55.2` with
@@ -79,9 +81,11 @@ Specification: parent plan lines 2250-2320.
   `ci.yml` now declares three required jobs on the same `ubuntu-24.04` runner
   and eight-minute timeout. `build-test` keeps `GATE_PROFILE: native-only`;
   `polars-lint` and `polars-test` set `GATE_PROFILE: polars-enabled`. The shared
-  `setup-rust` action already enables sccache through its `use-sccache`
-  default, which this workflow states explicitly, and the only cache the caller
-  controls is `generate-coverage`'s baseline publish; it is pinned to
+  `setup-rust` action installs sccache through its `use-sccache` default,
+  which this workflow states explicitly, but that input only provisions the
+  binary; it sets no compiler wrapper, so see "DL-03's cache clause needed a
+  wrapper the workflows never set" below. The only cache the caller controls is
+  `generate-coverage`'s baseline publish; it is pinned to
   `publish-artefact: 'false'` and its ratchet baseline saves only from
   `coverage-main.yml` on `main`. `coverage-main.yml` names the same native-only
   features, so the ratchet compares like with like.
@@ -672,6 +676,18 @@ workflow; the plan checkboxes above record the rest.
   built on top, and the combined module had grown to 439 lines. The equivalence
   argument for the moved defaults stays in the survivor module's docstring with
   a pointer to the new home, so the mutation-census record is still complete.
+- The confinement detector takes text, not a path. `_polars_paths` used to read
+  the file itself, so the only way to test it was to write a temporary source
+  tree and the only thing it could be asked about was a file that existed. It
+  now accepts `text: str` and the one caller in `check_polars_confinement`
+  reads the file, which lets the rename cases — `use polars as p;`,
+  `use polars::{self as p};`, and `use polars::prelude as p;` — be stated as
+  three strings rather than three fixtures. It also lets the seeded-detector
+  case judge the detector the real check uses, because a double can now stand
+  in where a file path could not be substituted. The rename resolution is
+  `alias_bindings` from the trust audit, so the confinement rule and the audit
+  cannot disagree about what renames a root; that sharing is why the detector
+  moved to a text signature without a second lexer of its own.
 
 ## Ruled out
 
@@ -1036,3 +1052,87 @@ profile; from the second run onward the comparison is native-only to
 native-only. The one handover is therefore a comparison of the same number
 computed two different ways, which passes because both are exactly 100.00, not
 because the tolerance absorbs it.
+
+## DL-03's cache clause needed a wrapper the workflows never set
+
+DL-03 says every hosted job runs sccache with the GitHub Actions cache backend,
+and the workflows said `use-sccache: 'true'` on the pinned `setup-rust` action,
+so the clause looked satisfied. It was not. That action runs
+`mozilla-actions/sccache-action`, which installs the binary and exports
+`SCCACHE_PATH`, and never sets `RUSTC_WRAPPER`; its own README asks the caller
+to set both `RUSTC_WRAPPER: sccache` and `SCCACHE_GHA_ENABLED: "true"`. No job
+set either, so every hosted compile ran unwrapped and the cache recorded
+`Compile requests 0`.
+
+The failure is silent by construction, which is why it survived several green
+runs. Cargo does not reject an unusable `RUSTC_WRAPPER`; it ignores it. A value
+naming a file that does not exist, or that is not executable, leaves the build
+successful and uncached. So the claim "sccache is enabled" could be made in
+good faith from the workflow text while being false of the run.
+
+The remedy is threefold and each part is separately contracted:
+
+- all three `ci.yml` jobs and `coverage-main.yml`'s `coverage-upload` declare
+  `RUSTC_WRAPPER: sccache` and `SCCACHE_GHA_ENABLED: "true"` in the job `env`,
+  so the provisioning steps and the gate routes inherit them;
+- each job runs `Report sccache wiring`, which resolves the wrapper on `PATH`
+  with `command -v` and prints `sccache --show-config`. `--show-config` needs
+  no compile, so the evidence exists before a gate can fail and hide it;
+- `tests/support/act_workflow_jobs.rs` pins both variables per job and the
+  wiring step's position, `act_workflow_policy.rs` pins the step's exact
+  script, and three new mutations in `act_workflow_contract_tests.rs` prove a
+  lost wrapper, a lost backend, and a lost `--show-config` each fail the
+  contract.
+
+Wrapping measured coverage was the part worth checking before it was done,
+because the coverage step sets `CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm` and
+`RUSTFLAGS` with `-C instrument-coverage`. Two facts settle it, both read from
+sccache v0.19.0's `src/compiler/rust.rs`: `-C instrument-coverage` is not a
+`cannot_cache!` trigger, and the full rustc command line is part of the cache
+key, so an instrumented object and an uninstrumented one are never the same
+entry. Wrapping the coverage step therefore cannot serve a wrong object.
+
+The Act smoke needed a matching change, because the derived job now runs the
+wiring step before `make install-build-tools` and the fixture PATH carried no
+`sccache`. A stub that answers `--show-config` is written beside the existing
+`make`/`cargo`/`rustc` stubs, and the stub's trace line records it like any
+other executor.
+
+The lesson is narrower than "check your action's inputs". An action can provide
+a tool without making it reachable, and a tool that is silently optional will
+not report its own absence. Where a claim is load-bearing, the pipeline needs a
+step whose failure is observable.
+
+## AC-04 stays representative after the cache change
+
+The acceptance record's conditions already read "no sccache", so adding
+`RUSTC_WRAPPER` to the gate jobs raises the question of whether the measurement
+still describes the shipped build. It does, and the evidence is checkable
+rather than assumed:
+
+- The control's workload is unchanged. `5f53ed6`, the commit the record was
+  written from, is not an ancestor of this branch after the rebase, but every
+  file the workload names — the workspace, crate, and fixture manifests, the
+  lock file, `.cargo/config.toml`, and `crates/combobulate-kernel/` — is
+  byte-identical between that commit and this head. A rebase moved the commit
+  identity; it did not move the thing being measured.
+- The lane still measures without a cache. `profile-measurements.yml` asserts
+  `test -z "${RUSTC_WRAPPER-}"` before the timed loop, and
+  `test_profile_measurement_workflow.py` pins both the absence of
+  `SCCACHE_RECACHE` and the assertion itself. The three gate jobs this branch
+  changed are `ci.yml` and `coverage-main.yml`; the measurement lane is not
+  among them.
+
+One weakness is real and deliberately left for its own change. The
+`RUSTC_WRAPPER` assertion sits before the `setup-rust` step rather than after
+it, so it proves the ambient environment at job start rather than the
+environment the timed builds inherit. `setup-rust` sets neither `RUSTC_WRAPPER`
+nor `SCCACHE_GHA_ENABLED` — verified against the pinned `47b337e4` action,
+which only runs `mozilla-actions/sccache-action` and exports nothing — so the
+two environments agree today and the record is sound. Moving the assertion to
+the last step before the loop is still the right hardening, because it would
+survive a future change to the action's outputs. It is not part of this change:
+it alters a different workflow from the one under repair, it would require
+re-running a 90-minute reserved measurement lane to re-establish the evidence,
+and the defect it guards against cannot currently fire. Recorded here so the
+follow-up has its rationale.

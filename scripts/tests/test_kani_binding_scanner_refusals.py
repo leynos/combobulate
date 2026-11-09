@@ -154,17 +154,37 @@ class ScannerRefusals(CheckoutFixture):
 
         DL-16 binds the audit to the digests a manifest records, so a source
         named without one cannot be checked against the file the audit reads.
-        ``_manifest_sources`` drops such an entry, and the scanner must then
-        refuse the manifest rather than report an audit of zero files.
+        ``_manifest_sources`` is all-or-nothing: it returns ``None`` for this
+        list rather than dropping the unbound entry, because keeping the other
+        entries would audit exactly the sources the author remembered to bind.
+        The scanner must then refuse the manifest, and the refusal names the
+        unbound binding rather than reporting an audit of zero files.
         """
         checkout = self.checkout(manifest=json.dumps({
             'harnesses': [{'name': 'h::x', 'role': 'claim'}],
             'sources': ['manifest.json', 'missing.rs'],
         }))
         self.assertIn("manifest 'manifest.json' was refused: "
-                      'it names no source files to audit',
+                      'it binds a source that names no path and digest',
                       captured_against(checkout.root, trust_audit, checkout.record()),
                       'a source list without digests must refuse the manifest as unauditable')
+
+    def test_an_empty_source_list_is_refused_for_naming_none(self):
+        """Require the empty list's own refusal, distinct from a malformed one.
+
+        ``()` and ``None`` are different faults with different repairs: an
+        empty list asks the author to declare the sources the proof covers,
+        while an unbound entry asks them to bind the one they named. A scanner
+        that collapsed the two would send every author to the same message.
+        """
+        checkout = self.checkout(manifest=json.dumps({
+            'harnesses': [{'name': 'h::x', 'role': 'claim'}],
+            'sources': [],
+        }))
+        self.assertIn("manifest 'manifest.json' was refused: "
+                      'it names no source files to audit',
+                      captured_against(checkout.root, trust_audit, checkout.record()),
+                      'an empty source list must be refused for naming none')
 
     def test_a_source_git_does_not_track_is_reported_by_its_own_class(self):
         """Require a source refusal to be reported as a source, not as the manifest.

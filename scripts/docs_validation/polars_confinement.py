@@ -20,7 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .context import ValidationContext, require
-from .trust_audit import Kind, TrustAuditError, tokenize
+from .trust_audit import Kind, Token, TrustAuditError, alias_bindings, tokenize
 
 # The one module allowed to name Polars, and the only prefix its submodules
 # could take. A submodule of the backend is still the backend.
@@ -59,8 +59,8 @@ def check_polars_confinement(context: ValidationContext) -> None:
     Examples
     --------
     ``check_polars_confinement(context)`` passes when only
-    ``src/polars_backend.rs`` names ``polars::``, and fails listing the file
-    and position of any other occurrence.
+    ``src/polars_backend.rs`` reaches Polars, and fails listing the file and
+    position of any other occurrence.
     """
     violations = _violations(context.root)
     require(not violations,
@@ -81,7 +81,7 @@ def _violations(root: Path) -> list[str]:
         if _is_backend(relative):
             continue
         found.extend(f'{relative}:{token.line}:{token.column}'
-                     for token in _polars_paths(source))
+                     for token in _polars_paths(source.read_text(encoding='utf-8')))
     return found
 
 
@@ -105,20 +105,29 @@ def _facade_sources(root: Path) -> tuple[Path, ...]:
     return tuple(sorted(src.rglob(f'*{RUST_SUFFIX}')))
 
 
-def _polars_paths(source: Path) -> list[object]:
-    """Return the tokens that begin a ``polars::`` path in one facade source.
+def _polars_paths(text: str) -> list[Token]:
+    """Return the tokens that begin a path into the Polars crate.
 
     A bare ``polars`` identifier that is not followed by ``::`` is not a path
     into the crate: it is how the module is named, imported, or referred to in
     prose the lexer has already discarded. Only the qualified form reaches the
     dependency's items, so only that form is confined.
+
+    The path need not be spelled ``polars::``. ``use polars as p;`` binds the
+    crate to another name — the same renaming the trust audit resolves for its
+    own roots — after which ``p::prelude::DataFrame`` reaches exactly the items
+    the literal form does. Matching only the literal spelling would let a facade
+    module import Polars under any name it liked and still pass the control,
+    which is the failure DL-19 keeps the confinement rule for. A grouped
+    ``use polars::{self as p};`` is the same rename and is read the same way.
     """
-    tokens = tokenize(source.read_text(encoding='utf-8'))
+    tokens = tokenize(text)
+    names = alias_bindings(tokens, POLARS_PATH)
     return [
         token
         for index, token in enumerate(tokens)
         if token.kind is Kind.IDENT
-        and token.text == POLARS_PATH
+        and token.text in names
         and index + 1 < len(tokens)
         and tokens[index + 1].text == PATH_SEPARATOR
     ]
@@ -130,13 +139,16 @@ def _require_seeded_violation(root: Path) -> None:
     The copy is tokenized in memory rather than written beside the real source,
     so the control cannot leave a stray file behind if it fails, and it cannot
     be confused with the real facade by any later walk.
+
+    The seeded text is handed to :func:`_polars_paths`, the detector the real
+    walk uses, rather than to a second reader written for the control. A control
+    that searched for the literal word with its own predicate would keep firing
+    after the detector regressed — the very case the control exists to catch.
     """
     original = root / NON_VACUITY_SOURCE
     require(original.is_file(), f'the non-vacuity control needs {NON_VACUITY_SOURCE} to exist')
-    seeded = 'use polars::prelude::DataFrame;\n' + original.read_text(encoding='utf-8')
-    reported = [token for token in tokenize(seeded)
-                if token.kind is Kind.IDENT and token.text == POLARS_PATH]
-    require(reported,
+    seeded = f'use {POLARS_PATH}::prelude::DataFrame;\n' + original.read_text(encoding='utf-8')
+    require(_polars_paths(seeded),
             'a seeded `use polars::` in a copy of '
             f'{NON_VACUITY_SOURCE} must be reported, so a scan that found '
             'nothing anywhere cannot pass')

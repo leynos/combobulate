@@ -49,6 +49,16 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
             "sudo apt-get update \\\n  && sudo apt-get install --yes --no-install-recommends \
              clang lld mold"
         ),
+        // DL-03: the wrapper Cargo is told to use must be runnable. Cargo
+        // silently ignores one that is not, so this step resolves it on `PATH`
+        // and prints the cache's own configuration. `--show-config` needs no
+        // compile, which is why the evidence is available before any gate runs.
+        Some("Report sccache wiring") => concat!(
+            "set -euo pipefail\n",
+            "wrapper=\"${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}\"\n",
+            "command -v \"$wrapper\"\n",
+            "sccache --show-config"
+        ),
         Some("Install the build standard") => "make install-build-tools",
         Some("Format") => "make check-fmt",
         Some("Check spelling") => "make spelling",

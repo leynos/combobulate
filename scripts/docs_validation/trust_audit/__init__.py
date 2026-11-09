@@ -43,10 +43,12 @@ from .matcher import (
     TrustItem,
     scan,
 )
+from .use_tree import alias_bindings, statement_end
 
 __all__ = [
     'KANI_VOCABULARY', 'VERUS_VOCABULARY', 'VOCABULARY', 'AuditedFile', 'Kind',
     'ModuleReference', 'ScanResult', 'Token', 'TrustAuditError', 'TrustItem',
-    'audit_tree', 'is_procedural_macro_crate', 'items_of', 'literal_body',
-    'resolve_repository_path', 'scan', 'scan_tree', 'tokenize',
+    'alias_bindings', 'audit_tree', 'is_procedural_macro_crate', 'items_of',
+    'literal_body', 'resolve_repository_path', 'scan', 'scan_tree',
+    'statement_end', 'tokenize',
 ]

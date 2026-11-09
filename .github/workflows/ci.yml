@@ -6,6 +6,15 @@ name: CI
 # (DL-14) is every required pull-request job here, so all three jobs share the
 # registered runner image and timeout, and each is sized so its slowest cold
 # run stays inside six minutes.
+#
+# DL-03's cache clause is only satisfied when Rust compilation actually goes
+# through sccache, so every job sets `RUSTC_WRAPPER: sccache` and
+# `SCCACHE_GHA_ENABLED: "true"`. The pinned `setup-rust` action runs
+# `mozilla-actions/sccache-action`, which installs the binary and exports
+# `SCCACHE_PATH` but never sets either variable; a job that left them unset
+# compiled without the cache and reported `Compile requests 0`. A malformed
+# wrapper value is silently ignored by Cargo, which is why the value is a bare
+# command name on `PATH` rather than a path to a file that may not exist.
 
 'on':
   pull_request:
@@ -26,6 +35,14 @@ jobs:
       # Make routes read this to select one profile. The native-only profile is
       # the one AC-07 measures, and the two *-polars jobs own the other.
       GATE_PROFILE: native-only
+      # DL-03: route every rustc invocation through the cache sccache-action
+      # installed. Cargo ignores a wrapper it cannot run, so this is what makes
+      # the cache reachable at all.
+      RUSTC_WRAPPER: sccache
+      # The GitHub Actions cache backend, which is the sccache storage DL-03
+      # names. Without it sccache compiles through to disk and shares nothing
+      # between jobs or runs.
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -51,6 +68,19 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Report sccache wiring
+        # DL-03's cache clause is about compilation that actually reaches
+        # sccache, and a wrapper Cargo cannot run is silently ignored rather
+        # than reported. So this step resolves the configured wrapper on PATH
+        # and prints the cache's own server configuration, which is the
+        # observable evidence that builds from here on are wrapped. It runs
+        # before the suite routes so a later failure cannot leave the question
+        # unanswered, and `--show-config` needs no compile to answer it.
+        run: |
+          set -euo pipefail
+          wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
+          command -v "$wrapper"
+          sccache --show-config
       - name: Install the build standard
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools
@@ -159,6 +189,8 @@ jobs:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
       GATE_PROFILE: polars-enabled
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -182,6 +214,14 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Report sccache wiring
+        # See `build-test`: the action installs sccache but sets no wrapper, so
+        # this step is the evidence that the job's compilation is wrapped.
+        run: |
+          set -euo pipefail
+          wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
+          command -v "$wrapper"
+          sccache --show-config
       - name: Install the build standard
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools
@@ -219,6 +259,8 @@ jobs:
       CARGO_TERM_COLOR: always
       BUILD_PROFILE: debug
       GATE_PROFILE: polars-enabled
+      RUSTC_WRAPPER: sccache
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
@@ -242,6 +284,14 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
           sudo apt-get update \
             && sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Report sccache wiring
+        # See `build-test`: the action installs sccache but sets no wrapper, so
+        # this step is the evidence that the job's compilation is wrapped.
+        run: |
+          set -euo pipefail
+          wrapper="${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}"
+          command -v "$wrapper"
+          sccache --show-config
       - name: Install the build standard
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools

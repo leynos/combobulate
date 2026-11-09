@@ -19,6 +19,8 @@ module only reports what the source says.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from .lexer import Kind, Token
 
 
@@ -30,15 +32,25 @@ def alias_bindings(tokens: tuple[Token, ...], root: str) -> frozenset[str]:
     claim is about what the code does, not what the crate is called at the use
     site, so an alias is matched exactly like the literal root.
 
-    Only the single-name form is read. A grouped or glob import
-    (``use kani::{assume};``, ``use kani::*;``) binds items rather than the
-    crate, so the qualified-path rule does not apply to it.
+    A grouped import can rename the crate as well, through the ``self`` member:
+    ``use kani::{self as k};`` binds ``k`` as another name for the crate, which
+    is the same renaming the plain form makes. An import that merely renames a
+    *member* — ``use kani::{assume as a};`` — still binds no crate alias: the
+    ``as`` there belongs to ``assume``, and reading it as one would make every
+    ``a::`` path trust.
+
+    A glob import (``use kani::*;``) binds items rather than the crate, so the
+    qualified-path rule does not apply to it.
 
     Examples
     --------
     A file that renames the crate reports both names::
 
         alias_bindings(tokenize('use kani as k;'), 'kani')  # {'kani', 'k'}
+
+    The grouped spelling reports the same names::
+
+        alias_bindings(tokenize('use kani::{self as k};'), 'kani')  # {'kani', 'k'}
     """
     names = {root}
     for index, token in enumerate(tokens):
@@ -47,26 +59,96 @@ def alias_bindings(tokens: tuple[Token, ...], root: str) -> frozenset[str]:
         end = statement_end(tokens, index + 1)
         if use_root(tokens, index + 1) != root:
             continue
-        alias = use_alias(tokens, index + 1, end)
-        if alias is not None:
-            names.add(alias)
+        names.update(use_aliases(tokens, index + 1, end))
     return frozenset(names)
 
 
-def use_alias(tokens: tuple[Token, ...], start: int, end: int) -> str | None:
-    """Return the name in ``use root as name;``, or None for any other form.
+def use_aliases(tokens: tuple[Token, ...], start: int, end: int) -> frozenset[str]:
+    """Return every name that renames the crate itself in one ``use`` statement.
 
-    The ``as`` must be the statement's own, so a grouped import whose last
-    member is renamed does not rename the crate. Reaching a brace before ``as``
-    means the statement binds something else.
+    Two forms rename the crate. The plain ``use root as name;`` does it
+    directly, and the grouped ``use root::{self as name};`` does it through the
+    ``self`` member, which stands for the crate itself rather than for one of
+    its items.
+
+    A rename of any other member — ``use root::{assume as a};`` — is not this
+    statement's own alias. Treating it as one would match every ``a::`` path in
+    the file against the trust root, which is a claim the source does not make.
+
+    Examples
+    --------
+    >>> sorted(use_aliases(tokenize('use kani as k;'), 1, 5))
+    ['k']
+    >>> sorted(use_aliases(tokenize('use kani::{self as k};'), 1, 8))
+    ['k']
+    >>> use_aliases(tokenize('use kani::{assume as a};'), 1, 8)
+    frozenset()
     """
-    for index in range(start, end):
-        text = tokens[index].text
-        if text in {'{', '}'}:
-            return None
-        if text == 'as':
-            alias = tokens[index + 1] if index + 1 < end else None
-            return alias.text if alias is not None and alias.kind is Kind.IDENT else None
+    return frozenset(tokens[index + 1].text for index in _crate_alias_indices(tokens, start, end))
+
+
+def _crate_alias_indices(tokens: tuple[Token, ...], start: int, end: int) -> Iterator[int]:
+    """Yield the index of each ``as`` that renames the crate in one statement.
+
+    At most one such ``as`` can appear in a statement Rust accepts, but the
+    reader reports every one it finds rather than assuming: a statement it
+    misreads is better reported twice than silently narrowed.
+    """
+    for index in range(start, end - 1):
+        if tokens[index].text != 'as':
+            continue
+        if tokens[index + 1].kind is not Kind.IDENT:
+            continue
+        if _renames_crate(tokens, start, index):
+            yield index
+
+
+def _renames_crate(tokens: tuple[Token, ...], start: int, as_index: int) -> bool:
+    """Report whether the ``as`` at ``as_index`` renames the root rather than a member.
+
+    Two positions do so: directly after the root (``root as name``) and directly
+    after a ``self`` that is itself the first thing inside a brace
+    (``root::{self as name}``). Every other ``as`` in the statement belongs to a
+    member path.
+
+    A bare ``self`` is the root itself, so ``self as name`` renames the crate
+    wherever it appears. Any other identifier is the root only when it is the
+    first one in the statement: ``root::name as alias`` puts a second identifier
+    in front of the ``as``, and that is a member rename.
+    """
+    target = as_index - 1
+    if target < start or tokens[target].kind is not Kind.IDENT:
+        return False
+    if tokens[target].text == 'self':
+        return True
+    return _is_root_reference(tokens, start, target)
+
+
+def _is_root_reference(tokens: tuple[Token, ...], start: int, index: int) -> bool:
+    """Report whether the identifier at ``index`` is the statement's own root.
+
+    A ``use`` statement reaches its root through a leading ``::`` or directly,
+    and nothing else precedes it but the keyword itself. So the root is the only
+    identifier between ``start`` and ``index``.
+    """
+    return all(tokens[cursor].kind is not Kind.IDENT for cursor in range(start, index))
+
+
+def use_alias(tokens: tuple[Token, ...], start: int, end: int) -> str | None:
+    """Return the first name a statement gives the crate, or None if it gives none.
+
+    A convenience over :func:`use_aliases` for the callers that want the one
+    alias a well-formed statement carries, in whichever spelling it is written.
+
+    Examples
+    --------
+    >>> use_alias(tokenize('use kani as k;'), 1, 5)
+    'k'
+    >>> use_alias(tokenize('use kani::{assume as a};'), 1, 8) is None
+    True
+    """
+    for index in _crate_alias_indices(tokens, start, end):
+        return tokens[index + 1].text
     return None
 
 

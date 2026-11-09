@@ -274,6 +274,25 @@ fn workflow_environment_mutations_break_the_contract() {
             "different lint shell",
             CI_WORKFLOW.replace("- name: Lint\n", "- name: Lint\n        shell: sh\n"),
         ),
+        // DL-03's cache clause is only met when compilation reaches sccache.
+        // The action installs the binary but sets no wrapper, and Cargo
+        // silently ignores a wrapper it cannot run, so each half of the
+        // declaration is checked against its own mutation.
+        (
+            "lost compiler wrapper",
+            CI_WORKFLOW.replace("RUSTC_WRAPPER: sccache", "RUSTC_WRAPPER: ''"),
+        ),
+        (
+            "lost cache backend",
+            CI_WORKFLOW.replace(
+                "SCCACHE_GHA_ENABLED: \"true\"",
+                "SCCACHE_GHA_ENABLED: \"false\"",
+            ),
+        ),
+        (
+            "lost wiring evidence",
+            CI_WORKFLOW.replace("          sccache --show-config", "          echo wired"),
+        ),
     ] {
         assert_ne!(
             changed, CI_WORKFLOW,
@@ -284,6 +303,16 @@ fn workflow_environment_mutations_break_the_contract() {
             "contract must detect {reason}"
         );
     }
+    act_route_mutations_break_the_contract();
+}
+
+/// Act's manual route is contracted separately from the hosted job environment.
+///
+/// The manual workflow may not acquire a pull-request trigger, which would make
+/// it repeat the full hosted validation, and its action revision may not drift
+/// off the pin the hosted route records. Neither is a `build-test` environment
+/// concern, so the cases live here rather than growing the loop above.
+fn act_route_mutations_break_the_contract() {
     let enabled_pr_act = ACT_VALIDATION_WORKFLOW.replace(
         "  workflow_dispatch:",
         "  pull_request:\n  workflow_dispatch:",
