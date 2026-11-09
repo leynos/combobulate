@@ -1309,10 +1309,13 @@ the workflow "runs only on pushes to `main`" — which the dispatch contradicted
 sixteen lines above. A dispatch may select any branch, so a branch run could
 write.
 
-The same hole existed in `ci.yml`, which the assessment did not name: it also
-declares `workflow_dispatch`, and its round-2 test keyed on
-`github.event_name == 'push'`. A dispatch there reads as "not a pull request"
-and gets `READ_WRITE`.
+The same hole existed in `ci.yml`, which the assessment did not name: it
+declares `workflow_dispatch` beside `pull_request`, and its round-2 test keyed
+on `github.event_name == 'push'`. The dispatch event name is itself `push`, so
+a dispatch read as a push — `'push' == 'push'` — and a dispatch from any branch
+got `READ_WRITE`. That is the opposite error from `coverage-main.yml`, where
+the same expression was false for every event and so made even a dispatch from
+`main` read-only.
 
 Both now key on `github.ref`, which is the only test that holds across every
 declared trigger without enumerating them: `refs/heads/main` writes, everything

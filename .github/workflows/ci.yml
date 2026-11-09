@@ -52,7 +52,9 @@ jobs:
       #
       # The test is the ref, not the event, because `workflow_dispatch` is
       # also declared here and a dispatch may run from any branch. Keying on
-      # `push` would give such a dispatch `READ_WRITE`; the ref gives the
+      # the event cannot separate a dispatch from a push: the dispatch event
+      # name is literally `push`, so such a run reads as a push to `main` and
+      # gets `READ_WRITE` from whatever branch it selects. The ref gives the
       # permitted write to `main` alone and reads everywhere else.
       SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}
     steps:
