@@ -1185,3 +1185,85 @@ loop is still the right hardening, because it would survive a future change to
 the action's outputs. It is not part of this change: it alters a different
 workflow from the one under repair, and the defect it guards against cannot
 currently fire. Recorded here so the follow-up has its rationale.
+
+## Round 2: two findings that survived the first disposition
+
+The second assessment accepted five of the earlier findings and raised two new
+ones. Both are real. Recording them here with the evidence, because each was
+established by running the code rather than by reading it.
+
+### A grouped import was read one root deep
+
+`use_tree.use_root` returns the first identifier of a `use` statement. For
+`use {std::mem, kani as k};` that is `std`, so `alias_bindings` skips the
+statement entirely and `k::assume` is never reported. The bug is visible as an
+order dependence, which is what makes it a defect rather than a stated limit:
+
+```text
+use {std::mem, kani as k};   bindings ['kani']        <- alias lost
+use {kani as k, std::mem};   bindings ['k', 'kani']   <- alias found
+```
+
+The same statement must not mean two different things because of member order.
+The audit has two consumers of that reader and both were wrong in the same way:
+`matcher._imported_roots` also calls `use_root`, so even an unaliased
+`use {std::mem, kani};` left `kani` out of the imported-root set that gates
+rule (iii). And `polars_confinement._polars_paths` resolves through
+`alias_bindings`, so `use {std::mem, polars as p};` escaped the confinement
+control by the same route.
+
+The repair reads every root a statement names, with its own alias, instead of
+one. `use_roots` returns one `(root, alias)` per root in the tree; the single-
+root callers keep working because the rarer spellings degrade to no alias
+rather than to no root.
+
+The split is keyed on how the statement *starts*, not on whether a brace
+appears anywhere. A statement beginning with `{` names several roots, so its
+top-level members are read one by one; a statement beginning with an identifier
+names one root, and any later brace lists that root's members. That distinction
+is what keeps `use kani::{self as k};` working through the existing
+per-statement code rather than a second implementation. Six reader-level
+regressions and one per consumer pin it, including both member orders of the
+same import, since the order dependence is the thing that made the old answer
+wrong.
+
+### The cache saved on every pull request
+
+DL-03's decision text ends "cache saves only on `main`". Nothing enforced it,
+and the cache metadata shows the policy inverted. Across 1255 entries (5.59 GB,
+against GitHub's 10 GB limit):
+
+| ref                  | entries | bytes   |
+| -------------------- | ------- | ------- |
+| `refs/pull/53/merge` | 1090    | 1.02 GB |
+| `refs/heads/main`    | 25      | 154 MB  |
+| `refs/pull/19/merge` | 20      | 831 MB  |
+
+Pulls write; `main` barely does. That is the opposite of what DL-03 asks for,
+and at 1 GB per pull it evicts the entries `main` needs.
+
+The first reading of the finding was that `SCCACHE_GHA_ENABLED` has no
+read-only mode. That was wrong, and checking the released binary rather than
+the action's inputs is what corrected it. `mozilla/sccache` gained
+`SCCACHE_GHA_RW_MODE` in `bdbab18`, which `v0.16.0` through `v0.19.0` all
+contain, and 0.19.0 is the version the hosted action installs. Its accepted
+values are `READ_ONLY` and `READ_WRITE`:
+
+```rust
+string_from_env_var(env_var_name).and_then(|value| match value.to_uppercase().as_str() {
+    "READ_ONLY" => Some(CacheModeConfig::ReadOnly),
+    "READ_WRITE" => Some(CacheModeConfig::ReadWrite),
+```
+
+So the repair is a job-level variable rather than a restructure: pull-request
+runs read the cache and do not write it, while a push to `main` keeps
+`READ_WRITE`. Writes on a pull request are also wasted work — a cache entry
+scoped to `refs/pull/N/merge` is never read by a later run of the same branch
+once the merge ref advances — so this costs the pull-request jobs nothing they
+were benefiting from.
+
+One constraint shaped where the switch lives: `profile-measurements.yml` asserts
+`test -z "${RUSTC_WRAPPER-}"` because AC-04 measures with no cache at all.
+That lane must keep neither a wrapper nor a cache backend, so the switch
+belongs to the three gate jobs in `ci.yml` and to `coverage-main.yml`, never to
+the measurement workflows.
