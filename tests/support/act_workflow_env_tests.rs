@@ -99,8 +99,10 @@ fn cache_mutations_break_the_contract() {
         (
             // `workflow_dispatch` is declared beside `pull_request`, and an
             // event test cannot separate the two: a dispatch reports its own
-            // event name, so the same spelling decides the wrong mode.
-            "a dispatch may save from a branch",
+            // event name, so this spelling makes every dispatch read-only,
+            // `main` included. The mutation is named for the mode it actually
+            // selects rather than for a save it cannot cause.
+            "a dispatch is read-only even from main",
             CI_WORKFLOW.replace(
                 "github.ref == 'refs/heads/main'",
                 "github.event_name == 'push'",

@@ -1338,11 +1338,17 @@ event and made every dispatch `READ_ONLY`, including a dispatch from `main`.
 An earlier revision of this record said the opposite, that a dispatch's event
 name is `push` and so a branch dispatch wrote. That was wrong, and it was a
 second error in the same place: I had first described the defect as "not a pull
-request, so eligible", which was also wrong. The workflow has never produced a
-dispatch, so nothing observed had distinguished the two readings; the
-documentation did. Both workflows are now safe for a reason that does not
-depend on which reading is right: neither event spelling separates a dispatch
-from the trigger beside it, so the ref decides.
+request, so eligible", which was also wrong.
+
+The dispatch history could not settle it. `ci.yml` has produced dispatches —
+`38768781598` on `1-1-reconciliation` among others — so an earlier statement
+here that the workflow had never been dispatched was wrong too. But
+`SCCACHE_GHA_RW_MODE` entered the workflow at `1090be2` (2026-11-09 12:44), and
+the most recent dispatch of any workflow is `2026-11-08T01:37`, so every
+dispatch predates the expression. Nothing observed had distinguished the two
+readings; the documentation did. Both workflows are now safe for a reason that
+does not depend on which reading is right: neither event spelling separates a
+dispatch from the trigger beside it, so the ref decides.
 
 Both now key on `github.ref`, which is the only test that holds across every
 declared trigger without enumerating them: `refs/heads/main` writes, everything

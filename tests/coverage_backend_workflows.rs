@@ -259,7 +259,7 @@ fn coverage_main_cache_mutations_break_the_contract() {
         ),
         (
             // The round-2 spelling: a dispatch reports its own event name, so
-            // this test makes every dispatch read-only.
+            // this test makes every dispatch read-only, `main` included.
             "cache mode keyed on the event",
             MAIN.replace(
                 "github.ref == 'refs/heads/main'",
