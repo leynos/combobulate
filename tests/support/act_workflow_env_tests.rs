@@ -66,8 +66,8 @@ fn workflow_environment_mutations_break_the_contract() {
 ///
 /// The save test keys on the ref rather than the event because both workflows
 /// also declare `workflow_dispatch`, which may run from any branch. An event
-/// test would read a branch dispatch as "not a pull request" and let it write,
-/// so that regression has its own case.
+/// test cannot decide the mode from the event when the same workflow declares
+/// more than one trigger, so that regression has its own case.
 fn cache_mutations_break_the_contract() {
     for (reason, changed) in [
         (
@@ -97,9 +97,9 @@ fn cache_mutations_break_the_contract() {
             ),
         ),
         (
-            // `workflow_dispatch` is declared beside `pull_request`, so an
-            // event test that only guards pull requests would let a branch
-            // dispatch write.
+            // `workflow_dispatch` is declared beside `pull_request`, and an
+            // event test cannot separate the two: a dispatch reports its own
+            // event name, so the same spelling decides the wrong mode.
             "a dispatch may save from a branch",
             CI_WORKFLOW.replace(
                 "github.ref == 'refs/heads/main'",

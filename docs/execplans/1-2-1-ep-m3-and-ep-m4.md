@@ -1311,11 +1311,19 @@ write.
 
 The same hole existed in `ci.yml`, which the assessment did not name: it
 declares `workflow_dispatch` beside `pull_request`, and its round-2 test keyed
-on `github.event_name == 'push'`. The dispatch event name is itself `push`, so
-a dispatch read as a push — `'push' == 'push'` — and a dispatch from any branch
-got `READ_WRITE`. That is the opposite error from `coverage-main.yml`, where
-the same expression was false for every event and so made even a dispatch from
-`main` read-only.
+on `github.event_name == 'push'`. A manual dispatch reports its event name as
+`workflow_dispatch`, not `push` — GitHub defines `github.event_name` as the
+name of the event that triggered the run — so the test was false for every
+event and made every dispatch `READ_ONLY`, including a dispatch from `main`.
+
+An earlier revision of this record said the opposite, that a dispatch's event
+name is `push` and so a branch dispatch wrote. That was wrong, and it was a
+second error in the same place: I had first described the defect as "not a pull
+request, so eligible", which was also wrong. The workflow has never produced a
+dispatch, so nothing observed had distinguished the two readings; the
+documentation did. Both workflows are now safe for a reason that does not
+depend on which reading is right: neither event spelling separates a dispatch
+from the trigger beside it, so the ref decides.
 
 Both now key on `github.ref`, which is the only test that holds across every
 declared trigger without enumerating them: `refs/heads/main` writes, everything
