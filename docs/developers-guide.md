@@ -95,6 +95,16 @@ configuration boundaries and their regression tests; each boundary owns its
 variable names and diagnostics. These helpers are not a cross-suite validation
 framework.
 
+A contract probe that shells out to `make` must pin `GATE_PROFILE=both` on the
+child command line and remove the variable from the child environment. Every
+hosted job exports the single profile it was scheduled to measure, and the
+Makefile honours it, so a probe asserting the default two-profile route would
+otherwise measure one profile on CI and two locally. The command-line
+assignment is what displaces a value replayed through an inherited `MAKEFLAGS`;
+the removal is what stops an exported value winning on level. A test that
+ignores this passes locally and fails hosted, which is the least useful place
+to learn about it.
+
 The separate `.github/workflows/act-validation.yml` workflow runs only on
 manual dispatch. It exercises the full workflow through Act in Docker to check
 local Act compatibility, including step routing, action execution, shell

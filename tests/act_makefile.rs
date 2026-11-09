@@ -186,6 +186,44 @@ fn command_records_distinguish_empty_and_unset_environment_values() {
     );
 }
 
+/// An inherited Make override must not narrow the default gate route.
+///
+/// A hosted job exports the single profile it was scheduled to measure, and the
+/// Makefile honours it, so the recorded route would lose one profile's commands
+/// — the failure hosted CI actually reported. The regression therefore injects
+/// the profile the way a hosted job does, as an inherited Make override, and
+/// requires the default two-profile route regardless.
+#[test]
+fn inherited_workflow_profile_does_not_narrow_the_gate_route() {
+    let harness = unwrap_test_result(MakeHarness::new(), "create the Make harness");
+    let output = unwrap_test_result(
+        harness.run_make_test(MakeOptions {
+            caller_makeflags: Some("-- GATE_PROFILE=polars-enabled"),
+            ..MakeOptions::default()
+        }),
+        "run make test with the hosted profile exported",
+    );
+    let invocations = unwrap_test_result(harness.invocations(), "read controlled invocations");
+
+    assert!(
+        output.status.success(),
+        "the default route must succeed with a hosted GATE_PROFILE override"
+    );
+    assert_eq!(
+        invocations
+            .iter()
+            .map(|invocation| invocation.executable.as_str())
+            .collect::<Vec<_>>(),
+        OUTER_EXECUTORS,
+        "an inherited GATE_PROFILE must not narrow the two-profile route"
+    );
+    assert_outer_invocations_are_ordered(
+        invocations
+            .get(2..)
+            .expect("both profiles' commands must be recorded"),
+    );
+}
+
 /// An inherited `WITH_ACT` value must not override the command-line setting.
 #[test]
 fn explicit_workflow_test_setting_prevents_nested_act_recursion() {

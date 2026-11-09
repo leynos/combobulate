@@ -80,6 +80,45 @@ fn inherited_with_act_does_not_reach_nested_make_all() {
     );
 }
 
+/// Confirms an inherited hosted profile cannot narrow the asserted route.
+///
+/// A hosted job supplies the single profile it was scheduled to measure, and
+/// the Makefile honours it, so a nested run that accepted the value would
+/// record half the stages this file asserts — the failure hosted CI reported
+/// for the neighbouring Make contracts. Both delivery routes are injected,
+/// because they need different defences: an exported variable is stopped by
+/// removing it from the child, while a value replayed through `MAKEFLAGS`
+/// outranks the assignment a child `make` merely inherits and is displaced
+/// only by a command-line assignment on the child itself.
+#[test]
+fn inherited_gate_profile_does_not_narrow_the_asserted_route() {
+    let test_binary = std::env::current_exe().expect("find current test executable");
+    for (description, variable, value) in [
+        ("exported variable", "GATE_PROFILE", "polars-enabled"),
+        (
+            "MAKEFLAGS replay",
+            "MAKEFLAGS",
+            "-- GATE_PROFILE=polars-enabled",
+        ),
+    ] {
+        let output = Command::new(&test_binary)
+            .args([
+                "--exact",
+                "parallel_all_runs_each_gate_in_order",
+                "--nocapture",
+            ])
+            .env(variable, value)
+            .output()
+            .expect("run the exact gate-order test with a hosted profile supplied");
+        assert!(
+            output.status.success(),
+            "the gate-order test must pin the default route against a {description}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
 /// Proves a failing Python docstring gate stops `make lint` at that stage.
 ///
 /// The `all` composite covers the same claim through its own test. This one

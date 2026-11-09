@@ -877,3 +877,37 @@ branch had never been pushed. Production source under `scripts/` is now
 byte-identical to the pre-contamination snapshot; the only remaining deltas
 against that snapshot are documentation, `spec/` records, and the survivor
 tests the artisan deliberately wrote.
+
+## The hosted gate profile leaks into the Make contract probes
+
+Hosted CI ran three Makefile-contract tests red that pass locally. The cause
+was not the contracts: each hosted job exports `GATE_PROFILE` for the single
+profile it was scheduled to measure, and every probe shelled out to a child
+`make` without neutralising it. The Makefile honours the inherited value, so an
+asserted two-profile route collapsed to one — `9` recorded executors became
+`7`, and `nextest run --all-targets --no-default-features` became
+`nextest run --all-targets`. nextest cancels the remaining tests after a first
+failure, so the hosted run reported three failures while `387` further tests
+never ran; the same exposure in `make_gate_order` and `build_standard_contract`
+was latent rather than absent.
+
+Make's precedence is what makes one rule cover every delivery route, verified
+directly in a scratch Makefile:
+
+- an exported `GATE_PROFILE` reaches a nested `make` and wins on level;
+- a command-line assignment on the child outranks the exported value;
+- a command-line assignment on the child also outranks the same assignment
+  replayed through inherited `MAKEFLAGS`, which is the one route an inherited
+  command-line assignment cannot beat.
+
+So each harness that asserts the default route now passes `GATE_PROFILE=both`
+on the child command line and removes the variable from the child environment.
+The pin alone covers the `MAKEFLAGS` route; the removal alone covers the
+exported route; together they cover both. The regression in
+`tests/make_gate_order.rs` injects each route separately and was confirmed to
+fail with the pin removed, so it tests the defect rather than passing vacuously.
+
+The lesson generalises past `GATE_PROFILE`: a contract probe that shells out to
+a build tool inherits whatever the measuring job exported, so the probe must
+state the routing it assumes rather than accept the caller's. A local pass is
+not evidence about the hosted route for this class of test.

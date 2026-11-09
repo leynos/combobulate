@@ -168,6 +168,13 @@ fn expanded(value: &str, inherited: Option<&str>) -> Read<Flags> {
 ///
 /// `without_preparation` treats the preparation targets as already built, so
 /// the result holds only the requested target's own commands.
+///
+/// The profile route is pinned rather than inherited. These contracts assert
+/// what the default two-profile route emits, and a hosted job exports the
+/// single profile it was scheduled to measure; an inherited value would halve
+/// the recipes read here. Pinning it on the command line outranks an inherited
+/// value however it arrives, and removing the variable stops it winning on
+/// level.
 fn dry_run(
     target: &str,
     host: Host,
@@ -175,6 +182,7 @@ fn dry_run(
     without_preparation: bool,
 ) -> Read<String> {
     let mut make = Command::new("make");
+    make.arg("GATE_PROFILE=both").env_remove("GATE_PROFILE");
     make.args(["-n", "-B"]);
     if without_preparation {
         make.args(PREPARATION_TARGETS.map(|name| format!("--old-file={name}")));
