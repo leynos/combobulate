@@ -911,3 +911,114 @@ The lesson generalizes past `GATE_PROFILE`: a contract probe that shells out to
 a build tool inherits whatever the measuring job exported, so the probe must
 state the routing it assumes rather than accept the caller's. A local pass is
 not evidence about the hosted route for this class of test.
+
+## The native-only measurement missed the optional-backend loop
+
+Once the Make contracts went green, hosted `build-test` still failed, now on
+the other side of the job: `Current coverage: 95.45%` against a 100 % baseline,
+`Coverage decreased`, tolerance ±1.00 percentage points. 95.45 % is exactly
+21/22, and it is the **native-only** route, so it is a different measurement
+from the 92/93 = 98.92 % reconciled above — that one was taken with default
+features, where `src/polars_backend.rs` is the file under test. Nothing in the
+earlier section applies to this failure except its method.
+
+The whole workspace under `--no-default-features` instruments two files. A local
+`cargo llvm-cov nextest --workspace --no-default-features --lcov` reproduction
+(hosted backend and link flags, 402 tests passing) gave:
+
+| file                 | hit/found |
+| -------------------- | --------- |
+| `combobulate-kernel` | 10/10     |
+| `src/profile.rs`     | 32/34     |
+| **total**            | **42/44** |
+
+`42/44` is 95.4545 %, which rounds to 95.45 %. The two missed lines are 78 and
+79, the body of the loop in `Display`:
+
+```rust
+for name in self.optional_backend_names() {
+    formatter.write_str(", ")?;
+    formatter.write_str(name)?;
+}
+```
+
+This is a genuine test gap and not the closure artefact recorded earlier. The
+loop is reached and its `for` header is hit, but the body executes only when a
+backend is present. In the native-only profile both `has_macros` and
+`has_polars` are compile-time `false`, so the iterator is always empty, the
+body can never run, and no integration test built native-only can reach it. The
+existing unit tests call `to_string()` too, but in that profile they render the
+empty case as well.
+
+The fix constructs the profile directly, which is possible because the test
+module is a child of the defining module, and renders all four combinations:
+
+```rust
+#[rstest]
+#[case::native(false, false, "native")]
+#[case::macros(true, false, "native, macros")]
+#[case::polars(false, true, "native, polars")]
+#[case::both(true, true, "native, macros, polars")]
+fn display_names_each_compiled_backend(/* ... */) { /* ... */ }
+```
+
+Measuring the fix on the narrowed target
+(`-p combobulate --lib --no-default-features`) gave `src/profile.rs` 34/34, so
+the workspace figure becomes 44/44 = 100.00 %. The added lines are not free —
+the report instrumented them and every one is hit — but they are all
+test-module lines whose assertions run, so the denominator grows only with
+lines that execute. `make test` exercises the same cases under the
+polars-enabled profile too, where `case::both` and `case::polars` cover a loop
+that already ran.
+
+The broader lesson is the one this branch keeps relearning: a profile is a
+different program. Code that is unreachable under `--no-default-features` is
+not covered by a test that passes in both profiles, and the only way to know
+which lines those are is to measure the profile the gate measures.
+
+## The coverage baseline is vacuous on `main`
+
+The 100 % baseline the ratchet compares against was not earned. On
+`origin/main` the only instrumented source is
+`crates/combobulate-kernel/src/lib.rs`; the facade's `src/lib.rs` and
+`crates/combobulate-macros/src/lib.rs` are doc-comment only and contribute no
+executable line, and main has no `[features]` table at all. `coverage-main.yml`
+on main also omits `with-default-features`, so it measures the default profile.
+The baseline is therefore "100 % of a tree with one small file in it", and any
+branch that adds real code starts below it.
+
+This cannot be bootstrapped from this branch by editing anything. The stored
+baseline is not a tracked file: it is an Actions cache entry written by the
+action's "Save baselines" step, and that step runs only when
+`inputs.publish-baseline == 'always'` or the event is a push to
+`refs/heads/main`. A pull request cannot advance it, by design, so that a
+branch run never moves the trunk baseline later pull requests are compared
+against.
+
+Merging this branch is therefore the bootstrap, and it works because of the
+`coverage-main.yml` change it carries. On `main` today that workflow omits
+`with-default-features`, so it measures the default profile over a tree that
+has one small file and reports 100 %. After the merge it passes
+`with-default-features: 'false'` and `features: ''`, exactly as `ci.yml` does,
+so `main` re-measures **44/44 = 100.00 %** over the same native-only profile
+the pull request gate checks. The baseline holds at 100.0 (the advance branch
+needs `current > baseline + 1.0`), and from then on the 100 % figure means
+"every one of the 44 instrumented lines in the native-only profile executes"
+rather than "the tree is nearly empty".
+
+The defensible resolution is therefore the one taken: make the branch's
+measured profile genuinely 100 % covered, which is a real statement about the
+code rather than a re-based number, and leave the baseline where it is. The
+alternative — lowering the stored baseline — would record a regression against
+a number that was never earned, and would hide exactly the kind of gap this
+section was written to find.
+
+One residual caveat is worth stating rather than discovering later. The
+baseline cache is restored by prefix `ratchet-baseline-${{ runner.os }}-` and
+newest-match wins, so a `main` run always reads the entry the previous `main`
+run wrote. The first `main` run after the merge restores the 100.0 written by
+the last vacuous measurement and saves a fresh 100.00 over the native-only
+profile; from the second run onward the comparison is native-only to
+native-only. The one handover is therefore a comparison of the same number
+computed two different ways, which passes because both are exactly 100.00, not
+because the tolerance absorbs it.
