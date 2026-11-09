@@ -1174,6 +1174,25 @@ it, and it was not run: the lane is reserved, takes about 90 minutes, and its
 result would replace a record `check_measurement_binding` currently accepts.
 Recorded so the inference is visible rather than mistaken for proof.
 
+**Open decision: AC-04 closure.** Two facts settle what closing this needs. The
+recorded run is `workflow_dispatch` 42435047681 on this branch at `5f53ed6`, so
+a re-measurement is the same operation and not a new lane. And
+`check_measurement_binding` validates the runner, hardware, toolchains and
+dates but never a revision, so the record binds to a build of a revision this
+branch does not contain while the task tick cites it. The omission is the
+upstream weakness; two options close it:
+
+1. Accept the documented inference. The record then stands as measured at
+   `5f53ed6` and the tick cites an inference, which is what this section says
+   and should not be read as a measurement at the final candidate.
+2. Dispatch `Profile measurements` on the final candidate, transcribe its
+   `build-budget` artefact into a new record the way `3b0e976` produced the
+   current one, and replace the binding.
+
+The owner chooses, because option 1 accepts a budget on an inference while
+option 2 spends a reserved lane. Neither changes the code under review, which
+is why this is recorded here rather than blocking a technical finding.
+
 One weakness is real and deliberately left for its own change. The
 `RUSTC_WRAPPER` assertion sits before the `setup-rust` step rather than after
 it, so it proves the ambient environment at job start rather than the
@@ -1391,3 +1410,36 @@ fault is `cache_errors`, and it is zero; no compilation failed either. The mode
 is doing what DL-03 declares, and the number is bookkeeping rather than a fault.
 `build-test` shows the same shape independently, which is what rules out an
 accident of one job.
+
+## Hosted runner provisioning stall (2026-11-09)
+
+Runs stopped starting at 14:16 UTC. Every run that completed before then has a
+conclusion; every run created after it sits in `queued` with `run_started_at`
+equal to its creation time and `updated_at` never advancing.
+
+Evidence that this is GitHub-side and not repository configuration:
+
+- Four runs across two commits were queued, and cancelling two superseded ones
+  took effect immediately, so the queue API is live.
+- Cancelling dropped the queue from four runs to two with no effect on the
+  remaining two, so the stall is not depth or concurrency.
+- Neither workflow declares `concurrency`, the runs are `pull_request` events
+  from a branch in this repository rather than a fork, `actions/permissions`
+  reports `enabled: true` with `allowed_actions: all`, and no run is
+  `in_progress`, so none is holding a slot.
+- `githubstatus.com` reports every component operational with a page update at
+  14:44, after the stall began. The day's "Incident with Webhooks and Actions"
+  ran 10:00–11:50, before the first stalled run was created.
+
+`gh run rerun` refuses with "This workflow is already running", which is the
+API treating a queued run as started. Nothing in this repository can clear the
+condition; the action is to wait, or to report the stall to GitHub support if
+it outlasts the work.
+
+What this leaves unverified, and what verifies it once runners return:
+
+- `check-fmt`, `test`, `lint` and `design-check` all pass locally at
+  `d986fc1`, and the same four passed hosted at `efe5b24`, whose only
+  difference from `d986fc1` is prose.
+- The main-writes direction of DL-03 cannot be observed before merge in any
+  case, because `main` does not carry the ref expression yet.
