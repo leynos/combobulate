@@ -3,6 +3,9 @@
 /// Direct regressions for the composed hosted CI route.
 #[path = "act_workflow_route_tests.rs"]
 mod ci_route;
+/// Job environment, cache write policy, and the manual Act route.
+#[path = "act_workflow_env_tests.rs"]
+mod environment;
 /// Direct regression corpus for the independent event predicates.
 #[path = "act_workflow_event_tests.rs"]
 mod events;
@@ -240,101 +243,6 @@ fn add_coverage(job: &mut Value) -> Read<()> {
         .insert("if".into(), Value::String("env.ACT != 'true'".into()));
     steps.push(coverage);
     Ok(())
-}
-
-#[test]
-fn workflow_environment_mutations_break_the_contract() {
-    for (reason, changed) in [
-        (
-            "lost coverage LLVM",
-            CI_WORKFLOW.replace(
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm",
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND: cranelift",
-            ),
-        ),
-        (
-            "disabled PR updates",
-            CI_WORKFLOW.replace("[opened, synchronize, reopened]", "[closed]"),
-        ),
-        (
-            "different job cwd",
-            CI_WORKFLOW.replace(
-                "  build-test:\n",
-                "  build-test:\n    defaults:\n      run:\n        working-directory: /tmp\n",
-            ),
-        ),
-        (
-            "different lint cwd",
-            CI_WORKFLOW.replace(
-                "- name: Lint\n",
-                "- name: Lint\n        working-directory: /tmp\n",
-            ),
-        ),
-        (
-            "different lint shell",
-            CI_WORKFLOW.replace("- name: Lint\n", "- name: Lint\n        shell: sh\n"),
-        ),
-        // DL-03's cache clause is only met when compilation reaches sccache.
-        // The action installs the binary but sets no wrapper, and Cargo
-        // silently ignores a wrapper it cannot run, so each half of the
-        // declaration is checked against its own mutation.
-        (
-            "lost compiler wrapper",
-            CI_WORKFLOW.replace("RUSTC_WRAPPER: sccache", "RUSTC_WRAPPER: ''"),
-        ),
-        (
-            "lost cache backend",
-            CI_WORKFLOW.replace(
-                "SCCACHE_GHA_ENABLED: \"true\"",
-                "SCCACHE_GHA_ENABLED: \"false\"",
-            ),
-        ),
-        (
-            "lost wiring evidence",
-            CI_WORKFLOW.replace("          sccache --show-stats", "          echo wired"),
-        ),
-    ] {
-        assert_ne!(
-            changed, CI_WORKFLOW,
-            "mutation must change source: {reason}"
-        );
-        assert!(
-            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
-            "contract must detect {reason}"
-        );
-    }
-    act_route_mutations_break_the_contract();
-}
-
-/// Act's manual route is contracted separately from the hosted job environment.
-///
-/// The manual workflow may not acquire a pull-request trigger, which would make
-/// it repeat the full hosted validation, and its action revision may not drift
-/// off the pin the hosted route records. Neither is a `build-test` environment
-/// concern, so the cases live here rather than growing the loop above.
-fn act_route_mutations_break_the_contract() {
-    let enabled_pr_act = ACT_VALIDATION_WORKFLOW.replace(
-        "  workflow_dispatch:",
-        "  pull_request:\n  workflow_dispatch:",
-    );
-    assert_ne!(
-        enabled_pr_act, ACT_VALIDATION_WORKFLOW,
-        "PR Act mutation must change source"
-    );
-    assert!(
-        !contracts_hold(CI_WORKFLOW, &enabled_pr_act),
-        "Act must not repeat full validation on pull requests"
-    );
-    let wrong_manual_pin =
-        ACT_VALIDATION_WORKFLOW.replace("47b337e4f230b591891656534d4ffad868131740", "main");
-    assert_ne!(
-        wrong_manual_pin, ACT_VALIDATION_WORKFLOW,
-        "manual pin mutation must change source"
-    );
-    assert!(
-        !contracts_hold(CI_WORKFLOW, &wrong_manual_pin),
-        "manual Act's action revision must stay pinned"
-    );
 }
 
 #[test]

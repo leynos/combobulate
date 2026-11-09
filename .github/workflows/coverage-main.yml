@@ -51,6 +51,11 @@ jobs:
       # compiles through to disk and shares nothing with the pull-request lane,
       # which is the half of the clause that makes main's cache reachable there.
       SCCACHE_GHA_ENABLED: "true"
+      # This workflow runs only on pushes to `main`, which is the one ref
+      # DL-03 permits to save, so it states the write explicitly rather than
+      # relying on sccache's default. The pull-request jobs in `ci.yml` set
+      # READ_ONLY instead.
+      SCCACHE_GHA_RW_MODE: READ_WRITE
     steps:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:

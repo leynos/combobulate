@@ -44,6 +44,14 @@ pub(crate) struct JobContract {
     /// job-level rather than per-step so the provisioning steps all inherit
     /// them, and `Report sccache wiring` resolves the wrapper on `PATH` to make
     /// the wiring observable rather than merely asserted.
+    ///
+    /// The third is a policy rather than a capability. DL-03 allows cache saves
+    /// only on `main`, and sccache 0.16.0 and later express that with
+    /// `SCCACHE_GHA_RW_MODE`, which otherwise defaults to `READ_WRITE`. So each
+    /// pull-request job reads the cache and does not write it. The mode is part
+    /// of the pinned environment because a job that dropped it would silently
+    /// resume writing entries scoped to `refs/pull/N/merge`, which no later run
+    /// of the branch reads once that ref advances.
     pub(super) env: &'static [(&'static str, &'static str)],
 }
 
@@ -95,6 +103,10 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("GATE_PROFILE", "native-only"),
             ("RUSTC_WRAPPER", "sccache"),
             ("SCCACHE_GHA_ENABLED", "true"),
+            (
+                "SCCACHE_GHA_RW_MODE",
+                "${{ github.event_name == 'push' && 'READ_WRITE' || 'READ_ONLY' }}",
+            ),
         ],
     },
     JobContract {
@@ -124,6 +136,10 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("GATE_PROFILE", "polars-enabled"),
             ("RUSTC_WRAPPER", "sccache"),
             ("SCCACHE_GHA_ENABLED", "true"),
+            (
+                "SCCACHE_GHA_RW_MODE",
+                "${{ github.event_name == 'push' && 'READ_WRITE' || 'READ_ONLY' }}",
+            ),
         ],
     },
     JobContract {
@@ -149,6 +165,10 @@ pub(crate) const JOBS: &[JobContract] = &[
             ("GATE_PROFILE", "polars-enabled"),
             ("RUSTC_WRAPPER", "sccache"),
             ("SCCACHE_GHA_ENABLED", "true"),
+            (
+                "SCCACHE_GHA_RW_MODE",
+                "${{ github.event_name == 'push' && 'READ_WRITE' || 'READ_ONLY' }}",
+            ),
         ],
     },
 ];
