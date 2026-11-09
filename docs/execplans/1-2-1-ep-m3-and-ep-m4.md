@@ -1518,12 +1518,50 @@ in fact still `in_progress`. A poll must therefore require a positive terminal
 status for every expected run, not merely the absence of a pending one; an API
 error is a failed observation, never a conclusion.
 
-What this leaves unverified, and what verifies it once runners return:
+### DL-03's read-only direction is now observed, not inferred
 
-- `check-fmt`, `test`, `lint` and `design-check` all pass locally at
-  `d986fc1`, and the same four passed hosted at `efe5b24`, whose only
-  difference from `d986fc1` is prose. The tip `9835151` adds only the plan
-  record.
+DL-03 says a non-`main` dispatch cannot write the cache, and until now that was
+argued from the expression rather than seen. Run 42693935970 settles it. It is a
+`workflow_dispatch` of `ci.yml` on `1-2-1-profiles-and-trust-audit` at
+`d66e6d4`, and its `build-test` job resolved:
+
+```text
+RUSTC_WRAPPER: sccache
+SCCACHE_GHA_RW_MODE: READ_ONLY
+```
+
+So a dispatch from a branch does read the cache without saving to it, and the
+`github.ref` test is what produces that. The mode is worth distinguishing from
+the expression that would have been wrong: the round-2 spelling
+`github.event_name == 'push'` also resolves this dispatch to `READ_ONLY`, so
+this observation alone cannot tell the two spellings apart. What it does
+establish is the behaviour DL-03 promises, which had only been inferred.
+
+Two limits on this evidence, because they matter for reuse:
+
+- `sccache --show-stats` prints
+  `Cache location   ghac, name: …, prefix: /sccache/` and a count of zero
+  compile requests. It does **not** print the effective read mode. The mode in
+  the log above comes from the job's environment dump, not from the cache's own
+  statistics. A successor looking for the mode in `--show-stats` will not find
+  it there.
+- The run did not finish. `build-test` and `polars-lint` were cancelled at
+  8m16s and 8m18s, against `timeout-minutes: 8`, because this dispatch ran
+  concurrently with the same head's pull-request CI on the same cold targets.
+  The wiring step precedes the suite, which is why the evidence survives. Treat
+  the cancellation as a failed AC-07 timing observation caused by running two
+  CI runs at once, not as a defect, and do not dispatch a branch run beside a
+  pull-request run when a timing budget is being measured.
+
+What the stall left unverified, and its state now:
+
+- Every hosted gate passed once runners returned. `9d57ae9` and `5237368` each
+  concluded CI and Design contracts `success`, and `d66e6d4` was green in CI
+  with design still queued at the time of writing. The local gates agreed:
+  `check-fmt` clean, `markdownlint` 0 issues, `spelling` clean, `scripts/tests`
+  1174 passed with 2596 subtests, and `check_docs` exit 0.
+- The read-only direction of DL-03 is observed; see
+  "DL-03's read-only direction is now observed, not inferred" above.
 - The main-writes direction of DL-03 cannot be observed before merge in any
   case, because `main` does not carry the ref expression yet.
 - AC-04's re-measurement (run 42650004173, dispatched at `9835151`) completed
