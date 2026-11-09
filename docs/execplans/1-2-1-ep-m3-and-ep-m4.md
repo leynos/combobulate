@@ -1136,21 +1136,43 @@ whose failure is observable — and the step's own commands need to be real.
 
 The acceptance record's conditions already read "no sccache", so adding
 `RUSTC_WRAPPER` to the gate jobs raises the question of whether the measurement
-still describes the shipped build. It does, and the evidence is checkable
-rather than assumed:
+still describes the shipped build.
 
-- The control's workload is unchanged. `5f53ed6`, the commit the record was
-  written from, is not an ancestor of this branch after the rebase, but every
-  file the workload names — the workspace, crate, and fixture manifests, the
-  lock file, `.cargo/config.toml`, and `crates/combobulate-kernel/` — is
-  byte-identical between that commit and this head. A rebase moved the commit
-  identity; it did not move the thing being measured.
-- The lane still measures without a cache. `profile-measurements.yml` asserts
-  `test -z "${RUSTC_WRAPPER-}"` before the timed loop, and
-  `test_profile_measurement_workflow.py` pins both the absence of
-  `SCCACHE_RECACHE` and the assertion itself. The three gate jobs this branch
-  changed are `ci.yml` and `coverage-main.yml`; the measurement lane is not
-  among them.
+The first version of this section claimed the control's workload was unchanged.
+That was wrong, and the error is worth keeping visible: a reviewer asked for
+the representativeness argument, and the answer written here compared the files
+that are easiest to name rather than the files the timed commands actually
+compile. Blob comparison against `5f53ed6` gives the real picture.
+
+Identical: `Cargo.toml`, `Cargo.lock`, `.cargo/config.toml`,
+`rust-toolchain.toml`, `src/lib.rs`, `crates/combobulate-kernel/Cargo.toml`, and
+`crates/combobulate-kernel/src/lib.rs`. So the manifests, the dependency
+graph, the toolchain pins, the backend selection, and the proof profile's
+entire subject are the same as the recorded run's.
+
+Changed: `src/profile.rs` (+34) and `src/polars_backend.rs` (+95). Both are
+inside the compiled graphs of the two Cargo profiles, so the measured
+workspaces are not textually identical to the recorded one. The recorded
+medians — native cold 0.30 s and Polars cold 65.08 s — measured a workspace
+about 124 lines smaller.
+
+Unchanged where it matters: `build-budget` has no diff from `5f53ed6`. The one
+change in `profile-measurements.yml` is in the separate `measure-profile` job,
+which AC-04 does not register. And the lane still measures with no cache:
+`build-budget` asserts `test -z "${RUSTC_WRAPPER-}"`, and
+`test_profile_measurement_workflow.py` pins that assertion along with the
+absence of `SCCACHE_RECACHE`.
+
+The verdict is therefore narrower than "representative". The conditions and the
+protocol are unchanged and no cache contaminates the samples; the workload grew
+slightly, which inflates a measured build without changing what the control
+measures. Every median sits far inside its ceiling — the tightest margin is
+Polars cold at roughly 9× headroom against 10 minutes — so growth of this order
+cannot plausibly move a verdict. That is an inference from headroom, not a
+re-measurement. Re-running `build-budget` at this head is what would discharge
+it, and it was not run: the lane is reserved, takes about 90 minutes, and its
+result would replace a record `check_measurement_binding` currently accepts.
+Recorded so the inference is visible rather than mistaken for proof.
 
 One weakness is real and deliberately left for its own change. The
 `RUSTC_WRAPPER` assertion sits before the `setup-rust` step rather than after
@@ -1158,10 +1180,8 @@ it, so it proves the ambient environment at job start rather than the
 environment the timed builds inherit. `setup-rust` sets neither `RUSTC_WRAPPER`
 nor `SCCACHE_GHA_ENABLED` — verified against the pinned `47b337e4` action,
 which only runs `mozilla-actions/sccache-action` and exports nothing — so the
-two environments agree today and the record is sound. Moving the assertion to
-the last step before the loop is still the right hardening, because it would
-survive a future change to the action's outputs. It is not part of this change:
-it alters a different workflow from the one under repair, it would require
-re-running a 90-minute reserved measurement lane to re-establish the evidence,
-and the defect it guards against cannot currently fire. Recorded here so the
-follow-up has its rationale.
+two environments agree today. Moving the assertion to the last step before the
+loop is still the right hardening, because it would survive a future change to
+the action's outputs. It is not part of this change: it alters a different
+workflow from the one under repair, and the defect it guards against cannot
+currently fire. Recorded here so the follow-up has its rationale.
