@@ -1415,31 +1415,50 @@ accident of one job.
 
 Runs stopped starting at 14:16 UTC. Every run that completed before then has a
 conclusion; every run created after it sits in `queued` with `run_started_at`
-equal to its creation time and `updated_at` never advancing.
+equal to its creation time, no runner assigned, and `updated_at` never
+advancing. By 16:25 that was 50 minutes and three runs on this branch, one of
+them the AC-04 re-measurement.
 
-Evidence that this is GitHub-side and not repository configuration:
+The cause is a GitHub-hosted runner shortage on the standard labels, not this
+repository. The distinguishing evidence is a label comparison across three
+repositories of the same account at the same moment:
 
-- Four runs across two commits were queued, and cancelling two superseded ones
-  took effect immediately, so the queue API is live.
-- Cancelling dropped the queue from four runs to two with no effect on the
-  remaining two, so the stall is not depth or concurrency.
-- Neither workflow declares `concurrency`, the runs are `pull_request` events
-  from a branch in this repository rather than a fork, `actions/permissions`
-  reports `enabled: true` with `allowed_actions: all`, and no run is
-  `in_progress`, so none is holding a slot.
-- `githubstatus.com` reports every component operational with a page update at
-  14:44, after the stall began. The day's "Incident with Webhooks and Actions"
-  ran 10:00–11:50, before the first stalled run was created.
+- `leynos/combobulate`: `build-test`, `polars-lint`, `polars-test` and
+  `design-check`, all `ubuntu-latest`, queued 50 minutes with no runner.
+- `leynos/whitaker`: `dependency-manifest-changes` and `clippy-snapshot`
+  (`ubuntu-latest`) and `build-lints` (`macos-15-intel`) queued, while
+  `build-lints` on `ubicloud-standard-2-ubuntu-2204` completed.
+- `leynos/femtologging`: `build-test` jobs on `ubicloud-standard-4`
+  `in_progress` while its `CI` workflow on `ubuntu-latest` is queued.
 
-`gh run rerun` refuses with "This workflow is already running", which is the
-API treating a queued run as started. Nothing in this repository can clear the
-condition; the action is to wait, or to report the stall to GitHub support if
-it outlasts the work.
+So runners are being provisioned and jobs are running: the stall is specific to
+the GitHub-hosted standard labels. Earlier observations that seemed to rule out
+GitHub are consistent with this — the status page reports Actions "Normal", the
+API is responsive, and cancelling a queued run takes effect immediately. A
+capacity shortfall on one label family is not a status-page incident.
+
+Also ruled out, so a successor does not re-investigate: neither workflow
+declares `concurrency`; the runs are `pull_request` events from a branch in
+this repository rather than a fork; `actions/permissions` reports
+`enabled: true` with `allowed_actions: all`; no run is `in_progress`, so none
+is holding a slot; and this repository has no self-hosted runners
+(`total_count: 0`), so the `ubuntu-latest` jobs depend entirely on the hosted
+pool. `gh run rerun` refuses with "This workflow is already running", which is
+the API treating a queued run as started. Billing could not be checked: the
+billing endpoint needs the `user` scope, which was not requested for a
+diagnostic.
+
+Nothing in this repository can clear the condition. The action is to wait, and
+to report the stall to GitHub support if it outlasts the work.
 
 What this leaves unverified, and what verifies it once runners return:
 
 - `check-fmt`, `test`, `lint` and `design-check` all pass locally at
   `d986fc1`, and the same four passed hosted at `efe5b24`, whose only
-  difference from `d986fc1` is prose.
+  difference from `d986fc1` is prose. The tip `9835151` adds only the plan
+  record.
 - The main-writes direction of DL-03 cannot be observed before merge in any
   case, because `main` does not carry the ref expression yet.
+- AC-04's re-measurement (run 42650004173, dispatched at `9835151`) is queued,
+  so the medians at this candidate are still unmeasured. They are the last
+  acceptance evidence this PR needs.
