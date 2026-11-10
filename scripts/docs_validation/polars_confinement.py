@@ -14,6 +14,17 @@ Non-vacuity is part of the control: a seeded ``use polars::`` in a copy of
 ``src/profile.rs`` must be reported. Without that half, a check that had
 regressed to reporting nothing would still pass, and every later confinement
 claim would be unsupported.
+
+One rename is out of reach. A Cargo dependency rename in the facade manifest —
+``pl = { package = "polars" }`` — makes every source file say ``pl::`` and
+never ``polars`` at all. The alias set is derived from the sources, so it never
+learns the name ``pl``, and the control passes while a facade module reaches
+Polars. Closing it means reading ``Cargo.toml`` for ``package =`` renames. That
+is deliberately not done: this control confines one dependency's paths as the
+source spells them, and a manifest parse per call would buy a different, wider
+guarantee than the rule stated above. The limitation is recorded rather than
+left implicit, so a future confinement claim names what it does and does not
+cover.
 """
 from __future__ import annotations
 
