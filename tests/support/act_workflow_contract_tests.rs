@@ -148,8 +148,24 @@ type Mutation = fn(&mut Value) -> Read<()>;
 ///
 /// Every mutation below touches only a `polars-*` job. A contract that resolved
 /// its steps, actions, or profile from `build-test` alone would accept them.
+///
+/// The baseline is what makes the per-case check mean anything. `apply_mutation`
+/// re-serialises the parsed document, and `serde_yaml` never reproduces the
+/// committed bytes: comments, quoting, and layout all change. Comparing a
+/// mutation's text against `CI_WORKFLOW` would therefore pass even for a no-op
+/// helper, and comparing the parsed documents is what proves the helper
+/// actually removed or inserted something. The baseline is also required to
+/// satisfy the contract, because otherwise every case could pass for the wrong
+/// reason: a round-trip that already broke the contract would make each
+/// mutation's failure indistinguishable from serialization noise.
 #[test]
 fn polars_job_mutations_break_the_contract() {
+    let baseline = apply_mutation(CI_WORKFLOW, "polars-lint", |_| Ok(()))
+        .expect("the unmutated workflow must round-trip");
+    assert!(
+        contracts_hold(&baseline.source, ACT_VALIDATION_WORKFLOW),
+        "an unmutated round-trip must still satisfy the contract"
+    );
     for (reason, job, mutate) in [
         (
             "lost Polars profile selection",
@@ -172,21 +188,39 @@ fn polars_job_mutations_break_the_contract() {
             add_coverage,
         ),
     ] {
-        let source = apply_mutation(CI_WORKFLOW, job, mutate)
+        let changed = apply_mutation(CI_WORKFLOW, job, mutate)
             .unwrap_or_else(|error| panic!("{reason}: {error}"));
-        assert_ne!(source, CI_WORKFLOW, "mutation must change source: {reason}");
+        assert_ne!(
+            changed.value, baseline.value,
+            "mutation must change the document: {reason}"
+        );
         assert!(
-            !contracts_hold(&source, ACT_VALIDATION_WORKFLOW),
+            !contracts_hold(&changed.source, ACT_VALIDATION_WORKFLOW),
             "contract must detect {reason}"
         );
     }
 }
 
-/// Applies one job-scoped mutation and re-serializes the derived workflow.
-fn apply_mutation(source: &str, job: &str, mutate: Mutation) -> Read<String> {
+/// A mutated workflow, held both parsed and serialized.
+///
+/// [`contracts_hold`] reads source text, so each result is serialized for it.
+/// The mutation check compares parsed values instead, because serialization
+/// alone differs from the committed bytes with or without a mutation.
+struct Mutated {
+    /// The document as the mutation left it.
+    value: Value,
+    /// That document serialized, for the contract's text interface.
+    source: String,
+}
+
+/// Applies one job-scoped mutation and keeps both of its representations.
+fn apply_mutation(source: &str, job: &str, mutate: Mutation) -> Read<Mutated> {
     let mut changed = super::document(source)?;
     mutate(polars_job(&mut changed, job)?)?;
-    Ok(serde_yaml::to_string(&changed)?)
+    Ok(Mutated {
+        value: changed.clone(),
+        source: serde_yaml::to_string(&changed)?,
+    })
 }
 
 /// Selects one job mapping for a mutation scoped to that job alone.
