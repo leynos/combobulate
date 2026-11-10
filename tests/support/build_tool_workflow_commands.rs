@@ -20,11 +20,19 @@ pub(super) struct WorkflowCommand<'a> {
 }
 
 /// Detect a test suite in a dry-run of a Make goal, including prerequisites.
+///
+/// The profile route is pinned rather than inherited, for the same reason
+/// `dry_run` in `build_standard_contract.rs` pins it: a hosted job exports the
+/// single profile it was scheduled to measure, and an inherited value would
+/// halve the recipes this dry run reads. Pinning on the command line outranks
+/// an inherited value however it arrives.
 fn make_goal_runs_suite(goal: &str) -> Read<bool> {
     let output = Command::new("make")
+        .env_remove("GATE_PROFILE")
         .args([
             "-n",
             "-B",
+            "GATE_PROFILE=both",
             "CARGO=probe-cargo",
             "CHECK_BUILD_TOOLS=true",
             goal,
