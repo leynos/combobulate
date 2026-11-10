@@ -1079,12 +1079,16 @@ pure rules; it carries one `RequiredJob` (name, runner image, timeout) per
 unconditioned `ci.yml` job, because DL-14 makes every required pull-request job
 part of `AC-07`'s workload. Each job is checked against the registered runner
 and timeout, so adding, renaming, or resizing a required job fails the control
-until `spec/acceptance-controls.json` records the same shape. The calibration
-check in `ci_controls.py` still reads the single `ci-build-test` workload,
-because that is the record the registered threshold was derived from. The
-original named imports remain re-exported from preregistration for focused
-tests; these helpers are not general GitHub Actions parsers, measurement
-libraries, or repository file APIs.
+until `spec/acceptance-controls.json` records the same shape. An attempt's
+`conclusion` is its longest required job's own conclusion, which is also the
+run's duration sample, so it cannot state whether a shorter job failed; the
+schema therefore requires `required_job_conclusions` for the `ci-required-jobs`
+workload, and `check_ci_measurement` fails the record when any job in that map
+is not `success`. The calibration check in `ci_controls.py` still reads the
+single `ci-build-test` workload, because that is the record the registered
+threshold was derived from. The original named imports remain re-exported from
+preregistration for focused tests; these helpers are not general GitHub Actions
+parsers, measurement libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
 documentation-pack validation. The control register is

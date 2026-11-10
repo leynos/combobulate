@@ -141,6 +141,13 @@ def _check_ci_measurement_outcome(
     if any(attempt['conclusion'] != 'success' for attempt in summary.attempts):
         require(OUTCOME_VERDICTS[record['outcome']] == 'fail', failed)
         return
+    if any(_unsuccessful_required_job(attempt) for attempt in summary.attempts):
+        # AC-07 requires *every* required job to succeed, and the per-attempt
+        # `conclusion` covers only the run's longest job. Without this the
+        # record could name a passing longest job while `polars-lint` failed.
+        require(OUTCOME_VERDICTS[record['outcome']] == 'fail',
+                f"{record['id']} must fail when any required job in an attempt does not succeed")
+        return
     if summary.has_incomplete_attempt:
         require(OUTCOME_VERDICTS[record['outcome']] == 'fail', failed)
         return
@@ -149,6 +156,18 @@ def _check_ci_measurement_outcome(
                 f"{record['id']} needs 20 required-job attempts for a conclusive result")
         return
     _check_ci_p90_outcome(control, record, list(summary.durations))
+
+
+def _unsuccessful_required_job(attempt: Mapping[str, object]) -> bool:
+    """Report whether any required job in one attempt did not succeed.
+
+    An attempt that records no per-job map contributes nothing here: the
+    pre-DL-14 `ci-build-test` workload measured one job, and the record's
+    single ``conclusion`` already states it. The schema requires the map for
+    ``ci-required-jobs``, so a current record cannot omit it.
+    """
+    conclusions = attempt.get('required_job_conclusions') or {}
+    return any(conclusion != 'success' for conclusion in conclusions.values())
 
 
 def _check_ci_p90_outcome(

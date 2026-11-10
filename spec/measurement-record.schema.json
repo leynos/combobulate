@@ -88,6 +88,14 @@
                 "conclusion": {
                   "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]
                 },
+                "required_job_conclusions": {
+                  "type": "object",
+                  "description": "The conclusion of every required pull-request job in this run, keyed by job name. AC-07 requires each of them to succeed, so recording only the longest job's conclusion would let a shorter failed job pass unrecorded. Every attempt must name each job the workload registers.",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]
+                  }
+                },
                 "wall_seconds": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
                 "started_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
                 "completed_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
@@ -152,6 +160,17 @@
                     },
                     "then": {
                       "properties": {"median": {"const": "not available"}}
+                    }
+                  },
+                  {
+                    "description": "The DL-14 workload measures every required job, so each attempt must record each job's own conclusion. The pre-DL-14 `ci-build-test` series measured one job and its attempts carry that job's conclusion already.",
+                    "if": {"properties": {"id": {"const": "ci-required-jobs"}}},
+                    "then": {
+                      "properties": {
+                        "attempts": {
+                          "items": {"required": ["required_job_conclusions"]}
+                        }
+                      }
                     }
                   }
                 ]

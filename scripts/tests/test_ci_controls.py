@@ -91,6 +91,27 @@ class CiMeasurement(unittest.TestCase):
                                     msg='a short successful window cannot pass AC-07'):
             check_ci_measurement(CI_CONTROL, measurement('pass', durations))
 
+    def test_a_failed_non_longest_job_fails_the_attempt(self) -> None:
+        """Fail the record when any required job other than the longest did not succeed.
+
+        The per-attempt ``conclusion`` describes the run's longest required job,
+        which is the run's duration sample. AC-07 requires every required job to
+        succeed, so a shorter job's failure is invisible in that one field:
+        ``build-test`` succeeded, ``polars-lint`` failed, and the record would
+        otherwise pass on the strength of the longest job alone.
+        """
+        record = measurement('pass', [60.0] * 20)
+        for attempt in record['workloads'][0]['attempts']:
+            attempt['required_job_conclusions'] = {
+                'build-test': 'success', 'polars-lint': 'success', 'polars-test': 'success',
+            }
+        record['workloads'][0]['attempts'][0]['required_job_conclusions']['polars-lint'] = 'failure'
+        with self.assertRaisesRegex(AssertionError, 'any required job in an attempt',
+                                    msg='a failed shorter required job must fail AC-07'):
+            check_ci_measurement(CI_CONTROL, record)
+        record['outcome'] = 'fail'
+        check_ci_measurement(CI_CONTROL, record)
+
     def test_duplicate_attempt_ids_are_rejected(self) -> None:
         """Do not count a repeated workflow attempt twice in the latest window."""
         record = measurement('pass', [60.0] * 20)

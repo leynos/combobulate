@@ -56,7 +56,14 @@ def record(outcome: str, purpose: str = 'acceptance') -> dict:
 
 
 def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
-    """Build an AC-07 record in newest-first order with timestamped job attempts."""
+    """Build an AC-07 record in newest-first order with timestamped job attempts.
+
+    ``conclusions`` pairs each run's overall conclusion with its duration. The
+    overall conclusion is the longest required job's own conclusion, so the
+    per-job map repeats it for ``build-test`` and reports the two shorter jobs
+    as successful: a run whose only failure is the longest job is the case these
+    fixtures describe.
+    """
     entry = record(outcome)
     entry['control_ids'] = [CI_CONTROL['id']]
     entry['recorded_on'] = CI_MEASUREMENT_DATE
@@ -68,7 +75,11 @@ def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
         start = newest_start - timedelta(minutes=index)
         finish = start + timedelta(seconds=seconds)
         attempts.append({'run_id': str(index + 1), 'run_number': index + 1, 'attempt': 1,
-                         'conclusion': conclusion, 'wall_seconds': seconds,
+                         'conclusion': conclusion,
+                         'required_job_conclusions': {'build-test': conclusion,
+                                                      'polars-lint': 'success',
+                                                      'polars-test': 'success'},
+                         'wall_seconds': seconds,
                          'started_at': start.isoformat().replace('+00:00', 'Z'),
                          'completed_at': finish.isoformat().replace('+00:00', 'Z'),
                          'url': f'https://github.com/leynos/combobulate/actions/runs/{index + 1}'})

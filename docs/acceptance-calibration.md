@@ -61,9 +61,12 @@ than tightening them.
    Record each run's longest required pull-request job, excluding queue time,
    and that job's conclusion. Failed, timed-out, cancelled, and missing jobs
    remain in the window. For `AC-07`, any such job fails its run independently
-   of the duration percentile. The record in `spec/calibration/ci-history.json`
-   predates DL-14 and samples the single `build-test` job instead, which is why
-   its workload is registered as `ci-build-test`.
+   of the duration percentile, and an acceptance record therefore carries each
+   required job's own conclusion in `required_job_conclusions`: the longest
+   job's conclusion alone cannot state whether a shorter job failed. The record
+   in `spec/calibration/ci-history.json` predates DL-14 and samples the single
+   `build-test` job instead, which is why its workload is registered as
+   `ci-build-test`.
 6. Extrapolation factor. The same workload ran on both machines: the design
    checks' `unittest` and pytest suites at commit 398d2f6. Hosted to local
    median ratios were 0.92 (`unittest`: 28.4 s against 30.9 s) and 1.17
