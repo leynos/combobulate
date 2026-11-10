@@ -110,14 +110,14 @@ shared-kernel and downstream probes must validate this arrangement before
 feature or proof-API stabilization.
 
 The gate profiles are recorded once, in
-[`spec/toolchain-profiles.json`](../spec/toolchain-profiles.json). `GATE_PROFILE`
-selects between the two the ordinary Make gates build: `native-only` builds
-with `--no-default-features` and `polars-enabled` with defaults, while `both`
-(the default) runs each in turn. Each is its own Cargo invocation, because
-feature unification would otherwise let one profile's resolution mask the
-other's. The record also holds the two verifier toolchains, `proof-kani` and
-`proof-verus`; those are not gate profiles, and the proof routes reach them
-through `make kani` and `make verus-probe`.
+[`spec/toolchain-profiles.json`](../spec/toolchain-profiles.json).
+`GATE_PROFILE` selects between the two the ordinary Make gates build:
+`native-only` builds with `--no-default-features` and `polars-enabled` with
+defaults, while `both` (the default) runs each in turn. Each is its own Cargo
+invocation, because feature unification would otherwise let one profile's
+resolution mask the other's. The record also holds the two verifier toolchains,
+`proof-kani` and `proof-verus`; those are not gate profiles, and the proof
+routes reach them through `make kani` and `make verus-probe`.
 
 The dependency direction is frontend to semantic graph to planner to backend
 ports. The semantic module must not import Polars or glam types. The public
@@ -928,7 +928,7 @@ cannot perform the calculations.
 | Gap  | Requirement | Missing evidence/capability                                                                                       | Disposition and unblock condition                                                                                                                                                                                                                                                                                                                                                                                                       |
 | ---- | ----------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | GAP1 | R1-R11      | No implementation or release baseline.                                                                            | Proposed work through roadmap phases 1-6; completion needs actual executable, verifier and adoption evidence within its declared scope.                                                                                                                                                                                                                                                                                                 |
-| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); `AC-04` has acceptance records dated 2026-11-08 and 2026-11-09, and the remaining controls are registered rather than measured.                                                                                                                                                                                                                                                                          |
+| GAP2 | R4, R7      | Performance, memory, CI, compile-cost, and proof-cost acceptance results (thresholds registered 2026-10-11).      | Controls and thresholds registered under D11 and D12 ([ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md)); `AC-04` has acceptance records dated 2026-11-08 and 2026-11-09, and the remaining controls are registered rather than measured.                                                                                                                                                                                |
 | GAP3 | R5, R6      | Trasic tree, revision, and compatibility oracle unavailable.                                                      | Blocks real-client adoption evidence, not numeric core or synthetic typed fixture work; resolve Q5.                                                                                                                                                                                                                                                                                                                                     |
 | GAP4 | R1, R3, R5  | Exact Rust/dependency/feature versions unselected.                                                                | Closed by [ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md) and D16: `spec/toolchain-profiles.json` records the nightly, the Polars pin, and the two verifier toolchains with every site that asserts them, and `GATE_PROFILE` runs each feature profile in its own invocation. Q3 is answered with a supported-toolchain set rather than one MSRV.                                                            |
 | GAP5 | R7          | Initial release boundary, licence, and authorities (ratified 2026-10-10).                                         | Resolved by D01 and D03 to D05 in the decision register; the crate stays unpublished until task 4.3.3 passes and the D01 authority approves release in a superseding decision.                                                                                                                                                                                                                                                          |
