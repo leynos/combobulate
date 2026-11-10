@@ -63,9 +63,7 @@
     "repository_rustc_commit": {
       "value": "249c1e4e31111b54ad2483cfd4cea06c7020c653",
       "sites": [
-        "tools/probes/observations/toolchains.log",
-        "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free.log",
-        "tools/verifier-fixtures/verus-wiring-probe/observations/verifier-free-hosted.log"
+        "tools/probes/observations/toolchains.log"
       ]
     },
     "kani_release": {
@@ -94,7 +92,6 @@
       "value": "nightly-2025-11-21-x86_64-unknown-linux-gnu",
       "sites": [
         "scripts/tests/fixtures/kani_logs/provenance.json",
-        "tools/probes/observations/toolchains.log",
         "scripts/verifier_probe_support.py",
         "scripts/tests/test_kani_route_builders.py",
         "tests/support/prover_tools_probe.rs"
@@ -140,8 +137,6 @@
     "verus_rust": {
       "value": "1.98.0",
       "sites": [
-        "tools/probes/observations/toolchains.log",
-        "spec/acceptance-controls.json",
         "spec/calibration/builds.json",
         "spec/calibration/shared-workloads-local.json",
         "spec/calibration/verifier-probe.json"
@@ -150,7 +145,6 @@
     "verus_z3": {
       "value": "4.16.0",
       "sites": [
-        "tools/probes/observations/toolchains.log",
         "tools/verifier-fixtures/verus-wiring-probe/provenance.json",
         "scripts/probe_provenance.py",
         "scripts/verus_probe.py",

@@ -108,11 +108,13 @@ def _check_record_shape(record: Mapping[str, object]) -> None:
 
 
 def _check_sourced_pins(root: Path, record: Mapping[str, object]) -> None:
-    """Re-derive each pin the record has a reader for and compare.
+    """Re-derive each pin the record has a reader for, then check every pin's sites.
 
-    Only pins with an unambiguous owning file are re-derived here. The rest are
-    covered by :func:`_check_pin_sweep`, which is what keeps this function from
-    growing a bespoke parser per capture format.
+    Only pins with an unambiguous owning file are re-derived here; the rest are
+    covered by the site sweep. The sweep runs over *every* pin rather than only
+    the six with readers, because a site whose value moved while the record was
+    not updated is the exact drift VO-7 is about, and checking six of twelve
+    would report a clean sweep over the half that was never read.
     """
     pins = record['pins']
     readers = {
@@ -128,8 +130,9 @@ def _check_sourced_pins(root: Path, record: Mapping[str, object]) -> None:
         expected = pins[pin_id]['value']
         require(actual == expected,
                 f"toolchain record pin {pin_id} is {expected!r} but its owner says {actual!r}")
-        require(_pin_sites(root, expected, pins[pin_id]['sites']),
-                f"pin {pin_id} cites a site that does not contain {expected!r}")
+    for pin_id, pin in pins.items():
+        require(_pin_sites(root, pin['value'], pin['sites']),
+                f"pin {pin_id} cites a site that does not contain {pin['value']!r}")
 
 
 def _pin_sites(root: Path, value: str, sites: Iterable[str]) -> bool:
