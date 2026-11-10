@@ -117,12 +117,13 @@ fn valid_manual_events(act: &Value) -> bool {
 /// Checks each hosted job's path, steps, guards, and failure semantics.
 fn valid_ci_route(ci: &Value) -> bool {
     valid_hosted_job_policy(ci)
+        && valid_ci_commands(ci)
         && JOBS.iter().all(|job| {
             job_steps(ci, job.name).is_some_and(|steps| {
                 valid_hosted_environment(ci, job)
                     && valid_hosted_steps(job, steps)
                     && valid_ci_order(ci, job, steps)
-                    && valid_ci_commands(ci, steps)
+                    && no_script_recurses_into_act(steps)
             })
         })
 }
@@ -182,33 +183,61 @@ fn valid_ci_order(ci: &Value, job: &JobContract, steps: &[Value]) -> bool {
 
 /// Pins the command, cache, coverage, and Act recursion boundaries.
 ///
+/// Every clause here reads a named step from a named job, so none depends on
+/// which job a caller is walking. Checking it once is what keeps the cost off
+/// the per-job loop, which would otherwise repeat the same step reads three
+/// times; `valid_hosted_steps` already proves each job carries the steps it
+/// declares, so a command clause cannot be satisfied by a step that only one
+/// job happens to have.
+///
 /// `Lint` appears in two jobs, so each job's lint step is checked against its
 /// own profile rather than against a single shared expectations table.
-fn valid_ci_commands(ci: &Value, steps: &[Value]) -> bool {
+fn valid_ci_commands(ci: &Value) -> bool {
+    let TestUnderAct { run, with_act, condition } = test_under_act(ci);
     text(
         build_test_step(ci, "Format").map_or(ci, |(_, item)| item),
         &["run"],
     ) == Some("make check-fmt")
         && valid_lint_step(ci, "build-test")
         && valid_lint_step(ci, "polars-lint")
-        && text(
-            build_test_step(ci, "Test under Act").map_or(ci, |(_, item)| item),
-            &["run"],
-        ) == Some("make test")
-        && text(
-            build_test_step(ci, "Test under Act").map_or(ci, |(_, item)| item),
-            &["env", "WITH_ACT"],
-        ) == Some("0")
-        && text(
-            build_test_step(ci, "Test under Act").map_or(ci, |(_, item)| item),
-            &["if"],
-        ) == Some("env.ACT == 'true'")
+        && run == Some("make test")
+        && with_act == Some("0")
+        && condition == Some("env.ACT == 'true'")
         && valid_test_step(ci)
         && valid_coverage_route(ci)
-        && !steps
-            .iter()
-            .filter_map(|item| text(item, &["run"]))
-            .any(|script| script.contains("WITH_ACT=1"))
+}
+
+/// What `build-test`'s Act step carries, read once rather than three times.
+struct TestUnderAct<'a> {
+    /// The Make goal the step runs.
+    run: Option<&'a str>,
+    /// Its `WITH_ACT` value, which selects the non-recursive Act route.
+    with_act: Option<&'a str>,
+    /// Its condition, which keeps the step out of an ordinary hosted run.
+    condition: Option<&'a str>,
+}
+
+/// Reads the `Test under Act` step's three asserted fields.
+fn test_under_act(ci: &Value) -> TestUnderAct<'_> {
+    let entry = build_test_step(ci, "Test under Act").map(|(_, item)| item);
+    TestUnderAct {
+        run: entry.and_then(|item| text(item, &["run"])),
+        with_act: entry.and_then(|item| text(item, &["env", "WITH_ACT"])),
+        condition: entry.and_then(|item| text(item, &["if"])),
+    }
+}
+
+/// Refuses a hosted job whose script would recurse into the full Act route.
+///
+/// This clause reads the steps of the job being walked, so it stays in the
+/// per-job loop. An inherited `WITH_ACT=1` would make the nested `make test`
+/// run Act validation from inside a hosted job, which is what the manual Act
+/// workflow exists to do instead.
+fn no_script_recurses_into_act(steps: &[Value]) -> bool {
+    !steps
+        .iter()
+        .filter_map(|item| text(item, &["run"]))
+        .any(|script| script.contains("WITH_ACT=1"))
 }
 
 /// Requires one job's lint step to build a private cold driver before `make lint`.
