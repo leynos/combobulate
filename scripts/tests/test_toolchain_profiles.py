@@ -14,11 +14,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.context import ValidationContext
-from docs_validation.revision_reader import tracked_paths
 from docs_validation.toolchain_profiles import (
     RECORD, SCHEMA, check_toolchain_profiles,
 )
@@ -214,20 +214,24 @@ class PinSweep(ScratchTree):
     def test_sweep_reads_the_live_tree_by_default(self):
         """Prove production runs the real sweep, not a truncated list.
 
-        The default argument is what the composition root relies on. A default
-        that enumerated only the record's own site list would still pass every
-        other case here while catching nothing, so this requires the Git-backed
-        enumeration to reach files the record does not name.
+        The default argument is what the composition root relies on, and every
+        other case here supplies its own list, so none of them exercises it. A
+        default that enumerated only the record's own sites would still pass
+        them all while catching nothing. This therefore calls the checker with
+        no ``tracked`` argument and requires a file the record does not name to
+        be found through the enumeration the sweep performs itself.
         """
-        listed = {site for pin in record_at(ROOT)['pins'].values() for site in pin['sites']}
-        enumerated = tracked_paths(ROOT)
-        unlisted = set(enumerated) - listed
-        self.assertTrue(
-            len(unlisted) > 100,
-            f'the sweep must reach well beyond the record, reached {len(unlisted)} files',
-        )
-        self.assertIn('Cargo.toml', enumerated,
-                      'the Git-backed sweep must reach an ordinary tracked file')
+        stray = self.root / 'tests/stray_pin.txt'
+        stray.parent.mkdir(parents=True, exist_ok=True)
+        stray.write_text('kani 0.67.0\n', encoding='utf-8')
+        enumerated = [*self.tracked, 'tests/stray_pin.txt']
+        with patch('docs_validation.revision_reader.tracked_paths',
+                   return_value=enumerated) as live_tree:
+            with self.assertRaises(AssertionError) as raised:
+                check_toolchain_profiles(ValidationContext(self.root))
+        live_tree.assert_called_once_with(self.root)
+        self.assertIn('tests/stray_pin.txt names pin kani_release', str(raised.exception),
+                      'the default sweep must read the enumeration rather than the record')
 
 
 class CapabilityEvidence(ScratchTree):
