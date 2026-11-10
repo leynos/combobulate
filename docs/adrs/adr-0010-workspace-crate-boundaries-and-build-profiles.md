@@ -146,7 +146,7 @@ profile mask another.
 Q3 asks for a Rust/MSRV and feature matrix. The record answers it with a set,
 because this repository has three toolchains with distinct roles:
 
-- `rustup:nightly-2026-08-27` (rustc 1.100.0-nightly) is the only ordinary
+- `rustup:nightly-2026-11-06` (rustc 1.101.0-nightly) is the only ordinary
   build toolchain. It compiles, lints, tests, and documents every shipped crate.
 - `nightly-2025-11-21` (rustc 1.93.0-nightly) is Kani 0.67.0's pinned
   toolchain. It compiles harness subjects only.
