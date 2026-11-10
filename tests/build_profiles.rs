@@ -9,20 +9,24 @@
 //! A tag filter that matches no scenario is a compile error, so binding a
 //! scenario can never pass by running nothing.
 
-#[cfg(not(feature = "polars"))]
-mod native {
-    //! The native-only route: no Polars, no macro crate.
+mod shared {
+    //! The scenario world and steps both profile routes share.
+    //!
+    //! The routes differ only in which features are compiled in. The recorded
+    //! read, the `When` step that fills it, and the step that reports the
+    //! native backend are the same code on both, so they live here once: a
+    //! change to the world's shape cannot then leave one route reading a field
+    //! the other no longer has.
 
     use combobulate::BuildProfile;
-    use pretty_assertions::assert_eq;
     use rstest::fixture;
-    use rstest_bdd_macros::{given, scenario, then, when};
+    use rstest_bdd_macros::{then, when};
 
     /// Records which features the running binary was compiled with.
     #[derive(Debug, Default)]
-    struct Observed {
+    pub(super) struct Observed {
         /// A read taken from `BuildProfile::current()` in the `When` step.
-        profile: Option<BuildProfile>,
+        pub(super) profile: Option<BuildProfile>,
     }
 
     /// Supplies the scenario's world.
@@ -51,21 +55,15 @@ mod native {
         reason = "needed to allow unused_braces for fixture macro expansion"
     )]
     #[fixture]
-    fn observed() -> Observed { Observed::default() }
-
-    #[given("the facade compiled without default features")]
-    fn compiled_without_default_features() {
-        assert!(
-            !BuildProfile::current().has_polars(),
-            "the native-only route must be built without default features"
-        );
-    }
+    pub(super) fn observed() -> Observed { Observed::default() }
 
     #[when("a consumer reads the build profile")]
-    fn read_profile(observed: &mut Observed) { observed.profile = Some(BuildProfile::current()); }
+    pub(super) fn read_profile(observed: &mut Observed) {
+        observed.profile = Some(BuildProfile::current());
+    }
 
     /// Unwraps the profile the `When` step recorded.
-    fn recorded(observed: &Observed) -> BuildProfile {
+    pub(super) fn recorded(observed: &Observed) -> BuildProfile {
         let Some(profile) = observed.profile else {
             panic!("the `When` step must run before any `Then` step")
         };
@@ -73,11 +71,33 @@ mod native {
     }
 
     #[then("the profile reports the native backend")]
-    fn reports_native(observed: &Observed) {
+    pub(super) fn reports_native(observed: &Observed) {
         let line = recorded(observed).to_string();
         assert!(
             line.starts_with("features: native"),
             "the profile must always begin with the native backend, got {line:?}"
+        );
+    }
+}
+
+#[cfg(not(feature = "polars"))]
+mod native {
+    //! The native-only route: no Polars, no macro crate.
+
+    use combobulate::BuildProfile;
+    use pretty_assertions::assert_eq;
+    use rstest_bdd_macros::{given, scenario, then};
+
+    // `observed` is the fixture `#[scenario]` binds the world from; the step
+    // functions themselves are registered by their attributes and resolved by
+    // step text, so they need no import here.
+    use super::shared::{Observed, observed, recorded};
+
+    #[given("the facade compiled without default features")]
+    fn compiled_without_default_features() {
+        assert!(
+            !BuildProfile::current().has_polars(),
+            "the native-only route must be built without default features"
         );
     }
 
@@ -134,69 +154,18 @@ mod polars {
 
     use combobulate::BuildProfile;
     use pretty_assertions::assert_eq;
-    use rstest::fixture;
-    use rstest_bdd_macros::{given, scenario, then, when};
+    use rstest_bdd_macros::{given, scenario, then};
 
-    /// Records which features the running binary was compiled with.
-    #[derive(Debug, Default)]
-    struct Observed {
-        /// A read taken from `BuildProfile::current()` in the `When` step.
-        profile: Option<BuildProfile>,
-    }
-
-    /// Supplies the scenario's world.
-    ///
-    /// `#[scenario]` resolves each parameter by looking for a fixture of the
-    /// same name, so this function is what makes `observed: Observed` bind.
-    //
-    // `fn_single_line = true` in `rustfmt.toml` puts this body on one line, and
-    // `#[fixture]` then expands it into a nested single-expression block, which
-    // is what `unused_braces` rejects. The attribute pair is the workaround the
-    // maintainer sanctions for that expansion (see
-    // `weaver-test-macros::allow_fixture_expansion_lints`, which emits exactly
-    // these two attributes): the `allow` suppresses the lint on the expansion,
-    // and the `expect` keeps `clippy::allow_attributes` satisfied for using
-    // `allow` rather than `expect` on a lint that only fires in the expansion.
-    //
-    // The `expect` is not behind `cfg(clippy)`. Clippy rejects that wrapper
-    // with `unnecessary_clippy_cfg`, and the plain wrapper is also what the
-    // driver emits, so the two agree on one spelling.
-    #[allow(
-        unused_braces,
-        reason = "fixture macro expansion triggers unused-braces on expression bodies"
-    )]
-    #[expect(
-        clippy::allow_attributes,
-        reason = "needed to allow unused_braces for fixture macro expansion"
-    )]
-    #[fixture]
-    fn observed() -> Observed { Observed::default() }
+    // `observed` is the fixture `#[scenario]` binds the world from; the step
+    // functions themselves are registered by their attributes and resolved by
+    // step text, so they need no import here.
+    use super::shared::{Observed, observed, recorded};
 
     #[given("the facade compiled with default features")]
     fn compiled_with_default_features() {
         assert!(
             BuildProfile::current().has_polars(),
             "the default route must be built with default features"
-        );
-    }
-
-    #[when("a consumer reads the build profile")]
-    fn read_profile(observed: &mut Observed) { observed.profile = Some(BuildProfile::current()); }
-
-    /// Unwraps the profile the `When` step recorded.
-    fn recorded(observed: &Observed) -> BuildProfile {
-        let Some(profile) = observed.profile else {
-            panic!("the `When` step must run before any `Then` step")
-        };
-        profile
-    }
-
-    #[then("the profile reports the native backend")]
-    fn reports_native(observed: &Observed) {
-        let line = recorded(observed).to_string();
-        assert!(
-            line.starts_with("features: native"),
-            "the profile must always begin with the native backend, got {line:?}"
         );
     }
 
