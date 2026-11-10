@@ -20,7 +20,7 @@ import hashlib
 import json
 import re
 import tomllib
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 
 from .context import ValidationContext, require
@@ -157,7 +157,7 @@ def _read_toolchain_channel(root: Path) -> str:
     return tomllib.loads((root / 'rust-toolchain.toml').read_text(encoding='utf-8'))['toolchain']['channel']
 
 
-def _read_single_line(relative: str):
+def _read_single_line(relative: str) -> Callable[[Path], str]:
     """Build a reader for a pin file whose whole content is the value."""
     def read(root: Path) -> str:
         """Return the pin file's content with its trailing newline removed."""
