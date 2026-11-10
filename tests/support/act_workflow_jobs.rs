@@ -174,10 +174,12 @@ pub(crate) const JOBS: &[JobContract] = &[
     },
 ];
 
-/// Expected paths and inputs, with the setup-rust capability-bound revision exception.
+/// Every action any job names, with the inputs that action must receive.
 ///
-/// This is the `build-test` action list; the other two jobs share the prelude
-/// actions but not their inputs, so each job's `actions` list pins order only.
+/// The setup-rust revision is capability-bound, so its path is a commit id;
+/// the rest are ordinary action references. All three jobs resolve their
+/// inputs from this one table, so an action shared by two jobs cannot acquire
+/// two different contracts, and a job's own `actions` list pins order only.
 pub(crate) const ACTIONS: &[ActionContract] = &[
     (
         "actions/checkout",
@@ -226,40 +228,17 @@ pub(crate) const ACTIONS: &[ActionContract] = &[
     ),
 ];
 
-/// Action contracts shared by every job that provisions rather than measures.
-///
-/// The `polars-*` jobs reuse the same checkout, Rust setup, and uv actions, so
-/// resolving them from one table keeps a stray input from being accepted in a
-/// job whose prelude is otherwise identical.
-const PRELUDE_ACTIONS: &[ActionContract] = &[
-    (
-        "actions/checkout",
-        "checkout",
-        &[("persist-credentials", "false")],
-    ),
-    (
-        "leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740",
-        "Setup Rust",
-        &[("rustflags", ""), ("use-sccache", "true")],
-    ),
-    ("astral-sh/setup-uv", "Setup uv", &[]),
-    (
-        "leynos/shared-actions/.github/actions/install-whitaker",
-        "Install Whitaker",
-        &[("cranelift", "true")],
-    ),
-];
-
 /// Resolves a job's action contracts by path, preserving that job's order.
+///
+/// Every path a job names must appear in `ACTIONS`: that one table is the only
+/// place an action's required inputs are stated, so a job cannot carry a
+/// contract that disagrees with another job's. A path absent from `ACTIONS`
+/// resolves to `None` and fails the caller, rather than falling back to a
+/// second table that could drift from this one without any test noticing.
 fn job_action_contracts(job: &JobContract) -> Option<Vec<&'static ActionContract>> {
     job.actions
         .iter()
-        .map(|path| {
-            ACTIONS
-                .iter()
-                .chain(PRELUDE_ACTIONS)
-                .find(|contract| contract.0 == *path)
-        })
+        .map(|path| ACTIONS.iter().find(|contract| contract.0 == *path))
         .collect()
 }
 
