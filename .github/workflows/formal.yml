@@ -63,12 +63,28 @@ jobs:
         if: always()
         run: |
           mkdir -p formal-results
-          uv run prover-tools kani check-version --repo-root . --kani-command kani \
-            > formal-results/kani-version 2>&1 || true
-          uv run prover-tools verus --help > formal-results/verus-help 2>&1 || true
+          # The host facts are written first so they survive a probe failure and
+          # still identify the machine that produced the artifact.
           nproc > formal-results/nproc
           free -b > formal-results/memory
           printf '%s\n' "${ImageOS-}" "${ImageVersion-}" > formal-results/image
+          # `uv run prover-tools` resolves a command from the project
+          # environment, which this repository does not have, so the earlier
+          # Make targets never made it available here. Read the pin the Makefile
+          # reads and run the helper from that source; a resolution or probe
+          # failure must fail the step rather than leave an error message in
+          # the artifact under the name of a version.
+          prover_tools_repository="$(awk '/^repository:/ { print $2 }' tools/rust-prover-tools/REF)"
+          prover_tools_ref="$(awk '/^ref:/ { print $2 }' tools/rust-prover-tools/REF)"
+          if ! printf '%s' "$prover_tools_ref" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "tools/rust-prover-tools/REF must pin a 40-hex ref; got '$prover_tools_ref'" >&2
+            exit 1
+          fi
+          prover_tools_source="git+${prover_tools_repository}@${prover_tools_ref}"
+          uv tool run --from "$prover_tools_source" prover-tools kani check-version \
+            --repo-root . --kani-command kani > formal-results/kani-version 2>&1
+          uv tool run --from "$prover_tools_source" prover-tools verus --help \
+            > formal-results/verus-help 2>&1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
