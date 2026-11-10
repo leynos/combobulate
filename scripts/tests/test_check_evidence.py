@@ -174,6 +174,28 @@ def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
     assert ': tested []' in captured.out, 'records after an invalid one are still admitted and reported'
 
 
+def test_a_schema_invalid_object_does_not_abort_the_binding_pass(tmp_path, capsys):
+    """Report a schema-invalid object as such while still admitting the valid records.
+
+    The object below parses as JSON but lacks ``verdict_source``, which
+    ``checked_inputs`` reads unguarded. Binding it raised ``KeyError``, the
+    ``except`` turned that into "cannot load configuration", and the run
+    returned 2 without reporting any record — including the valid ones.
+    """
+    invalid = tmp_path / 'incomplete.json'
+    invalid.write_text(json.dumps({'id': 'incomplete'}), encoding='utf-8')
+
+    code = run('--as-of', '2026-10-10', *WITH_BINDINGS, str(invalid), fixture('complete-test'))
+    captured = capsys.readouterr()
+
+    assert code == 2, 'a schema-invalid record still exits 2'
+    assert 'incomplete.json: schema-invalid' in captured.err, \
+        'the invalid object is diagnosed rather than reported as a configuration failure'
+    assert 'cannot load configuration' not in captured.err, \
+        'an invalid record is not a configuration failure'
+    assert ': tested []' in captured.out, 'the valid record after it must still be admitted'
+
+
 @pytest.mark.parametrize('args', [('--as-of', 'yesterday', str(EXAMPLE)), ('--as-of', '2026-10-10', '--require',
                                                                              'restricted', str(EXAMPLE))])
 def test_usage_errors_exit_two(args, capsys):

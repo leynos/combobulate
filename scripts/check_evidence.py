@@ -260,7 +260,8 @@ def main(
         register = exception_register(options.exceptions, options.decisions, options.roadmap)
         current = load_bindings(options.bindings)
         parsers = frozenset(load_json(ROOT / 'spec/evidence-reason-codes.json')['registered_log_parsers'])
-        reviewed = [record for record in (readable_record(path) for path in records) if record is not None]
+        reviewed = [record for record in (readable_record(path) for path in records)
+                    if record is not None and validator.is_valid(record)]
         verified_logs, trust_audits = checked_inputs(ROOT, reviewed, parsers)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
