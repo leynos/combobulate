@@ -294,17 +294,31 @@ class BuildBudgetTests(unittest.TestCase):
         self.assertIn('for profile in native-only polars-enabled', cold, 'the loop must name both Cargo profiles')
 
     def test_each_cold_run_starts_from_an_empty_target(self) -> None:
-        """A reused cold target measures a warm build."""
-        job = _job('build-budget')
-        cold = _step_run_matching(job, 'cold-target-$profile-$run')
-        proof_cold = _step_run_matching(job, 'cold-target-proof-$run')
+        """A reused cold target measures a warm build.
 
-        for script, label in ((cold, 'Cargo'), (proof_cold, 'Kani')):
-            self.assertIn(
-                'rm -rf -- "$CARGO_TARGET_DIR"' if label == 'Cargo' else 'rm -rf -- "$proof_target"',
-                script,
-                f'the {label} cold target must be empty before the timed region',
-            )
+        Each cold script removes its target twice: once before the timed build
+        and once after, so the ten cold targets cannot exhaust the runner's
+        disk. Membership alone would therefore pass with the pre-run removal
+        deleted, and the profile would then be measured against whatever the
+        previous run left behind. Requiring the removal to precede the timed
+        invocation is what distinguishes the two.
+        """
+        job = _job('build-budget')
+        scripts = (
+            (_step_run_matching(job, 'cold-target-$profile-$run'),
+             'rm -rf -- "$CARGO_TARGET_DIR"', '/usr/bin/time -v -o "$output.time"', 'Cargo'),
+            (_step_run_matching(job, 'cold-target-proof-$run'),
+             'rm -rf -- "$proof_target"', '/usr/bin/time -v -o "$proof_output.time"', 'Kani'),
+        )
+
+        for script, removal, timed, label in scripts:
+            with self.subTest(profile=label):
+                self.assertIn(removal, script,
+                              f'the {label} cold run must remove its target')
+                self.assertLess(
+                    script.index(removal), script.index(timed),
+                    f'the {label} cold target must be empty before the timed region',
+                )
 
     def test_one_warm_up_is_discarded_per_phase(self) -> None:
         """A measured first incremental build would include the initial compile."""
