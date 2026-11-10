@@ -94,16 +94,31 @@ def _workspace_members(root: Path, metadata: dict) -> tuple[tuple[Path, tuple[st
     ``targets[].src_path`` is absolute, and is made relative to the repository
     root here, because that is the form :func:`_entry_points` resolves against
     and the form the rest of the audit speaks. An absolute path outside the
-    root would be a dependency's source, which this audit does not own;
-    ``relative_to`` raises there rather than auditing it silently.
+    root would be a dependency's source, which this audit does not own, so it
+    is skipped rather than audited.
+
+    Both sides are resolved before they are compared. Cargo reports canonical
+    paths, while ``root`` may be reached through a symlink — a macOS temporary
+    directory is the usual case, where ``/var/...`` is canonically
+    ``/private/var/...``. Comparing the unresolved forms would find no target
+    inside the root and silently drop every crate's sources, leaving only the
+    directory fallback in :func:`_entry_points` and the gap this function
+    exists to close open again. A resolved comparison is also path-aware, so a
+    sibling such as ``/repo-other`` no longer matches a root of ``/repo`` and
+    reach a ``relative_to`` that would raise outside the documented failures.
+
+    ``crate_root`` is resolved to match, because :func:`_entry_points` joins
+    paths from it and a member directory under a symlinked root would otherwise
+    disagree with the sources beside it.
     """
+    canonical = root.resolve()
     members = []
     for package in metadata['packages']:
-        crate_root = Path(package['manifest_path']).parent
+        crate_root = Path(package['manifest_path']).parent.resolve()
         sources = tuple(
-            str(Path(target['src_path']).relative_to(root))
+            Path(target['src_path']).resolve().relative_to(canonical).as_posix()
             for target in package.get('targets', ())
-            if str(Path(target['src_path'])).startswith(str(root))
+            if Path(target['src_path']).resolve().is_relative_to(canonical)
         )
         members.append((crate_root, sources))
     return tuple(sorted(members, key=lambda member: str(member[0])))
