@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import sys
 import unittest
+from contextlib import AbstractContextManager
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -165,27 +167,13 @@ class _FixedScanner:
                      for entry in files for item in entry.items)
 
 
-class _Patch:
-    """Install one scanner in place of the check's own, for the body of a case."""
+def _fixed_scanner(names: tuple[str, ...]) -> AbstractContextManager[object]:
+    """Return a context manager installing a scanner that reports ``names``.
 
-    def __init__(self, scanner: _FixedScanner) -> None:
-        """Record the replacement scanner."""
-        self._scanner = scanner
-
-    def __enter__(self):
-        """Replace the names the check imports, and record the originals."""
-        import docs_validation.trust_audit_check as module
-        self._originals = module.audit_tree, module.items_of
-        module.audit_tree, module.items_of = self._scanner.audit_tree, self._scanner.items_of
-        return self
-
-    def __exit__(self, *_):
-        """Restore the real scanner."""
-        import docs_validation.trust_audit_check as module
-        module.audit_tree, module.items_of = self._originals
-        return False
-
-
-def _fixed_scanner(names: tuple[str, ...]) -> _Patch:
-    """Return a context manager installing a scanner that reports ``names``."""
-    return _Patch(_FixedScanner(names))
+    Both names the check resolves through its own module globals are patched
+    together, so a body that raises still restores the real scanner and one
+    case cannot leak a stub into the next.
+    """
+    scanner = _FixedScanner(names)
+    return patch.multiple('docs_validation.trust_audit_check',
+                          audit_tree=scanner.audit_tree, items_of=scanner.items_of)

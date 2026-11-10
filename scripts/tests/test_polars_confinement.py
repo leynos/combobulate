@@ -12,7 +12,9 @@ from __future__ import annotations
 import sys
 import tempfile
 import unittest
+from contextlib import AbstractContextManager
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -265,35 +267,15 @@ class NonVacuity(unittest.TestCase):
                       'a detector that found nothing must fail the control')
 
 
-class _SilentDetector:
-    """Stand in for the detector, reporting no path for any source."""
+def _reporting_nothing() -> AbstractContextManager[object]:
+    """Return a context manager installing a detector that reports nothing.
 
-    def __call__(self, text: str) -> list:
-        """Report nothing, which is the regression the control exists to catch."""
-        del text
-        return []
-
-
-class _Patch:
-    """Install one detector in place of the module's own, for the body of a case."""
-
-    def __enter__(self):
-        """Replace the detector and record the original."""
-        import docs_validation.polars_confinement as module
-        self._original = module._polars_paths
-        module._polars_paths = _SilentDetector()
-        return self
-
-    def __exit__(self, *_):
-        """Restore the real detector."""
-        import docs_validation.polars_confinement as module
-        module._polars_paths = self._original
-        return False
-
-
-def _reporting_nothing() -> _Patch:
-    """Return a context manager installing a detector that reports nothing."""
-    return _Patch()
+    The patch targets the module attribute rather than the name this test
+    imports, because ``check_polars_confinement`` resolves ``_polars_paths``
+    through its own module globals. ``mock.patch`` restores the original even
+    when the case raises, which is why the control need not undo it by hand.
+    """
+    return patch('docs_validation.polars_confinement._polars_paths', return_value=[])
 
 
 class CommittedTree(ScratchFacade):
