@@ -39,7 +39,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from docs_validation.trust_audit import (  # noqa: E402  (import after sys.path)
     TrustAuditError, audit_tree, items_of,
 )
-from docs_validation.trust_audit.command import RUST_SUFFIX  # noqa: E402
+from docs_validation.trust_audit.command import RUST_SUFFIX  # noqa: E402  (import after sys.path)
 
 # The files a directory contributes as entry points. A file in tests/benches/
 # examples is its own crate root, so it is a driver wherever it sits; inside a

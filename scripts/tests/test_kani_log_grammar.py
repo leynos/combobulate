@@ -387,7 +387,7 @@ class UnsupportedEvidence(unittest.TestCase):
 
     def test_an_inventory_log_decides_a_tool_error_that_names_its_format(self):
         """Require a list run to be refused by format, not silenced."""
-        decision = facts.decision_for((facts.HarnessFact('h::c', CLAIM, facts.SUCCESS),), format='inventory')
+        decision = facts.decision_for((facts.HarnessFact('h::c', CLAIM, facts.SUCCESS),), log_format='inventory')
         self.assertEqual(decision.outcome, 'tool-error',
                          'an inventory carries no verdicts and must decide a tool error')
         self.assertIn("'inventory'", decision.reason,

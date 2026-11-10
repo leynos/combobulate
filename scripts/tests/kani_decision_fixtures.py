@@ -214,12 +214,12 @@ def manifest_of(facts: Iterable[HarnessFact]) -> Manifest:
     return Manifest(tuple(entries))
 
 
-def build(facts: Sequence[HarnessFact], *, format: str = 'regular',
+def build(facts: Sequence[HarnessFact], *, log_format: str = 'regular',
           unsupported_constructs: tuple[str, ...] = ()) -> tuple[KaniLog, Manifest]:
     """Build one log and its manifest from a sequence of harness facts."""
     manifest = manifest_of(facts)
-    if format != 'regular':
-        return KaniLog(next(iter(SUPPORTED_VERSIONS)), format, (), None, unsupported_constructs), manifest
+    if log_format != 'regular':
+        return KaniLog(next(iter(SUPPORTED_VERSIONS)), log_format, (), None, unsupported_constructs), manifest
     blocks = tuple(block for block in (block_of(fact) for fact in facts) if block is not None)
     summary = ManualSummary(
         verified=sum(1 for block in blocks if block.verdict == 'SUCCESSFUL'),
@@ -227,7 +227,7 @@ def build(facts: Sequence[HarnessFact], *, format: str = 'regular',
         total=len(blocks),
         failed=tuple(block.name for block in blocks if block.verdict == 'FAILED'),
     )
-    return KaniLog(next(iter(SUPPORTED_VERSIONS)), format, blocks, summary, unsupported_constructs), manifest
+    return KaniLog(next(iter(SUPPORTED_VERSIONS)), log_format, blocks, summary, unsupported_constructs), manifest
 
 
 def decision_for(facts: Sequence[HarnessFact], **options: Any):
@@ -330,5 +330,5 @@ def facts_of_row(row: dict[str, Any]) -> tuple[HarnessFact, ...]:
 
 def decide_row(row: dict[str, Any]):
     """Decide one decision-table row."""
-    return decision_for(facts_of_row(row), format=row.get('format', 'regular'),
+    return decision_for(facts_of_row(row), log_format=row.get('format', 'regular'),
                         unsupported_constructs=tuple(row.get('unsupported_constructs', ())))
