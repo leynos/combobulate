@@ -1649,15 +1649,16 @@ other even though neither diff conflicts textually: the rebase applied all 59
 commits without a single conflict and the tree it produced still failed.
 
 **The failure was first read as a date boundary, and that reading was wrong.**
-The hosted run reported `toolchain record pin repository_channel is
-'nightly-2026-08-27' but its owner says 'nightly-2026-11-06'`, and an earlier
-revision of this section attributed it to `--as-of 2026-11-10` tripping a
-record-expiry rule. The date is not the cause. `design-check` checks out the
-pull request's *merge* ref, which carries `main`'s `rust-toolchain.toml`
-alongside this branch's record; the same tree on the branch head alone still
-says `nightly-2026-08-27`, and the identical run at `2b875ad` passed only
-because `main` had not yet moved. Reproducing it locally needs the rebase, not
-a different `--as-of`.
+The hosted run reported
+`toolchain record pin repository_channel is
+'nightly-2026-08-27' but its owner says 'nightly-2026-11-06'`,
+and an earlier revision of this section attributed it to `--as-of 2026-11-10`
+tripping a record-expiry rule. The date is not the cause. `design-check` checks
+out the pull request's *merge* ref, which carries `main`'s
+`rust-toolchain.toml` alongside this branch's record; the same tree on the
+branch head alone still says `nightly-2026-08-27`, and the identical run at
+`2b875ad` passed only because `main` had not yet moved. Reproducing it locally
+needs the rebase, not a different `--as-of`.
 
 The reconciliation separates two things the pin model had not yet had to tell
 apart.
@@ -1696,9 +1697,9 @@ from the requirement and demands the acceptance record report it. So with the
 control left as it is, no measurement taken after the bump can ever bind —
 AC-04 included — and the failure would name a *record* rather than the stale
 control that caused it. Bumping the parenthetical to `nightly-2026-11-06`
-instead invalidates both existing AC-04 records, which were honestly measured
-at `2026-08-27`, and takes AC-04 from `pass` to a binding error; both were
-tested against the real records rather than reasoned about.
+instead invalidates both existing AC-04 records, which were honestly measured at
+`2026-08-27`, and takes AC-04 from `pass` to a binding error; both were tested
+against the real records rather than reasoned about.
 
 The version is not removed from the requirement, only the copy that decays. The
 control keeps its demand that the record report a `rust` toolchain, and the
