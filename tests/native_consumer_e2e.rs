@@ -12,21 +12,11 @@ use std::{
     error::Error,
     path::{Path, PathBuf},
     process::Command,
-    time::Duration,
 };
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
-
-/// Bounds the fixture's `cargo build`, which compiles the facade and kernel.
-///
-/// The fixture is small but shares the machine's compile admission queue with
-/// every other agent, so the tier matches the repository's build tests rather
-/// than the two-minute read tier.
-const BUILD_DEADLINE: Duration = Duration::from_mins(15);
-
-/// Bounds the dependency-graph read, which resolves but compiles nothing.
-const READ_DEADLINE: Duration = Duration::from_mins(2);
+use serde_json::Value;
 
 /// Package-name prefixes that may never appear in a native-only consumer.
 const FORBIDDEN_PREFIXES: &[&str] = &["polars", "glam", "kani", "verus", "vstd"];
@@ -39,9 +29,6 @@ const FORBIDDEN_PREFIXES: &[&str] = &["polars", "glam", "kani", "verus", "vstd"]
 /// file carries the `build_profiles__rendered_native__` prefix.
 const NATIVE_ONLY_SNAPSHOT: &str =
     "tests/snapshots/build_profiles__rendered_native__native_only.snap";
-
-/// Bounds the profile binary, which prints one line and returns.
-const RUN_DEADLINE: Duration = Duration::from_mins(1);
 
 /// The fixture's manifest, resolved from the repository root Cargo sets.
 fn fixture_manifest() -> PathBuf {
@@ -61,22 +48,28 @@ fn native_only_snapshot() -> Result<String, Box<dyn Error>> {
         ambient_authority(),
     )?;
     let contents = root.read_to_string(NATIVE_ONLY_SNAPSHOT)?;
-    Ok(snapshot_body(&contents).to_owned())
+    Ok(snapshot_body(&contents)?.to_owned())
 }
 
 /// Extracts the rendered value from an `insta` snapshot file.
 ///
 /// `insta` writes a YAML header delimited by `---` lines before the value. Only
 /// the body is compared, so the header's metadata changes cannot fail this
-/// test; the `insta` snapshot test owns that format. The delimiter is searched
-/// from the right because the header itself opens with it, and the body is a
-/// single profile line containing no `---`.
-fn snapshot_body(contents: &str) -> &str {
-    contents
-        .rsplit("\n---\n")
-        .next()
-        .unwrap_or(contents)
-        .trim_end()
+/// test; the `insta` snapshot test owns that format.
+///
+/// The split takes the first closing delimiter, not the last: the header opens
+/// with `---`, closes with a second `---`, and everything after that closing
+/// line is the body. A snapshot with no closing delimiter is a malformed file,
+/// so it is reported as such rather than compared header and all, which would
+/// fail with a message pointing at the fixture's output rather than the
+/// snapshot's format. The body may itself contain `---`; that no longer
+/// matters.
+fn snapshot_body(contents: &str) -> Result<&str, Box<dyn Error>> {
+    let (_, body) = contents
+        .strip_prefix("---\n")
+        .and_then(|header| header.split_once("\n---\n"))
+        .ok_or("the snapshot must open and close its header with --- lines")?;
+    Ok(body.trim_end())
 }
 
 /// Builds a Cargo child with the caller's build selectors removed.
@@ -97,10 +90,10 @@ fn fixture_cargo(arguments: &[&str], target_dir: &Path) -> Command {
 
 /// Runs a Cargo invocation, returning its standard output on success.
 ///
-/// A caller-supplied deadline is not applied here: nextest gives this test its
-/// own process and the repository's `.config/nextest.toml` owns the tier, so
-/// the constants above document the expectation rather than duplicating the
-/// mechanism. Cargo's own diagnostics are returned on failure, because a
+/// No deadline is applied here: nextest gives this test its own process and
+/// `.config/nextest.toml` owns the tier, which is why the repository's tests
+/// start plain `Command` children (see "Test timeouts" in the developers'
+/// guide). Cargo's own diagnostics are returned on failure, because a
 /// resolution error otherwise reads as an unrelated assertion.
 fn run_cargo(mut command: Command, description: &str) -> Result<String, Box<dyn Error>> {
     let output = command.output()?;
@@ -115,6 +108,31 @@ fn run_cargo(mut command: Command, description: &str) -> Result<String, Box<dyn 
     Ok(String::from_utf8(output.stdout)?)
 }
 
+/// Extracts the fixture's built binary from Cargo's JSON message stream.
+///
+/// The profile directory and the executable name both come from Cargo rather
+/// than from a literal `debug/native-consumer` path. A literal would silently
+/// stop matching if the fixture were renamed or built under a custom profile,
+/// and it would omit the platform's `.exe` suffix. `compiler-artifact`
+/// messages carry an `executable` for binaries, tests, and build scripts, so
+/// the target kind is checked as well: only a `bin` is the fixture itself, and
+/// its dependencies' library artefacts carry no executable at all.
+fn built_binary(stream: &str) -> Result<PathBuf, Box<dyn Error>> {
+    let executable = stream
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+        .filter(|message| message["reason"] == "compiler-artifact")
+        .filter(|message| {
+            message["target"]["kind"]
+                .as_array()
+                .is_some_and(|kinds| kinds.iter().any(|kind| kind == "bin"))
+        })
+        .filter_map(|message| message["executable"].as_str().map(str::to_owned))
+        .next()
+        .ok_or("Cargo reported no executable for the fixture's binary target")?;
+    Ok(PathBuf::from(executable))
+}
+
 /// Builds the fixture and returns its `cargo tree` output and rendered profile.
 fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
     let target_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("native-consumer");
@@ -123,13 +141,20 @@ fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
         .ok_or("the fixture manifest path is not UTF-8")?
         .to_owned();
 
-    run_cargo(
+    let build = run_cargo(
         fixture_cargo(
-            &["build", "--locked", "--manifest-path", &manifest],
+            &[
+                "build",
+                "--locked",
+                "--message-format=json-render-diagnostics",
+                "--manifest-path",
+                &manifest,
+            ],
             &target_dir,
         ),
         "building the native consumer",
     )?;
+    let binary = built_binary(&build)?;
     let tree = run_cargo(
         fixture_cargo(
             &[
@@ -145,7 +170,6 @@ fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
         ),
         "reading the native consumer's dependency graph",
     )?;
-    let binary = target_dir.join("debug/native-consumer");
     let rendered = run_cargo(
         {
             let mut command = Command::new(&binary);
@@ -237,14 +261,36 @@ fn fixture_cargo_removes_the_caller_build_selectors() {
     }
 }
 
-/// The stated tiers must stay ordered: the build outranks the reads.
+/// The binary lookup rejects a stream that names no binary target.
 #[test]
-fn the_fixture_build_deadline_clears_a_shared_admission_queue() {
+fn binary_lookup_reports_a_stream_without_a_binary() {
+    let library_only = concat!(
+        r#"{"reason":"compiler-artifact","target":{"kind":["lib"],"name":"combobulate"},"#,
+        r#""executable":null}"#,
+        "\n",
+        "Compiling combobulate v0.1.0\n"
+    );
     assert!(
-        BUILD_DEADLINE > READ_DEADLINE && READ_DEADLINE > RUN_DEADLINE,
-        concat!(
-            "the build compiles the facade, so its tier must exceed the read tier, which must ",
-            "exceed the one-line run"
-        )
+        built_binary(library_only).is_err(),
+        "a stream with no bin target must report the missing executable rather than \
+         fall back to a guessed path"
+    );
+}
+
+/// The binary lookup takes the binary target's own reported path.
+#[test]
+fn binary_lookup_uses_the_reported_executable() {
+    let stream = concat!(
+        r#"{"reason":"compiler-artifact","target":{"kind":["lib"],"name":"combobulate"}"#,
+        ",\"executable\":null}\n",
+        r#"{"reason":"compiler-artifact","target":{"kind":["bin"],"name":"native-consumer"},"#,
+        r#""executable":"/tmp/target/debug/native-consumer"}"#,
+        "\n"
+    );
+    let binary = built_binary(stream);
+    assert_eq!(
+        binary.as_deref().ok(),
+        Some(Path::new("/tmp/target/debug/native-consumer")),
+        "the reported bin artifact's executable is the path to run"
     );
 }
