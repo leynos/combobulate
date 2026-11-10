@@ -116,6 +116,14 @@ fn inherited_gate_profile_does_not_narrow_the_asserted_route() {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
+        // The filter names one test; if that name changes, an exact filter can
+        // match nothing and the child still exits successfully, which would let
+        // this case pass without having run the assertion it exists to repeat.
+        let summary = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            summary.contains("running 1 test") && summary.contains("1 passed; 0 failed"),
+            "the nested run against a {description} must execute exactly the named test: {summary}"
+        );
     }
 }
 
