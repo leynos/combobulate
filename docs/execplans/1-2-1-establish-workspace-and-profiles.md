@@ -592,11 +592,15 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - Note (2026-11-07): `make lint` and `make test` iterate `GATE_PROFILES`, so
     running them is what verifies DL-18's two-profile isolation. There is no
     separate profile gate to run.
-- [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
+- [x] EP-M4. Profile record, pin consistency, and ADR-0010.
   - Status (2026-11-07): `spec/toolchain-profiles.json`, its schema,
-    `scripts/docs_validation/toolchain_profiles.py`, ADR-0010 (Proposed), and
-    proposed D16 exist.
-  - [ ] Sponsor acceptance of D16 and ADR-0010, and the AC-04 amendment text.
+    `scripts/docs_validation/toolchain_profiles.py`, ADR-0010, and D16 exist.
+  - [x] (2026-10-22) Sponsor acceptance of D16 and ADR-0010, and the AC-04
+    amendment text. `spec/decisions.json` records D16 as accepted on
+    2026-10-22 with its approval reference, and ADR-0010's status line records
+    the same date. The AC-04 amendment needed no separate approval: ADR-0008's
+    2026-10-31 amendment (`684f687`) retired the acceptance-control approval
+    ceremony, so an acceptance control is an ordinary reviewed file.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
   - [x] (2026-11-07) Mutation census over both packages. mutmut 3.6.0, run from
     a private virtualenv at `/tmp/mut-venv` rather than through `uv tool run`
@@ -2399,8 +2403,11 @@ the approved CI shape and the AC-07 amendment.
   `preregistration.py`, and their tests to accept the amended AC-07 workload.
   Record the amendment, with its new `ci.yml` digest, in
   `spec/acceptance-controls.json` in the same commit.
-- Checkpoint: the sponsor approves the AC-07 amendment text and job sizes
-  before this push. Status is `BLOCKED` until then.
+- Checkpoint: ~~the sponsor approves the AC-07 amendment text and job sizes
+  before this push.~~ **Withdrawn (2026-11-08).** ADR-0008's 2026-10-31
+  amendment (`684f687`) made an acceptance control an ordinary reviewed file,
+  so no separate approval precedes the push and this milestone is no longer
+  blocked on one. The delivered CI shape is recorded in `Progress`.
 - Green: rerun the scenarios, snapshots, end-to-end test, and both profile
   routes; then the common gates and the hosted CI on the push.
 - Acceptance: VO-4, VO-5, VO-14; both profiles lint and test locally; hosted
