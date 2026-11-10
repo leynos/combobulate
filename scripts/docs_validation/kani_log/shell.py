@@ -69,6 +69,20 @@ class MissingEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class GitUnavailable:
+    """Why Git could not answer what a root tracks; e.g. the root is not a repository.
+
+    A separate value from an empty result, because the two answer different
+    questions. "Nothing here is tracked" is evidence about the paths a record
+    cites; "Git could not answer" is evidence about the checkout, and reporting
+    it as the former made a broken invocation read as a specific, wrong
+    verdict about each cited path. Both stay fail-closed: neither admits.
+    """
+
+    detail: str
+
+
+@dataclass(frozen=True, slots=True)
 class KaniBinding:
     """The inputs one record's Kani claim is decided from."""
 
@@ -80,7 +94,7 @@ class KaniBinding:
     source_digests: Mapping[str, str]
 
 
-def tracked_paths(root: Path, paths: Sequence[str]) -> frozenset[str]:
+def tracked_paths(root: Path, paths: Sequence[str]) -> frozenset[str] | GitUnavailable:
     """Return the subset of ``paths`` Git tracks under ``root``.
 
     One ``git ls-files`` call answers for all of them, so a record citing many
@@ -89,7 +103,13 @@ def tracked_paths(root: Path, paths: Sequence[str]) -> frozenset[str]:
     Examples
     --------
     ``tracked_paths(root, ['spec/roadmap.json', 'scratch/none.log'])`` returns
-    only the tracked path when the second is untracked.
+    only the tracked path when the second is untracked. A root Git cannot
+    answer for returns ``GitUnavailable`` rather than an empty set, so the
+    caller can say that instead of blaming each cited path.
+
+    ``check=False`` is deliberate: a non-zero exit is ordinary here, because a
+    directory that is not a repository is exactly what this function is asked
+    about, and ``CalledProcessError`` would escape as an exception.
     """
     wanted = sorted(set(paths))
     if not wanted:
@@ -98,7 +118,8 @@ def tracked_paths(root: Path, paths: Sequence[str]) -> frozenset[str]:
         ['git', '-C', str(root), 'ls-files', '--', *wanted],
         capture_output=True, check=False, text=True)
     if completed.returncode != 0:
-        return frozenset()
+        detail = completed.stderr.strip() or f'git ls-files exited {completed.returncode}'
+        return GitUnavailable(detail)
     return frozenset(completed.stdout.splitlines())
 
 
@@ -117,7 +138,10 @@ def read_tracked(root: Path, relative: str) -> bytes | MissingEvidence:
     root_resolved = root.resolve()
     if root_resolved not in resolved.parents:
         return MissingEvidence('path', relative, 'it resolves outside the repository')
-    if relative not in tracked_paths(root, [relative]):
+    tracked = tracked_paths(root, [relative])
+    if isinstance(tracked, GitUnavailable):
+        return MissingEvidence('path', relative, f'Git could not report what it tracks: {tracked.detail}')
+    if relative not in tracked:
         return MissingEvidence('path', relative, 'it is not tracked by Git')
     try:
         return resolved.read_bytes()

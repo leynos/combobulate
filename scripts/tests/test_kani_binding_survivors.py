@@ -49,8 +49,8 @@ from docs_validation.kani_log import (
 )
 from docs_validation.kani_log.decide import _Observed, _rejected_as_intended
 from docs_validation.kani_log.shell import (
-    MissingEvidence, UNNAMED_RECORD, bind_verdict, bound_sources,
-    tracked_paths,
+    GitUnavailable, MissingEvidence, UNNAMED_RECORD, bind_verdict, bound_sources,
+    read_tracked, tracked_paths,
 )
 from git_fixtures import run_git
 from kani_binding_fixtures import ROOT, ScratchCheckout, digest, record
@@ -395,11 +395,26 @@ class TrackedPathListings(unittest.TestCase):
 
         ``subprocess.run`` with ``check=True`` raises ``CalledProcessError``
         from inside the gate. The wrong root is exactly what the function is
-        asked about, so it must answer "nothing is tracked" rather than throw.
+        asked about, so it must answer rather than throw — and the answer must
+        be that Git could not report, not that nothing is tracked. The two
+        differ: the second would blame every cited path individually for a
+        problem with the checkout.
         """
         with tempfile.TemporaryDirectory() as directory:
-            self.assertEqual(tracked_paths(Path(directory), ['x']), frozenset(),
-                             'a directory that is not a repository must yield no paths')
+            result = tracked_paths(Path(directory), ['x'])
+            self.assertIsInstance(result, GitUnavailable,
+                                  'a directory that is not a repository must report why Git could not answer')
+            self.assertTrue(result.detail,
+                            'the report names what Git said, so the caller can print it')
+
+    def test_a_read_from_a_non_repository_says_git_could_not_report(self):
+        """Carry the Git failure into the read API's refusal rather than blaming the path."""
+        with tempfile.TemporaryDirectory() as directory:
+            result = read_tracked(Path(directory), 'run.log')
+            self.assertIsInstance(result, MissingEvidence,
+                                  'an unreadable checkout is still a refusal')
+            self.assertIn('Git could not report', result.reason,
+                          'the refusal names the real cause, not an untracked path')
 
 
 if __name__ == '__main__':
