@@ -223,5 +223,3 @@ fn direction_violations_are_reported(#[case] fixture: &str, #[case] expected: &s
     let violations = cargo::metadata::direction_violations(&metadata);
     assert_that!(violations.join("; ").as_str(), contains_substring(expected));
 }
-// weave: run 'weave explain tests/workspace_boundaries.rs' for per-hunk detail, 'weave check' to
-// verify your resolution
