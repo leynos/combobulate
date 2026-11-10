@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.14"
-# dependencies = []
+# dependencies = ["cyclopts==5.2.0"]
 # ///
 """Report trusted items in Rust sources, in the evidence schema's audit shape.
 

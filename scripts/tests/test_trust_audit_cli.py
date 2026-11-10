@@ -19,6 +19,8 @@ Examples
 from __future__ import annotations
 
 import importlib.util
+import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -126,6 +128,62 @@ class DriverDiscovery(unittest.TestCase):
         drivers = list(self.command._drivers(self.root / 'crates/one/src/lib.rs'))
         self.assertEqual(drivers, [('crates/one/src/lib.rs', self.root)],
                          'a file argument must be its own repository-relative driver')
+
+
+class StandaloneEntryPoint(unittest.TestCase):
+    """Run the script the way its shebang does, over its own declared dependencies.
+
+    The cases above load the command in-process, so they exercise the discovery
+    helpers without proving the thing a user invokes. They cannot catch a
+    missing PEP 723 dependency either: the test environment installs
+    ``scripts/requirements.txt``, which happens to pin what the script imports.
+    Running it as a subprocess with the mode Git records and the dependencies
+    the script itself declares is the only check that reaches the real entry
+    point.
+    """
+
+    def _run(self, *arguments: str) -> subprocess.CompletedProcess[str]:
+        """Invoke the script from the repository root, as its documentation shows."""
+        return subprocess.run(
+            [str(SCRIPTS / 'trust_audit.py'), *arguments],
+            capture_output=True, check=False, text=True, timeout=180, cwd=ROOT,
+        )
+
+    def test_the_documented_entry_point_is_executable(self) -> None:
+        """Require the executable bit, because the docs show the path being run directly.
+
+        ``git ls-files -s`` reports the mode Git will check out, which is the
+        mode a fresh clone gets; the working tree's own bit would hide a mode
+        that was never committed.
+        """
+        recorded = subprocess.run(
+            ['git', 'ls-files', '-s', '--', 'scripts/trust_audit.py'],
+            capture_output=True, check=True, text=True, cwd=ROOT,
+        ).stdout
+        self.assertIn('100755', recorded,
+                      'scripts/trust_audit.py is documented as runnable, so Git must record it executable')
+
+    def test_standalone_entrypoint_reports_json_for_one_source(self) -> None:
+        """Print the audit as JSON, using only the dependencies the script declares."""
+        result = self._run('crates/combobulate-kernel/src/lib.rs')
+        self.assertEqual(result.returncode, 0,
+                         f'auditing a source must succeed: {result.stderr}')
+        audited = json.loads(result.stdout)
+        self.assertEqual([entry['source'] for entry in audited],
+                         ['crates/combobulate-kernel/src/lib.rs'],
+                         'the audit names the source it read')
+        self.assertIsInstance(audited[0]['items'], list,
+                              'each audited source reports its trusted items as a list')
+
+    def test_standalone_entrypoint_exits_non_zero_and_says_why(self) -> None:
+        """Reject a path that does not exist with status 1 rather than an empty audit."""
+        result = self._run('scratch/no-such-source.rs')
+        self.assertEqual(result.returncode, 1,
+                         'a path that cannot be audited must fail rather than audit nothing')
+        self.assertIn('does not exist', result.stderr,
+                      'the refusal names the reason')
+        self.assertEqual(result.stdout, '',
+                         'a refused audit writes no JSON, so a caller cannot read it as an empty result')
 
 
 if __name__ == '__main__':
