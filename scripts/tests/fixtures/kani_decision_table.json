@@ -29,6 +29,14 @@
       "why": "A failed assertion is the strongest disproof and outranks everything below it."
     },
     {
+      "id": "foreign-check-failure-is-a-counterexample",
+      "harnesses": [
+        {"name": "h::claim", "role": "claim", "status": "FOREIGN_FAILURE", "verdict": "FAILED"}
+      ],
+      "outcome": "counterexample",
+      "why": "Kani attributes a check to the function owning its source line, so an assertion in a routine the harness calls is reported inside the harness's block under that routine's name. The block printed FAILED, so the run disproved something the claim depends on; reading only the harness's own checks would call it verified."
+    },
+    {
       "id": "counterexample-outranks-timeout",
       "harnesses": [
         {"name": "h::a", "role": "claim", "status": "FAILURE", "verdict": "FAILED"},

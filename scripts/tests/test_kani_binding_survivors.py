@@ -7,30 +7,31 @@ for a nameless record, or the target of the editor line the refusal came from.
 They survive because the existing suites assert outcomes, not the prose and
 labels a record's author reads back.
 
-Five families of survivor are equivalents rather than gaps, and this module
+Four families of survivor are equivalents rather than gaps, and this module
 records why instead of silencing them: ``MissingEvidence`` is returned for a
 refusal whose *label* the scanner does not compare, so a mutant that changed
-one refusal's class still refuses; ``manifest_from_document``'s
-``should_panic`` default is unobservable because ``bool`` of ``()``, ``None``,
-and ``False`` are all false; ``_manifest_sources``'s ``()`` and omitted-argument
-defaults are unobservable because ``None`` is not a ``Sequence`` and so returns
-the same empty tuple — its own cases live in
-``test_kani_manifest_source_list``; and ``tracked_paths``'s ``subprocess.run(check=False)``
-is unobservable because the function tests ``returncode`` on the next line and
-returns the same empty set whether the command failed or raised. The
-``(control.expected_failure or '')`` default in
-:func:`~docs_validation.kani_log.decide._rejected_as_intended` is equivalent
-for a subtler reason: ``Harness.__post_init__`` refuses every falsy
+one refusal's class still refuses; ``_manifest_sources``'s ``()`` and
+omitted-argument defaults are unobservable because ``None`` is not a
+``Sequence`` and so returns the same empty tuple — its own cases live in
+``test_kani_manifest_source_list``; the ``(control.expected_failure or '')``
+default in :func:`~docs_validation.kani_log.decide._rejected_as_intended` is
+equivalent for a subtler reason: ``Harness.__post_init__`` refuses every falsy
 expectation, and ``'   '`` is truthy, so the ``or`` never fires and the
-``'XXXX'`` mutant cannot be reached. ``bind_verdict``'s decoding of the log is
-the last: ``decode(errors='replace')`` and ``decode('UTF-8', ...)`` are the same
-call as ``decode('utf-8', ...)``, because Python resolves the encoding name
-case-insensitively and this host's preferred encoding is UTF-8. A mutant no
+``'XXXX'`` mutant cannot be reached; and ``bind_verdict``'s decoding of the log
+is the last, where ``decode(errors='replace')`` and ``decode('UTF-8', ...)`` are
+the same call as ``decode('utf-8', ...)``, because Python resolves the encoding
+name case-insensitively and this host's preferred encoding is UTF-8. A mutant no
 input can distinguish is not a gap.
+
+``tracked_paths``'s ``check=False`` was reported as a fifth family and is *not*
+one: ``check=True`` raises ``CalledProcessError`` where the function promises an
+empty set, and ``test_a_repository_that_is_not_one_yields_no_paths`` requires
+that empty set for a directory that is not a repository. The argument is
+observable, so no test here claims otherwise.
 
 Examples
 --------
->>> unnamed_label({})[:6]
+>>> unnamed_label()
 'record'
 """
 from __future__ import annotations
@@ -262,13 +263,29 @@ class RefusalLabels(unittest.TestCase):
 
 
 class ManifestDefaults(unittest.TestCase):
-    """Record the ``should_panic`` default as an equivalent, not a gap."""
+    """Require the ``should_panic`` default to be the boolean false, not a falsy value.
+
+    ``manifest_from_document`` now refuses anything but a JSON boolean, which
+    makes the default observable: a default of ``()`` or ``None`` would be
+    refused rather than read as "no panic expected". An omitted key must still
+    mean false, because most manifest entries do not mention the flag.
+    """
 
     def test_an_entry_without_should_panic_is_false(self):
-        """Require the omitted flag to mean false, whatever value the default takes."""
+        """Require the omitted flag to mean false, rather than to be refused."""
         document = {'harnesses': [{'name': 'h::x', 'role': 'claim'}]}
         self.assertFalse(manifest_from_document(document).harnesses[0].should_panic,
                          'an entry that omits should_panic must not declare it')
+
+    def test_a_should_panic_that_is_not_a_boolean_is_refused(self):
+        """Require a quoted or numeric flag to be refused rather than coerced."""
+        for value in ('false', 'true', 1, 0, None):
+            with self.subTest(value=value):
+                document = {'harnesses': [{'name': 'h::x', 'role': 'claim',
+                                           'should_panic': value}]}
+                with self.assertRaises(ValueError,
+                                       msg=f'{value!r} is not a JSON boolean and must be refused'):
+                    manifest_from_document(document)
 
 
 class ManifestRefusalLabel(unittest.TestCase):

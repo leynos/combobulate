@@ -162,8 +162,14 @@ def manifest_from_document(document: Mapping[str, object]) -> Manifest:
         expected = entry.get('expected_failure')
         if expected is not None and not isinstance(expected, str):
             raise ValueError(f'harness {entry["name"]!r} has a malformed expected_failure')
+        # `should_panic` is what lets a failed claim be excused, so a truthful
+        # type matters more here than anywhere else in the entry: `bool()` would
+        # accept the string "false" as a panic claim.
+        should_panic = entry.get('should_panic', False)
+        if not isinstance(should_panic, bool):
+            raise ValueError(f'harness {entry["name"]!r} has a malformed should_panic')
         harnesses.append(Harness(entry['name'], entry['role'], tuple(covers), expected,
-                                 bool(entry.get('should_panic', False))))
+                                 should_panic))
     if not harnesses:
         raise ValueError('the harness manifest declares no harnesses')
     names = [item.name for item in harnesses]

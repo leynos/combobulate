@@ -49,6 +49,12 @@ UNDETERMINED = 'UNDETERMINED'
 UNWIND_FAILURE = 'UNWIND_FAILURE'
 UNSUPPORTED_CHECK = 'UNSUPPORTED_CHECK'
 UNSUPPORTED_ASSERTION = 'UNSUPPORTED_ASSERTION'
+# A block whose only failed check belongs to a routine the harness called.
+# Kani attributes a check to the function owning its source line, so a library
+# assertion the harness reaches is reported inside the harness's block under the
+# library's name, and the block still prints ``FAILED``. Nothing the manifest
+# declares failed, yet the run disproved something the claim depends on.
+FOREIGN_FAILURE = 'FOREIGN_FAILURE'
 ABSENT = 'ABSENT'
 
 SATISFIED = 'SATISFIED'
@@ -60,9 +66,13 @@ AS_INTENDED = 'as-intended'
 OTHERWISE = 'otherwise'
 
 UNSUPPORTED_WORDING = 'TerminatorKind::InlineAsm is not currently supported by Kani.'
+# The library check the corpus's own logs report, so a constructed block names a
+# check Kani really prints rather than one invented here.
+LIBRARY_CHECK = "core::fmt::Arguments::<'_>::from_str.assertion.1"
 BOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --unwind 2 --sat-solver cadical`'
 UNBOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --sat-solver cadical`'
-FAILING = (FAILURE, AS_INTENDED, OTHERWISE, UNWIND_FAILURE, UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION)
+FAILING = (FAILURE, AS_INTENDED, OTHERWISE, UNWIND_FAILURE, UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION,
+           FOREIGN_FAILURE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,6 +110,15 @@ class HarnessFact:
 
 def _checks(fact: HarnessFact) -> list[PropertyResult]:
     """Build the checks this fact's block reports, in the order Kani lists them."""
+    checks = (_foreign_checks(fact.name) if fact.status == FOREIGN_FAILURE
+              else _owned_checks(fact))
+    if fact.cover != NOTHING:
+        checks.append(PropertyResult(f'{fact.name}.cover.1', fact.cover, fact.witness))
+    return checks
+
+
+def _owned_checks(fact: HarnessFact) -> list[PropertyResult]:
+    """Build the single check a harness owns, when its class names one."""
     name = fact.name
     kind = {
         SUCCESS: ('assertion.1', 'SUCCESS', 'the assertion holds'),
@@ -113,10 +132,24 @@ def _checks(fact: HarnessFact) -> list[PropertyResult]:
         UNSUPPORTED_CHECK: ('unsupported_construct.1', 'FAILURE', UNSUPPORTED_WORDING),
         UNSUPPORTED_ASSERTION: ('assertion.1', 'FAILURE', UNSUPPORTED_WORDING),
     }.get(fact.status)
-    checks = [PropertyResult(f'{name}.{kind[0]}', kind[1], kind[2])] if kind else []
-    if fact.cover != NOTHING:
-        checks.append(PropertyResult(f'{name}.cover.1', fact.cover, fact.witness))
-    return checks
+    return [PropertyResult(f'{name}.{kind[0]}', kind[1], kind[2])] if kind else []
+
+
+def _foreign_checks(name: str) -> list[PropertyResult]:
+    """Build a block whose own check passes while a library check it reached fails.
+
+    Kani attributes a check to the function owning its source line, so an
+    assertion in a routine the harness calls is reported inside the harness's
+    block under that routine's name, and the block still prints ``FAILED``. This
+    is the corpus's ``verified`` shape with its library assertion failed instead
+    of unreachable, so the class is one the parser really produces. The
+    identifier is written whole rather than assembled from ``name``: prefixing
+    the harness would make the check its own and test nothing.
+    """
+    return [PropertyResult(LIBRARY_CHECK, 'FAILURE', 'attempt to shift left with overflow'),
+            PropertyResult(f'{name}.assertion.1', 'SUCCESS',
+                           "This is a placeholder message; Kani doesn't support message "
+                           'formatted at runtime')]
 
 
 def block_of(fact: HarnessFact) -> HarnessBlock | None:
@@ -191,10 +224,15 @@ def claim_variants(name: str = 'h::c') -> tuple[HarnessFact, ...]:
     plus the claim that never ran with and without a declared cover (an absent
     harness still has a cover the manifest names, and that cover is what VO-11b
     must report as unsatisfied).
+
+    ``FOREIGN_FAILURE`` is one of the outcomes, not a variant of ``FAILURE``: a
+    block whose only failed check belongs to a routine the harness called has no
+    owned failure at all, and a decision that reads ownership alone cannot tell
+    it from a clean run.
     """
     outcomes = (HarnessFact(name, CLAIM, status) for status in
-                (SUCCESS, FAILURE, TIMEOUT, UNDETERMINED, UNWIND_FAILURE, UNSUPPORTED_CHECK,
-                 UNSUPPORTED_ASSERTION))
+                (SUCCESS, FAILURE, FOREIGN_FAILURE, TIMEOUT, UNDETERMINED, UNWIND_FAILURE,
+                 UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION))
     witnesses = (HarnessFact(name, CLAIM, SUCCESS, cover) for cover in COVER_STATUSES[1:])
     panics = (HarnessFact(name, CLAIM, FAILURE, should_panic=True, note=note) for note in (True, False))
     absent = (HarnessFact(name, CLAIM, ABSENT, cover) for cover in (NOTHING, SATISFIED))

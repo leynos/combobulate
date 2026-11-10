@@ -76,6 +76,7 @@ class _Observed:
     name: str
     succeeded: bool
     properties: tuple[PropertyResult, ...] = field(default_factory=tuple)
+    unattributed: tuple[PropertyResult, ...] = field(default_factory=tuple)
     failure_messages: tuple[str, ...] = field(default_factory=tuple)
     timed_out: bool = False
     panics_as_expected: bool = False
@@ -103,6 +104,22 @@ class _Observed:
         """
         return tuple(item for item in self.failures
                      if not item.is_unwinding and item.kind != UNSUPPORTED_KIND)
+
+    @property
+    def foreign_failures(self) -> tuple[PropertyResult, ...]:
+        """Return the block's failures that belong to a function the harness called.
+
+        Kani attributes a check to the function owning its source line, so an
+        assertion in a library routine the harness reaches is owned by that
+        routine rather than by the harness. ``properties`` keeps only the
+        harness's own checks, which is right for the weaker verdicts — a library
+        ``UNREACHABLE`` is routine and says nothing about the claim — but a
+        *failed* foreign check is still a disproof of the run, and dropping it
+        would let a `FAILED` verdict decide ``verified``.
+        """
+        return tuple(item for item in self.unattributed
+                     if item.status == 'FAILURE'
+                     and not item.is_unwinding and item.kind != UNSUPPORTED_KIND)
 
     @property
     def indeterminate(self) -> bool:
@@ -167,12 +184,17 @@ def _observations(log: KaniLog, manifest: Manifest) -> dict[str, _Observed]:
         if block.name not in declared:
             raise ValueError(
                 f'the log reports harness {block.name!r}, which the manifest does not declare')
-        # Library checks are reported inside another harness's block. They belong
-        # to no manifest harness, so nothing in the decision may read them;
-        # surfacing one as a run failure would make every run look bad.
+        # Kani reports library checks inside a harness's block. They belong to no
+        # manifest harness, so they are not attributed to one; the corpus's
+        # `verified` log carries a library assertion that is merely UNREACHABLE,
+        # and counting that as a run failure would make every run look bad. A
+        # library check that actually *failed* is a different matter, and
+        # `_outcome` answers it from the verdict rather than from ownership.
+        owned = block.owned(block.name)
         observed[block.name] = _Observed(
             name=block.name, succeeded=block.succeeded,
-            properties=block.owned(block.name),
+            properties=owned,
+            unattributed=tuple(item for item in block.checks if item not in owned),
             failure_messages=tuple(item.message for item in block.failures),
             timed_out=block.timed_out,
             panics_as_expected=block.panics_as_expected,
@@ -225,6 +247,12 @@ def _rejected_as_intended(control: Harness, seen: _Observed) -> bool:
     claim would be caught.
     """
     expected = (control.expected_failure or '').strip()
+    # A blank expectation matches nothing. `PropertyResult.kind` is '' for an
+    # identifier with fewer than three dot-separated parts, so without this
+    # guard such a failure would match the empty expectation and be reported as
+    # intended without the manifest ever naming a property.
+    if not expected:
+        return False
     return any(expected in (item.identifier, item.property, item.kind) for item in seen.failures)
 
 
@@ -235,9 +263,19 @@ def _outcome(log: KaniLog, claims: list[_Observed | None], manifest: Manifest) -
     as expected only when Kani's own verdict carries the note that a panic was
     encountered as expected; without that note the ordinary rules apply, so a
     manifest cannot talk the decision out of a real failure.
+
+    A claim's unowned failures are checked too, and they rank with its own. Kani
+    attributes a check to the function owning its source line, so an assertion
+    in a routine the harness calls is owned by that routine; ``owned`` drops it,
+    and a `FAILED` verdict would then decide ``verified``. Only *failures* are
+    recovered this way, and only at the counterexample rank: a library
+    ``UNREACHABLE`` is routine and must not turn a clean run into
+    ``solver-unknown``.
     """
     reported = [item for item in claims if item is not None]
     if any(_counts_as_counterexample(item, manifest) for item in reported):
+        return COUNTEREXAMPLE
+    if any(item.foreign_failures for item in reported):
         return COUNTEREXAMPLE
     if any(item.timed_out or item.unwinding_failures for item in reported):
         return RESOURCE_EXHAUSTED
