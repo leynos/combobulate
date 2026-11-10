@@ -397,8 +397,19 @@ lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo def
 			$(WHITAKER) --lib whitaker_suite --fail-on-no-libraries -- $(CARGO_FLAGS) $$flags; \
 	done
 
-typecheck: check-build-tools ## Type-check without building
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
+# Type-checks each gate profile in its own invocation, for the same reason the
+# lint and test gates do: one default-feature run never reaches the
+# `cfg(not(feature = "polars"))` code the native-only route exists to cover.
+typecheck: check-build-tools ## Type-check every gate profile without building
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== typecheck profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+		esac; \
+		RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+			$(CARGO) check $(CARGO_FLAGS) $$flags; \
+	done
 
 install-build-tools: ## Install pinned `mold` and the repository toolchain
 	@scripts/install-build-tools.sh

@@ -2,7 +2,7 @@
 
 Combobulate's array algebra is not yet implemented. The `combobulate` facade
 crate exports one public item, [`BuildProfile`](#build-profile), which reports
-the features and target facts compiled into the binary you are holding. The
+the features and target facts compiled into the running binary. The
 unpublished `combobulate-kernel` crate exposes only `TargetFacts`. Nothing in
 the workspace carries a stability promise. Do not use the proposed design
 examples as working Rust examples.
