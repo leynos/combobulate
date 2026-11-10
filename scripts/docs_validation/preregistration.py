@@ -27,7 +27,7 @@ from .ci_controls import (
 from .context import ValidationContext, require
 
 __all__ = [
-    'AcceptanceWorkflowSettings', 'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'RequiredJob',
+    'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'AcceptanceWorkflowSettings', 'RequiredJob',
     'check_acceptance_controls', 'check_acceptance_workflow', 'check_calibration_record',
     'check_calibration_reference', 'check_ci_calibration', 'check_ci_measurement', 'check_completeness',
     'check_control_bindings', 'check_host_identity', 'check_measurement_binding', 'check_registration_declarations',
