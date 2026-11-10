@@ -82,13 +82,65 @@ def audit_tree(root: Path, drivers: Iterable[str]) -> tuple[AuditedFile, ...]:
     audit_tree(root, ['src/lib.rs']) returns every item in the crate's module
     tree, not only the ones written in ``src/lib.rs``.
     """
+    return _walk(root, drivers, None)
+
+
+def audit_bound_tree(root: Path, sources: Mapping[str, bytes]) -> tuple[AuditedFile, ...]:
+    """Audit a bound source set, refusing a walk that leaves it.
+
+    :func:`audit_tree` reads every file it visits from the working tree. That is
+    right for a developer auditing a checkout, but wrong for the evidence gate:
+    the manifest binds each listed source to a digest, and a walk that re-read a
+    child module the manifest never named would audit bytes nobody checked. A
+    local edit to that child would then change the item multiset a record is
+    matched against, so uncommitted code could satisfy a committed claim.
+
+    Handing the walk the bytes its caller already verified makes the audited
+    text and the verified text the same bytes. A module declared by a bound file
+    but itself unbound is refused rather than read, because reading it is
+    exactly the escape this entry point exists to stop.
+
+    Parameters
+    ----------
+    root
+        Repository root; every source path must be repository-relative.
+    sources
+        Repository-relative path mapped to the exact bytes the caller verified.
+
+    Returns
+    -------
+    tuple[AuditedFile, ...]
+        One entry per bound file that contains at least one item, in path order.
+
+    Raises
+    ------
+    TrustAuditError
+        If a module target is unbound, a source is not UTF-8, or a path escapes
+        the root.
+
+    Examples
+    --------
+    ``{'src/lib.rs': b'fn f() { kani::assume(true); }'}`` audits that text. A
+    ``lib.rs`` declaring ``mod child;`` with no ``src/child.rs`` entry is
+    refused rather than read from disk.
+    """
+    return _walk(root, sources, sources)
+
+
+def _walk(root: Path, drivers: Iterable[str],
+          bound: Mapping[str, bytes] | None) -> tuple[AuditedFile, ...]:
+    """Scan a module tree, reading verified bytes instead of the working tree when bound.
+
+    ``bound`` of None is the unconstrained walk over a checkout. A mapping is
+    the bound walk: every file visited must appear in it.
+    """
     scanned: dict[str, tuple[TrustItem, ...]] = {}
     pending = list(dict.fromkeys(drivers))
     while pending:
         relative = PurePosixPath(pending.pop().replace('\\', '/')).as_posix()
         if relative in scanned:
             continue
-        result = _scan_file(root, relative)
+        result = _scan_source(root, relative, bound)
         scanned[relative] = result.items
         pending.extend(_module_targets(root, relative, result.modules))
     return tuple(AuditedFile(path, scanned[path])
@@ -234,6 +286,29 @@ def resolve_repository_path(root: Path, relative: str) -> Path:
 def _scan_file(root: Path, relative: str) -> ScanResult:
     """Scan one file, choosing proc-macro mode from the crate that owns it."""
     return scan_tree(root, relative, is_procedural_macro_crate(_manifest_for(root, relative)))
+
+
+def _scan_source(root: Path, relative: str,
+                 bound: Mapping[str, bytes] | None) -> ScanResult:
+    """Scan one source, from the verified bytes when a bound set is supplied.
+
+    The proc-macro decision still reads the crate manifest from disk: the
+    manifest states how the crate is compiled, and it is not part of the source
+    set a record binds to digests.
+    """
+    # Containment is checked on every path, bound or not: a caller's map is
+    # data, and an absolute or escaping key would otherwise be scanned.
+    resolve_repository_path(root, relative)
+    if bound is None:
+        return _scan_file(root, relative)
+    if relative not in bound:
+        raise TrustAuditError(
+            f'{relative} is compiled by a bound source but is not itself bound to a digest')
+    try:
+        text = bound[relative].decode('utf-8')
+    except UnicodeDecodeError as error:
+        raise TrustAuditError(f'{relative} cannot be read: {error}') from error
+    return scan(text, procedural_macro=is_procedural_macro_crate(_manifest_for(root, relative)))
 
 
 def _manifest_for(root: Path, relative: str) -> Path:

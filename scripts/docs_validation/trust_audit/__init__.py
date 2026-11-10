@@ -27,6 +27,7 @@ Examples
 """
 from .command import (
     AuditedFile,
+    audit_bound_tree,
     audit_tree,
     is_procedural_macro_crate,
     items_of,
@@ -48,7 +49,7 @@ from .use_tree import alias_bindings, statement_end
 __all__ = [
     'KANI_VOCABULARY', 'VERUS_VOCABULARY', 'VOCABULARY', 'AuditedFile', 'Kind',
     'ModuleReference', 'ScanResult', 'Token', 'TrustAuditError', 'TrustItem',
-    'alias_bindings', 'audit_tree', 'is_procedural_macro_crate', 'items_of',
+    'alias_bindings', 'audit_bound_tree', 'audit_tree', 'is_procedural_macro_crate', 'items_of',
     'literal_body', 'resolve_repository_path', 'scan', 'scan_tree',
     'statement_end', 'tokenize',
 ]

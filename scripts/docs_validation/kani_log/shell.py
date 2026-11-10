@@ -272,12 +272,16 @@ def bind_verdict(root: Path, record: Mapping[str, object]) -> VerifiedLogResult 
     return _verified_result(decide(log, manifest), log_path, log_sha256)
 
 
-def bound_sources(root: Path, record: Mapping[str, object]) -> tuple[str, ...] | MissingEvidence:
+def bound_sources(root: Path, record: Mapping[str, object]) -> Mapping[str, bytes] | MissingEvidence:
     """Return the manifest-declared sources of one record's claim, once they are readable.
 
     The scanner audits these files and the gate compares the result with the
     record's ``trust_audit``; returning them here keeps the scanner's input and
-    the record's claim bound to the same list.
+    the record's claim bound to the same list. The *bytes* are returned rather
+    than the paths so the scanner audits exactly the text whose digest this
+    function checked. A path alone would let the scanner re-open the file and
+    read whatever it holds by then, and the digest check would have vouched for
+    an earlier version of it.
 
     A record citing no manifest — or several — has nothing this scanner can
     audit, so it is refused rather than raising. The schema permits an empty
@@ -313,8 +317,10 @@ def bound_sources(root: Path, record: Mapping[str, object]) -> tuple[str, ...] |
                                'it binds a source that names no path and digest')
     if not sources:
         return MissingEvidence('manifest', str(artefact['path']), 'it names no source files to audit')
+    verified: dict[str, bytes] = {}
     for relative, sha256 in sources:
         data = read_artefact(root, relative, sha256, 'source')
         if isinstance(data, MissingEvidence):
             return data
-    return tuple(relative for relative, _ in sources)
+        verified[relative] = data
+    return verified

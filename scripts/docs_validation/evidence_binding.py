@@ -35,7 +35,7 @@ from pathlib import Path
 
 from .evidence_gate import VerifiedLogResult, VerifiedTrustAudit
 from .kani_log.shell import KANI, MissingEvidence, bind_verdict, bound_sources
-from .trust_audit import TrustAuditError, audit_tree, items_of
+from .trust_audit import TrustAuditError, audit_bound_tree, items_of
 
 # Adapters are keyed by the tool name a record writes, which is the name the
 # registry lists. Keeping the map here means a record for an unregistered tool
@@ -160,7 +160,11 @@ def trust_audit(root: Path, record: Mapping[str, object],
         _refusal(record, sources)
         return None
     try:
-        files = audit_tree(root, sources)
+        # The bound walk, not the working-tree one: `bound_sources` has already
+        # checked each source's digest, and re-reading the files here would
+        # audit bytes nobody vouched for. It also refuses a module the bound
+        # set does not name, which is the same DL-16 escape one level down.
+        files = audit_bound_tree(root, sources)
     except TrustAuditError as error:
         print(f'{record.get("id", "record")}: trust audit refused: {error}', file=sys.stderr)
         return None

@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.trust_audit import (
     TrustAuditError,
+    audit_bound_tree,
     audit_tree,
     is_procedural_macro_crate,
     items_of,
@@ -425,5 +426,57 @@ class ManifestDiscoveryFailsClosed(unittest.TestCase):
             (self.root / name).write_text('[lib]\nproc-macro = true\n', encoding='utf-8')
         self.assertEqual(audit_tree(self.root, ['src/lib.rs']), (),
                          'only the manifest Cargo reads may select proc-macro mode')
+
+
+class BoundAuditStopsAtTheVerifiedSet(unittest.TestCase):
+    """Require the bound walk to read only the bytes its caller verified.
+
+    The evidence gate binds each manifest source to a digest before auditing it.
+    A walk that then opened the working tree would audit bytes nobody checked,
+    so a local edit to a child module could change the item multiset a record is
+    matched against. Refusing an unbound child is the same policy one level
+    down: the walk may not leave the set it was handed.
+    """
+
+    def setUp(self):
+        """Create a scratch crate whose ``lib.rs`` compiles one child module."""
+        self._directory = tempfile.TemporaryDirectory()
+        self.root = Path(self._directory.name)
+        self._write('src/lib.rs', 'mod child;\n')
+        self._write('src/child.rs', 'fn f() { kani::assume(x); }')
+
+    def tearDown(self):
+        """Remove the scratch crate."""
+        self._directory.cleanup()
+
+    def _write(self, relative: str, text: str) -> None:
+        """Write one scratch source, creating its directory."""
+        target = self.root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding='utf-8')
+
+    def test_the_audited_text_is_the_verified_bytes_not_the_working_tree(self):
+        """Audit the caller's bytes, so an edit on disk cannot reach the result."""
+        bound = {'src/lib.rs': b'mod child;\n',
+                 'src/child.rs': b'fn f() { kani::assume(x); }'}
+        # The working tree now disagrees with the bound bytes. The audit must
+        # report what the caller verified, not what the file has become.
+        self._write('src/child.rs', 'fn f() { kani::stub(a, b); }')
+        reported = {entry.path: [item.item for item in entry.items]
+                    for entry in audit_bound_tree(self.root, bound)}
+        self.assertEqual(reported, {'src/child.rs': ['assume']},
+                         'the audit must read the verified bytes, not the edited file')
+
+    def test_a_module_the_bound_set_does_not_name_is_refused(self):
+        """Refuse an unbound child rather than reading it from disk.
+
+        Reading it would put a file the manifest never bound into the item
+        multiset, which is exactly the escape DL-16 exists to prevent.
+        """
+        bound = {'src/lib.rs': b'mod child;\n'}
+        with self.assertRaises(TrustAuditError) as raised:
+            audit_bound_tree(self.root, bound)
+        self.assertIn('not itself bound to a digest', str(raised.exception),
+                      'the refusal must say the module left the bound set')
 
 

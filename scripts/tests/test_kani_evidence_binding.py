@@ -40,6 +40,7 @@ from git_fixtures import run_git
 
 ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / 'scripts/tests/fixtures/evidence'
+MANIFEST = 'scripts/tests/fixtures/evidence/default-unwind-manifest.json'
 AS_OF = datetime.date(2026, 11, 7)
 KANI = frozenset({'kani'})
 
@@ -125,8 +126,14 @@ class AdmittedFixture(unittest.TestCase):
                          'a duplicated citation must not demote the record it cites')
 
 
-class TamperedEvidence(unittest.TestCase):
-    """Each tampered artefact stops the record being admitted."""
+class ScratchCheckout:
+    """Copy the tracked repository sources into a scratch Git checkout.
+
+    The binding seam reads ``scripts/`` and ``tools/`` and requires every path
+    to be Git-tracked, so a case that tampers with one file needs a real
+    repository rather than a directory of loose files. This is a mixin rather
+    than a ``TestCase`` so it contributes no tests of its own.
+    """
 
     def setUp(self) -> None:
         """Copy the tracked repository sources into a scratch checkout."""
@@ -143,6 +150,16 @@ class TamperedEvidence(unittest.TestCase):
     def record(self, name: str = 'bounded-kani') -> dict:
         """Return the positive fixture, ready to be altered."""
         return copy.deepcopy(fixture_record(name))
+
+    def _commit(self, relative: str, text: str, message: str) -> None:
+        """Replace one tracked file and commit it, so Git still tracks the path."""
+        (self.root / relative).write_text(text, encoding='utf-8')
+        run_git(self.root, 'add', '-A')
+        run_git(self.root, 'commit', '-q', '-m', message)
+
+
+class TamperedEvidence(ScratchCheckout, unittest.TestCase):
+    """Each tampered artefact stops the record being admitted."""
 
     def test_a_tampered_log_is_refused(self):
         """Require the log digest to be checked against the bytes on disk."""
@@ -227,6 +244,30 @@ class TamperedEvidence(unittest.TestCase):
         admission = admit(ROOT, record)
         self.assertEqual((admission.level, admission.reasons), (Level.REJECTED, ('schema-invalid',)),
                          'a Kani record may not step outside the parser by renaming its kind')
+
+
+class BoundAuditStopsAtTheManifest(ScratchCheckout, unittest.TestCase):
+    """Require the trust audit to read only the sources the manifest bound.
+
+    ``bound_sources`` checks each declared source against its digest and the
+    audit then reports what that source contains. The module walk is the gap: a
+    manifest binding ``lib.rs`` alone still declares ``mod harnesses;``, so a
+    working-tree walk would follow the declaration and report items from a file
+    the manifest never bound — and a local edit to that file would change the
+    item multiset a record is matched against. Refusing the unbound module is
+    the same manifest-scope policy DL-16 states, one level down.
+    """
+
+    def test_a_module_outside_the_bound_set_is_refused(self):
+        """Refuse the walk rather than audit a file no digest covers."""
+        document = json.loads((self.root / MANIFEST).read_text(encoding='utf-8'))
+        document['sources'] = document['sources'][:1]
+        self._commit(MANIFEST, json.dumps(document, indent=2) + '\n', 'Narrow the manifest')
+        record = self.record()
+        record['result_artefacts'][0]['sha256'] = digest(self.root / MANIFEST)
+        self.assertIsNone(
+            trust_audit(self.root, record, KANI),
+            'a module the manifest does not bind must refuse the audit, not be read')
 
 
 if __name__ == '__main__':

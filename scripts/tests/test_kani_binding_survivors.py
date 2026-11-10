@@ -261,6 +261,19 @@ class RefusalLabels(unittest.TestCase):
                           'tools/verifier-fixtures/kani-corpus/src/harnesses.rs'),
                          'the scanner must audit the sources the record manifest names')
 
+    def test_the_bound_source_map_carries_the_bytes_the_digest_checked(self):
+        """Require the verified text itself, not a path the scanner would re-open.
+
+        Returning paths let the audit re-read each file, so the bytes it scanned
+        were whatever the file held at that moment rather than the bytes whose
+        digest :func:`bound_sources` had just accepted. Carrying the bytes makes
+        the audited text and the verified text the same fact.
+        """
+        sources = bound_sources(ROOT, record())
+        on_disk = (ROOT / 'tools/verifier-fixtures/kani-corpus/src/lib.rs').read_bytes()
+        self.assertEqual(sources['tools/verifier-fixtures/kani-corpus/src/lib.rs'], on_disk,
+                         'the bound bytes must be the file the digest was checked against')
+
 
 class ManifestDefaults(unittest.TestCase):
     """Require the ``should_panic`` default to be the boolean false, not a falsy value.
