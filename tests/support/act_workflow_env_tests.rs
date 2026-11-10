@@ -6,7 +6,16 @@
 //! a Make profile are selected. They are grouped separately so the parent
 //! corpus stays within the module length limit without weakening any case.
 
-use super::super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, contracts_hold};
+use serde_yaml::Value;
+
+use super::super::{
+    ACT_VALIDATION_WORKFLOW,
+    CI_WORKFLOW,
+    JOBS,
+    Read,
+    contracts_hold,
+    document,
+};
 
 #[test]
 fn workflow_environment_mutations_break_the_contract() {
@@ -70,33 +79,70 @@ fn workflow_environment_mutations_break_the_contract() {
 /// test cannot decide the mode from the event when the same workflow declares
 /// more than one trigger, so that regression has its own case.
 fn cache_mutations_break_the_contract() {
-    for (reason, changed) in [
-        (
-            "lost compiler wrapper",
-            CI_WORKFLOW.replace("RUSTC_WRAPPER: sccache", "RUSTC_WRAPPER: ''"),
-        ),
+    for (reason, key, replacement) in [
+        ("lost compiler wrapper", "RUSTC_WRAPPER", Some("''")),
         (
             "lost cache backend",
-            CI_WORKFLOW.replace(
-                "SCCACHE_GHA_ENABLED: \"true\"",
-                "SCCACHE_GHA_ENABLED: \"false\"",
-            ),
+            "SCCACHE_GHA_ENABLED",
+            Some("\"false\""),
         ),
         (
             "pull requests save to the cache",
-            CI_WORKFLOW.replace(
-                "'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY'",
-                "true && 'READ_WRITE'",
-            ),
+            "SCCACHE_GHA_RW_MODE",
+            Some("true && 'READ_WRITE'"),
         ),
-        (
-            "cache write mode dropped",
-            CI_WORKFLOW.replace(
-                "      SCCACHE_GHA_RW_MODE: ${{ github.ref == 'refs/heads/main' && 'READ_WRITE' \
-                 || 'READ_ONLY' }}\n",
-                "",
-            ),
-        ),
+        ("cache write mode dropped", "SCCACHE_GHA_RW_MODE", None),
+    ] {
+        for job in JOBS.iter().map(|job| job.name) {
+            let changed = rewrite_job_environment(CI_WORKFLOW, job, key, replacement)
+                .unwrap_or_else(|error| panic!("{reason} in {job}: {error}"));
+            assert_ne!(
+                changed, CI_WORKFLOW,
+                "mutation must change source: {reason} in {job}"
+            );
+            assert!(
+                !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
+                "contract must detect {reason} in {job}: a job's cache declaration is its own"
+            );
+        }
+    }
+    whole_workflow_cache_mutations_break_the_contract();
+}
+
+/// Replaces or removes one cache key in exactly one job's environment.
+///
+/// `str.replace` would rewrite the same line in all three jobs at once, so the
+/// cases above could only ever prove detection when every job drifted together.
+/// A regression that drops a key from one `polars-*` job would still pass. This
+/// mutates one job's mapping instead, which is what the committed contract
+/// asserts: each job's environment is checked against its own declaration.
+fn rewrite_job_environment(
+    source: &str,
+    job: &str,
+    key: &str,
+    replacement: Option<&str>,
+) -> Read<String> {
+    let mut changed = document(source)?;
+    let environment = changed
+        .get_mut("jobs")
+        .and_then(|jobs| jobs.get_mut(job))
+        .and_then(|job| job.get_mut("env"))
+        .and_then(Value::as_mapping_mut)
+        .ok_or_else(|| format!("the committed workflow must declare {job}'s environment"))?;
+    match replacement {
+        Some(value) => environment.insert(Value::String(key.into()), Value::String(value.into())),
+        None => environment.remove(Value::String(key.into())),
+    };
+    Ok(serde_yaml::to_string(&changed)?)
+}
+
+/// The regressions that are only visible once every job drifts together.
+///
+/// A dispatch reading as read-only, and the wiring evidence disappearing,
+/// describe the workflow as a whole rather than one job's environment, so these
+/// stay whole-source mutations.
+fn whole_workflow_cache_mutations_break_the_contract() {
+    for (reason, changed) in [
         (
             // `workflow_dispatch` is declared beside `pull_request`, and an
             // event test cannot separate the two: a dispatch reports its own
