@@ -1237,9 +1237,9 @@ holds under one feature selection is never reported for the other; a harness
 that needs the kernel states the profile it was built under, and the
 `BuildProfile` report is an observation of the build, not a certificate.
 Verifier installation is a profile concern, not a consumer one: the ordinary
-profiles contain no verifier, and `tests/workspace_boundaries.rs` asserts that
-the native dependency tree reaches no package under the `kani`, `verus`, or
-`vstd` prefix.
+profiles contain no verifier, and `tests/workspace_profiles.rs` asserts that
+neither ordinary profile's facade closure reaches a package under the `kani`,
+`verus`, or `vstd` prefix.
 
 For Kani, provide public executable observers, bounded input constructors and
 stable contract targets. Bounds remain explicit in the consumer harness; valid

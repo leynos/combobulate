@@ -356,7 +356,7 @@ class UnsupportedEvidence(unittest.TestCase):
     def test_the_wording_is_matched_without_case(self):
         """Require the marker to match Kani's sentence whatever case it is printed in.
 
-        The sentence is prose, and a release that capitalises its warning must
+        The sentence is prose, and a release that capitalizes its warning must
         not silently turn an unsupported verdict into a counterexample. The
         fact is excused as a panic so the counterexample branch does not decide
         first; this test is about the wording alone.

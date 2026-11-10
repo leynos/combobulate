@@ -180,13 +180,15 @@ jobs:
           nproc > build-budget/nproc
           free -b > build-budget/memory
           printf '%s\n' "$ImageOS" "$ImageVersion" > build-budget/image
-          # The control's cache policy is "no sccache"; a wrapper left set by an
-          # earlier step would cache compile results and change the timings.
-          test -z "${RUSTC_WRAPPER-}"
-          printf '%s\n' "${RUSTC_WRAPPER-}" "$CARGO_INCREMENTAL" > build-budget/build-environment
       - uses: leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740
         with:
           rustflags: ''
+          # The control measures with no sccache, and this action's default is
+          # `true`, which installs the binary and exports `SCCACHE_PATH`. Left
+          # at the default, the next step's assertion could only pass because
+          # nothing had wired the wrapper yet — and the setup steps below, which
+          # compile, would run with a cache one environment variable away.
+          use-sccache: 'false'
       - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
       - name: Install the linker toolchain
         run: |
@@ -299,6 +301,19 @@ jobs:
           date +%s > build-budget/setup-end
       - name: Fetch dependencies once, untimed
         run: cargo fetch --locked
+      - name: Confirm the measured environment carries no cache
+        run: |
+          set -euo pipefail
+          # The control's cache policy is "no sccache", and every step above this
+          # one provisions tools. The assertion belongs here rather than at the
+          # top of the job, so it observes the environment the timed builds will
+          # actually inherit: a wrapper exported by any provisioning step below
+          # fails the job instead of quietly caching the samples. The recorded
+          # fact goes with it, for the same reason — an environment captured
+          # before the tools were installed would describe a runner that never
+          # ran a build.
+          test -z "${RUSTC_WRAPPER-}"
+          printf '%s\n' "${RUSTC_WRAPPER-}" "$CARGO_INCREMENTAL" > build-budget/build-environment
       - name: Measure five cold builds per profile, alternating
         run: |
           set -euo pipefail

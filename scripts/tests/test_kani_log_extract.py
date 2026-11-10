@@ -98,7 +98,7 @@ class CorpusFacts(unittest.TestCase):
 
         The extract table records the flag but the decision does not read it, so
         this is the only assertion standing between the flag and silent removal.
-        Without it, an unwinding failure would be recognised solely by the
+        Without it, an unwinding failure would be recognized solely by the
         ``unwind`` suffix on the check identifier, and the ``[Kani] info:`` line
         Kani prints about it would be dropped without anything noticing.
         """

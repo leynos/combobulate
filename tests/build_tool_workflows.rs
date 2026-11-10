@@ -164,9 +164,8 @@ fn rejects_ineffective_installers_and_unprovable_workflows() {
         // comes from `concat!`, so this argument stays named.
         let source = format!(
             concat!(
-                "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo \
-                 apt-get ",
-                "install clang mold\n      - run: cargo test\n{install}",
+                "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo ",
+                "apt-get install clang mold\n      - run: cargo test\n{install}",
             ),
             install = install
         );

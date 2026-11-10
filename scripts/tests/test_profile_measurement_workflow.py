@@ -69,6 +69,20 @@ def _step_run_matching(job: dict, needle: str) -> str:
     raise AssertionError(f'no step script in the job contains {needle!r}')
 
 
+def _setup_rust_inputs(job: dict) -> dict[str, str]:
+    """Return the ``with:`` inputs of one job's pinned ``setup-rust`` step.
+
+    Raises
+    ------
+    AssertionError
+        When the job has no ``setup-rust`` step.
+    """
+    for step in job['steps']:
+        if 'shared-actions/.github/actions/setup-rust@' in step.get('uses', ''):
+            return cast('dict', step.get('with', {}))
+    raise AssertionError('the job has no setup-rust step')
+
+
 class TriggerTests(unittest.TestCase):
     """Keep both entry points and the label gate that guards them."""
 
@@ -330,6 +344,42 @@ class BuildBudgetTests(unittest.TestCase):
             _step_run_matching(_job('build-budget'), 'RUSTC_WRAPPER'),
             'the job must reject an inherited cache wrapper',
         )
+
+    def test_setup_rust_does_not_install_sccache_for_the_measurement(self) -> None:
+        """The action's default installs sccache, and the control forbids it.
+
+        ``setup-rust`` defaults ``use-sccache`` to ``true``, which installs the
+        binary and exports ``SCCACHE_PATH``. The measurement must name
+        ``'false'`` rather than rely on nothing wiring the wrapper: a job that
+        left the default in place would provision the cache it then asserts is
+        absent.
+        """
+        inputs = _setup_rust_inputs(_job('build-budget'))
+
+        self.assertEqual(inputs.get('use-sccache'), 'false',
+                         'the measuring job must not install sccache at all')
+
+    def test_the_cache_assertion_runs_after_the_tools_are_installed(self) -> None:
+        """The assertion must observe the environment the timed builds inherit.
+
+        An assertion placed before ``setup-rust`` can only observe the runner's
+        own environment, so a later provisioning step that exported
+        ``RUSTC_WRAPPER`` would go unnoticed while every sample was cached. The
+        step that asserts and records belongs immediately before the first
+        timed phase, with the tool installs between it and the top of the job.
+        """
+        steps = _job('build-budget')['steps']
+        names = [step.get('name', '') for step in steps]
+        assertion = next(index for index, step in enumerate(steps)
+                         if 'RUSTC_WRAPPER' in step.get('run', ''))
+        cold = names.index('Measure five cold builds per profile, alternating')
+
+        self.assertLess(assertion, cold, 'the assertion must precede the first timed build')
+        self.assertLess(cold - assertion, 2,
+                        'only the fetch may sit between the assertion and the timed builds')
+        for installed in ('Install the pinned build standard', 'Install the pinned Kani release'):
+            self.assertLess(names.index(installed), assertion,
+                            f'setup step {installed!r} must run before the assertion observes it')
 
     def test_the_proof_profile_runs_the_installed_driver_directly(self) -> None:
         """The helper's `kani exec` refuses this repository's backend table."""
