@@ -42,6 +42,12 @@ def alias_bindings(tokens: tuple[Token, ...], root: str) -> frozenset[str]:
     A glob import (``use kani::*;``) binds items rather than the crate, so the
     qualified-path rule does not apply to it.
 
+    ``extern crate`` renames the crate the same way and without a ``use`` at
+    all: ``extern crate kani as k;`` makes ``k::assume`` the Kani call. Missing
+    it would describe a file as trust-free while it assumed exactly what the
+    vocabulary names, which is the fail-open direction this module exists to
+    prevent.
+
     Examples
     --------
     A file that renames the crate reports both names::
@@ -51,15 +57,38 @@ def alias_bindings(tokens: tuple[Token, ...], root: str) -> frozenset[str]:
     The grouped spelling reports the same names::
 
         alias_bindings(tokenize('use kani::{self as k};'), 'kani')  # {'kani', 'k'}
+
+    An ``extern crate`` rename reports the same pair::
+
+        alias_bindings(tokenize('extern crate kani as k;'), 'kani')  # {'kani', 'k'}
     """
     names = {root}
     for index, token in enumerate(tokens):
+        renamed = _extern_crate_alias(tokens, index, root)
+        if renamed is not None:
+            names.add(renamed)
+            continue
         if token.kind is not Kind.IDENT or token.text != 'use':
             continue
         end = statement_end(tokens, index + 1)
         aliases = [alias for named, alias in use_roots(tokens, index + 1, end) if named == root]
         names.update(alias for alias in aliases if alias is not None)
     return frozenset(names)
+
+
+def _extern_crate_alias(tokens: tuple[Token, ...], start: int, root: str) -> str | None:
+    """Return the name ``extern crate <root> as <name>;`` binds at ``start``.
+
+    ``None`` covers every other shape, including an ``extern crate`` without a
+    rename: that spelling binds the crate under its own name, which is already
+    in the result set.
+    """
+    if (start + 4 >= len(tokens) or tokens[start].kind is not Kind.IDENT
+            or tokens[start].text != 'extern' or tokens[start + 1].text != 'crate'
+            or tokens[start + 2].text != root or tokens[start + 3].text != 'as'
+            or tokens[start + 4].kind is not Kind.IDENT):
+        return None
+    return tokens[start + 4].text
 
 
 def use_roots(tokens: tuple[Token, ...], start: int, end: int) -> tuple[tuple[str, str | None], ...]:

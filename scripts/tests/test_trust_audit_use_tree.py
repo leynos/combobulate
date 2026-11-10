@@ -151,6 +151,46 @@ class ImportedRootAliases(unittest.TestCase):
                          frozenset({'kani', 'k'}),
                          'a leading :: must not hide the crate being renamed')
 
+    def test_an_extern_crate_rename_binds_the_alias(self):
+        """Require `extern crate kani as k;` to bind both names.
+
+        The rename is the same one ``use kani as k;`` makes, spelled without a
+        ``use``. A reader that only looked for ``use`` reported the file as
+        trust-free while ``k::assume`` assumed exactly what the vocabulary
+        names.
+        """
+        self.assertEqual(alias_bindings(tokenize('extern crate kani as k;'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'an extern crate rename must bind the alias it declares')
+
+    def test_an_extern_crate_without_a_rename_reports_only_the_root(self):
+        """Require the plain form to be read without inventing an alias.
+
+        ``extern crate kani;`` binds the crate under its own name, which is
+        already in the set. Reading the token after the root as an alias would
+        report whatever followed the semicolon.
+        """
+        self.assertEqual(alias_bindings(tokenize('extern crate kani;'), 'kani'),
+                         frozenset({'kani'}),
+                         'an unaliased extern crate must not invent an alias')
+
+    def test_an_extern_crate_of_another_crate_binds_nothing(self):
+        """Require the root test, so the rule is not a wildcard over ``extern crate``."""
+        self.assertEqual(alias_bindings(tokenize('extern crate other as k;'), 'kani'),
+                         frozenset({'kani'}),
+                         'only an extern crate of the named root may be reported')
+
+    def test_an_extern_crate_statement_is_not_read_twice_as_a_use(self):
+        """Require the ``continue``, so the ``as`` is not also read as a member alias.
+
+        The extern branch answers the whole statement. Falling through to the
+        ``use`` reader as well would read ``as k`` again from a statement with
+        no ``use`` in it, which is the shape that reported a nonexistent root.
+        """
+        tokens = tokenize('extern crate kani as k; kani::assume(x);')
+        self.assertEqual(alias_bindings(tokens, 'kani'), frozenset({'kani', 'k'}),
+                         'an extern crate statement must not also be read as a use tree')
+
 
 class GroupedAliasReachesTheMatcher(unittest.TestCase):
     """Require a grouped crate alias to make a qualified path report (DL-17).

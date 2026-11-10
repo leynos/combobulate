@@ -50,7 +50,11 @@ class Token:
 _RAW_START = re.compile(r'(?:b|c)?r(#*)"')
 # A byte or C string's opening quote, tried only when no raw fence matched.
 _PREFIXED_QUOTE = re.compile(r'(?:b|c)"')
-_IDENT = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
+# An identifier, with Rust's raw form `r#name` folded in. `_RAW_START` is tried
+# first, so this alternative only sees `r#` when no quote follows; without it
+# `kani::r#assume(x)` lexes as `r`, `#`, `assume`, and the `#` standing between
+# `::` and `assume` hides the call from the qualified-path rule.
+_IDENT = re.compile(r'(?:r#)?[A-Za-z_][A-Za-z0-9_]*')
 # Multi-character punctuators that change how a following `::` reads.
 _PUNCTUATORS = ('::', '->', '=>', '..=', '..', '&&', '||', '::<', '!=', '==', '<=', '>=')
 
@@ -134,7 +138,10 @@ def tokenize(text: str) -> tuple[Token, ...]:
             continue
         matched = _IDENT.match(cursor.text, cursor.index)
         if matched:
-            tokens.append(Token(Kind.IDENT, matched[0], cursor.line, cursor.column))
+            # The bare name is what the vocabulary matches; the column stays at
+            # the prefix so a location names the token the author wrote.
+            tokens.append(Token(Kind.IDENT, matched[0].removeprefix('r#'),
+                                cursor.line, cursor.column))
             cursor.take(len(matched[0]))
             continue
         if _skip_character_literal_or_lifetime(cursor):

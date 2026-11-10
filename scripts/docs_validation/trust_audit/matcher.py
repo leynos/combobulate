@@ -90,12 +90,20 @@ class ModuleReference:
 
     ``path`` is set when a ``#[path = "…"]`` attribute names the file directly;
     otherwise the caller derives it from ``name`` by Rust's usual search.
+
+    ``enclosing`` lists the inline modules the declaration sits inside, outermost
+    first. It is what separates ``mod nested { mod trusted; }`` in ``src/lib.rs``
+    — which compiles ``src/nested/trusted.rs`` — from a top-level
+    ``mod trusted;``, which compiles ``src/trusted.rs``. Dropping it audits the
+    wrong file, and where the wrong file exists as a decoy the audit reports a
+    clean scan of code the crate never compiles.
     """
 
     name: str
     path: str | None
     line: int
     column: int
+    enclosing: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,16 +289,23 @@ def _is_bare_use(tokens: tuple[Token, ...], index: int) -> bool:
 
 
 def _imported_roots(tokens: tuple[Token, ...]) -> frozenset[str]:
-    """Return the trust roots this file imports from a ``use`` tree.
+    """Return the trust roots this file imports, by ``use`` or ``extern crate``.
 
     Every root of every statement counts, not just its leading word.
     ``use {std::mem, kani};`` imports ``kani`` as surely as the ungrouped form
     does, and reading only the first identifier would leave it out — which
     quietly disables rule (iii) for that file.
+
+    ``extern crate kani;`` is the same import spelled without a ``use``, and it
+    likewise makes a bare ``assume`` resolve to Kani, so it counts too.
     """
     roots = set()
     for index, token in enumerate(tokens):
-        if token.kind is not Kind.IDENT or token.text != 'use':
+        if token.kind is not Kind.IDENT:
+            continue
+        if token.text == 'extern' and index + 2 < len(tokens) and tokens[index + 1].text == 'crate':
+            roots.add(tokens[index + 2].text)
+        if token.text != 'use':
             continue
         end = statement_end(tokens, index + 1)
         roots.update(root for root, _ in use_roots(tokens, index + 1, end))
@@ -346,9 +361,15 @@ def _module_references(tokens: tuple[Token, ...]) -> tuple[ModuleReference, ...]
     which file that is; without one the caller searches by Rust's rules. Both
     are surfaced rather than resolved here, because resolution needs a
     repository root this module does not have.
+
+    An inline module still contributes a *directory*, because a ``mod x;``
+    inside it compiles ``…/x.rs`` relative to the module path, not to the
+    declaring file's own directory. The enclosing inline names travel with the
+    reference so the caller can apply that rule.
     """
     references = []
     spans = dict(attribute_spans(tokens))
+    inline = _InlineModules(tokens)
     for index, token in enumerate(tokens):
         if token.kind is not Kind.IDENT or token.text != 'mod':
             continue
@@ -359,8 +380,37 @@ def _module_references(tokens: tuple[Token, ...]) -> tuple[ModuleReference, ...]
         if following.text != ';':
             continue
         references.append(ModuleReference(name.text, _path_attribute(tokens, spans, index),
-                                         name.line, name.column))
+                                         name.line, name.column, inline.enclosing(index)))
     return tuple(references)
+
+
+class _InlineModules:
+    """Report the inline ``mod`` names that enclose a token.
+
+    A single left-to-right walk pairs every ``mod name {`` with the ``}`` that
+    closes it, so the enclosing chain at any index is the stack the walk holds
+    there. Building that once per file keeps the lookup from re-scanning the
+    token stream for every ``mod`` declaration.
+    """
+
+    def __init__(self, tokens: tuple[Token, ...]) -> None:
+        """Pair every inline module's braces and record each token's chain."""
+        self._chains: list[tuple[str, ...]] = [()] * len(tokens)
+        stack: list[tuple[str, int]] = []
+        for index, token in enumerate(tokens):
+            # A closing brace belongs to the module that *holds* the inline one,
+            # so it is popped before the chain is recorded for that position.
+            if stack and index == stack[-1][1]:
+                stack.pop()
+            self._chains[index] = tuple(name for name, _ in stack)
+            if (token.kind is Kind.IDENT and token.text == 'mod'
+                    and index + 2 < len(tokens) and tokens[index + 1].kind is Kind.IDENT
+                    and tokens[index + 2].text == '{'):
+                stack.append((tokens[index + 1].text, matching(tokens, index + 2, '{', '}')))
+
+    def enclosing(self, index: int) -> tuple[str, ...]:
+        """Return the inline module names enclosing the token at ``index``."""
+        return self._chains[index]
 
 
 def _path_attribute(tokens: tuple[Token, ...], spans: Mapping[int, int],

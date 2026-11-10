@@ -143,6 +143,64 @@ class RuleThreeBreadth(unittest.TestCase):
         self.assertEqual(item_names('use std::mem;\nfn f() { assume(x); }'), (),
                          'an unrelated import must not make a bare word trust')
 
+    def test_extern_crate_makes_a_bare_use_trust(self):
+        """Report the bare use after `extern crate kani;`.
+
+        The declaration is the same import ``use kani;`` makes, spelled
+        without a ``use``, so it triggers rule (iii) too. A reader that only
+        looked for ``use`` described the file as trust-free while a bare
+        ``assume`` reached Kani.
+        """
+        self.assertEqual(item_names('extern crate kani;\nfn f() { assume(x); }'),
+                         ('assume',),
+                         'an extern crate import must make the bare use report')
+
+    def test_extern_crate_rename_makes_a_qualified_path_trust(self):
+        """Report `k::assume` after `extern crate kani as k;`."""
+        self.assertEqual(item_names('extern crate kani as k;\nfn f() { k::assume(x); }'),
+                         ('assume',),
+                         'an extern crate rename must reach rule (i)')
+
+    def test_extern_crate_of_an_ordinary_crate_changes_nothing(self):
+        """Leave a bare word alone when the ``extern crate`` is not a trust root."""
+        self.assertEqual(item_names('extern crate std;\nfn f() { assume(x); }'), (),
+                         'an unrelated extern crate must not make a bare word trust')
+
+
+class RawIdentifiers(unittest.TestCase):
+    """Require a raw identifier to be the name it spells, not a ``#`` and a word.
+
+    Rust lets a keyword be used as a name by prefixing it with ``r#``, and a
+    crate can rename an import to one. Lexing ``r#assume`` as ``r``, ``#``,
+    ``assume`` leaves a punctuator between ``::`` and the name, so the
+    qualified-path rule no longer sees a path and the call is invisible.
+    """
+
+    def test_a_raw_identifier_is_the_bare_name_it_spells(self):
+        """Require the lexer to hand the matcher the name without its prefix."""
+        self.assertEqual([item.item for item in scan('fn f() { kani::r#assume(x); }').items],
+                         ['assume'],
+                         'a raw identifier must report as the name it spells')
+
+    def test_a_raw_identifier_keeps_its_own_position(self):
+        """Require the column to locate the token the author wrote.
+
+        The prefix is two characters, and pointing at the name after it would
+        name a column the source does not put that word at.
+        """
+        item, = scan('fn f() { kani::r#assume(x); }').items
+        self.assertEqual((item.line, item.column), (1, 16),
+                         'a raw identifier must report where it starts')
+
+
+class QualifiedPathRule(unittest.TestCase):
+    """Require a ``kani::`` or ``vstd::`` path to report on its own (rule i)."""
+
+    def test_an_ordinary_qualified_path_reports(self):
+        """Keep the plain form working, so the raw case is not a swap for it."""
+        self.assertEqual(item_names('fn f() { kani::assume(x); }'), ('assume',),
+                         'a qualified trust path must report without any import')
+
 
 class NestedRegionMatching(unittest.TestCase):
     """Close a ``verus!`` body at its own brace, however deeply it nests.

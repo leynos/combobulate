@@ -260,7 +260,7 @@ def _module_targets(root: Path, relative: str,
     targets = []
     for module in modules:
         candidates = (_path_candidates(relative, module) if module.path is not None
-                      else _search_candidates(relative, module.name))
+                      else _search_candidates(relative, module))
         # Containment is checked before existence so an escaping `#[path]` is
         # refused for what it is. Reporting only that the file is absent would
         # invite someone to create it outside the repository and call the audit
@@ -294,22 +294,27 @@ def _path_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
     return ((PurePosixPath(relative).parent / str(module.path)).as_posix(),)
 
 
-def _search_candidates(relative: str, name: str) -> tuple[str, ...]:
+def _search_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
     """Return the paths Rust searches for a bare ``mod name;``.
 
-    The directory is not simply the declaring file's own: Rust puts a child of
-    a *non-root* module in a directory named after that module. So
-    ``src/lib.rs`` declaring ``mod foo;`` searches ``src/foo.rs``, while
-    ``src/foo.rs`` declaring ``mod bar;`` searches ``src/foo/bar.rs``.
+    The directory is not simply the declaring file's own. Two rules apply.
 
-    Reading the declaring file's own directory for the second case would find
-    an unrelated ``src/bar.rs`` — a decoy, or a sibling module of another name —
-    and audit it as though it were compiled into the module that declared it.
-    That is the failure this rule exists to prevent, so the child directory is
-    derived from the module path rather than from the file's parent.
+    The file's own contribution: Rust puts a child of a *non-root* module in a
+    directory named after that module, so ``src/lib.rs`` declaring ``mod foo;``
+    searches ``src/foo.rs`` while ``src/foo.rs`` declaring ``mod bar;`` searches
+    ``src/foo/bar.rs``. Reading the declaring file's own directory for the
+    second case would find an unrelated ``src/bar.rs`` — a decoy, or a sibling
+    module of another name — and audit it as though it were compiled into the
+    module that declared it.
+
+    The inline modules' contribution: a ``mod x;`` written inside
+    ``mod nested { … }`` is looked for under ``nested/``, because the inline
+    module is a module in its own right. Both rules compose, and the inline
+    chain comes after the file's own directory so the nearer scope is tried
+    first.
     """
-    directory = _module_directory(relative)
-    return tuple(template.format(directory=directory, name=name, suffix=RUST_SUFFIX)
+    directory = PurePosixPath(_module_directory(relative), *module.enclosing).as_posix()
+    return tuple(template.format(directory=directory, name=module.name, suffix=RUST_SUFFIX)
                  for template in MODULE_FILE_CANDIDATES)
 
 

@@ -164,6 +164,23 @@ class ModuleResolution(unittest.TestCase):
         self.assertIn('outside', str(raised.exception),
                       'the refusal must say the target leaves the repository')
 
+    def test_an_inline_module_declaration_resolves_under_its_ancestor(self):
+        """Resolve ``mod nested { mod trusted; }`` to ``src/nested/trusted.rs``.
+
+        The inline module is itself a module, so its child lives one directory
+        deeper than the declaring file. A decoy at ``src/trusted.rs`` is where
+        the shallow reading lands: the audit then reports a clean scan of a
+        file the crate never compiles, while the module carrying the trust
+        call goes unread.
+        """
+        self._write('src/lib.rs', 'mod nested { mod trusted; }')
+        self._write('src/nested/trusted.rs', 'fn g() { kani::assume(x); }')
+        self._write('src/trusted.rs', 'fn h() {}')
+        reported = {entry.path: [item.item for item in entry.items]
+                    for entry in audit_tree(self.root, ['src/lib.rs'])}
+        self.assertEqual(reported, {'src/nested/trusted.rs': ['assume']},
+                         'an inline ancestor must direct the child to its own directory')
+
     def test_a_path_attribute_survives_a_later_attribute(self):
         """Require ``#[path]`` to be found wherever it sits in the attribute list.
 

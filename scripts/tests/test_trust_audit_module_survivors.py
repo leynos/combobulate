@@ -14,7 +14,7 @@ mutant moves.
 Examples
 --------
 >>> scan('mod a;').modules
-(ModuleReference(name='a', path=None, line=1, column=5),)
+(ModuleReference(name='a', path=None, line=1, column=5, enclosing=()),)
 """
 from __future__ import annotations
 
@@ -171,6 +171,46 @@ class ModuleBodiesAndNames(unittest.TestCase):
         self.assertEqual(modules('mod a;\nmod;\nmod b;'),
                          (('a', None), ('b', None)),
                          'a malformed declaration must not stop the module walk')
+
+class EnclosingInlineModules(unittest.TestCase):
+    """Require a declaration inside ``mod x { … }`` to carry the enclosing name.
+
+    The inline module is a module in its own right, so ``mod nested { mod
+    trusted; }`` compiles ``src/nested/trusted.rs`` rather than
+    ``src/trusted.rs``. Without the enclosing chain the audit resolves the
+    second path, and where that file exists as a decoy it reports a clean scan
+    of code the crate never compiles while the real module goes unaudited.
+    """
+
+    def test_an_inline_ancestor_is_carried_outermost_first(self):
+        """Require the whole chain, ordered as the paths are nested."""
+        reference, = scan('mod outer { mod inner { mod leaf; } }').modules
+        self.assertEqual(reference.enclosing, ('outer', 'inner'),
+                         'every enclosing inline module must be reported, outermost first')
+
+    def test_a_top_level_declaration_carries_no_ancestor(self):
+        """Require the empty chain, so the plain search is unchanged."""
+        reference, = scan('mod a;').modules
+        self.assertEqual(reference.enclosing, (),
+                         'a declaration outside any inline module must carry no ancestor')
+
+    def test_a_declaration_after_an_inline_body_carries_no_ancestor(self):
+        """Require the closing brace to end the inline module's scope.
+
+        The ``}`` belongs to the module that holds the inline one, so a chain
+        recorded at that index must not still name it. Keeping the name would
+        send every later declaration into ``src/outer/``.
+        """
+        reference, = scan('mod outer { }\nmod a;').modules
+        self.assertEqual(reference.enclosing, (),
+                         'an inline module must stop enclosing at its closing brace')
+
+    def test_a_sibling_inline_module_does_not_nest(self):
+        """Require a closed inline module to be popped before the next opens."""
+        first, second = scan('mod a { mod x; }\nmod b { mod c; }').modules
+        self.assertEqual((first.enclosing, second.enclosing), (('a',), ('b',)),
+                         'a sibling inline module must not become an ancestor')
+
 
 class OnlyTheModKeywordDeclares(unittest.TestCase):
     """Require ``mod`` to be the word that declares, not merely a position."""

@@ -187,13 +187,17 @@ def checked_inputs(root: Path, records: list[Mapping[str, object]],
     Returns
     -------
     tuple[tuple[VerifiedLogResult, ...], tuple[VerifiedTrustAudit, ...]]
-        The parser results and scanner audits, each in record order, omitting
-        the records no adapter could bind.
+        The parser results and scanner audits, each in record order and each
+        distinct value exactly once. A record no adapter could bind contributes
+        nothing.
 
     Examples
     --------
-    Two records citing the same log yield two identical results, because the
-    gate matches on identity rather than position and must see one per claim.
+    Two records citing the same log contribute one result, not two. The gate
+    asks that exactly one candidate match a record's ``(tool, path, digest)``,
+    so a duplicated identity would make a sound record look ambiguous and
+    demote it to ``verdict-self-reported``. Equal values came from the same
+    bytes, so they are one fact.
     """
     logs, audits = [], []
     for record in records:
@@ -203,4 +207,6 @@ def checked_inputs(root: Path, records: list[Mapping[str, object]],
             logs.append(result)
         if audit is not None:
             audits.append(audit)
-    return tuple(logs), tuple(audits)
+    # Both value types are frozen dataclasses over hashable fields, so
+    # `dict.fromkeys` is an ordered de-duplication that preserves record order.
+    return tuple(dict.fromkeys(logs)), tuple(dict.fromkeys(audits))

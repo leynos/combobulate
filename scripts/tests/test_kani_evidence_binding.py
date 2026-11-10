@@ -17,7 +17,7 @@ Examples
 --------
 >>> fixture_record('bounded-kani')['method']['run_mode']
 'full-profile'
->>> admit_fixture().level.value
+>>> admit(ROOT, fixture_record('bounded-kani')).level.value
 'bounded'
 """
 from __future__ import annotations
@@ -101,6 +101,28 @@ class AdmittedFixture(unittest.TestCase):
         admission = admit(ROOT, fixture_record('bounded-kani'), parsers=frozenset())
         self.assertIn('verdict-self-reported', admission.reasons,
                       'tool registration alone must be required to parse a verdict')
+
+    def test_two_records_citing_one_log_still_admit(self):
+        """Require a shared artefact to be bound once, not once per citing record.
+
+        The gate asks that *exactly one* candidate match a record's ``(tool,
+        path, digest)`` and demotes the record when the count differs. Two
+        records citing the same log are two claims about one capture, so
+        appending a result per record makes the count two and turns a sound
+        record into ``verdict-self-reported``. Equal values came from the same
+        bytes, so they are one fact.
+        """
+        record = fixture_record('bounded-kani')
+        logs, audits = checked_inputs(ROOT, [record, record], KANI)
+        self.assertEqual(len(logs), 1,
+                         'one log cited by two records must bind to one result')
+        self.assertEqual(len(audits), 1,
+                         'one manifest audited for two records must bind to one audit')
+        admission = admit_evidence(record, AdmissionContext(
+            exceptions={}, bindings=fixture_bindings(), as_of=AS_OF,
+            log_parsers=KANI, verified_log_results=logs, verified_trust_audits=audits))
+        self.assertEqual((admission.level, admission.reasons), (Level.BOUNDED, ()),
+                         'a duplicated citation must not demote the record it cites')
 
 
 class TamperedEvidence(unittest.TestCase):
