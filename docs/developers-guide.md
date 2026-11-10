@@ -89,14 +89,15 @@ after installing the linker, which resolves the wrapper on `PATH` and prints
 `sccache --show-stats`, whose cache-location line names the backend in use.
 DL-03 requires the GitHub Actions cache backend, and the pinned `setup-rust`
 action only provisions the binary: it exports `SCCACHE_PATH` and sets neither
-variable. Cargo ignores a `RUSTC_WRAPPER` it cannot run rather than failing, so
-a job that omitted them compiled uncached and reported nothing. The wiring step
-is the observable half of that declaration; `--show-stats` needs no compile, so
-it answers before any gate can fail and obscure the question. Use only flags
-the released binary accepts: sccache 0.19.0 has no `--show-config`, and a step
-that called it failed the three jobs it was added to make observable. The
-coverage steps are wrapped too, which is safe because sccache hashes the full
-rustc command line, so an instrumented object never shares a cache key with an
+variable. An absent `RUSTC_WRAPPER` is not itself an error, so a job that
+omitted them compiled uncached and reported nothing; a wrapper Cargo cannot
+execute is a different case, and fails the build. The wiring step is the
+observable half of that declaration; `--show-stats` needs no compile, so it
+answers before any gate can fail and obscure the question. Use only flags the
+released binary accepts: sccache 0.19.0 has no `--show-config`, and a step that
+called it failed the three jobs it was added to make observable. The coverage
+steps are wrapped too, which is safe because sccache hashes the full rustc
+command line, so an instrumented object never shares a cache key with an
 uninstrumented one.
 
 DL-03 allows cache saves only on `main`, which is a policy the backend has no

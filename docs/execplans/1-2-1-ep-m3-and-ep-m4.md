@@ -1065,10 +1065,23 @@ set either, so every hosted compile ran unwrapped and the cache recorded
 `Compile requests 0`.
 
 The failure is silent by construction, which is why it survived several green
-runs. Cargo does not reject an unusable `RUSTC_WRAPPER`; it ignores it. A value
-naming a file that does not exist, or that is not executable, leaves the build
-successful and uncached. So the claim "sccache is enabled" could be made in
-good faith from the workflow text while being false of the run.
+runs, but not for the reason an earlier revision of this section gave. That
+revision said Cargo ignores an unusable `RUSTC_WRAPPER`, so a wrapper naming a
+missing or non-executable file would leave the build successful and uncached.
+That is wrong, and it was an invented mechanism rather than a misreading of a
+source. Cargo passes the wrapper straight to `Command::new` and reports a spawn
+failure as `could not execute process`, which fails the build; its own
+testsuite asserts exit 101 with that message for a wrapper absent from `PATH`
+(`rustc_wrapper_from_path` in `tests/testsuite/build.rs`, present unchanged at
+tag `0.100.0`, the pinned compiler's Cargo, and at `master`). The true silence
+is narrower and is the one that occurred: nothing *forced* a job to set the
+variable at all, so a job that never set it compiled unwrapped and reported
+`Compile requests 0` with no error. So the claim "sccache is enabled" could be
+made in good faith from the workflow text while being false of the run.
+
+The remedy therefore targets omission, not malformation: declaring the variable
+at job level makes it present for every step, and the `Report sccache wiring`
+step resolves it so presence is observed rather than assumed.
 
 The remedy is threefold and each part is separately contracted:
 

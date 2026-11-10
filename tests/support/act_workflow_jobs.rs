@@ -39,8 +39,9 @@ pub(crate) struct JobContract {
     /// `SCCACHE_GHA_ENABLED: "true"`, because DL-03's cache clause is about
     /// compilation that actually reaches sccache. The pinned `setup-rust`
     /// action installs the binary and exports `SCCACHE_PATH` but sets neither
-    /// variable, and Cargo silently ignores a wrapper it cannot run — so a job
-    /// without them compiled uncached while reporting nothing wrong. They are
+    /// variable, and an absent wrapper is not itself an error — so a job
+    /// without them compiled uncached while reporting nothing wrong. A wrapper
+    /// Cargo cannot execute is different: it fails the build. They are
     /// job-level rather than per-step so the provisioning steps all inherit
     /// them, and `Report sccache wiring` resolves the wrapper on `PATH` to make
     /// the wiring observable rather than merely asserted.

@@ -58,8 +58,9 @@ fn workflow_environment_mutations_break_the_contract() {
 ///
 /// The clause is only met when compilation reaches sccache, and the declaration
 /// that achieves it has parts that fail silently. The action installs the
-/// binary but sets no wrapper, and Cargo ignores a wrapper it cannot run. The
-/// storage backend is opt-in, so an unset backend compiles through to disk.
+/// binary but sets no wrapper, and an absent wrapper is not itself an error
+/// (a wrapper Cargo cannot execute would fail the build instead). The storage
+/// backend is opt-in, so an unset backend compiles through to disk.
 /// And saves are permitted only on `main`, which sccache expresses as a read
 /// mode that defaults to `READ_WRITE`. Each failure is invisible in a green job,
 /// so each gets its own mutation.

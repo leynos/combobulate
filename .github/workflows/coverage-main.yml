@@ -44,8 +44,8 @@ jobs:
       BUILD_PROFILE: debug
       # DL-03: route every rustc invocation through the cache sccache-action
       # installed. The action installs the binary and exports `SCCACHE_PATH`
-      # but never sets this variable, and Cargo silently ignores a wrapper it
-      # cannot run, so the cache stayed unreachable until it was named here.
+      # but never sets this variable, and an absent variable is not an error,
+      # so the cache stayed unreachable until it was named here.
       RUSTC_WRAPPER: sccache
       # The GitHub Actions cache backend DL-03 names. Without it sccache
       # compiles through to disk and shares nothing with the pull-request lane,

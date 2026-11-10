@@ -49,14 +49,14 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
             "sudo apt-get update \\\n  && sudo apt-get install --yes --no-install-recommends \
              clang lld mold"
         ),
-        // DL-03: the wrapper Cargo is told to use must be runnable. Cargo
-        // silently ignores one that is not, so this step resolves it on `PATH`
-        // and prints the cache's own statistics, whose cache-location line
-        // names the backend in use. `--show-stats` needs no compile, which is
-        // why the evidence is available before any gate runs. The flag must be
-        // one the released binary accepts: `--show-config` does not exist in
-        // sccache 0.19.0 and exits 2, so a step using it failed the job it was
-        // added to make observable.
+        // DL-03: the wrapper Cargo is told to use must be runnable. Nothing
+        // errors if the variable is merely absent, so this step resolves it on
+        // `PATH` and prints the cache's own statistics, whose cache-location
+        // line names the backend in use. `--show-stats` needs no compile,
+        // which is why the evidence is available before any gate runs. The
+        // flag must be one the released binary accepts: `--show-config` does
+        // not exist in sccache 0.19.0 and exits 2, so a step using it failed
+        // the job it was added to make observable.
         Some("Report sccache wiring") => concat!(
             "set -euo pipefail\n",
             "wrapper=\"${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}\"\n",

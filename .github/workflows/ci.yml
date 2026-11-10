@@ -12,9 +12,10 @@ name: CI
 # `SCCACHE_GHA_ENABLED: "true"`. The pinned `setup-rust` action runs
 # `mozilla-actions/sccache-action`, which installs the binary and exports
 # `SCCACHE_PATH` but never sets either variable; a job that left them unset
-# compiled without the cache and reported `Compile requests 0`. A malformed
-# wrapper value is silently ignored by Cargo, which is why the value is a bare
-# command name on `PATH` rather than a path to a file that may not exist.
+# compiled without the cache and reported `Compile requests 0` with no error of
+# its own. The value is a bare command name on `PATH` so the action's install
+# location is what resolves it; a value Cargo cannot execute is a hard build
+# failure, not a silent fallback.
 
 'on':
   pull_request:
@@ -36,8 +37,8 @@ jobs:
       # the one AC-07 measures, and the two *-polars jobs own the other.
       GATE_PROFILE: native-only
       # DL-03: route every rustc invocation through the cache sccache-action
-      # installed. Cargo ignores a wrapper it cannot run, so this is what makes
-      # the cache reachable at all.
+      # installed. Nothing supplies this variable on the job's behalf, so
+      # declaring it here is what makes the cache reachable at all.
       RUSTC_WRAPPER: sccache
       # The GitHub Actions cache backend, which is the sccache storage DL-03
       # names. Without it sccache compiles through to disk and shares nothing
@@ -84,9 +85,9 @@ jobs:
             && sudo apt-get install --yes --no-install-recommends clang lld mold
       - name: Report sccache wiring
         # DL-03's cache clause is about compilation that actually reaches
-        # sccache, and a wrapper Cargo cannot run is silently ignored rather
-        # than reported. So this step resolves the configured wrapper on PATH
-        # and prints the cache's own statistics, whose cache-location line names
+        # sccache, and nothing here errors if the variable is simply absent. So
+        # this step resolves the configured wrapper on PATH and prints the
+        # cache's own statistics, whose cache-location line names
         # the backend the server is actually using. That is the observable
         # evidence that builds from here on are wrapped. It runs before the
         # suite routes so a later failure cannot leave the question unanswered,
