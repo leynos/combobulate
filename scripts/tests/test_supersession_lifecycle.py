@@ -9,33 +9,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from docs_validation.decisions import check_register_records, validate_register
-from test_decision_register import SCHEMA, accept, accepted_register, record
+from test_decision_register import (
+    SCHEMA, accept, accepted_register, free_identifier, record,
+)
 
 
 DecisionRecord = dict[str, object]
 DecisionRegister = dict[str, list[DecisionRecord]]
-
-
-def free_identifier(register: DecisionRegister, first: int) -> str:
-    """Return the first ``D<n>`` at or after ``first`` the register does not already use.
-
-    The suite builds replacement records on top of the committed register, so a
-    hard-coded identifier starts colliding the moment the register grows to it.
-    Allocating one keeps these cases about supersession rather than about which
-    numbers the repository happens to have taken.
-
-    Examples
-    --------
-    With D15 and D16 committed, asking from 16 names the next free record::
-
-        free_identifier(accepted_register(), 16)
-        # 'D17'
-    """
-    used = {str(entry['id']) for entry in register['decisions']}
-    candidate = first
-    while f'D{candidate}' in used:
-        candidate += 1
-    return f'D{candidate}'
 
 
 def supersede_decision(register: DecisionRegister, replacement_id: str, lifecycle: str) -> DecisionRecord:
