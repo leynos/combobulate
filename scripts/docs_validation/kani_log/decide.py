@@ -285,6 +285,14 @@ def _outcome(log: KaniLog, claims: list[_Observed | None], manifest: Manifest) -
         return SOLVER_UNKNOWN
     if len(reported) != len(manifest.claims):
         return SKIPPED
+    # Every check this decision has looked at was attributed to a manifest
+    # harness. A block Kani still declared `FAILED` had a failure somewhere, and
+    # if none of the attributed checks carries it, the parser did not capture
+    # it. Reading the verdict as well as the checks is what stops that from
+    # deciding `verified`: ownership explains *whose* failure it was, not
+    # whether the run succeeded.
+    if any(not item.succeeded for item in reported):
+        return COUNTEREXAMPLE
     return VERIFIED
 
 

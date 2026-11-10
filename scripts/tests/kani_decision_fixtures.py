@@ -55,6 +55,12 @@ UNSUPPORTED_ASSERTION = 'UNSUPPORTED_ASSERTION'
 # library's name, and the block still prints ``FAILED``. Nothing the manifest
 # declares failed, yet the run disproved something the claim depends on.
 FOREIGN_FAILURE = 'FOREIGN_FAILURE'
+# A block Kani declared `FAILED` whose captured checks all succeeded. The
+# failure exists — Kani printed the verdict and reconciled a failure count — but
+# it is not among the checks this decision can attribute, so nothing in
+# `properties` and nothing in `unattributed` carries it. Reading ownership alone
+# cannot tell this from a clean run; the verdict is the only remaining fact.
+UNATTRIBUTED_FAILURE = 'UNATTRIBUTED_FAILURE'
 ABSENT = 'ABSENT'
 
 SATISFIED = 'SATISFIED'
@@ -71,6 +77,10 @@ UNSUPPORTED_WORDING = 'TerminatorKind::InlineAsm is not currently supported by K
 LIBRARY_CHECK = "core::fmt::Arguments::<'_>::from_str.assertion.1"
 BOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --unwind 2 --sat-solver cadical`'
 UNBOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --sat-solver cadical`'
+# The statuses whose failure the block explains in `Failed Checks:`.
+# `UNATTRIBUTED_FAILURE` is deliberately absent: its zero failure count and its
+# absent explanation are the class, and listing one would make the block
+# something the reader would refuse as self-contradictory.
 FAILING = (FAILURE, AS_INTENDED, OTHERWISE, UNWIND_FAILURE, UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION,
            FOREIGN_FAILURE)
 
@@ -102,7 +112,12 @@ class HarnessFact:
 
     @property
     def verdict(self) -> str:
-        """Return the verdict Kani would print for this fact set."""
+        """Return the verdict Kani would print for this fact set.
+
+        ``UNATTRIBUTED_FAILURE`` prints ``FAILED`` while listing only passing
+        checks, which is the shape a decision that reads ownership alone cannot
+        tell from a clean run.
+        """
         if self.status in (SUCCESS, UNDETERMINED) or (self.status == FAILURE and self.should_panic and self.note):
             return 'SUCCESSFUL'
         return 'FAILED'
@@ -131,6 +146,10 @@ def _owned_checks(fact: HarnessFact) -> list[PropertyResult]:
         UNWIND_FAILURE: ('unwind.0', 'FAILURE', 'unwinding assertion loop 0'),
         UNSUPPORTED_CHECK: ('unsupported_construct.1', 'FAILURE', UNSUPPORTED_WORDING),
         UNSUPPORTED_ASSERTION: ('assertion.1', 'FAILURE', UNSUPPORTED_WORDING),
+        # The check this class owns passes; the failure Kani counted is
+        # elsewhere. That is what makes the verdict the only fact that can tell
+        # it from a clean run.
+        UNATTRIBUTED_FAILURE: ('assertion.1', 'SUCCESS', 'the assertion holds'),
     }.get(fact.status)
     return [PropertyResult(f'{name}.{kind[0]}', kind[1], kind[2])] if kind else []
 
@@ -225,14 +244,17 @@ def claim_variants(name: str = 'h::c') -> tuple[HarnessFact, ...]:
     harness still has a cover the manifest names, and that cover is what VO-11b
     must report as unsatisfied).
 
-    ``FOREIGN_FAILURE`` is one of the outcomes, not a variant of ``FAILURE``: a
-    block whose only failed check belongs to a routine the harness called has no
-    owned failure at all, and a decision that reads ownership alone cannot tell
-    it from a clean run.
+    ``FOREIGN_FAILURE`` and ``UNATTRIBUTED_FAILURE`` are outcomes in their own
+    right, not variants of ``FAILURE``. Both have a `FAILED` verdict with no
+    failure among the checks the harness owns, so a decision that reads
+    ownership alone cannot tell either from a clean run; they differ in where
+    the missing failure went. In the first it is a listed check owned by a
+    routine the harness called, which the decision can still weigh. In the
+    second it was never listed at all, so the verdict is the only fact left.
     """
     outcomes = (HarnessFact(name, CLAIM, status) for status in
-                (SUCCESS, FAILURE, FOREIGN_FAILURE, TIMEOUT, UNDETERMINED, UNWIND_FAILURE,
-                 UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION))
+                (SUCCESS, FAILURE, FOREIGN_FAILURE, UNATTRIBUTED_FAILURE, TIMEOUT, UNDETERMINED,
+                 UNWIND_FAILURE, UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION))
     witnesses = (HarnessFact(name, CLAIM, SUCCESS, cover) for cover in COVER_STATUSES[1:])
     panics = (HarnessFact(name, CLAIM, FAILURE, should_panic=True, note=note) for note in (True, False))
     absent = (HarnessFact(name, CLAIM, ABSENT, cover) for cover in (NOTHING, SATISFIED))
