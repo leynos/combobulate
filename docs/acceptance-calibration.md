@@ -118,8 +118,9 @@ _Table 2: Calibrated measurements and registered thresholds._
   used to choose the sample. That window predates DL-03, so its per-job samples
   are not per-run longest-job samples and cannot be re-read as one. DL-14
   therefore registers the amended workload as `ci-required-jobs` and leaves the
-  220 s threshold in place; the new window starts empty when the three-job
-  shape lands, and `AC-07` reports `inconclusive` until 20 runs have completed.
+  registered eight-minute p90 budget in place; the new window starts empty when
+  the three-job shape lands, and `AC-07` reports `inconclusive` until 20 runs
+  have completed.
 
 ## Reproduction
 

@@ -94,8 +94,8 @@ Specification: parent plan lines 2250-2320.
   the amended workload as an ordinary reviewed file, per ADR-0008's 2026-10-31
   amendment. The workload id is `ci-required-jobs`, the settings value carries
   one `RequiredJob` per unconditioned job, and `check_ci_calibration` still
-  reads the registered `ci-build-test` record because that is the evidence the
-  220 s threshold came from.
+  reads the registered `ci-build-test` record because that is the calibration
+  whose 220 s p90 the registered eight-minute budget rests on.
 - [x] (2026-11-08) Both workflow contracts are re-keyed to the new shape.
   `tests/support/act_workflow_contract.rs` now contracts each job's ordered
   steps, actions, and environment separately; four typed mutation cases prove a
