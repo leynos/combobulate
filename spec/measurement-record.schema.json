@@ -145,13 +145,19 @@
             "items": {
               "if": {
                 "properties": {
-                  "id": {"enum": ["ci-build-test", "ci-required-jobs"]}
+                  "id": {"const": "ci-required-jobs"}
                 },
                 "required": ["id"]
               },
               "then": {
+                "description": "The DL-14 workload measures every required job, so each attempt records each job's own conclusion. A pre-DL-14 `ci-build-test` series is calibration history: an acceptance record that names it falls to the ordinary branch and must carry measured samples, which the checker then rejects as the wrong workload.",
                 "required": ["attempts"],
-                "properties": {"attempts": {"minItems": 1}},
+                "properties": {
+                  "attempts": {
+                    "minItems": 1,
+                    "items": {"required": ["required_job_conclusions"]}
+                  }
+                },
                 "allOf": [
                   {
                     "if": {
@@ -160,17 +166,6 @@
                     },
                     "then": {
                       "properties": {"median": {"const": "not available"}}
-                    }
-                  },
-                  {
-                    "description": "The DL-14 workload measures every required job, so each attempt must record each job's own conclusion. The pre-DL-14 `ci-build-test` series measured one job and its attempts carry that job's conclusion already.",
-                    "if": {"properties": {"id": {"const": "ci-required-jobs"}}},
-                    "then": {
-                      "properties": {
-                        "attempts": {
-                          "items": {"required": ["required_job_conclusions"]}
-                        }
-                      }
                     }
                   }
                 ]

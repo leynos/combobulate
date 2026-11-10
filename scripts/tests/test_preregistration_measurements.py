@@ -231,6 +231,44 @@ class WorkflowAndCi(unittest.TestCase):
                                     msg='an untimed failed attempt must never be recorded as a pass'):
             check_ci_measurement(CI_CONTROL, passing)
 
+    def test_required_jobs_workload_must_record_every_job(self):
+        """Require each AC-07 attempt to name its jobs, and only that workload to.
+
+        The DL-14 workload measures every required job, so an attempt without
+        the per-job map leaves a shorter job's failure unrecorded. A
+        ``ci-build-test`` workload is the pre-DL-14 calibration series and is
+        not this branch: an acceptance record naming it must supply measured
+        samples instead.
+        """
+        per_job = record('pass')
+        per_job['control_ids'] = [CI_CONTROL['id']]
+        per_job['recorded_on'] = CI_MEASUREMENT_DATE
+        workload = per_job['workloads'][0]
+        workload['id'] = 'ci-required-jobs'
+        workload['attempts'] = [{
+            'run_id': '21', 'run_number': 21, 'attempt': 1, 'conclusion': 'success',
+            'wall_seconds': 60.0,
+            'started_at': '2026-10-12T12:00:00Z',
+            'completed_at': '2026-10-12T12:01:00Z',
+            'url': 'https://github.com/leynos/combobulate/actions/runs/21',
+        }]
+        workload['samples'] = [60.0]
+        with self.assertRaises(ValidationError, msg='an AC-07 attempt must name every required job'):
+            RECORD_VALIDATOR.validate(per_job)
+
+        workload['attempts'][0]['required_job_conclusions'] = {'build-test': 'success'}
+        RECORD_VALIDATOR.validate(per_job)
+
+        calibration_series = copy.deepcopy(per_job)
+        calibration_workload = calibration_series['workloads'][0]
+        calibration_workload['id'] = 'ci-build-test'
+        calibration_workload['samples'] = []
+        calibration_workload['median'] = 'not available'
+        del calibration_workload['attempts'][0]['required_job_conclusions']
+        with self.assertRaises(ValidationError,
+                               msg='a ci-build-test acceptance workload cannot claim AC-07 attempts'):
+            RECORD_VALIDATOR.validate(calibration_series)
+
     def test_other_controls_still_require_a_sample(self):
         """Keep ordinary acceptance controls subject to the sample requirement."""
         no_samples = record('pass')
