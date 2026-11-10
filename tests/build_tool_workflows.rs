@@ -152,6 +152,37 @@ fn a_variable_expansion_is_resolved_by_its_subcommand() {
     }
 }
 
+/// A global option's value word is not the subcommand, and stays unresolved.
+///
+/// `cargo_subcommand_runs_no_tests` treats the first word that is neither an
+/// option nor a `+toolchain` override as the subcommand. Cargo has global
+/// options that take their value as a separate word, so `--config foo build`
+/// puts `foo` in that position and the classifier reads it as the subcommand.
+/// `foo` is not on the non-suite allowlist, so the command is reported as
+/// unresolved rather than accepted as a build.
+///
+/// That is the intended trade: teaching the classifier which options take a
+/// value would enlarge the grammar it has to track, and every option it failed
+/// to learn would become a way for a suite command to pass as something else.
+/// Failing closed costs an error on a command no committed workflow uses and
+/// keeps the allowlist the actual contract.
+#[test]
+fn a_global_option_value_is_not_read_as_the_subcommand() {
+    for command in [
+        "cargo --config foo build \"$FLAGS\"",
+        "cargo --target-dir out build \"$FLAGS\"",
+    ] {
+        let source = format!(
+            "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: {command}\n"
+        );
+        let document = workflow(&source).expect("parse a separate-value option fixture");
+        assert!(
+            workflow_violations(&[("config.yml".to_owned(), document)]).is_err(),
+            "an option's value word must not be read as a non-suite subcommand: {command}"
+        );
+    }
+}
+
 #[test]
 fn rejects_ineffective_installers_and_unprovable_workflows() {
     for install in [
