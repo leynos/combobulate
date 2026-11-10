@@ -193,7 +193,11 @@ fn valid_ci_order(ci: &Value, job: &JobContract, steps: &[Value]) -> bool {
 /// `Lint` appears in two jobs, so each job's lint step is checked against its
 /// own profile rather than against a single shared expectations table.
 fn valid_ci_commands(ci: &Value) -> bool {
-    let TestUnderAct { run, with_act, condition } = test_under_act(ci);
+    let TestUnderAct {
+        run,
+        with_act,
+        condition,
+    } = test_under_act(ci);
     text(
         build_test_step(ci, "Format").map_or(ci, |(_, item)| item),
         &["run"],

@@ -8,14 +8,7 @@
 
 use serde_yaml::Value;
 
-use super::super::{
-    ACT_VALIDATION_WORKFLOW,
-    CI_WORKFLOW,
-    JOBS,
-    Read,
-    contracts_hold,
-    document,
-};
+use super::super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, JOBS, Read, contracts_hold, document};
 
 #[test]
 fn workflow_environment_mutations_break_the_contract() {
@@ -94,8 +87,16 @@ fn cache_mutations_break_the_contract() {
         ("cache write mode dropped", "SCCACHE_GHA_RW_MODE", None),
     ] {
         for job in JOBS.iter().map(|job| job.name) {
-            let changed = rewrite_job_environment(CI_WORKFLOW, job, key, replacement)
-                .unwrap_or_else(|error| panic!("{reason} in {job}: {error}"));
+            // `unwrap_or_else(|e| panic!(..))` would read the same here, but
+            // Whitaker's `no_unwrap_or_else_panic` rejects that shape outright
+            // while the `Result`-returning alternative trips
+            // `clippy::panic_in_result_fn` on the assertions below. An explicit
+            // match reports the setup failure and keeps the assertions, which
+            // is the same form `act_make_assertions::unwrap_test_result` uses.
+            let changed = match rewrite_job_environment(CI_WORKFLOW, job, key, replacement) {
+                Ok(changed) => changed,
+                Err(error) => panic!("{reason} in {job}: {error}"),
+            };
             assert_ne!(
                 changed, CI_WORKFLOW,
                 "mutation must change source: {reason} in {job}"
@@ -126,7 +127,7 @@ fn rewrite_job_environment(
     let environment = changed
         .get_mut("jobs")
         .and_then(|jobs| jobs.get_mut(job))
-        .and_then(|job| job.get_mut("env"))
+        .and_then(|declared| declared.get_mut("env"))
         .and_then(Value::as_mapping_mut)
         .ok_or_else(|| format!("the committed workflow must declare {job}'s environment"))?;
     match replacement {

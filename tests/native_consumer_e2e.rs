@@ -121,16 +121,29 @@ fn built_binary(stream: &str) -> Result<PathBuf, Box<dyn Error>> {
     let executable = stream
         .lines()
         .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter(|message| message["reason"] == "compiler-artifact")
-        .filter(|message| {
-            message["target"]["kind"]
-                .as_array()
-                .is_some_and(|kinds| kinds.iter().any(|kind| kind == "bin"))
+        .filter(is_binary_artifact)
+        .find_map(|message| {
+            message
+                .get("executable")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
         })
-        .filter_map(|message| message["executable"].as_str().map(str::to_owned))
-        .next()
         .ok_or("Cargo reported no executable for the fixture's binary target")?;
     Ok(PathBuf::from(executable))
+}
+
+/// Reports whether a Cargo JSON message describes the fixture's own binary.
+///
+/// `pointer` is used rather than `Value`'s index operator because a message
+/// whose shape is not the one Cargo documents must simply stop matching, not
+/// panic or reach for a key that only some artifact kinds carry.
+fn is_binary_artifact(message: &Value) -> bool {
+    let is_artifact = message.get("reason").and_then(Value::as_str) == Some("compiler-artifact");
+    let is_bin = message
+        .pointer("/target/kind")
+        .and_then(Value::as_array)
+        .is_some_and(|kinds| kinds.iter().any(|kind| kind.as_str() == Some("bin")));
+    is_artifact && is_bin
 }
 
 /// Builds the fixture and returns its `cargo tree` output and rendered profile.
@@ -272,8 +285,8 @@ fn binary_lookup_reports_a_stream_without_a_binary() {
     );
     assert!(
         built_binary(library_only).is_err(),
-        "a stream with no bin target must report the missing executable rather than \
-         fall back to a guessed path"
+        "a stream with no bin target must report the missing executable rather than fall back to \
+         a guessed path"
     );
 }
 
