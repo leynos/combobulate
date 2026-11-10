@@ -42,7 +42,7 @@ def record(outcome: str, purpose: str = 'acceptance') -> dict:
              'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
                           'vcpus': 4, 'memory_gib': 16, 'architecture': 'x64',
                           'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
-             'toolchains': {'rust': 'nightly-2026-08-27', 'codegen_backend': 'Cranelift',
+             'toolchains': {'rust': 'nightly-2026-11-06', 'codegen_backend': 'Cranelift',
                             'linker': 'mold 2.41.0', 'verus': '0.2026.09.06.8dea4a2 with Z3 4.16.0',
                             'kani': '0.67.0'},
              'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',

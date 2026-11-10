@@ -1636,3 +1636,76 @@ What the stall left unverified, and its state now:
   job AC-04 registers. So the last acceptance evidence this PR needed is in
   hand, and reading the run badge instead of the job would have reported the
   opposite.
+
+## Main moved the pinned toolchain under the pin record
+
+`95de530` (PR #64, on `main`) moved `rust-toolchain.toml` from
+`nightly-2026-08-27` to `nightly-2026-11-06`, taking rustc from
+`1.100.0-nightly (bff8e12ff 2026-08-26)` to
+`1.101.0-nightly (249c1e4e3 2026-11-05)`. This branch introduces
+`spec/toolchain-profiles.json`, which pins the repository channel and names
+`rust-toolchain.toml` as that pin's owner, so the two changes contradict each
+other even though neither diff conflicts textually: the rebase applied all 59
+commits without a single conflict and the tree it produced still failed.
+
+**The failure was first read as a date boundary, and that reading was wrong.**
+The hosted run reported `toolchain record pin repository_channel is
+'nightly-2026-08-27' but its owner says 'nightly-2026-11-06'`, and an earlier
+revision of this section attributed it to `--as-of 2026-11-10` tripping a
+record-expiry rule. The date is not the cause. `design-check` checks out the
+pull request's *merge* ref, which carries `main`'s `rust-toolchain.toml`
+alongside this branch's record; the same tree on the branch head alone still
+says `nightly-2026-08-27`, and the identical run at `2b875ad` passed only
+because `main` had not yet moved. Reproducing it locally needs the rebase, not
+a different `--as-of`.
+
+The reconciliation separates two things the pin model had not yet had to tell
+apart.
+
+- **The repository pin is live.** `repository_channel`,
+  `repository_rustc_commit`, `toolchains.repository`, both ordinary profiles'
+  `toolchain`, and the `ordinary: true` entry of `supported_toolchain_set` all
+  describe what the repository builds with *now*, so they move to
+  `nightly-2026-11-06`. `tests/build_tools_preflight.rs` and
+  `tests/support/build_tools_preflight.rs` stop being pin sites at all: #64
+  replaced their literal with `support::pinned_channel()`, which reads
+  `rust-toolchain.toml` at run time, so they can no longer disagree with it.
+- **A dated capture is historical.** `spec/calibration/*.json`, both
+  `spec/measurements/ac-04-*.json`, `tools/probes/observations/toolchains.log`
+  and the Verus observations record what a named run actually used. Rewriting
+  `nightly-2026-08-27` out of them would make a 2026-11-09 measurement claim a
+  toolchain it never ran, so they keep their text and leave the pin's `sites`
+  list. They are no longer flagged by the sweep for the same reason: the sweep
+  reports files that name a *current* pin value, and `nightly-2026-08-27` stops
+  being one.
+- `tools/probes/observations/toolchains.log` was the only file naming
+  `repository_rustc_commit`, so replacing its repository section is also what
+  keeps that pin's `sites` list non-empty and truthful. The values are this
+  host's own `rustc -vV` and `cargo -V` under the new pin, which is what the
+  file exists to record.
+- The seven tests that hard-code the pin move with it. That is the coupling the
+  plan already argued for at "The pin sweep is load-bearing rather than
+  decorative": a pin bump must edit them, which is why they are listed.
+
+**A second defect, which `main` introduced and this branch is the first to
+see.** Every control from AC-01 to AC-07 carries
+`"rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)"`.
+The parenthetical is a decaying annotation, and the checker reads it as a
+requirement: `_check_registered_toolchains` extracts every `nightly-YYYY-MM-DD`
+from the requirement and demands the acceptance record report it. So with the
+control left as it is, no measurement taken after the bump can ever bind —
+AC-04 included — and the failure would name a *record* rather than the stale
+control that caused it. Bumping the parenthetical to `nightly-2026-11-06`
+instead invalidates both existing AC-04 records, which were honestly measured
+at `2026-08-27`, and takes AC-04 from `pass` to a binding error; both were
+tested against the real records rather than reasoned about.
+
+The version is not removed from the requirement, only the copy that decays. The
+control keeps its demand that the record report a `rust` toolchain, and the
+value it must agree with now lives in exactly one place, the pin record, whose
+`repository_channel` owner is re-derived from `rust-toolchain.toml` on every
+run. That is a stronger check than a prose parenthetical, and it is the same
+de-duplication the sweep enforces everywhere else: a literal that has an owning
+record is not restated in a second place where it can rot. VO-7's substance is
+unchanged, because the agreement it asks for is now checked against the owner
+rather than against a copy of the owner's old value.

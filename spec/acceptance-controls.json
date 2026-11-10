@@ -73,7 +73,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -133,7 +133,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -193,7 +193,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -256,7 +256,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -316,7 +316,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -376,7 +376,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -432,7 +432,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",

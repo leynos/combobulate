@@ -26,7 +26,7 @@ class VerifierFreeCommandTests(unittest.TestCase):
         workspace = Path('/tmp/epm1-verifier-free-workspace')
         home = Path('/home/probe')
 
-        command = module.container_run_command(workspace, 'probe:tag', home, 'nightly-2026-08-27')
+        command = module.container_run_command(workspace, 'probe:tag', home, 'nightly-2026-11-06')
 
         self.assertEqual(command[:2], ['podman', 'run'], 'the probe must run through podman')
         for flag in ('--network=none', '--userns=keep-id', '--security-opt=label=disable'):

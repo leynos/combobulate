@@ -90,7 +90,7 @@ class ValidationReport(unittest.TestCase):
             },
             'runner_metadata': {'image_os': 'ubuntu24', 'image_version': '20261012.1'},
             'toolchains': {
-                'rust': 'nightly-2026-08-27', 'codegen_backend': 'Cranelift',
+                'rust': 'nightly-2026-11-06', 'codegen_backend': 'Cranelift',
                 'linker': 'mold 2.41.0',
                 'verus': '0.2026.09.06.8dea4a2 with Z3 4.16.0', 'kani': '0.67.0',
             },

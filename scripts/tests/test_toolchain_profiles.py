@@ -100,7 +100,7 @@ class SourcedPins(ScratchTree):
         """Change `rust-toolchain.toml` alone and require the disagreement."""
         channel = (self.root / 'rust-toolchain.toml').read_text(encoding='utf-8')
         (self.root / 'rust-toolchain.toml').write_text(
-            channel.replace('nightly-2026-08-27', 'nightly-2026-09-01'), encoding='utf-8',
+            channel.replace('nightly-2026-11-06', 'nightly-2026-09-01'), encoding='utf-8',
         )
         self.assert_fails('repository_channel')
 

@@ -32,7 +32,7 @@ pub fn add(value: u32) -> u32 {
 
 TOOLCHAIN = '''\
 [toolchain]
-channel = "nightly-2026-08-27"
+channel = "nightly-2026-11-06"
 components = ["clippy", "rustfmt"]
 '''
 
@@ -117,13 +117,13 @@ class StructuralDigestTests(unittest.TestCase):
         """TOML is hashed as parsed data."""
         reformatted = (
             '# pinned\n[toolchain]\ncomponents = [\n  "clippy",\n  "rustfmt",\n]\n'
-            'channel   =   "nightly-2026-08-27"  # moved\n'
+            'channel   =   "nightly-2026-11-06"  # moved\n'
         )
         self.assertSame('rust-toolchain.toml', TOOLCHAIN, reformatted, 'toml reformat')
 
     def test_toml_toolchain_channel_change_is_detected(self) -> None:
         """Moving the channel changes the parsed toolchain."""
-        moved = TOOLCHAIN.replace('2026-08-27', '2026-08-28')
+        moved = TOOLCHAIN.replace('2026-11-06', '2026-08-28')
         self.assertDiffers('rust-toolchain.toml', TOOLCHAIN, moved, 'channel')
 
     def test_json_layout_is_ignored_and_values_are_not(self) -> None:
@@ -182,16 +182,16 @@ class StructuralDigestTests(unittest.TestCase):
         }
         (self.directory / 'rust-toolchain.toml').write_text(toolchain_now)
         (self.directory / 'other.toml').write_text(other)
-        command = ['podman', 'RUSTUP_TOOLCHAIN=nightly-2026-08-27']
+        command = ['podman', 'RUSTUP_TOOLCHAIN=nightly-2026-11-06']
         return DIGEST.classify_drift(self.directory, digests, command)
 
     def test_channel_only_toolchain_drift_warns_and_passes(self) -> None:
         """A bumped channel is a note naming both values, not a failure."""
-        failures, note = self.drift(TOOLCHAIN.replace('2026-08-27', '2026-09-30'))
+        failures, note = self.drift(TOOLCHAIN.replace('2026-11-06', '2026-09-30'))
         self.assertEqual(failures, [], 'channel-only drift must not fail')
         self.assertEqual(
             note,
-            'Evidence captured for toolchain nightly-2026-08-27; '
+            'Evidence captured for toolchain nightly-2026-11-06; '
             'evidence missing for the current pin nightly-2026-09-30.',
             'the note must name the recorded and current channels',
         )
@@ -206,7 +206,7 @@ class StructuralDigestTests(unittest.TestCase):
         """Components or targets changing is a real change, even with a new channel."""
         for changed in (
             TOOLCHAIN.replace('"rustfmt"', '"rustfmt", "miri"'),
-            TOOLCHAIN.replace('2026-08-27', '2026-09-30').replace('"rustfmt"', '"miri"'),
+            TOOLCHAIN.replace('2026-11-06', '2026-09-30').replace('"rustfmt"', '"miri"'),
             TOOLCHAIN + 'targets = ["wasm32-unknown-unknown"]\n',
         ):
             with self.subTest(changed=changed):
@@ -231,7 +231,7 @@ class StructuralDigestTests(unittest.TestCase):
         for bad in ('nightly-2026-99-99', 'nightly-2026-02-30', 'beta-2026-13-01'):
             self.assertFalse(DIGEST.is_rustup_channel(bad), bad)
         self.assertTrue(DIGEST.is_rustup_channel('nightly-2026-02-28'), 'real date')
-        failures, note = self.drift(TOOLCHAIN.replace('2026-08-27', '2026-99-99'))
+        failures, note = self.drift(TOOLCHAIN.replace('2026-11-06', '2026-99-99'))
         self.assertEqual(failures, ['rust-toolchain.toml'], 'impossible date fails')
         self.assertIsNone(note, 'no warning for an impossible date')
 
