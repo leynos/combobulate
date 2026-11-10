@@ -286,6 +286,24 @@ class CapabilityEvidence(ScratchTree):
         self.check()
 
 
+class CapabilityIdentity(ScratchTree):
+    """A capability ID is an identifier, so its shape must bind every value."""
+
+    def test_capability_id_must_be_a_patterned_string(self):
+        """`pattern` constrains only strings, so a numeric ID would otherwise pass."""
+        from jsonschema import ValidationError
+
+        for bad_id, expectation in ((5, "5 is not of type 'string'"), ('PC1', 'does not match')):
+            with self.subTest(capability_id=bad_id):
+                record = record_at(self.root)
+                record['capabilities'][0]['id'] = bad_id
+                write_record(self.root, record)
+                with self.assertRaises(ValidationError) as raised:
+                    self.check()
+                self.assertIn(expectation, str(raised.exception),
+                              f'the capability ID {bad_id!r} must be rejected by the schema')
+
+
 class RepositoryRecord(ScratchTree):
     """The committed record must satisfy the checker it ships with."""
 
