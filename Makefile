@@ -137,7 +137,8 @@ TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,tes
 # routes below share one script that records the built binary and runs it. The
 # root suite reaches the same record through `tests/cardinality_probe_ui.rs`.
 UI_GATE_MANIFEST ?= tools/gates/cardinality-ui/Cargo.toml
-UI_GATE_SCRIPT ?= scripts/cardinality_ui_gate.py# The script composes RUSTFLAGS from these flags, so they are passed by value.
+UI_GATE_SCRIPT ?= scripts/cardinality_ui_gate.py
+# The script composes RUSTFLAGS from these flags, so they are passed by value.
 # An assigned RUSTFLAGS here would replace the caller's value instead.
 UI_GATE_ENVIRONMENT = DEV_RUST_FLAGS="$(DEV_RUST_FLAGS)"
 PYTHON ?= python3
