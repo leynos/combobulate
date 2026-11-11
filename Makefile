@@ -100,23 +100,34 @@ RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
 # DL-18: ordinary gates select a named feature profile rather than
 # `--all-features`. `--all-features` would let a future verifier feature enter
 # every route, and it never lints the `cfg(not(feature = "polars"))` code the
-# native-only route exists to cover. Both profiles run locally by default;
-# `GATE_PROFILE=native-only` or `polars-enabled` selects one.
+# native-only route exists to cover. Every profile runs locally by default;
+# `GATE_PROFILE` selects one.
 #
 # Each profile is a separate Cargo invocation. Sharing one would let feature
 # unification mask a profile: Polars pulls in dependencies that would then
 # satisfy the native-only route's graph too, so the native-only route would
 # stop proving that the facade builds without them.
+#
+# `native-only` and `polars-enabled` are the two profiles CI runs on every
+# pull request, and `both` runs them. `macros-only` and `polars-only` are also
+# accepted, so the two features Cargo can select independently are each built
+# without the other: a build claiming one backend while compiled with the other
+# passed every other route, because each of those turns both on or both off.
+# They are not named by `both`, because the pull-request lane measures the two
+# profiles AC-07 budgets and a cold Polars build in the same job would spend it.
 GATE_PROFILE ?= both
 GATE_PROFILES = $(strip $(if $(filter both,$(GATE_PROFILE)),native-only polars-enabled,\
-	$(filter native-only polars-enabled,$(GATE_PROFILE))))
+	$(filter native-only polars-enabled macros-only polars-only,$(GATE_PROFILE))))
 ifeq ($(GATE_PROFILES),)
-$(error GATE_PROFILE must be one of native-only, polars-enabled, or both; got '$(GATE_PROFILE)')
+$(error GATE_PROFILE must be one of native-only, polars-enabled, macros-only, \
+	polars-only, or both; got '$(GATE_PROFILE)')
 endif
-# The per-profile flags are the only difference between the two routes, so they
-# are named once and reused by every gate below.
+# The per-profile flags are the only difference between the routes, so they are
+# named once and reused by every gate below.
 PROFILE_FLAGS_native-only := --no-default-features
 PROFILE_FLAGS_polars-enabled :=
+PROFILE_FLAGS_macros-only := --no-default-features --features macros
+PROFILE_FLAGS_polars-only := --no-default-features --features polars
 CARGO_FLAGS ?= --all-targets
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
@@ -126,8 +137,7 @@ TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,tes
 # routes below share one script that records the built binary and runs it. The
 # root suite reaches the same record through `tests/cardinality_probe_ui.rs`.
 UI_GATE_MANIFEST ?= tools/gates/cardinality-ui/Cargo.toml
-UI_GATE_SCRIPT ?= scripts/cardinality_ui_gate.py
-# The script composes RUSTFLAGS from these flags, so they are passed by value.
+UI_GATE_SCRIPT ?= scripts/cardinality_ui_gate.py# The script composes RUSTFLAGS from these flags, so they are passed by value.
 # An assigned RUSTFLAGS here would replace the caller's value instead.
 UI_GATE_ENVIRONMENT = DEV_RUST_FLAGS="$(DEV_RUST_FLAGS)"
 PYTHON ?= python3
@@ -172,6 +182,8 @@ test: prepare-ui-gate ## Run tests with warnings treated as errors
 		case "$$profile" in \
 			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
 			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
 		esac; \
 		$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $$flags $(BUILD_JOBS); \
 		$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" \
@@ -342,6 +354,8 @@ lint-clippy: check-build-tools ## Run rustdoc, then Clippy for every gate profil
 		case "$$profile" in \
 			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
 			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
 		esac; \
 		RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
 			$(CARGO) clippy $(CARGO_FLAGS) $$flags -- $(RUST_FLAGS); \
@@ -391,6 +405,8 @@ lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo def
 		case "$$profile" in \
 			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
 			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
 		esac; \
 		$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" \
 			DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" \
@@ -406,6 +422,8 @@ typecheck: check-build-tools ## Type-check every gate profile without building
 		case "$$profile" in \
 			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
 			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
 		esac; \
 		RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
 			$(CARGO) check $(CARGO_FLAGS) $$flags; \

@@ -26,9 +26,10 @@ const FORBIDDEN_PREFIXES: &[&str] = &["polars", "glam", "kani", "verus", "vstd"]
 /// The fixture is compared with the same artefact `tests/build_profiles.rs`
 /// owns rather than a second copy, so the two routes cannot drift: `insta`
 /// names a snapshot after the module path that asserts it, which is why the
-/// file carries the `build_profiles__rendered_native__` prefix.
-const NATIVE_ONLY_SNAPSHOT: &str =
-    "tests/snapshots/build_profiles__rendered_native__native_only.snap";
+/// file carries the `build_profiles__rendered__` prefix. The rendering tests
+/// share one `rendered` module — one `cfg`-gated test per profile — so the
+/// prefix no longer names the profile; the snapshot's own name does.
+const NATIVE_ONLY_SNAPSHOT: &str = "tests/snapshots/build_profiles__rendered__native_only.snap";
 
 /// The fixture's manifest, resolved from the repository root Cargo sets.
 fn fixture_manifest() -> PathBuf {
