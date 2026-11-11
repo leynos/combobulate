@@ -27,6 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from git_fixtures import run_git
+
 from docs_validation.trust_audit import (
     TrustAuditError,
     audit_bound_tree,
@@ -249,6 +251,61 @@ class ModuleResolution(unittest.TestCase):
                           for entry in audit_tree(self.root, ['src/lib.rs'])],
                          [('src/elsewhere.rs', ['should_panic'])],
                          'the audit must read the file the crate compiles, not the bare name')
+
+    def test_an_inline_module_path_attribute_replaces_its_directory(self):
+        """Resolve a bare ``mod x;`` against the enclosing module's own ``#[path]``.
+
+        Rust substitutes the attribute value for the directory the inline module
+        would have occupied, so ``#[path = "thread_files"] mod thread { mod
+        local; }`` compiles ``thread_files/local.rs``. Searching ``thread/local.rs``
+        finds a decoy when one exists and reports a clean scan of code the crate
+        never compiles, while the real module goes unaudited.
+        """
+        self._write('src/lib.rs', '#[path = "thread_files"]\nmod thread {\n    mod local;\n}\n')
+        self._write('src/thread_files/local.rs', 'fn g() { kani::assume(x); }')
+        self._write('src/thread/local.rs', 'fn decoy() { kani::stub(a, b); }')
+        self.assertEqual([(entry.path, [item.item for item in entry.items])
+                          for entry in audit_tree(self.root, ['src/lib.rs'])],
+                         [('src/thread_files/local.rs', ['assume'])],
+                         'an inline module #[path] must replace its directory component')
+
+    def test_an_inline_path_attribute_composes_with_a_non_root_file(self):
+        """Compose the file's own module directory with an inline ``#[path]``.
+
+        ``src/plain.rs`` declaring the annotated inline module is a non-mod-rs
+        file, so its module directory comes first and the attribute follows:
+        the compiled file is ``src/plain/thread_files/local.rs``. This is the
+        same composition the existing decoy case pins for a bare inline name,
+        applied one rule further out.
+        """
+        self._write('src/lib.rs', 'mod plain;')
+        self._write('src/plain.rs', '#[path = "thread_files"]\nmod thread {\n    mod local;\n}\n')
+        self._write('src/plain/thread_files/local.rs', 'fn g() { kani::assume(x); }')
+        for decoy in ('src/thread_files/local.rs', 'src/plain/thread/local.rs',
+                      'src/plain/local.rs'):
+            self._write(decoy, 'fn decoy() { kani::stub(a, b); }')
+        self.assertEqual([(entry.path, [item.item for item in entry.items])
+                          for entry in audit_tree(self.root, ['src/lib.rs'])],
+                         [('src/plain/thread_files/local.rs', ['assume'])],
+                         'a non-mod-rs file must contribute its module directory before '
+                         'the inline #[path] value')
+
+    def test_a_path_attribute_inside_a_path_annotated_inline_module(self):
+        """Let the innermost ``#[path]`` win, as Rust's own example does.
+
+        The Reference's combined example is ``#[path = "thread_files"] mod
+        thread { #[path = "tls.rs"] mod local_data; }``, which loads
+        ``thread_files/tls.rs``. The inner attribute names a file relative to
+        the outer module's directory rather than replacing it.
+        """
+        self._write('src/lib.rs', '#[path = "thread_files"]\nmod thread {\n'
+                                  '    #[path = "tls.rs"]\n    mod local_data;\n}\n')
+        self._write('src/thread_files/tls.rs', 'fn g() { kani::should_panic(); }')
+        self._write('src/tls.rs', 'fn decoy() { kani::stub(a, b); }')
+        self.assertEqual([(entry.path, [item.item for item in entry.items])
+                          for entry in audit_tree(self.root, ['src/lib.rs'])],
+                         [('src/thread_files/tls.rs', ['should_panic'])],
+                         'an inner #[path] must resolve beneath the inline module directory')
 
     def test_driver_order_does_not_change_the_result(self):
         """Report the same audit whatever order the drivers arrive in."""
@@ -476,12 +533,18 @@ class BoundAuditStopsAtTheVerifiedSet(unittest.TestCase):
     so a local edit to a child module could change the item multiset a record is
     matched against. Refusing an unbound child is the same policy one level
     down: the walk may not leave the set it was handed.
+
+    The scratch tree is a real Git repository because ownership is answered from
+    the index as well as the working tree. A manifest deleted from disk still
+    owns its sources, and only the index can say so; a directory Git cannot
+    answer for is a refusal rather than a guess.
     """
 
     def setUp(self):
         """Create a scratch crate whose ``lib.rs`` compiles one child module."""
         self._directory = tempfile.TemporaryDirectory()
         self.root = Path(self._directory.name)
+        run_git(self.root, 'init', '-q')
         self._write('src/lib.rs', 'mod child;\n')
         self._write('src/child.rs', 'fn f() { kani::assume(x); }')
 
@@ -561,11 +624,68 @@ class BoundAuditStopsAtTheVerifiedSet(unittest.TestCase):
         DL-17 treats an unqualified vocabulary word as code only when a file
         imports the vocabulary, so no crate owning the file means no macro can
         be expanding it. Refusing here would reject a bound set for a fact that
-        has a true answer.
+        has a true answer. Git is tracked here, because "no manifest exists" and
+        "a manifest was not bound" are the same picture when Git cannot say
+        which manifests the repository holds.
         """
         bound = {'src/lib.rs': b'mod child;\n',
                  'src/child.rs': b'let s = r#"kani::assume"#;'}
         self.assertEqual(audit_bound_tree(self.root, bound), (),
                          'a source no crate compiles carries data, not code')
+
+    def test_a_removed_nested_manifest_does_not_promote_the_workspace_root(self):
+        """Refuse rather than answer from a shallower crate the source never had.
+
+        The failure CodeRabbit reported is one of *ownership*, not of reading
+        bytes: a nested ``Cargo.toml`` deleted from disk left the search to find
+        the workspace root, whose ordinary-crate answer switched literal
+        scanning off for a source that is byte-for-byte bound to a digest. The
+        trust item inside that literal then vanished from an audit that
+        succeeded. Git still tracks the removed manifest, so the walk refuses
+        and names the manifest the author has to deal with.
+
+        The nested manifest is committed and then removed from the working tree
+        without staging the deletion, which is exactly the state a half-finished
+        refactor leaves behind.
+        """
+        nested = 'crates/macros/Cargo.toml'
+        self._write('Cargo.toml', '[package]\nname = "root"\n')
+        self._write(nested, '[lib]\nproc-macro = true\n')
+        run_git(self.root, 'add', '-A')
+        run_git(self.root, 'commit', '-q', '-m', 'Add the nested proc-macro crate')
+        (self.root / nested).unlink()
+        source = 'crates/macros/src/lib.rs'
+        literal = 'let s = r#"kani::assume"#;'
+        self._write(source, literal)
+        bound = {'Cargo.toml': b'[package]\nname = "root"\n',
+                 source: literal.encode('utf-8')}
+        with self.assertRaises(TrustAuditError) as raised:
+            audit_bound_tree(self.root, bound)
+        message = str(raised.exception)
+        self.assertIn(nested, message,
+                      'the refusal must name the manifest that owns the source')
+        self.assertIn('cannot be verified', message,
+                      'the refusal must say which decision it could not take')
+
+    def test_a_bound_walk_that_cannot_read_the_index_refuses(self):
+        """Refuse when Git cannot report the manifests, rather than guessing.
+
+        A walk outside a repository cannot tell "no crate owns this source" from
+        "a manifest the record never bound". Those answer the literal-scanning
+        question in opposite directions, and the unsound one is silent, so the
+        audit stops and says so.
+        """
+        # A directory of its own rather than a subdirectory of the scratch
+        # root: that root is a repository, and Git answers for everything under
+        # it, so a subdirectory would prove nothing about an unreachable index.
+        with tempfile.TemporaryDirectory() as directory:
+            outside = Path(directory)
+            (outside / 'src').mkdir()
+            (outside / 'src/lib.rs').write_text('let s = r#"kani::assume"#;', encoding='utf-8')
+            bound = {'src/lib.rs': b'let s = r#"kani::assume"#;'}
+            with self.assertRaises(TrustAuditError) as raised:
+                audit_bound_tree(outside, bound)
+        self.assertIn('Git cannot report the manifests', str(raised.exception),
+                      'the refusal must attribute the gap to Git, not to the source')
 
 

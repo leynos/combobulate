@@ -85,6 +85,23 @@ class TrustItem:
 
 
 @dataclass(frozen=True, slots=True)
+class InlineModule:
+    """One inline ``mod name { … }`` an enclosing declaration sits inside.
+
+    ``path`` is the module's own ``#[path = "…"]`` value, when it has one. Rust
+    replaces that module's directory component with the attribute's value, so a
+    bare ``mod x;`` inside ``#[path = "thread_files"] mod thread { … }``
+    compiles ``thread_files/x.rs`` and not ``thread/x.rs``. Keeping the value on
+    the enclosing entry — rather than folding it into a resolved directory —
+    leaves the resolution to the caller, which is the only layer that knows the
+    declaring file.
+    """
+
+    name: str
+    path: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class ModuleReference:
     """A module file this source compiles, for the caller to resolve and scan.
 
@@ -92,18 +109,20 @@ class ModuleReference:
     otherwise the caller derives it from ``name`` by Rust's usual search.
 
     ``enclosing`` lists the inline modules the declaration sits inside, outermost
-    first. It is what separates ``mod nested { mod trusted; }`` in ``src/lib.rs``
-    — which compiles ``src/nested/trusted.rs`` — from a top-level
-    ``mod trusted;``, which compiles ``src/trusted.rs``. Dropping it audits the
-    wrong file, and where the wrong file exists as a decoy the audit reports a
-    clean scan of code the crate never compiles.
+    first. Each entry keeps the inline module's own ``#[path]`` value, because
+    that attribute replaces the module's directory component: it is what
+    separates ``mod nested { mod trusted; }`` in ``src/lib.rs`` — which compiles
+    ``src/nested/trusted.rs`` — from a top-level ``mod trusted;``, which
+    compiles ``src/trusted.rs``. Dropping the chain audits the wrong file, and
+    where the wrong file exists as a decoy the audit reports a clean scan of
+    code the crate never compiles.
     """
 
     name: str
     path: str | None
     line: int
     column: int
-    enclosing: tuple[str, ...] = ()
+    enclosing: tuple[InlineModule, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -395,21 +414,24 @@ class _InlineModules:
 
     def __init__(self, tokens: tuple[Token, ...]) -> None:
         """Pair every inline module's braces and record each token's chain."""
-        self._chains: list[tuple[str, ...]] = [()] * len(tokens)
-        stack: list[tuple[str, int]] = []
+        self._chains: list[tuple[InlineModule, ...]] = [()] * len(tokens)
+        stack: list[tuple[InlineModule, int]] = []
+        spans = dict(attribute_spans(tokens))
         for index, token in enumerate(tokens):
             # A closing brace belongs to the module that *holds* the inline one,
             # so it is popped before the chain is recorded for that position.
             if stack and index == stack[-1][1]:
                 stack.pop()
-            self._chains[index] = tuple(name for name, _ in stack)
+            self._chains[index] = tuple(module for module, _ in stack)
             if (token.kind is Kind.IDENT and token.text == 'mod'
                     and index + 2 < len(tokens) and tokens[index + 1].kind is Kind.IDENT
                     and tokens[index + 2].text == '{'):
-                stack.append((tokens[index + 1].text, matching(tokens, index + 2, '{', '}')))
+                module = InlineModule(tokens[index + 1].text,
+                                      _path_attribute(tokens, spans, index))
+                stack.append((module, matching(tokens, index + 2, '{', '}')))
 
-    def enclosing(self, index: int) -> tuple[str, ...]:
-        """Return the inline module names enclosing the token at ``index``."""
+    def enclosing(self, index: int) -> tuple[InlineModule, ...]:
+        """Return the inline modules enclosing the token at ``index``."""
         return self._chains[index]
 
 

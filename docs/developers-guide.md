@@ -571,7 +571,14 @@ lives only in a review comment is not a boundary.
 - `trust_audit` serves the evidence gate's I/O shell and the `trust-audit`
   design check only. It reads the item shapes those two consumers need and is
   not a general Rust parser: adding a caller means deciding whether it needs
-  the scanner or something else.
+  the scanner or something else. Within the package, `manifest` owns crate
+  ownership: which `Cargo.toml` compiles a source, and whether that crate
+  expands literals. A bound walk takes ownership from the manifests its caller
+  verified plus the paths Git tracks, never from working-tree presence, because
+  a nested manifest deleted but not yet staged would otherwise let the
+  workspace root answer for a crate it does not own and switch literal scanning
+  off silently. When ownership cannot be established the walk refuses rather
+  than guessing, and names the manifest to bind.
 - `kani_log` serves the evidence gate's I/O shell only. Its decision function
   is pure — it takes the parsed facts and the manifest and returns the
   admission facts — so it must not read files, and a rule that needs another

@@ -11,12 +11,16 @@ The package is split by what each part needs to know:
   literals. It is the only module that must understand Rust's syntax.
 - :mod:`~docs_validation.trust_audit.matcher` applies DL-17's matching rule to
   the lexed tokens, deciding which occurrences of a vocabulary word are trust.
+- :mod:`~docs_validation.trust_audit.manifest` decides which crate owns a
+  source and whether that crate expands literals, taking ownership from the
+  manifests the audit may trust rather than from the working tree.
 - :mod:`~docs_validation.trust_audit.command` resolves module files against a
   repository root and renders the audit in the evidence schema's shape.
 
 The split is deliberate: the rule can be tested over token streams with no
-filesystem, and the filesystem policy can be tested with no Rust grammar beyond
-``mod`` declarations.
+filesystem, the ownership rule can be tested with no Rust grammar, and the
+filesystem policy can be tested with no Rust grammar beyond ``mod``
+declarations.
 
 Examples
 --------
@@ -35,10 +39,17 @@ from .command import (
     scan_tree,
 )
 from .lexer import Kind, Token, TrustAuditError, literal_body, tokenize
+from .manifest import (
+    MANIFEST_NAME,
+    ManifestOwnership,
+    owning_manifest,
+    tracked_manifests,
+)
 from .matcher import (
     KANI_VOCABULARY,
     VERUS_VOCABULARY,
     VOCABULARY,
+    InlineModule,
     ModuleReference,
     ScanResult,
     TrustItem,
@@ -47,9 +58,11 @@ from .matcher import (
 from .use_tree import alias_bindings, statement_end
 
 __all__ = [
-    'KANI_VOCABULARY', 'VERUS_VOCABULARY', 'VOCABULARY', 'AuditedFile', 'Kind',
+    'KANI_VOCABULARY', 'MANIFEST_NAME', 'VERUS_VOCABULARY', 'VOCABULARY', 'AuditedFile',
+    'InlineModule', 'Kind', 'ManifestOwnership',
     'ModuleReference', 'ScanResult', 'Token', 'TrustAuditError', 'TrustItem',
     'alias_bindings', 'audit_bound_tree', 'audit_tree', 'is_procedural_macro_crate', 'items_of',
-    'literal_body', 'resolve_repository_path', 'scan', 'scan_tree',
+    'literal_body', 'owning_manifest', 'resolve_repository_path', 'scan', 'scan_tree',
+    'tracked_manifests',
     'statement_end', 'tokenize',
 ]

@@ -22,23 +22,20 @@ result with the record.
 """
 from __future__ import annotations
 
-import tomllib
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from .lexer import TrustAuditError
-from .matcher import ModuleReference, ScanResult, TrustItem, scan
+from .manifest import (
+    is_procedural_macro_crate,
+    is_procedural_macro_crate_text,
+    owning_manifest,
+    tracked_manifests,
+)
+from .matcher import InlineModule, ModuleReference, ScanResult, TrustItem, scan
 
 RUST_SUFFIX = '.rs'
-# A proc-macro crate can turn a literal into code, so its literals are scanned.
-# The manifest is parsed rather than pattern-matched because TOML gives an
-# author many spellings of one declaration: `proc-macro=true`, a comment after
-# the value, and the dotted `lib.proc-macro = true` all declare the same crate.
-# Reading the text instead would audit any of them as an ordinary library and
-# silently stop scanning the tokens that crate's macros emit.
-PROCEDURAL_MACRO_TABLE = 'lib'
-PROCEDURAL_MACRO_KEY = 'proc-macro'
 # The file a bare `mod x;` resolves to inside a `src/`-style module.
 MODULE_FILE_CANDIDATES = ('{directory}/{name}{suffix}', '{directory}/{name}/mod{suffix}')
 # The stems that own their directory's children directly rather than a
@@ -134,13 +131,16 @@ def _walk(root: Path, drivers: Iterable[str],
     ``bound`` of None is the unconstrained walk over a checkout. A mapping is
     the bound walk: every file visited must appear in it.
     """
+    # One index query per walk: every file is asked the same question, and a
+    # shell-out per source would be paid for every module in the tree.
+    tracked = None if bound is None else tracked_manifests(root)
     scanned: dict[str, tuple[TrustItem, ...]] = {}
     pending = list(dict.fromkeys(drivers))
     while pending:
         relative = PurePosixPath(pending.pop().replace('\\', '/')).as_posix()
         if relative in scanned:
             continue
-        result = _scan_source(root, relative, bound)
+        result = _scan_source(root, relative, bound, tracked)
         scanned[relative] = result.items
         pending.extend(_module_targets(root, relative, result.modules))
     return tuple(AuditedFile(path, scanned[path])
@@ -206,76 +206,6 @@ def scan_tree(root: Path, relative: str, procedural_macro: bool = False) -> Scan
     return scan(text, procedural_macro=procedural_macro)
 
 
-def is_procedural_macro_crate(manifest: Path) -> bool:
-    """Report whether a crate's manifest declares a proc-macro target.
-
-    The manifest is parsed as TOML and ``[lib] proc-macro`` is read from the
-    document, rather than the directive being searched for in the text. TOML
-    lets the same declaration be written with any spacing, with a trailing
-    comment, or dotted as ``lib.proc-macro = true``; matching the text would
-    read the last two as ordinary libraries. A false negative here is the
-    unsound direction: the crate's literals are what its macros emit, so their
-    vocabulary would go unreported.
-
-    A manifest that cannot be read or parsed is *not* procedural, for the reason
-    given at :func:`is_procedural_macro_crate_text`.
-
-    Parameters
-    ----------
-    manifest
-        Path to a ``Cargo.toml``.
-
-    Returns
-    -------
-    bool
-        True when the manifest declares ``[lib] proc-macro = true``.
-
-    Examples
-    --------
-    A manifest containing ``[lib]`` and ``proc-macro = true`` returns True,
-    including when the value carries a comment; an ordinary library manifest,
-    a commented-out directive, and a missing file all return False.
-    """
-    try:
-        text = manifest.read_text(encoding='utf-8')
-    except (OSError, UnicodeDecodeError):
-        return False
-    return is_procedural_macro_crate_text(text)
-
-
-def is_procedural_macro_crate_text(text: str) -> bool:
-    """Report whether manifest *text* declares a proc-macro target.
-
-    This is the decision :func:`is_procedural_macro_crate` makes once it has
-    read a file, exposed separately so the bound walk can decide from the bytes
-    a record's digest vouched for rather than re-opening the path. A manifest
-    that does not parse is not procedural, for the reason given there.
-
-    Parameters
-    ----------
-    text
-        The manifest's contents, as TOML.
-
-    Returns
-    -------
-    bool
-        True when the document declares ``[lib] proc-macro = true``.
-
-    Examples
-    --------
-    >>> is_procedural_macro_crate_text('[lib]\\nproc-macro = true\\n')
-    True
-    >>> is_procedural_macro_crate_text('[package]\\nname = "a"\\n')
-    False
-    """
-    try:
-        document = tomllib.loads(text)
-    except tomllib.TOMLDecodeError:
-        return False
-    library = document.get(PROCEDURAL_MACRO_TABLE)
-    return isinstance(library, Mapping) and library.get(PROCEDURAL_MACRO_KEY) is True
-
-
 def resolve_repository_path(root: Path, relative: str) -> Path:
     """Resolve a repository-relative path, refusing anything outside the root.
 
@@ -313,19 +243,40 @@ def resolve_repository_path(root: Path, relative: str) -> Path:
     return resolved
 
 
-def _scan_file(root: Path, relative: str, bound: Mapping[str, bytes] | None) -> ScanResult:
-    """Scan one file, choosing proc-macro mode from the crate that owns it."""
-    return scan_tree(root, relative, _is_procedural(root, relative, bound))
+def _is_procedural(root: Path, relative: str, bound: Mapping[str, bytes] | None,
+                   tracked: frozenset[str] | None) -> bool:
+    """Report whether the crate owning ``relative`` is a proc-macro crate.
+
+    The decision belongs to :mod:`~docs_validation.trust_audit.manifest`, which
+    takes ownership from the manifests that exist for *this* audit rather than
+    from the working tree: a nested manifest deleted from disk still owns its
+    sources, and letting it disappear would hand them to the workspace root,
+    whose ordinary-crate answer would silently switch literal scanning off.
+
+    A source no crate compiles carries data, not code, so it is not procedural.
+    A bound walk that cannot establish ownership refuses instead, because the
+    two answers — "no crate" and "an unbound crate" — are indistinguishable
+    from verified bytes alone.
+    """
+    ownership = owning_manifest(root, relative, bound, tracked)
+    if ownership is None:
+        return False
+    if ownership.bound is not None:
+        try:
+            return is_procedural_macro_crate_text(ownership.bound.decode('utf-8'))
+        except UnicodeDecodeError as error:
+            raise TrustAuditError(f'{ownership.path} cannot be read: {error}') from error
+    return is_procedural_macro_crate(root / ownership.path)
 
 
-def _scan_source(root: Path, relative: str,
-                 bound: Mapping[str, bytes] | None) -> ScanResult:
+def _scan_source(root: Path, relative: str, bound: Mapping[str, bytes] | None,
+                 tracked: frozenset[str] | None) -> ScanResult:
     """Scan one source, from the verified bytes when a bound set is supplied."""
     # Containment is checked on every path, bound or not: a caller's map is
     # data, and an absolute or escaping key would otherwise be scanned.
     resolve_repository_path(root, relative)
     if bound is None:
-        return _scan_file(root, relative, None)
+        return scan_tree(root, relative, _is_procedural(root, relative, None, None))
     if relative not in bound:
         raise TrustAuditError(
             f'{relative} is compiled by a bound source but is not itself bound to a digest')
@@ -333,59 +284,7 @@ def _scan_source(root: Path, relative: str,
         text = bound[relative].decode('utf-8')
     except UnicodeDecodeError as error:
         raise TrustAuditError(f'{relative} cannot be read: {error}') from error
-    return scan(text, procedural_macro=_is_procedural(root, relative, bound))
-
-
-def _is_procedural(root: Path, relative: str,
-                   bound: Mapping[str, bytes] | None) -> bool:
-    """Report whether the crate owning ``relative`` is a proc-macro crate.
-
-    A bound walk may not answer this from the working tree. The manifest decides
-    whether the file's string literals are *code* — a proc-macro crate's literals
-    are the tokens its macros emit — so reading it from disk lets a local edit
-    turn literal scanning off and hide a trust item inside a source the record
-    did bind to a digest. When the owning manifest is in the bound set its
-    verified bytes decide, and when there is no owning manifest the file is
-    compiled by no crate, so the answer is False and no bytes were trusted.
-
-    A manifest that exists but is unbound is refused rather than read. That case
-    has no honest answer: reading it trusts unverified bytes, and guessing
-    either way invents or suppresses items from a claim nobody established.
-    The refusal names the manifest, because the repair — binding it — belongs to
-    whoever wrote the manifest's source list.
-    """
-    manifest = _manifest_for(root, relative)
-    if manifest is None:
-        return False
-    if bound is None:
-        return is_procedural_macro_crate(manifest)
-    owned = manifest.relative_to(root).as_posix()
-    if owned not in bound:
-        raise TrustAuditError(
-            f'{relative}: its crate manifest {owned} is not bound to a digest, so whether '
-            f'the crate expands literals cannot be verified')
-    try:
-        text = bound[owned].decode('utf-8')
-    except UnicodeDecodeError as error:
-        raise TrustAuditError(f'{owned} cannot be read: {error}') from error
-    return is_procedural_macro_crate_text(text)
-
-
-def _manifest_for(root: Path, relative: str) -> Path | None:
-    """Find the nearest ``Cargo.toml`` above a source file, if one exists.
-
-    ``None`` is the honest answer for a source no crate compiles. Returning the
-    root's manifest instead would attribute a stranger's data to a crate that
-    does not own the file, and would erase the distinction between "no crate"
-    and "a crate whose manifest happens to be the root's".
-    """
-    for directory in (root / relative).parents:
-        candidate = directory / 'Cargo.toml'
-        if candidate.is_file():
-            return candidate
-        if directory == root:
-            break
-    return None
+    return scan(text, procedural_macro=_is_procedural(root, relative, bound, tracked))
 
 
 def _module_targets(root: Path, relative: str,
@@ -441,7 +340,8 @@ def _path_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
     directory: the mod-rs file's directory plus the inline names, preceded by
     the file's own module directory when it is not a mod-rs file. That is
     exactly :func:`_module_directory` followed by the enclosing chain, the rule
-    :func:`_search_candidates` already applies to a bare ``mod name;``.
+    :func:`_search_candidates` already applies to a bare ``mod name;`` — with
+    each inline module's own ``#[path]`` substituted for its name.
 
     Ignoring the chain is not a refusal a caller can notice: the declaration
     resolves to some file either way, so where the shallow path exists as a
@@ -450,7 +350,7 @@ def _path_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
     """
     if not module.enclosing:
         return ((PurePosixPath(relative).parent / str(module.path)).as_posix(),)
-    directory = PurePosixPath(_module_directory(relative), *module.enclosing)
+    directory = _enclosing_directory(relative, module.enclosing)
     return ((directory / str(module.path)).as_posix(),)
 
 
@@ -469,13 +369,35 @@ def _search_candidates(relative: str, module: ModuleReference) -> tuple[str, ...
 
     The inline modules' contribution: a ``mod x;`` written inside
     ``mod nested { … }`` is looked for under ``nested/``, because the inline
-    module is a module in its own right. Both rules compose, and the inline
-    chain comes after the file's own directory so the nearer scope is tried
-    first.
+    module is a module in its own right. An inline module carrying
+    ``#[path = "…"]`` contributes that value instead of its name, because the
+    attribute replaces the directory component: a bare ``mod x;`` inside
+    ``#[path = "thread_files"] mod thread { … }`` compiles
+    ``thread_files/x.rs``, not ``thread/x.rs``. Both rules compose, and the
+    inline chain comes after the file's own directory so the nearer scope is
+    tried first.
     """
-    directory = PurePosixPath(_module_directory(relative), *module.enclosing).as_posix()
+    directory = _enclosing_directory(relative, module.enclosing).as_posix()
     return tuple(template.format(directory=directory, name=module.name, suffix=RUST_SUFFIX)
                  for template in MODULE_FILE_CANDIDATES)
+
+
+def _enclosing_directory(relative: str, enclosing: Iterable[InlineModule]) -> PurePosixPath:
+    """Return the directory an inline chain contributes beneath the declaring file.
+
+    Each entry contributes one component: the inline module's own ``#[path]``
+    value when it has one, otherwise its name. Rust's rule is that the attribute
+    *replaces* the directory the inline module would have occupied, which is why
+    the value is substituted rather than appended — appending would search
+    ``thread/thread_files/x.rs`` for a file the crate loads from
+    ``thread_files/x.rs``. A ``#[path]`` with more than one component is applied
+    as written, matching Rust, which treats the value as a relative path.
+    """
+    components: list[str] = [_module_directory(relative)]
+    for inline in enclosing:
+        components.extend(PurePosixPath(inline.path).parts if inline.path is not None
+                          else (inline.name,))
+    return PurePosixPath(*components)
 
 
 def _module_directory(relative: str) -> str:

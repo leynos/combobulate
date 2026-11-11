@@ -185,8 +185,22 @@ class EnclosingInlineModules(unittest.TestCase):
     def test_an_inline_ancestor_is_carried_outermost_first(self):
         """Require the whole chain, ordered as the paths are nested."""
         reference, = scan('mod outer { mod inner { mod leaf; } }').modules
-        self.assertEqual(reference.enclosing, ('outer', 'inner'),
+        self.assertEqual([(module.name, module.path) for module in reference.enclosing],
+                         [('outer', None), ('inner', None)],
                          'every enclosing inline module must be reported, outermost first')
+
+    def test_an_inline_module_keeps_its_own_path_attribute(self):
+        """Carry the inline module's ``#[path]``, because it replaces its directory.
+
+        ``#[path = "thread_files"] mod thread { mod local; }`` compiles
+        ``thread_files/local.rs``, not ``thread/local.rs``. The value has to
+        travel with the enclosing entry so the caller can substitute it; the
+        scanner does not know the declaring file, so it cannot resolve it here.
+        """
+        reference, = scan('#[path = "thread_files"] mod thread { mod local; }').modules
+        self.assertEqual([(module.name, module.path) for module in reference.enclosing],
+                         [('thread', 'thread_files')],
+                         'an inline module carrying #[path] must report the attribute value')
 
     def test_a_top_level_declaration_carries_no_ancestor(self):
         """Require the empty chain, so the plain search is unchanged."""
@@ -208,7 +222,9 @@ class EnclosingInlineModules(unittest.TestCase):
     def test_a_sibling_inline_module_does_not_nest(self):
         """Require a closed inline module to be popped before the next opens."""
         first, second = scan('mod a { mod x; }\nmod b { mod c; }').modules
-        self.assertEqual((first.enclosing, second.enclosing), (('a',), ('b',)),
+        self.assertEqual(([(module.name, module.path) for module in first.enclosing],
+                          [(module.name, module.path) for module in second.enclosing]),
+                         ([('a', None)], [('b', None)]),
                          'a sibling inline module must not become an ancestor')
 
 
