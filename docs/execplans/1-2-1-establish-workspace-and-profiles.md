@@ -718,8 +718,9 @@ committed together with its Green change.
   `scripts/docs_validation/preregistration.py`. Impact: DL-14 changed the
   workload to every required job, so the checker now reads one `RequiredJob`
   per unconditioned job and the calibration check still reads the registered
-  `ci-build-test` record, which is the evidence behind the 220 s threshold. No
-  source digest is bound by the control: source identity is Git's job.
+  `ci-build-test` record, which records the 220 s calibration p90 that set the
+  registered eight-minute budget. No source digest is bound by the control:
+  source identity is Git's job.
 - Observation: hosted CI never runs `make test`; its test step is the shared
   `generate-coverage` action with default features. Evidence:
   `.github/workflows/ci.yml` lines 105-126. Impact: profile checks need their

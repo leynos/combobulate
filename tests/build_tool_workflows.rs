@@ -183,6 +183,35 @@ fn a_global_option_value_is_not_read_as_the_subcommand() {
     }
 }
 
+/// An option's value must not be accepted merely because it looks like a
+/// subcommand.
+///
+/// The allowlist alone cannot settle `cargo --config build "$SUBCOMMAND"`:
+/// `build` is a real non-suite subcommand *and* a plausible value for
+/// `--config`, so checking only that word accepts the command while the
+/// expansion in the real subcommand position goes unread. The classifier
+/// therefore refuses a candidate that follows a bare option, which is what
+/// keeps `$SUBCOMMAND` from naming a suite unseen.
+///
+/// A `--name=value` option carries its own value, so the word after it is
+/// genuinely the subcommand and stays resolvable.
+#[test]
+fn an_option_value_that_looks_like_a_subcommand_stays_unresolved() {
+    for command in [
+        "cargo --config build \"$SUBCOMMAND\"",
+        "cargo --manifest-path build \"$SUBCOMMAND\"",
+    ] {
+        let source = format!(
+            "jobs:\n  suite:\n    runs-on: ubuntu-latest\n    steps:\n      - run: {command}\n"
+        );
+        let document = workflow(&source).expect("parse an ambiguous value fixture");
+        assert!(
+            workflow_violations(&[("ambiguous.yml".to_owned(), document)]).is_err(),
+            "an option's value must not stand in for the subcommand: {command}"
+        );
+    }
+}
+
 #[test]
 fn rejects_ineffective_installers_and_unprovable_workflows() {
     for install in [

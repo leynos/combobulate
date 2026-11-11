@@ -104,21 +104,48 @@ fn cargo_line_reaches_suite(command: &WorkflowCommand<'_>) -> Read<bool> {
 /// Report whether the command's subcommand is one that runs no test target.
 ///
 /// Cargo's grammar is `cargo [global option]… <subcommand> [argument]…`, so the
-/// first word that is neither an option nor a `+toolchain` override is the
-/// subcommand. If that word is not a literal, or is not a subcommand known to
-/// run no tests, this reports false and the caller treats the command as
-/// unresolved.
+/// first word that is neither an option nor a `+toolchain` override is normally
+/// the subcommand. "Normally" is doing real work in that sentence: Cargo's
+/// global options include ones that take their value as a separate word, so
+/// `cargo --config build "$SUBCOMMAND"` puts the config file's name exactly
+/// where the subcommand would be. Reading `build` there and accepting it as a
+/// non-suite subcommand would let `$SUBCOMMAND` expand to `test` unseen.
+///
+/// A bare option immediately before the candidate is therefore treated as
+/// possibly consuming it. Where that happens the position is ambiguous and this
+/// reports false, so the caller treats the command as unresolved. An option
+/// spelled `--name=value` cannot consume the next word and does not count.
+///
+/// If the candidate word is not a literal, or is not a subcommand known to run
+/// no tests, this also reports false.
 fn cargo_subcommand_runs_no_tests(arguments: &[&str]) -> bool {
     /// Subcommands that compile, fetch, inspect or install, but never run a suite.
     const NON_SUITE: &[&str] = &[
         "binstall", "build", "check", "clean", "clippy", "doc", "fetch", "install", "metadata",
         "package", "publish", "tree", "update",
     ];
-    arguments
+    let Some((index, candidate)) = arguments
         .iter()
-        .find(|word| !word.starts_with('-') && !word.starts_with('+'))
-        .is_some_and(|subcommand| NON_SUITE.contains(subcommand))
+        .enumerate()
+        .find(|(_, word)| !word.starts_with('-') && !word.starts_with('+'))
+    else {
+        return false;
+    };
+    if let Some(preceding) = index.checked_sub(1).and_then(|at| arguments.get(at))
+        && may_take_a_separate_value(preceding)
+    {
+        return false;
+    }
+    NON_SUITE.contains(candidate)
 }
+
+/// Report whether a word could be an option whose value is the following word.
+///
+/// A `--name=value` option carries its value already, and a `+toolchain`
+/// override is not an option at all. Everything else beginning with `-` may be
+/// a flag or may be waiting for its value, and this classifier has no option
+/// table to tell them apart.
+fn may_take_a_separate_value(word: &str) -> bool { word.starts_with('-') && !word.contains('=') }
 
 /// Recognize suite subcommands even after a toolchain or Cargo option.
 fn cargo_arguments_reach_suite(arguments: &[&str]) -> bool {
