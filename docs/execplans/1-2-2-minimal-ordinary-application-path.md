@@ -261,7 +261,8 @@ The thresholds are:
   proof design, Rust API and ownership, tests and governance tooling, and
   design conformance. Their findings are folded into this revision (see
   `Revision note`).
-- [ ] Draft PR opened for plan review.
+- [x] (2026-11-11) Draft PR opened for plan review:
+  <https://github.com/leynos/combobulate/pull/71>.
 - [ ] User approval of the plan (status becomes `APPROVED`).
 - [ ] EP-M1: specify. SC-12, the `ShapeAgreement` registration, examples and
   the Python model, the ADR-0006 amendment, and the denotation in technical
