@@ -257,8 +257,8 @@ that motivated the addition, so a later reader does not delete the two profiles
 as redundant. Every shipped route before this change turned `macros` and
 `polars` on together or off together: `native-only` has neither and
 `polars-enabled` has both. `src/profile.rs` reads each flag separately with
-`cfg!(feature = ...)`, so a swap of the two — `has_macros` reporting the Polars
-flag and `has_polars` reporting the macro flag — would satisfy both existing
+`cfg!(feature = ...)`, so a swap of the two (`has_macros` reporting the Polars
+flag and `has_polars` reporting the macro flag) would satisfy both existing
 routes. No test could have distinguished a correct implementation from that one.
 
 The repair has three parts. `make` now accepts `GATE_PROFILE=macros-only` and
