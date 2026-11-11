@@ -1141,14 +1141,17 @@ derived once from the same parsed workflow the runner and timeout checks use —
 is passed to `check_ci_measurement` and `verdict`, and every attempt's map must
 name exactly that set. An omitted job is refused rather than read as success:
 the map can only state conclusions that were written, so a record could
-otherwise leave a failed job out and pass on the jobs it did record. The
-calibration check reads the single pre-DL-14 `ci-build-test` workload, because
-that is the record the registered threshold was derived from; it moved to
-`scripts/docs_validation/ci_calibration.py` so `ci_controls.py` keeps one
-contract — what a current record must say — and stays within the file-size
-limit. The original named imports remain re-exported from preregistration for
-focused tests; these helpers are not general GitHub Actions parsers,
-measurement libraries, or repository file APIs.
+otherwise leave a failed job out and pass on the jobs it did record. A job the
+run never created is a separate case and carries its own value, `missing` — the
+schema's, not GitHub's, because GitHub reports nothing for a job it never
+created. Recording it fails AC-07 independently of the p90, and its diagnostic
+names the job. The calibration check reads the single pre-DL-14 `ci-build-test`
+workload, because that is the record the registered threshold was derived from;
+it moved to `scripts/docs_validation/ci_calibration.py` so `ci_controls.py`
+keeps one contract — what a current record must say — and stays within the
+file-size limit. The original named imports remain re-exported from
+preregistration for focused tests; these helpers are not general GitHub Actions
+parsers, measurement libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
 documentation-pack validation. The control register is

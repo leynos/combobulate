@@ -1,7 +1,7 @@
 """Validate AC-07 CI attempt outcomes and their calibration history."""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from math import ceil, isclose
@@ -12,6 +12,18 @@ from .context import require
 # calibration record keeps `ci-build-test`, which is the series it actually
 # measured before the job split; only acceptance records use this id.
 REQUIRED_JOB_WORKLOAD = 'ci-required-jobs'
+
+# The per-job values that mean a required job did not run. GitHub never reports
+# `missing`: a job the run did not create has no conclusion to fetch, so a
+# recorder that could only write GitHub's vocabulary had no way to say what
+# happened. Omitting the key instead is refused as a malformed record, which
+# would leave the one honest case — the job genuinely never existed — with no
+# legal encoding. So `missing` is this schema's own value, and AC-07's rule
+# that a missing required job fails the control is what makes it a failure
+# rather than an absence of evidence.
+MISSING_JOB_CONCLUSION = 'missing'
+
+SUCCESSFUL_JOB_CONCLUSION = 'success'
 
 OUTCOME_VERDICTS = {
     'pass': 'pass', 'fail': 'fail', 'budget-exceeded': 'fail', 'resource-exhausted': 'fail',
@@ -81,6 +93,12 @@ def check_ci_measurement(
         would silently skip the completeness rule: the caller that forgot it
         would be the one whose record passes unchecked.
 
+    A job the run never created is recorded as
+    :data:`MISSING_JOB_CONCLUSION`, not by leaving its key out. The two cases
+    differ: an absent key is a malformed record, while a job that genuinely did
+    not run is a fact the record must be able to state, and stating it fails
+    AC-07 on its own instead of through the p90.
+
     Returns
     -------
     None
@@ -99,7 +117,8 @@ def check_ci_measurement(
     Examples
     --------
     check_ci_measurement(control, record, frozenset({'build-test'})) rejects an
-    AC-07 timeout marked as passing, and a record that omits a required job.
+    AC-07 timeout marked as passing, a record that omits a required job, and a
+    record whose map marks one ``missing`` while claiming to pass.
     """
     if control['id'] != 'AC-07':
         return
@@ -125,6 +144,12 @@ def _check_recorded_job_names(
     workflow's own set closes that gap from the other side — an extra key is a
     job the workflow does not declare, and a missing key is a job whose result
     the record withholds.
+
+    "Missing key" here means the record is malformed, not that the job did not
+    run. A run that never created a required job states that with
+    :data:`MISSING_JOB_CONCLUSION`, which this rule accepts as a key and the
+    outcome rule then fails. Keeping the two apart is what lets an honest
+    account of a run that skipped a job be written down at all.
 
     Parameters
     ----------
@@ -212,6 +237,16 @@ def _check_ci_measurement_outcome(
 ) -> None:
     """Enforce failure, sample-count, and p90 rules; failures take precedence."""
     failed = f"{record['id']} must fail when a required-job attempt fails, times out, or has no duration"
+    missing_jobs = _missing_required_jobs(summary.attempts)
+    if missing_jobs:
+        # A job the run never created has no conclusion to consult, so it is
+        # not covered by the run's own `conclusion` either. AC-07's registered
+        # decision rule names it separately for that reason, and it fails the
+        # control on its own rather than through the p90 or the longest job.
+        require(OUTCOME_VERDICTS[record['outcome']] == 'fail',
+                f"{record['id']} must fail when a required job was never created in an attempt; "
+                f"missing {missing_jobs}")
+        return
     if any(attempt['conclusion'] != 'success' for attempt in summary.attempts):
         require(OUTCOME_VERDICTS[record['outcome']] == 'fail', failed)
         return
@@ -239,9 +274,37 @@ def _unsuccessful_required_job(attempt: Mapping[str, object]) -> bool:
     pre-DL-14 `ci-build-test` workload measured one job, and the record's
     single ``conclusion`` already states it. The schema requires the map for
     ``ci-required-jobs``, so a current record cannot omit it.
+
+    A ``missing`` job is *not* counted here. Its whole point is that it produced
+    no conclusion, so calling it "did not succeed" would fold a distinct
+    registered failure into the generic one and lose which happened; the caller
+    checks for it first, with its own diagnostic.
     """
     conclusions = attempt.get('required_job_conclusions') or {}
-    return any(conclusion != 'success' for conclusion in conclusions.values())
+    return any(conclusion != SUCCESSFUL_JOB_CONCLUSION
+               and conclusion != MISSING_JOB_CONCLUSION
+               for conclusion in conclusions.values())
+
+
+def _missing_required_jobs(attempts: Iterable[Mapping[str, object]]) -> list[str]:
+    """Name the required jobs that a run never created, in sorted order.
+
+    ``required_job_conclusions`` marks one with :data:`MISSING_JOB_CONCLUSION`.
+    The name list is returned rather than a bool so the diagnostic says which
+    job disappeared: "a required job was never created" is not actionable
+    without knowing which one, and the repair differs per job.
+
+    Examples
+    --------
+    An attempt recording ``{'build-test': 'success', 'polars-lint': 'missing'}``
+    returns ``['polars-lint']``.
+    """
+    return sorted({
+        job
+        for attempt in attempts
+        for job, conclusion in (attempt.get('required_job_conclusions') or {}).items()
+        if conclusion == MISSING_JOB_CONCLUSION
+    })
 
 
 def _check_ci_p90_outcome(

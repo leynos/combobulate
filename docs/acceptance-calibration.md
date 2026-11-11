@@ -67,9 +67,14 @@ than tightening them.
    must name every job the workflow declares, not merely one of them; the
    checker compares it with the workflow's own required set and refuses a
    record that omits a job, since an unlisted failure would otherwise read as a
-   success. The record in `spec/calibration/ci-history.json` predates DL-14 and
-   samples the single `build-test` job instead, which is why its workload is
-   registered as `ci-build-test`.
+   success. A required job the run never created is recorded with the value
+   `missing`, which is the schema's own and not one of GitHub's conclusions:
+   omitting its key is a malformed record, and writing a conclusion nobody
+   observed would misreport the run. Recording `missing` fails AC-07 on its
+   own, independently of the duration percentile. The record in
+   `spec/calibration/ci-history.json` predates DL-14 and samples the single
+   `build-test` job instead, which is why its workload is registered as
+   `ci-build-test`.
 6. Extrapolation factor. The same workload ran on both machines: the design
    checks' `unittest` and pytest suites at commit 398d2f6. Hosted to local
    median ratios were 0.92 (`unittest`: 28.4 s against 30.9 s) and 1.17

@@ -282,6 +282,30 @@ class WorkflowAndCi(unittest.TestCase):
                                msg='a ci-build-test acceptance workload cannot claim AC-07 attempts'):
             RECORD_VALIDATOR.validate(calibration_series)
 
+    def test_a_never_created_job_has_a_legal_per_job_value(self):
+        """Accept ``missing`` per job while still refusing an invented conclusion.
+
+        The completeness rule requires every required job's key, so a run that
+        never created one needs a value the schema allows. Without it the record
+        could only omit the key — which the checker refuses as malformed — or
+        write a GitHub conclusion nobody observed. The value is this schema's
+        own, not part of GitHub's vocabulary, so a test pins that it validates
+        and that a neighbouring non-value does not, which keeps the enum from
+        quietly widening to accept anything.
+        """
+        absent = ci_record('fail', [('success', 60.0)] * 20)
+        for attempt in absent['workloads'][0]['attempts']:
+            attempt['required_job_conclusions']['polars-test'] = 'missing'
+        RECORD_VALIDATOR.validate(absent)
+        check_ci_measurement(CI_CONTROL, absent, REQUIRED_JOBS)
+        self.assertEqual(verdict(CI_CONTROL, [absent], REQUIRED_JOBS), 'fail',
+                         'a record naming a never-created job must fail AC-07')
+
+        invented = copy.deepcopy(absent)
+        invented['workloads'][0]['attempts'][0]['required_job_conclusions']['polars-test'] = 'not-a-conclusion'
+        with self.assertRaises(ValidationError, msg='the per-job vocabulary must stay closed'):
+            RECORD_VALIDATOR.validate(invented)
+
     def test_other_controls_still_require_a_sample(self):
         """Keep ordinary acceptance controls subject to the sample requirement."""
         no_samples = record('pass')

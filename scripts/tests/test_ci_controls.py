@@ -139,6 +139,48 @@ class CiMeasurement(unittest.TestCase):
                                     msg='a per-job map must name every required job'):
             check_ci_measurement(CI_CONTROL, record, REQUIRED_JOBS)
 
+    def test_a_job_the_run_never_created_fails_an_otherwise_passing_window(self) -> None:
+        """Record a never-created required job as ``missing`` and fail AC-07 on it.
+
+        The omission rule leaves this case with no legal encoding unless the
+        schema gains one. A required job that never ran produced no conclusion,
+        so a recorder could either drop its key — which the completeness rule
+        refuses as a malformed record — or write a GitHub conclusion it never
+        observed. ``missing`` is the third option, and it must fail the control
+        by itself: no attempt here has a non-success run conclusion or a
+        non-success job conclusion, and the p90 is well inside budget, so a
+        passing verdict could only come from ignoring the absent job.
+        """
+        record = measurement('pass', [60.0] * 20)
+        record['workloads'][0]['attempts'][3]['required_job_conclusions']['polars-test'] = 'missing'
+        with self.assertRaisesRegex(AssertionError, 'required job was never created',
+                                    msg='a never-created required job must fail AC-07'):
+            check_ci_measurement(CI_CONTROL, record, REQUIRED_JOBS)
+        record['outcome'] = 'fail'
+        check_ci_measurement(CI_CONTROL, record, REQUIRED_JOBS)
+
+    def test_the_missing_job_diagnostic_names_the_job(self) -> None:
+        """Name the absent job in the failure, because the repair differs per job."""
+        record = measurement('inconclusive', [60.0] * 20)
+        record['workloads'][0]['attempts'][0]['required_job_conclusions']['polars-lint'] = 'missing'
+        with self.assertRaisesRegex(AssertionError, r"missing \['polars-lint'\]",
+                                    msg='the diagnostic must name the job that never ran'):
+            check_ci_measurement(CI_CONTROL, record, REQUIRED_JOBS)
+
+    def test_a_missing_job_does_not_read_as_a_generic_failure(self) -> None:
+        """Keep the never-created case out of the ordinary "did not succeed" rule.
+
+        Both verdicts are `fail`, so only the diagnostic separates them. Folding
+        ``missing`` into the generic rule would report a job that never existed
+        as one that ran and failed, which is a different repair.
+        """
+        record = measurement('pass', [60.0] * 20)
+        record['workloads'][0]['attempts'][0]['required_job_conclusions']['build-test'] = 'missing'
+        with self.assertRaises(AssertionError) as raised:
+            check_ci_measurement(CI_CONTROL, record, REQUIRED_JOBS)
+        self.assertNotIn('any required job in an attempt', str(raised.exception),
+                         'a never-created job must not be reported as one that did not succeed')
+
     def test_an_undeclared_job_is_rejected(self) -> None:
         """Refuse a per-job map naming a job the workflow does not declare.
 
