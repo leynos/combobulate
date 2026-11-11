@@ -60,6 +60,68 @@ def test_standalone_entrypoint_has_its_runtime_dependencies():
     ], 'standalone CLI reports the admitted level and reasons'
 
 
+def test_the_standalone_entry_point_admits_a_bounded_kani_record():
+    """Run the PEP 723 entry point for a Kani record and require its level.
+
+    The other bounded-Kani cases drive ``app`` in-process, which proves the
+    gate's decision but not that the shipped script reaches it: an import the
+    entry point never declares, an argument it drops, or a parser it does not
+    register all pass in-process. Ordinary ``tested`` evidence already had this
+    check; bounded admission did not, and it is the path that depends on the
+    log parser and the manifest binding being wired at the executable.
+    """
+    result = subprocess.run(
+        [
+            str(ROOT / 'scripts/check_evidence.py'),
+            '--as-of', '2026-11-11',
+            '--require', 'bounded',
+            *WITH_KANI_BINDINGS,
+            fixture('bounded-kani'),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=180,
+    )
+    assert result.returncode == 0, f'standalone CLI should admit bounded evidence: {result.stderr}'
+    assert result.stdout.splitlines() == [f"{fixture('bounded-kani')}: bounded []"], \
+        'the executable reports the admitted level and no blocking reason'
+    assert result.stderr == '', 'an admitted record produces no refusal on stderr'
+
+
+def test_the_standalone_entry_point_refuses_a_tampered_manifest(tmp_path):
+    """Require the shipped script, not just ``app``, to refuse a rewritten manifest.
+
+    The record is tampered exactly as the in-process case tampers it, so the
+    only difference between the two is the route into the gate. A boundary
+    that re-read or re-resolved the manifest on its way in would admit this
+    record while the in-process case still refused it.
+    """
+    record = json.loads((FIXTURES / 'bounded-kani.json').read_text(encoding='utf-8'))
+    record['result_artefacts'][0]['sha256'] = 'f' * 64
+    tampered = tmp_path / 'tampered.json'
+    tampered.write_text(json.dumps(record), encoding='utf-8')
+
+    result = subprocess.run(
+        [
+            str(ROOT / 'scripts/check_evidence.py'),
+            '--as-of', '2026-11-11',
+            '--require', 'bounded',
+            *WITH_KANI_BINDINGS,
+            str(tampered),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=180,
+    )
+    assert result.returncode == 1, 'a tampered manifest must fail the standalone CLI'
+    assert 'verdict-self-reported' in result.stdout, \
+        'the refused verdict blocks bounded admission'
+    assert 'its digest differs from the one the record binds' in result.stderr, \
+        'the executable names the digest mismatch rather than some other refusal'
+
+
 def test_bounded_kani_record_is_admitted_through_the_command(capsys):
     """Admit a Kani record at `bounded` through the real command, not a hand-built context.
 
