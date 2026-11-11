@@ -182,6 +182,46 @@ class ModuleResolution(unittest.TestCase):
         self.assertEqual(reported, {'src/nested/trusted.rs': ['assume']},
                          'an inline ancestor must direct the child to its own directory')
 
+    def test_a_path_attribute_inside_an_inline_module_resolves_under_it(self):
+        """Resolve ``mod nested { #[path = "…"] mod x; }`` beneath ``nested/``.
+
+        Rust resolves a ``#[path]`` at file scope against the declaring file's
+        own directory, but inside an inline module it resolves against that
+        module's directory. Reading only the file's directory sends the audit to
+        ``src/elsewhere.rs``, which this crate really does contain — as an
+        unrelated module — so the misreading is not a refusal but a clean report
+        of the wrong file, while the module that uses trust goes unread.
+        """
+        self._write('src/lib.rs', 'mod nested { #[path = "elsewhere.rs"] mod trusted; }')
+        self._write('src/nested/elsewhere.rs', 'fn g() { kani::assume(x); }')
+        self._write('src/elsewhere.rs', 'fn decoy() { kani::stub(a, b); }')
+        reported = {entry.path: [item.item for item in entry.items]
+                    for entry in audit_tree(self.root, ['src/lib.rs'])}
+        self.assertEqual(reported, {'src/nested/elsewhere.rs': ['assume']},
+                         'an inline ancestor must direct a #[path] target to its own directory')
+
+    def test_a_path_attribute_in_a_nested_file_resolves_under_its_module_directory(self):
+        """Compose both rules for a ``#[path]`` inside a non-mod-rs file.
+
+        ``src/plain.rs`` is a module, so its children live beneath ``src/plain``
+        before the inline names apply. Three shallower readings each land on a
+        file this crate contains: the declaring file's directory with the inline
+        names dropped, its directory plus the one inline name, and its directory
+        plus the inline name while dropping the directory named after the file.
+        Only the composed path is the file the crate compiles, and a decoy at
+        each of the others is what makes picking one of them visible.
+        """
+        self._write('src/lib.rs', 'mod plain;')
+        self._write('src/plain.rs', 'mod nested { #[path = "witness.rs"] mod trusted; }')
+        self._write('src/plain/nested/witness.rs', 'fn g() { kani::assume(x); }')
+        for decoy in ('src/witness.rs', 'src/plain/witness.rs', 'src/nested/witness.rs'):
+            self._write(decoy, 'fn decoy() { kani::stub(a, b); }')
+        reported = {entry.path: [item.item for item in entry.items]
+                    for entry in audit_tree(self.root, ['src/lib.rs'])}
+        self.assertEqual(reported, {'src/plain/nested/witness.rs': ['assume']},
+                         'a non-mod-rs file must contribute its module directory before '
+                         'the inline ancestors')
+
     def test_a_path_attribute_survives_a_later_attribute(self):
         """Require ``#[path]`` to be found wherever it sits in the attribute list.
 

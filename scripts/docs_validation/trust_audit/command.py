@@ -365,8 +365,27 @@ def _inside(root: Path, relative: str) -> bool:
 
 
 def _path_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
-    """Return the single path a ``#[path]`` attribute names."""
-    return ((PurePosixPath(relative).parent / str(module.path)).as_posix(),)
+    """Return the single path a ``#[path]`` attribute names.
+
+    At file scope the target is relative to the declaring file's own directory —
+    ``src/a/b.rs`` writing ``#[path = "foo.rs"]`` means ``src/a/foo.rs``, not
+    ``src/a/b/foo.rs`` — so :func:`_module_directory` plays no part.
+
+    Inside ``mod inline { … }`` the target is relative to that inline module's
+    directory: the mod-rs file's directory plus the inline names, preceded by
+    the file's own module directory when it is not a mod-rs file. That is
+    exactly :func:`_module_directory` followed by the enclosing chain, the rule
+    :func:`_search_candidates` already applies to a bare ``mod name;``.
+
+    Ignoring the chain is not a refusal a caller can notice: the declaration
+    resolves to some file either way, so where the shallow path exists as a
+    decoy the audit reports a clean scan of code the crate never compiles while
+    the real module goes unread.
+    """
+    if not module.enclosing:
+        return ((PurePosixPath(relative).parent / str(module.path)).as_posix(),)
+    directory = PurePosixPath(_module_directory(relative), *module.enclosing)
+    return ((directory / str(module.path)).as_posix(),)
 
 
 def _search_candidates(relative: str, module: ModuleReference) -> tuple[str, ...]:
