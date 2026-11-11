@@ -3,6 +3,10 @@
   "description": "The claim set the default_unwind capture actually covers. VO-11b compares a log with the manifest it was decided against, so a positive fixture must bind a manifest naming exactly the harnesses the log reports. It narrows the crate manifest rather than restating it: the roles, declared cover, and expected failure are the crate's, and only the selection is this record's.",
   "sources": [
     {
+      "path": "tools/verifier-fixtures/kani-corpus/Cargo.toml",
+      "sha256": "e940d56d4b821c09d727f1fdca72a5c9d8795ad58617d668efc4bba2cd550c2e"
+    },
+    {
       "path": "tools/verifier-fixtures/kani-corpus/src/lib.rs",
       "sha256": "a732985c6ad4dafdd8dcaf525b71d1339a2778794708cb1dc7380ca5e7f3735e"
     },

@@ -191,14 +191,20 @@ reserved, and each is stated here because it changes what a record must supply.
 every source file the record's harness manifest names, requires each path to be
 Git-tracked and inside the repository, checks each file's digest against the
 manifest, runs the scanner over it, and passes a `VerifiedTrustAudit` bound to
-the same manifest. `abstract_record` then derives `trust = 'unaudited'` unless
-an audit bound to the record's single `result_artefacts` manifest has an item
-multiset `(item, location)` equal to the record's `trust_audit.items`. A record
-that claims `audited` with no matching scan is therefore `unaudited`, which
-MS-1 already blocks for deductive and bounded evidence. A record whose
-`method.tool` names a registered parser must have `evidence_kind` `deductive` or
-`bounded`, so a failed verifier run cannot be renamed a passing test to step
-outside the parser; that rejection reuses `schema-invalid`.
+the same manifest. A manifest must also bind the `Cargo.toml` of every crate
+that owns one of its sources, because the scanner reads that manifest to decide
+whether the crate's string literals are code. A source whose owning manifest is
+unbound is refused rather than read: the working tree could otherwise answer
+that question, and an edit there would stop literal scanning and hide a trust
+item inside a source the record did bind to a digest. `abstract_record` then
+derives `trust = 'unaudited'` unless an audit bound to the record's single
+`result_artefacts` manifest has an item multiset `(item, location)` equal to
+the record's `trust_audit.items`. A record that claims `audited` with no
+matching scan is therefore `unaudited`, which MS-1 already blocks for deductive
+and bounded evidence. A record whose `method.tool` names a registered parser
+must have `evidence_kind` `deductive` or `bounded`, so a failed verifier run
+cannot be renamed a passing test to step outside the parser; that rejection
+reuses `schema-invalid`.
 
 **The trust-audit matching rule (DL-17).** The scanner lexes Rust, skips
 comments and literals, and reports an identifier as a trusted item when it is:

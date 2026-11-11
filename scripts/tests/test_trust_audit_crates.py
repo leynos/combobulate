@@ -519,4 +519,53 @@ class BoundAuditStopsAtTheVerifiedSet(unittest.TestCase):
         self.assertIn('not itself bound to a digest', str(raised.exception),
                       'the refusal must say the module left the bound set')
 
+    def test_a_bound_manifest_decides_proc_macro_mode_from_its_verified_bytes(self):
+        """Take the scan mode from the manifest the caller verified, not from disk.
+
+        A proc-macro crate's literals are code, so an edit that removed the
+        directive from the working tree would stop literal scanning and hide a
+        trust item inside a source the record did bind to a digest. The bound
+        bytes say the crate expands literals, so the literal must still be read.
+        """
+        literal = 'let s = r#"kani::assume"#;'
+        self._write('Cargo.toml', '[package]\nname = "ordinary"\n')
+        self._write('src/lib.rs', literal)
+        bound = {'Cargo.toml': b'[lib]\nproc-macro = true\n',
+                 'src/lib.rs': literal.encode('utf-8')}
+        reported = {entry.path: [item.item for item in entry.items]
+                    for entry in audit_bound_tree(self.root, bound)}
+        self.assertEqual(reported, {'src/lib.rs': ['assume']},
+                         'the verified manifest must decide whether literals are code')
+
+    def test_an_unbound_manifest_refuses_the_walk(self):
+        """Refuse a source whose owning manifest the bound set omits.
+
+        The manifest decides whether the source's literals are code, so neither
+        reading it from disk nor guessing either way is honest. Naming the
+        manifest is what points the author at the repair: bind it.
+        """
+        bound = {'src/lib.rs': b'mod child;\n',
+                 'src/child.rs': b'fn f() { kani::assume(x); }'}
+        self._write('Cargo.toml', '[package]\nname = "ordinary"\n')
+        with self.assertRaises(TrustAuditError) as raised:
+            audit_bound_tree(self.root, bound)
+        message = str(raised.exception)
+        self.assertIn('Cargo.toml is not bound to a digest', message,
+                      'the refusal must name the unbound manifest')
+        self.assertIn('cannot be verified', message,
+                      'the refusal must say which decision it could not take')
+
+    def test_a_source_with_no_owning_manifest_is_data_not_code(self):
+        """Keep the honest False for a source no crate compiles.
+
+        DL-17 treats an unqualified vocabulary word as code only when a file
+        imports the vocabulary, so no crate owning the file means no macro can
+        be expanding it. Refusing here would reject a bound set for a fact that
+        has a true answer.
+        """
+        bound = {'src/lib.rs': b'mod child;\n',
+                 'src/child.rs': b'let s = r#"kani::assume"#;'}
+        self.assertEqual(audit_bound_tree(self.root, bound), (),
+                         'a source no crate compiles carries data, not code')
+
 

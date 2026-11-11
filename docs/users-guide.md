@@ -132,8 +132,10 @@ verifier's verdict remains self-reported until a registered adapter validates
 the cited log digest and supplies a matching result; registration by itself
 cannot satisfy `proof` or `bounded`. Kani is registered and has an adapter, so
 a Kani record that cites a committed log, its harness manifest, and that
-manifest's sources is decided from those artefacts. Verus has no adapter yet,
-so its records remain self-reported.
+manifest's sources is decided from those artefacts. The manifest must also bind
+the `Cargo.toml` of each crate owning a bound source, because whether a crate's
+string literals are code is read from it; a manifest that leaves it out refuses
+its own audit. Verus has no adapter yet, so its records remain self-reported.
 
 The command reads the repository policy files by default. To check records
 against alternate or temporary inputs, pass all relevant paths explicitly:

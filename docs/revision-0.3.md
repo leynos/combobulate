@@ -87,6 +87,12 @@ verdict itself. A record citing a log whose bytes changed, an unbound module,
 or a manifest the parser cannot read is refused and falls back to
 `self-reported`, which blocks verifier evidence.
 
+A manifest must bind the `Cargo.toml` of every crate that owns one of its
+sources. The scanner reads that manifest to decide whether the crate's string
+literals are code, and a source whose owning manifest is unbound is refused
+rather than read: otherwise the working tree could answer the question, and an
+edit there could hide a trust item inside a source the record did bind.
+
 The binding is per record and per manifest: a result is matched only when its
 tool, log path and digest, and manifest path and digest all agree with the
 record's own. Two records citing one capture against different manifests are
@@ -101,8 +107,10 @@ Verus has no adapter yet, so its records remain self-reported.
 - If you must avoid Polars, set `default-features = false` and check that the
   build still reports the features you expect.
 - If you produce evidence records, cite the harness manifest as the record's
-  `result_artefacts` entry. A Kani record without one is not decided from its
-  log.
+  `result_artefacts` entry and bind your crate's `Cargo.toml` in that manifest's
+  `sources`, alongside the sources it owns. A Kani record without a manifest
+  is not decided from its log, and a manifest that leaves the owning manifest
+  unbound refuses its own audit.
 - Run `make check-fmt`, `make lint`, and `make test` before committing; all
   three now iterate the profiles rather than building one.
 

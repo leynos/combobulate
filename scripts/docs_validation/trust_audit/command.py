@@ -217,10 +217,8 @@ def is_procedural_macro_crate(manifest: Path) -> bool:
     unsound direction: the crate's literals are what its macros emit, so their
     vocabulary would go unreported.
 
-    A manifest that cannot be read or parsed is *not* procedural. That is the
-    loud direction — a literal is reported as data — and it is the correct one:
-    guessing True would invent trust items for a crate nothing establishes is a
-    macro crate.
+    A manifest that cannot be read or parsed is *not* procedural, for the reason
+    given at :func:`is_procedural_macro_crate_text`.
 
     Parameters
     ----------
@@ -239,8 +237,40 @@ def is_procedural_macro_crate(manifest: Path) -> bool:
     a commented-out directive, and a missing file all return False.
     """
     try:
-        document = tomllib.loads(manifest.read_text(encoding='utf-8'))
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        text = manifest.read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError):
+        return False
+    return is_procedural_macro_crate_text(text)
+
+
+def is_procedural_macro_crate_text(text: str) -> bool:
+    """Report whether manifest *text* declares a proc-macro target.
+
+    This is the decision :func:`is_procedural_macro_crate` makes once it has
+    read a file, exposed separately so the bound walk can decide from the bytes
+    a record's digest vouched for rather than re-opening the path. A manifest
+    that does not parse is not procedural, for the reason given there.
+
+    Parameters
+    ----------
+    text
+        The manifest's contents, as TOML.
+
+    Returns
+    -------
+    bool
+        True when the document declares ``[lib] proc-macro = true``.
+
+    Examples
+    --------
+    >>> is_procedural_macro_crate_text('[lib]\\nproc-macro = true\\n')
+    True
+    >>> is_procedural_macro_crate_text('[package]\\nname = "a"\\n')
+    False
+    """
+    try:
+        document = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
         return False
     library = document.get(PROCEDURAL_MACRO_TABLE)
     return isinstance(library, Mapping) and library.get(PROCEDURAL_MACRO_KEY) is True
@@ -283,24 +313,19 @@ def resolve_repository_path(root: Path, relative: str) -> Path:
     return resolved
 
 
-def _scan_file(root: Path, relative: str) -> ScanResult:
+def _scan_file(root: Path, relative: str, bound: Mapping[str, bytes] | None) -> ScanResult:
     """Scan one file, choosing proc-macro mode from the crate that owns it."""
-    return scan_tree(root, relative, is_procedural_macro_crate(_manifest_for(root, relative)))
+    return scan_tree(root, relative, _is_procedural(root, relative, bound))
 
 
 def _scan_source(root: Path, relative: str,
                  bound: Mapping[str, bytes] | None) -> ScanResult:
-    """Scan one source, from the verified bytes when a bound set is supplied.
-
-    The proc-macro decision still reads the crate manifest from disk: the
-    manifest states how the crate is compiled, and it is not part of the source
-    set a record binds to digests.
-    """
+    """Scan one source, from the verified bytes when a bound set is supplied."""
     # Containment is checked on every path, bound or not: a caller's map is
     # data, and an absolute or escaping key would otherwise be scanned.
     resolve_repository_path(root, relative)
     if bound is None:
-        return _scan_file(root, relative)
+        return _scan_file(root, relative, None)
     if relative not in bound:
         raise TrustAuditError(
             f'{relative} is compiled by a bound source but is not itself bound to a digest')
@@ -308,18 +333,59 @@ def _scan_source(root: Path, relative: str,
         text = bound[relative].decode('utf-8')
     except UnicodeDecodeError as error:
         raise TrustAuditError(f'{relative} cannot be read: {error}') from error
-    return scan(text, procedural_macro=is_procedural_macro_crate(_manifest_for(root, relative)))
+    return scan(text, procedural_macro=_is_procedural(root, relative, bound))
 
 
-def _manifest_for(root: Path, relative: str) -> Path:
-    """Find the nearest ``Cargo.toml`` above a source file."""
+def _is_procedural(root: Path, relative: str,
+                   bound: Mapping[str, bytes] | None) -> bool:
+    """Report whether the crate owning ``relative`` is a proc-macro crate.
+
+    A bound walk may not answer this from the working tree. The manifest decides
+    whether the file's string literals are *code* — a proc-macro crate's literals
+    are the tokens its macros emit — so reading it from disk lets a local edit
+    turn literal scanning off and hide a trust item inside a source the record
+    did bind to a digest. When the owning manifest is in the bound set its
+    verified bytes decide, and when there is no owning manifest the file is
+    compiled by no crate, so the answer is False and no bytes were trusted.
+
+    A manifest that exists but is unbound is refused rather than read. That case
+    has no honest answer: reading it trusts unverified bytes, and guessing
+    either way invents or suppresses items from a claim nobody established.
+    The refusal names the manifest, because the repair — binding it — belongs to
+    whoever wrote the manifest's source list.
+    """
+    manifest = _manifest_for(root, relative)
+    if manifest is None:
+        return False
+    if bound is None:
+        return is_procedural_macro_crate(manifest)
+    owned = manifest.relative_to(root).as_posix()
+    if owned not in bound:
+        raise TrustAuditError(
+            f'{relative}: its crate manifest {owned} is not bound to a digest, so whether '
+            f'the crate expands literals cannot be verified')
+    try:
+        text = bound[owned].decode('utf-8')
+    except UnicodeDecodeError as error:
+        raise TrustAuditError(f'{owned} cannot be read: {error}') from error
+    return is_procedural_macro_crate_text(text)
+
+
+def _manifest_for(root: Path, relative: str) -> Path | None:
+    """Find the nearest ``Cargo.toml`` above a source file, if one exists.
+
+    ``None`` is the honest answer for a source no crate compiles. Returning the
+    root's manifest instead would attribute a stranger's data to a crate that
+    does not own the file, and would erase the distinction between "no crate"
+    and "a crate whose manifest happens to be the root's".
+    """
     for directory in (root / relative).parents:
         candidate = directory / 'Cargo.toml'
         if candidate.is_file():
             return candidate
         if directory == root:
             break
-    return root / 'Cargo.toml'
+    return None
 
 
 def _module_targets(root: Path, relative: str,

@@ -254,10 +254,15 @@ class RefusalLabels(unittest.TestCase):
         ``bound_sources`` re-opens the manifest the record cites, so its
         declared source list is what the scanner audits. A mutant that passed a
         literal path would audit the wrong file or refuse a valid record.
+
+        The crate manifest leads the list because the audit reads it to decide
+        whether the crate's literals are code, so it is bound with the sources
+        that decision applies to.
         """
         sources = bound_sources(ROOT, record())
         self.assertEqual(tuple(sources),
-                         ('tools/verifier-fixtures/kani-corpus/src/lib.rs',
+                         ('tools/verifier-fixtures/kani-corpus/Cargo.toml',
+                          'tools/verifier-fixtures/kani-corpus/src/lib.rs',
                           'tools/verifier-fixtures/kani-corpus/src/harnesses.rs'),
                          'the scanner must audit the sources the record manifest names')
 

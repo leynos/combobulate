@@ -260,9 +260,16 @@ class BoundAuditStopsAtTheManifest(ScratchCheckout, unittest.TestCase):
     """
 
     def test_a_module_outside_the_bound_set_is_refused(self):
-        """Refuse the walk rather than audit a file no digest covers."""
+        """Refuse the walk rather than audit a file no digest covers.
+
+        The manifest is narrowed to the crate root alone, which is the source
+        that declares ``mod harnesses;``. Selecting it by path rather than by
+        position keeps the case about the unbound child, not about which entry
+        an author happened to write first.
+        """
         document = json.loads((self.root / MANIFEST).read_text(encoding='utf-8'))
-        document['sources'] = document['sources'][:1]
+        document['sources'] = [source for source in document['sources']
+                               if source['path'].endswith('/src/lib.rs')]
         self._commit(MANIFEST, json.dumps(document, indent=2) + '\n', 'Narrow the manifest')
         record = self.record()
         record['result_artefacts'][0]['sha256'] = digest(self.root / MANIFEST)
