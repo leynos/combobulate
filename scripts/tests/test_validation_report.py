@@ -193,6 +193,42 @@ class ValidationReport(unittest.TestCase):
             'the command path must reject a workflow runner that differs from AC-07',
         )
 
+    def test_an_omitted_required_job_is_rejected_by_composition(self) -> None:
+        """Reject an AC-07 record that omits a job the real workflow declares.
+
+        The required-job set is read from `.github/workflows/ci.yml` in the
+        fixture copy, so this exercises the seam the unit tests stub: the
+        workflow's job names reach the record check. Calling
+        `check_acceptance_controls` directly rather than the whole command keeps
+        the assertion about that seam; the full command would also run the
+        toolchain pin sweep, and a record naming a registered pin would be
+        refused for that unrelated reason instead.
+        """
+        self.write_ac07_record({'build-test': 'success', 'polars-lint': 'success'})
+        with self.assertRaisesRegex(AssertionError, r"missing \['polars-test'\]",
+                                    msg='the composition path must reject an AC-07 record that omits a job'):
+            check_acceptance_controls(ValidationContext(self.root), ())
+
+    def write_ac07_record(self, job_conclusions: dict[str, str]) -> None:
+        """Commit an otherwise-passing AC-07 window that records *job_conclusions*."""
+        register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
+        control = next(item for item in register['controls'] if item['id'] == 'AC-07')
+        record = self.acceptance_record('ac07-fixture', 'AC-07', control['frozen']['registered_on'])
+        attempt = {'attempt': 1, 'conclusion': 'success', 'wall_seconds': 60.0,
+                   'required_job_conclusions': dict(job_conclusions),
+                   'started_at': '2026-10-12T12:00:00Z', 'completed_at': '2026-10-12T12:01:00Z'}
+        record['workloads'] = [{
+            'id': 'ci-required-jobs', 'description': 'Every required PR job.',
+            'command': 'gh run view', 'metric': 'wall time', 'unit': 's',
+            'samples': [60.0] * 20, 'median': 60.0,
+            'attempts': [{**attempt, 'run_id': str(index), 'run_number': index,
+                          'url': f'https://github.com/leynos/combobulate/actions/runs/{index}'}
+                         for index in range(20, 0, -1)],
+        }]
+        measurements = self.root / 'spec/measurements'
+        measurements.mkdir(exist_ok=True)
+        (measurements / 'ac07-fixture.json').write_text(json.dumps(record), encoding='utf-8')
+
     def test_decoded_json_strings_cannot_hide_host_identities(self) -> None:
         """Reject escaped host identities in calibration and acceptance JSON."""
         calibration_path = self.root / 'spec/calibration/verifier-probe.json'

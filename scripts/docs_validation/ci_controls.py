@@ -1,12 +1,10 @@
 """Validate AC-07 CI attempt outcomes and their calibration history."""
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from math import ceil, isclose
-from statistics import median
 
 from .context import require
 
@@ -45,8 +43,26 @@ class AcceptanceWorkflowSettings:
 
     jobs: tuple[RequiredJob, ...]
 
+    @property
+    def job_names(self) -> frozenset[str]:
+        """Return the registered required-job names; e.g. `{'build-test', 'polars-lint'}`.
 
-def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, object]) -> None:
+        The record check compares each attempt's per-job map with this set, so it
+        must be derived from the same workflow the runner and timeout checks use.
+        Deriving it here rather than at each call site keeps one definition of
+        "required job" for both checks.
+
+        Examples
+        --------
+        AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-24.04', 8),)).job_names
+        is frozenset({'build-test'}).
+        """
+        return frozenset(job.name for job in self.jobs)
+
+
+def check_ci_measurement(
+    control: Mapping[str, object], record: Mapping[str, object], required_jobs: frozenset[str],
+) -> None:
     """Validate AC-07 retry samples and apply failure-first outcome rules.
 
     Parameters
@@ -56,6 +72,14 @@ def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, obj
     record : Mapping[str, object]
         Acceptance record containing one attempt per workflow run, each carrying
         that run's longest required job.
+    required_jobs : frozenset[str]
+        The required-job names the workflow declares, normally
+        :attr:`AcceptanceWorkflowSettings.job_names`. Every attempt's
+        ``required_job_conclusions`` must name exactly these jobs, so a record
+        cannot omit a job that failed by leaving it out of the map. This is a
+        required argument rather than an optional one because an omitted set
+        would silently skip the completeness rule: the caller that forgot it
+        would be the one whose record passes unchecked.
 
     Returns
     -------
@@ -65,7 +89,8 @@ def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, obj
     Raises
     ------
     AssertionError
-        If attempts, durations, sample retention, or the recorded outcome disagree.
+        If attempts, durations, sample retention, the recorded outcome, or the
+        per-job map's job names disagree with the workflow and the record.
     KeyError
         If a required control or record field is absent.
     ValueError
@@ -73,7 +98,8 @@ def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, obj
 
     Examples
     --------
-    check_ci_measurement(control, record) rejects an AC-07 timeout marked as passing.
+    check_ci_measurement(control, record, frozenset({'build-test'})) rejects an
+    AC-07 timeout marked as passing, and a record that omits a required job.
     """
     if control['id'] != 'AC-07':
         return
@@ -83,7 +109,55 @@ def check_ci_measurement(control: Mapping[str, object], record: Mapping[str, obj
     summary = _ci_attempt_durations(attempts, record['id'])
     require(workload['samples'] == list(summary.durations),
             f"{record['id']} samples must retain every started required-job attempt duration")
+    _check_recorded_job_names(workload, required_jobs, record['id'])
     _check_ci_measurement_outcome(control, record, summary)
+
+
+def _check_recorded_job_names(
+    workload: Mapping[str, object], required_jobs: frozenset[str], record_id: str,
+) -> None:
+    """Require every attempt to record exactly the workflow's required jobs.
+
+    The outcome rule treats a job missing from an attempt's map as successful:
+    it can only see the conclusions written there. A record that names two of
+    the three required jobs but omits the one that failed would therefore pass
+    on the strength of the jobs it did record. Comparing the map's keys with the
+    workflow's own set closes that gap from the other side — an extra key is a
+    job the workflow does not declare, and a missing key is a job whose result
+    the record withholds.
+
+    Parameters
+    ----------
+    workload : Mapping[str, object]
+        The record's single ``ci-required-jobs`` workload.
+    required_jobs : frozenset[str]
+        Names from the workflow, via :attr:`AcceptanceWorkflowSettings.job_names`.
+    record_id : str
+        Record identifier used in any diagnostic.
+
+    Returns
+    -------
+    None
+        Returns only when every attempt records each required job and no other.
+
+    Raises
+    ------
+    AssertionError
+        If an attempt's job names differ from the workflow's required set.
+
+    Examples
+    --------
+    A workflow declaring ``build-test`` and ``polars-lint`` is satisfied by an
+    attempt recording both, and refused when the attempt records only
+    ``build-test``.
+    """
+    for attempt in workload['attempts']:
+        recorded = set(attempt.get('required_job_conclusions') or {})
+        missing = sorted(required_jobs - recorded)
+        unexpected = sorted(recorded - required_jobs)
+        require(not missing and not unexpected,
+                f"{record_id} run {attempt['run_id']} attempt {attempt['attempt']} must record every "
+                f"required job's conclusion; missing {missing}, unexpected {unexpected}")
 
 
 def _ci_required_jobs_workload(record: Mapping[str, object]) -> Mapping[str, object]:
@@ -212,106 +286,6 @@ def nearest_rank(values: list[float], quantile: float) -> float:
     """
     require(bool(values), 'A percentile requires at least one sample')
     return sorted(values)[ceil(quantile * len(values)) - 1]
-
-
-def check_ci_calibration(control: Mapping[str, object], records: Mapping[str, dict]) -> None:
-    """Validate the AC-07 calibration history and its recorded p90 derivation.
-
-    Parameters
-    ----------
-    control : Mapping[str, object]
-        Registered AC-07 control containing calibration metadata and thresholds.
-    records : Mapping[str, dict]
-        Calibration records indexed by repository-relative path.
-
-    Returns
-    -------
-    None
-        Returns when the calibration is not required or all retained samples agree.
-
-    Raises
-    ------
-    AssertionError
-        If a required record, attempt window, median, timestamp, or p90 is inconsistent.
-    KeyError
-        If a required control, record, or workload field is absent.
-    ValueError
-        If a retained attempt timestamp is malformed.
-
-    Examples
-    --------
-    check_ci_calibration(control, records) accepts a history whose p90 matches its samples.
-    """
-    calibration = control['frozen']['calibration']
-    if calibration['status'] != 'calibrated':
-        return
-    record = records.get(calibration['record'])
-    require(record is not None, f"{control['id']} cites missing calibration record {calibration['record']}")
-    workloads = {workload['id']: workload for workload in record['workloads']}
-    build_test = _required_ci_calibration_workload(workloads, 'ci-build-test', calibration['record'])
-    design_check = _required_ci_calibration_workload(workloads, 'design-check', calibration['record'])
-    build_durations = _validate_ci_calibration_workload(build_test, 'ci-build-test', calibration['record'])
-    _validate_ci_calibration_workload(design_check, 'design-check', calibration['record'])
-    _check_ci_calibration_timestamps(build_test['attempts'], calibration['record'])
-    _check_ci_calibration_p90(control, calibration, build_test, build_durations)
-
-
-def _required_ci_calibration_workload(
-    workloads: Mapping[str, Mapping[str, object]], workload_id: str, record_id: str,
-) -> Mapping[str, object]:
-    """Select one calibration history; for example, reject a missing job history."""
-    workload = workloads.get(workload_id)
-    require(workload is not None, f"{record_id} lacks {workload_id} history")
-    return workload
-
-
-def _validate_ci_calibration_workload(
-    workload: Mapping[str, object], workload_id: str, record_id: str,
-) -> list[float]:
-    """Validate a 20-attempt sample window; for example, reject a missing duration."""
-    attempts = workload.get('attempts', [])
-    require(len(attempts) == 20, f"{record_id} must retain 20 {workload_id} attempts")
-    attempt_ids = [(attempt['run_id'], attempt['attempt']) for attempt in attempts]
-    require(len(attempt_ids) == len(set(attempt_ids)), f"{record_id} repeats a {workload_id} attempt")
-    starts = [attempt['started_at'] for attempt in attempts]
-    require(all(start is not None for start in starts),
-            f"{record_id} must retain start times for every {workload_id} attempt")
-    require(starts == sorted(starts, reverse=True),
-            f"{record_id} {workload_id} attempts are not newest first")
-    durations = [attempt['wall_seconds'] for attempt in attempts if attempt['wall_seconds'] is not None]
-    require(bool(durations), f"{record_id} has no timed {workload_id} attempts")
-    require(workload['samples'] == durations,
-            f"{record_id} samples must include every timed {workload_id} attempt")
-    require(len(durations) == len(attempts), f"{record_id} must time every {workload_id} attempt")
-    require(workload['median'] == median(durations),
-            f"{record_id} median does not match its {workload_id} attempts")
-    return durations
-
-
-def _check_ci_calibration_timestamps(attempts: list[Mapping[str, object]], record_id: str) -> None:
-    """Bind build durations to timestamps; for example, reject edited wall times."""
-    for attempt in attempts:
-        require(attempt['completed_at'] is not None,
-                f"{record_id} must retain completion times for every ci-build-test attempt")
-        elapsed = (datetime.fromisoformat(attempt['completed_at'].replace('Z', '+00:00'))
-                   - datetime.fromisoformat(attempt['started_at'].replace('Z', '+00:00'))).total_seconds()
-        require(isclose(attempt['wall_seconds'], elapsed, abs_tol=0.001),
-                f"{record_id} ci-build-test duration does not match its timestamps")
-
-
-def _check_ci_calibration_p90(
-    control: Mapping[str, object], calibration: Mapping[str, object], workload: Mapping[str, object],
-    durations: list[float],
-) -> None:
-    """Bind AC-07's percentile to its samples; for example, reject a stale derivation."""
-    p90_seconds = nearest_rank(durations, 0.9)
-    p90_budget = control['frozen']['decision_rule']['thresholds']['p90_minutes'] * 60
-    require(p90_seconds <= p90_budget,
-            f"{control['id']} calibration p90 {p90_seconds} s exceeds its {p90_budget} s budget")
-    match = re.search(
-        r'nearest-rank p90 ([0-9.]+) s', calibration['derivation'], re.IGNORECASE)
-    require(match is not None and float(match[1]) == p90_seconds,
-            f"{control['id']} calibration derivation does not match its recorded attempt p90")
 
 
 def check_acceptance_workflow(settings: AcceptanceWorkflowSettings, control: Mapping[str, object]) -> None:

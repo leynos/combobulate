@@ -20,9 +20,10 @@ from .acceptance_evidence import (
     verdict,
 )
 from .acceptance_registration import FROZEN_FIELDS, check_completeness, check_registration_declarations
+from .ci_calibration import check_ci_calibration
 from .ci_controls import (
     OUTCOME_VERDICTS, AcceptanceWorkflowSettings, RequiredJob, check_acceptance_workflow,
-    check_ci_calibration, check_ci_measurement,
+    check_ci_measurement,
 )
 from .context import ValidationContext, require
 
@@ -178,10 +179,11 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     require(len(ids) == len(set(ids)), 'Duplicate acceptance control ID')
     controls_by_id = {control['id']: control for control in controls}
     workflow = context.load_yaml('.github/workflows/ci.yml')
-    check_acceptance_workflow(_workflow_settings(workflow), controls_by_id['AC-07'])
+    workflow_settings = _workflow_settings(workflow)
+    check_acceptance_workflow(workflow_settings, controls_by_id['AC-07'])
     check_ci_calibration(controls_by_id['AC-07'], records)
     _check_acceptance_measurements(controls_by_id, records, measurements)
-    _check_registered_controls(controls, records, measurements)
+    _check_registered_controls(controls, records, measurements, workflow_settings.job_names)
     context.record('acceptance-controls', 'Typed protocols are complete; measurement records bind known controls, '
                                           'registered dates and the hosted image; calibration evidence is '
                                           'excluded from acceptance verdicts.', len(ids))
@@ -232,11 +234,12 @@ def _check_acceptance_measurements(
 
 def _check_registered_controls(
     controls: list[dict], records: Mapping[str, dict], measurements: list[dict],
+    required_jobs: frozenset[str],
 ) -> None:
     """Check every frozen control; for example, reject calibration used as acceptance evidence."""
     for control in controls:
         check_completeness(control)
         check_calibration_reference(control, records)
-        require(verdict(control, records.values()) == 'not-run',
+        require(verdict(control, records.values(), required_jobs) == 'not-run',
                 f"{control['id']} has acceptance evidence in the calibration directory")
-        verdict(control, measurements)
+        verdict(control, measurements, required_jobs)

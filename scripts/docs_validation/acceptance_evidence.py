@@ -203,7 +203,10 @@ def check_control_bindings(controls: Mapping[str, Mapping[str, object]], record:
     for control_id in record['control_ids']:
         require(control_id in controls, f"{record['id']} cites unknown control {control_id}")
 
-def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object]]) -> str:
+def verdict(
+    control: Mapping[str, object], records: Iterable[Mapping[str, object]],
+    required_jobs: frozenset[str],
+) -> str:
     """Return the acceptance verdict after binding every matching measurement.
 
     Any failing outcome fails; otherwise any inconclusive outcome is
@@ -216,6 +219,11 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
         Registered control being assessed.
     records : Iterable[Mapping[str, object]]
         Calibration or acceptance records available to the assessment.
+    required_jobs : frozenset[str]
+        Required-job names from the workflow, passed through to
+        :func:`check_ci_measurement`. It is a required argument for the same
+        reason it is there: a caller that omitted it would skip the
+        job-completeness rule.
 
     Returns
     -------
@@ -240,7 +248,7 @@ def verdict(control: Mapping[str, object], records: Iterable[Mapping[str, object
     outcomes = []
     for record in matching_records:
         check_measurement_binding(control, record)
-        check_ci_measurement(control, record)
+        check_ci_measurement(control, record, required_jobs)
         outcomes.append(OUTCOME_VERDICTS[record['outcome']])
     if not outcomes:
         return 'not-run'

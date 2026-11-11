@@ -23,6 +23,12 @@ from test_preregistration import (
     record,
 )
 
+# The three jobs `ci.yml` declares without an `if:` condition, which is what
+# `_workflow_settings` treats as required. Hand-copying them here rather than
+# reading the workflow keeps these focused tests independent of YAML parsing;
+# the composition-path test in `test_validation_report.py` reads the real file.
+REQUIRED_JOBS = frozenset({'build-test', 'polars-lint', 'polars-test'})
+
 
 class Outcomes(unittest.TestCase):
     """VO-12: retries count, and every bound acceptance record decides the verdict."""
@@ -48,7 +54,7 @@ class Outcomes(unittest.TestCase):
         failure_outcomes = {'fail', 'budget-exceeded', 'resource-exhausted', 'missing'}
         for length in range(1, 4):
             for outcomes in itertools.product(RECORD_OUTCOMES, repeat=length):
-                result = verdict(CONTROL, [record(outcome) for outcome in outcomes])
+                result = verdict(CONTROL, [record(outcome) for outcome in outcomes], REQUIRED_JOBS)
                 if any(outcome in failure_outcomes for outcome in outcomes):
                     expected_verdict = 'fail'
                 elif any(outcome == 'inconclusive' for outcome in outcomes):
@@ -65,7 +71,7 @@ class Outcomes(unittest.TestCase):
         """Keep calibration-purpose records out of acceptance verdicts."""
         for outcome in RECORD_OUTCOMES:
             records = [record(outcome, purpose='calibration')]
-            self.assertEqual(verdict(CONTROL, records), 'not-run', 'calibration never satisfies a control')
+            self.assertEqual(verdict(CONTROL, records, REQUIRED_JOBS), 'not-run', 'calibration never satisfies a control')
 
     def test_unknown_control_id_is_rejected(self):
         """Reject a measurement that names an unregistered control."""
@@ -160,7 +166,7 @@ class Outcomes(unittest.TestCase):
         faulty = dict(OUTCOME_VERDICTS, **{'resource-exhausted': 'pass'})
         outcomes = [faulty[name] for name in ('pass', 'resource-exhausted')]
         self.assertEqual(set(outcomes), {'pass'}, 'the seeded fault would pass an exhausted run')
-        self.assertEqual(verdict(CONTROL, [record('pass'), record('resource-exhausted')]), 'fail',
+        self.assertEqual(verdict(CONTROL, [record('pass'), record('resource-exhausted')], REQUIRED_JOBS), 'fail',
                          'the real mapping fails it')
 
 
@@ -192,10 +198,10 @@ class WorkflowAndCi(unittest.TestCase):
         """Fail a run when timeouts occur despite an in-budget p90."""
         attempts = [('success', 1.0)] * 18 + [('timed_out', 480.0)] * 2
         with self.assertRaisesRegex(AssertionError, 'must fail when a required-job attempt fails'):
-            check_ci_measurement(CI_CONTROL, ci_record('pass', attempts))
+            check_ci_measurement(CI_CONTROL, ci_record('pass', attempts), REQUIRED_JOBS)
         failed = ci_record('fail', attempts)
-        check_ci_measurement(CI_CONTROL, failed)
-        self.assertEqual(verdict(CI_CONTROL, [failed]), 'fail',
+        check_ci_measurement(CI_CONTROL, failed, REQUIRED_JOBS)
+        self.assertEqual(verdict(CI_CONTROL, [failed], REQUIRED_JOBS), 'fail',
                          'timeouts fail AC-07 even when nearest-rank p90 is within budget')
 
     def test_untimed_failed_attempt_is_a_valid_failed_measurement(self):
@@ -222,20 +228,24 @@ class WorkflowAndCi(unittest.TestCase):
         }]
 
         RECORD_VALIDATOR.validate(failed)
-        check_ci_measurement(CI_CONTROL, failed)
-        self.assertEqual(verdict(CI_CONTROL, [failed]), 'fail',
+        check_ci_measurement(CI_CONTROL, failed, REQUIRED_JOBS)
+        self.assertEqual(verdict(CI_CONTROL, [failed], REQUIRED_JOBS), 'fail',
                          'an untimed failed AC-07 attempt must remain a failed measurement')
         passing = copy.deepcopy(failed)
         passing['outcome'] = 'pass'
         with self.assertRaisesRegex(AssertionError, 'must fail when a required-job attempt fails',
                                     msg='an untimed failed attempt must never be recorded as a pass'):
-            check_ci_measurement(CI_CONTROL, passing)
+            check_ci_measurement(CI_CONTROL, passing, REQUIRED_JOBS)
 
     def test_required_jobs_workload_must_record_every_job(self):
         """Require each AC-07 attempt to name its jobs, and only that workload to.
 
         The DL-14 workload measures every required job, so an attempt without
-        the per-job map leaves a shorter job's failure unrecorded. A
+        the per-job map leaves a shorter job's failure unrecorded. The schema can
+        only require that map to be non-empty: it does not know the workflow's
+        required-job set, so a map naming one job validates. The checker refuses
+        such a map against the workflow's own set, so the single-job map below
+        validates and is then rejected by ``check_ci_measurement``. A
         ``ci-build-test`` workload is the pre-DL-14 calibration series and is
         not this branch: an acceptance record naming it must supply measured
         samples instead.
@@ -258,6 +268,9 @@ class WorkflowAndCi(unittest.TestCase):
 
         workload['attempts'][0]['required_job_conclusions'] = {'build-test': 'success'}
         RECORD_VALIDATOR.validate(per_job)
+        with self.assertRaisesRegex(AssertionError, "missing \\['polars-lint', 'polars-test'\\]",
+                                    msg='a schema-valid map still must name every required job'):
+            check_ci_measurement(CI_CONTROL, per_job, REQUIRED_JOBS)
 
         calibration_series = copy.deepcopy(per_job)
         calibration_workload = calibration_series['workloads'][0]

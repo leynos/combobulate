@@ -1123,11 +1123,20 @@ until `spec/acceptance-controls.json` records the same shape. An attempt's
 run's duration sample, so it cannot state whether a shorter job failed; the
 schema therefore requires `required_job_conclusions` for the `ci-required-jobs`
 workload, and `check_ci_measurement` fails the record when any job in that map
-is not `success`. The calibration check in `ci_controls.py` still reads the
-single `ci-build-test` workload, because that is the record the registered
-threshold was derived from. The original named imports remain re-exported from
-preregistration for focused tests; these helpers are not general GitHub Actions
-parsers, measurement libraries, or repository file APIs.
+is not `success`. A schema cannot say *which* jobs a map must contain, because
+the workflow is not its input, so `AcceptanceWorkflowSettings.job_names` —
+derived once from the same parsed workflow the runner and timeout checks use —
+is passed to `check_ci_measurement` and `verdict`, and every attempt's map must
+name exactly that set. An omitted job is refused rather than read as success:
+the map can only state conclusions that were written, so a record could
+otherwise leave a failed job out and pass on the jobs it did record. The
+calibration check reads the single pre-DL-14 `ci-build-test` workload, because
+that is the record the registered threshold was derived from; it moved to
+`scripts/docs_validation/ci_calibration.py` so `ci_controls.py` keeps one
+contract — what a current record must say — and stays within the file-size
+limit. The original named imports remain re-exported from preregistration for
+focused tests; these helpers are not general GitHub Actions parsers,
+measurement libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
 documentation-pack validation. The control register is
