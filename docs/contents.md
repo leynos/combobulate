@@ -20,6 +20,8 @@ implemented API or completed verification.
   and observable acceptance criteria.
 - [Testable bets](testable-bets.md): experiments and explicit falsifiers.
 - [Revision 0.2](revision-0.2.md): changes from the original design.
+- [Library changes in this delivery](revision-0.3.md): the facade features,
+  `BuildProfile`, the trust-audit command, and the Kani verdict binding.
 - [Source register](references.md): technical sources and evidence limits.
 - [Design validation](validation.md): documentation checks and outstanding
   implementation/verifier obligations.

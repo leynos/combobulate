@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'scripts/tests/fixtures/evidence'
 EXAMPLE = ROOT / 'spec/proof-evidence.example.json'
 WITH_BINDINGS = ('--bindings', str(FIXTURES / 'bindings.json'),)
+# The bounded Kani record names a different component, so it needs its own
+# registered profile for the binding to read as current.
+WITH_KANI_BINDINGS = ('--bindings', str(FIXTURES / 'bounded-kani-bindings.json'),)
 
 
 def run(*args: str) -> int:
@@ -55,6 +58,44 @@ def test_standalone_entrypoint_has_its_runtime_dependencies():
     assert result.stdout.splitlines() == [
         f"{fixture('complete-test')}: tested []",
     ], 'standalone CLI reports the admitted level and reasons'
+
+
+def test_bounded_kani_record_is_admitted_through_the_command(capsys):
+    """Admit a Kani record at `bounded` through the real command, not a hand-built context.
+
+    Every other Kani case in the suite assembles an `AdmissionContext` itself,
+    which proves the gate's comparison but not that the CLI binds the
+    artefacts and registers the parser. This one starts from the command.
+    """
+    assert run('--as-of', '2026-11-11', '--require', 'bounded', *WITH_KANI_BINDINGS,
+               fixture('bounded-kani')) == 0, 'a committed log and manifest must admit the record at bounded'
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [f'{fixture("bounded-kani")}: bounded []'], \
+        'the command reports the admitted level and no blocking reason'
+    assert captured.err == '', 'a record whose artefacts all bind produces no refusal'
+
+
+def test_a_manifest_with_a_rewritten_harness_list_is_refused_by_the_command(tmp_path, capsys):
+    """Refuse a record whose manifest bytes no longer match the digest it binds.
+
+    The record still cites the committed log, and the log still parses. Only
+    the manifest's digest is stale, so a gate that matched on the log identity
+    would admit the record anyway. The record is written to a scratch path and
+    keeps naming the *committed* manifest, because that is the artefact whose
+    bytes changed: a scratch manifest path would be refused earlier, for not
+    being a repository-relative path, and the digest check would never run.
+    """
+    record = json.loads((FIXTURES / 'bounded-kani.json').read_text(encoding='utf-8'))
+    record['result_artefacts'][0]['sha256'] = 'f' * 64
+    tampered = tmp_path / 'tampered.json'
+    tampered.write_text(json.dumps(record), encoding='utf-8')
+
+    assert run('--as-of', '2026-11-11', '--require', 'bounded', *WITH_KANI_BINDINGS,
+               str(tampered)) == 1, 'a manifest whose bytes changed cannot carry the record verdict'
+    captured = capsys.readouterr()
+    assert 'verdict-self-reported' in captured.out, 'the refused verdict blocks bounded admission'
+    assert 'its digest differs from the one the record binds' in captured.err, \
+        'the command names the digest mismatch rather than some other refusal'
 
 
 def test_complete_test_record_is_admitted_at_tested(capsys):

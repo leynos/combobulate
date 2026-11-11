@@ -573,8 +573,15 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   - Status (2026-11-07): `BuildProfile`, both profile routes, snapshots, and
     the native-consumer end-to-end test exist and `make typecheck` passed.
     Gate profiles (DL-18) are present in the Makefile as `GATE_PROFILE` and
-    per-profile Cargo invocations. Neither is marked done: the milestone
-    closes only when its own gates and conformance check pass together.
+    per-profile Cargo invocations.
+  - Status (2026-11-11): every EP-M3 item is ticked. The two single-feature
+    profiles `macros-only` and `polars-only` now exist and each has its own
+    BDD scenario in `tests/build_profiles.rs`, which is what makes a swapped
+    feature mapping fail; `tests/polars_surface_ui.rs` builds the
+    `polars-surface-absent` fixture and requires the gated names to be
+    unresolved. This box stays unticked until the settled-candidate gate set
+    passes, because the milestone closes only when its own gates and
+    conformance check pass together.
   - [x] (2026-11-08) CI shape (DL-03, DL-14). Earlier drafts recorded this as
     blocked on a sponsor checkpoint. That checkpoint no longer existed:
     ADR-0008's 2026-10-31 amendment (`684f687`, on `main`) retired the
@@ -638,6 +645,13 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
         with its probe-by-probe evidence in
         `1-2-1-ep-m3-and-ep-m4.md`'s EP-M5 checklist; log
         `/tmp/killmatrix-trust-1-2-1-profiles-and-trust-audit.out`.
+  - Status (2026-11-11): every EP-M5 item is ticked and its artefact exists.
+    The gate binds both artefacts a verdict is decided from, not just the
+    log: `VerifiedLogResult` carries the manifest path and digest, so a record
+    whose own manifest cannot be read no longer borrows a neighbour's verdict
+    for the same capture, and two records citing one capture against
+    different manifests keep one verdict each. This box stays unticked until
+    the settled-candidate gate set passes, for the same reason EP-M3's does.
 - [x] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
   - [x] (2026-11-08) AC-04 acceptance record.
         `spec/measurements/ac-04-profile-build-budgets-2026-11-08.json` is
@@ -657,6 +671,12 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
         ticked. The task's detail bullet stays unticked because
         `export_roadmap.py` refuses a ticked detail. `AC-07` reads
         `inconclusive` on this CI shape, as DL-14 records, not `pass`.
+  - [x] (2026-11-11) Milestone records reconciled. EP-M3 and EP-M5 now carry
+        dated status notes naming what is complete and why their boxes wait
+        for the settled-candidate gates, so a reader no longer has to infer
+        progress from an unticked box. The delivery note
+        `docs/revision-0.3.md` signposts the facade features, `BuildProfile`,
+        the native-only configuration, and the trust-audit command.
 
 Each Red step records its log path and the names of the failing tests here. A
 Red state is never committed on its own, because it fails `make test`; it is

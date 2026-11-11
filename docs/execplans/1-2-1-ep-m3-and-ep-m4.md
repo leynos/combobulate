@@ -7,9 +7,11 @@ state of EP-M3 to EP-M6 so a later session can resume without re-deriving what
 has already been built and what has already been ruled out.
 
 Each milestone's own checklist is complete. EP-M4 and EP-M6 are delivered and
-the parent plan ticks them; EP-M3 and EP-M5 stay unticked there because each
-closes only when its gates and conformance check pass together, which is the
-settled-candidate gate run rather than any item on the checklist below.
+the parent plan ticks them. EP-M3 and EP-M5 are complete in the tree and their
+items are all ticked below; their *boxes* in the parent plan stay unticked
+until the settled-candidate gate set passes on the branch head, because each
+milestone closes only when its gates and conformance check pass together, and
+that run is a fact about a candidate rather than about a checklist.
 
 It is a **living document**: update the checklists and the notes as work
 proceeds, not at the end.
@@ -32,7 +34,7 @@ reusable once its claims become true, but it must not be applied before then.
 
 `1-2-1-profiles-and-trust-audit`, branched from `main` at `408aba7`.
 
-## EP-M3 status: checklist complete, pending the candidate gates (2026-11-11)
+## EP-M3 status: checklist complete, gates pending (2026-11-11)
 
 Specification: parent plan lines 2250-2320.
 
@@ -444,7 +446,7 @@ validates a claim's shape, not its truth. Ticking 1.2.1 does **not** claim
 AC-07 passes: DL-14 restarts the 20-run window on the new three-job shape, so
 the control reads `inconclusive` until the window refills.
 
-## EP-M5 status: checklist complete, pending the candidate gates (2026-11-11)
+## EP-M5 status: checklist complete, gates pending (2026-11-11)
 
 Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
 1957-2046.

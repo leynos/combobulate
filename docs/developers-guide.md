@@ -1003,9 +1003,11 @@ Proof evidence for a record-sourced component goes in `spec/evidence/` as a
 schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
 before committing, and see
 [evidence and decision records](evidence-and-decision-records.md) for the
-fields, levels, reason codes, and log-parser obligations. Until a log parser is
-registered for a verifier, its records are self-reported and cannot satisfy a
-`proof` or `bounded` component.
+fields, levels, reason codes, and log-parser obligations. `kani` is registered
+and has an adapter, so a Kani record citing a committed log, its harness
+manifest, and that manifest's sources is decided from those artefacts. A
+verifier with no registered adapter, such as Verus, remains self-reported and
+cannot satisfy a `proof` or `bounded` component.
 
 ### Compose the evidence-admission boundary
 
@@ -1024,8 +1026,9 @@ when the tool, the log path and digest, and the manifest path and digest all
 agree, so two records citing one capture against different manifests are two
 verdicts and neither can answer for the other. A record whose log, manifest,
 or audit it cannot bind falls back to `self-reported` and is rejected; Verus
-has no adapter yet and is always self-reported. `abstract_record(record, context)` maps a schema-valid record to
-the ten-field model; `admit` applies the pure MS-0 to MS-2 rules and returns an
+has no adapter yet and is always self-reported.
+`abstract_record(record, context)` maps a schema-valid record to the ten-field
+model; `admit` applies the pure MS-0 to MS-2 rules and returns an
 admission level with reason codes. Neither function reads files, the clock, the
 environment, or the network. Add producers at the adapter boundary and pass
 explicit inputs into the gate.
@@ -1380,7 +1383,11 @@ Kani harness inventory (all subjects are deliberately separate fixture bodies):
 Run definitions, the tool-produced inventory, source digests, exact commands,
 and statuses accompany the captured logs. Exit status alone cannot establish a
 verdict: the impossible-cover subject exits successfully. The corpus is not
-registered as an evidence parser until task 1.2.1's parser milestone passes.
+itself an evidence parser; `kani` is registered in
+`spec/evidence-reason-codes.json` and read by the adapter described under
+[the evidence-admission boundary](#compose-the-evidence-admission-boundary).
+A record still cites the corpus's inventory as its manifest, and a manifest
+whose digest differs from the one the record binds is refused.
 
 `uv run --script scripts/run_verifier_probes.py verifier-free` builds the
 comparison sources in a rootless container without verifier installations. This
