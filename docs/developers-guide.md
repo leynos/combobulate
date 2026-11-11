@@ -1018,9 +1018,13 @@ digest, and deriving the admission-relevant facts. Tool registration alone is
 insufficient. The CLI has one verifier adapter, `evidence_binding`: it reads a
 Kani record's committed log, its harness manifest, and that manifest's sources,
 binds them, and passes a `VerifiedLogResult` and `VerifiedTrustAudit` into the
-gate. A record whose log, manifest, or audit it cannot bind falls back to
-`self-reported` and is rejected; Verus has no adapter yet and is always
-self-reported. `abstract_record(record, context)` maps a schema-valid record to
+gate. Both values carry the manifest identity as well as the log's, because a
+verdict is decided against a manifest: a result is matched to a record only
+when the tool, the log path and digest, and the manifest path and digest all
+agree, so two records citing one capture against different manifests are two
+verdicts and neither can answer for the other. A record whose log, manifest,
+or audit it cannot bind falls back to `self-reported` and is rejected; Verus
+has no adapter yet and is always self-reported. `abstract_record(record, context)` maps a schema-valid record to
 the ten-field model; `admit` applies the pure MS-0 to MS-2 rules and returns an
 admission level with reason codes. Neither function reads files, the clock, the
 environment, or the network. Add producers at the adapter boundary and pass

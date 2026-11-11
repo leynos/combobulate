@@ -176,7 +176,9 @@ def trust_audit(root: Path, record: Mapping[str, object],
 
     The audit is bound to the record's single result artefact, which is the
     harness manifest: the gate compares that identity with the record's, so an
-    audit of some other manifest cannot stand in for this one.
+    audit of some other manifest cannot stand in for this one. The verdict
+    adapter binds the same artefact for the same reason, so the two results of
+    one record describe one manifest rather than two records' worth of them.
 
     Parameters
     ----------
@@ -280,11 +282,14 @@ def checked_inputs(root: Path, records: list[Mapping[str, object]],
 
     Examples
     --------
-    Two records citing the same log contribute one result, not two. The gate
-    asks that exactly one candidate match a record's ``(tool, path, digest)``,
-    so a duplicated identity would make a sound record look ambiguous and
-    demote it to ``verdict-self-reported``. Equal values came from the same
-    bytes, so they are one fact.
+    The same record admitted twice contributes one result, not two. The gate
+    asks that exactly one candidate match a record's tool, log and manifest
+    identity, so a duplicated result would make a sound record look ambiguous
+    and demote it to ``verdict-self-reported``. Equal values came from the same
+    bytes decided against the same manifest, so they are one fact. Two records
+    citing one log but binding different manifests are *not* equal: each
+    verdict was decided against a different claim set, and collapsing them
+    would let one record answer for the other.
     """
     logs, audits, refusals = [], [], []
     for record in records:

@@ -271,5 +271,91 @@ class BoundAuditStopsAtTheManifest(ScratchCheckout, unittest.TestCase):
             'a module the manifest does not bind must refuse the audit, not be read')
 
 
+class AVerdictBelongsToItsOwnManifest(ScratchCheckout, unittest.TestCase):
+    """Require a parsed verdict to be bound to the manifest it was decided against.
+
+    A Kani decision is taken from two artefacts: the log says what happened and
+    the record's harness manifest says what that meant. Binding the result to the
+    log alone therefore lets two records that share a capture share one verdict,
+    and the gate's "exactly one candidate" count then behaves in both directions
+    badly. A record whose own manifest never parsed could be admitted on its
+    neighbour's decision, and a sound record citing a capture some other record
+    also cites could be demoted because the count reached two.
+
+    Each case here writes a second manifest into the checkout, so the two
+    records differ only in the artefact the verdict is supposed to be tied to.
+    """
+
+    def _bind_together(self, *records):
+        """Admit every record in one pass, as the CLI and the closure check do."""
+        logs, audits = checked_inputs(self.root, list(records), KANI).pair()
+        context = AdmissionContext(exceptions={}, bindings=fixture_bindings(), as_of=AS_OF,
+                                   log_parsers=KANI, verified_log_results=logs,
+                                   verified_trust_audits=audits)
+        return [admit_evidence(record, context) for record in records]
+
+    def _second_record(self, relative: str, document: dict) -> dict:
+        """Write one more manifest, and return a record that binds it and the fixture's log."""
+        text = json.dumps(document, indent=2) + '\n'
+        self._commit(relative, text, f'Add {relative}')
+        record = self.record()
+        record['id'] = 'EV-SECOND'
+        record['result_artefacts'] = [{'path': relative, 'sha256': digest(self.root / relative)}]
+        return record
+
+    def test_a_manifest_the_adapter_cannot_read_yields_no_borrowed_verdict(self):
+        """Reject a record whose own manifest never parsed, whatever it cites.
+
+        The manifest here is valid JSON with a usable ``sources`` list and no
+        ``harnesses`` array, so the scanner can audit it and the verdict adapter
+        refuses it. Bound by the log alone, the refused verdict would be absent
+        from the result list while the neighbour's result still matched the
+        record's log identity — and the record would admit at ``bounded`` on a
+        decision taken against a manifest it does not name.
+        """
+        document = json.loads((self.root / MANIFEST).read_text(encoding='utf-8'))
+        del document['harnesses']
+        second = self._second_record('scripts/tests/fixtures/evidence/no-harnesses.json', document)
+        sound, broken = self._bind_together(self.record(), second)
+        self.assertEqual((sound.level, sound.reasons), (Level.BOUNDED, ()),
+                         'the sound record must still admit on its own verdict')
+        self.assertEqual((broken.level, broken.reasons), (Level.REJECTED, ('verdict-self-reported',)),
+                         'a record whose manifest cannot be decided from must not borrow a verdict')
+
+    def test_two_records_sharing_a_log_keep_a_verdict_each(self):
+        """Admit both records when one capture is decided against two manifests.
+
+        The two manifests here are identical in content, which is the hard
+        case: nothing about the decision distinguishes them, so only the
+        artefact identity can. Matching on the log alone finds two candidates
+        for each record and demotes both.
+        """
+        document = json.loads((self.root / MANIFEST).read_text(encoding='utf-8'))
+        second = self._second_record('scripts/tests/fixtures/evidence/twin-manifest.json', document)
+        first, twin = self._bind_together(self.record(), second)
+        self.assertEqual((first.level, first.reasons), (Level.BOUNDED, ()),
+                         'the fixture record must keep its verdict when a twin manifest exists')
+        self.assertEqual((twin.level, twin.reasons), (Level.BOUNDED, ()),
+                         'a second record decided against its own manifest must admit too')
+
+    def test_a_record_sharing_a_log_with_a_different_decision_keeps_its_own(self):
+        """Keep one record's verdict when another decides differently from the same log.
+
+        Narrowing the manifest to its claim alone leaves the log reporting a
+        control the manifest does not declare, which the decision function
+        refuses. The two results then differ in every fact — but they share a
+        log identity, so a result list matched on the log alone would hold two
+        candidates for the sound record and demote it.
+        """
+        document = json.loads((self.root / MANIFEST).read_text(encoding='utf-8'))
+        document['harnesses'] = [item for item in document['harnesses'] if item['role'] == 'claim']
+        second = self._second_record('scripts/tests/fixtures/evidence/claim-only-manifest.json', document)
+        sound, narrowed = self._bind_together(self.record(), second)
+        self.assertEqual((sound.level, sound.reasons), (Level.BOUNDED, ()),
+                         'a sound record must not be demoted by another record citing its log')
+        self.assertIs(narrowed.level, Level.REJECTED,
+                      'the narrowed manifest decides tool-error, which cannot be admitted')
+
+
 if __name__ == '__main__':
     unittest.main()

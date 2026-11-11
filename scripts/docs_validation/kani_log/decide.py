@@ -62,12 +62,6 @@ class Decision:
     run_mode: str
     reason: str = ''
 
-    def result(self) -> dict[str, object]:
-        """Render the decision in the shape a ``VerifiedLogResult`` takes."""
-        return {'outcome': self.outcome, 'bounds': self.bounds,
-                'witness_statuses': self.witness_statuses,
-                'negative_controls': self.negative_controls, 'run_mode': self.run_mode}
-
 
 @dataclass(frozen=True, slots=True)
 class _Observed:

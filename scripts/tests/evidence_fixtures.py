@@ -81,7 +81,8 @@ def verified_log_results(record: dict) -> tuple[VerifiedLogResult, ...]:
         return ()
     method = record['method']
     return (VerifiedLogResult(
-        tool=method['tool'], log_path=log['path'], log_sha256=log['sha256'], outcome=record['outcome'],
+        tool=method['tool'], log_path=log['path'], log_sha256=log['sha256'],
+        manifest_path=MANIFEST, manifest_sha256=DIGEST, outcome=record['outcome'],
         bounds=record['bounds']['kind'],
         witness_statuses=tuple(item['status'] for item in record['success_witnesses']),
         negative_controls=tuple((item['required'], item['observed']) for item in record['negative_controls']),

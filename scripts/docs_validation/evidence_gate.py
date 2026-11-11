@@ -241,7 +241,22 @@ def binding_state(record: Mapping[str, object], bindings: Mapping[str, Mapping[s
 def _matching_verified_log_result(
     record: Mapping[str, object], context: AdmissionContext,
 ) -> VerifiedLogResult | None:
-    """Find a registered adapter result bound to this record and its derived facts."""
+    """Find the registered adapter result bound to this record and its derived facts.
+
+    The identity is both artefacts the adapter read, not only the log. A verdict
+    is decided from the log *and* the record's harness manifest, so two records
+    citing one capture against different manifests are two distinct results.
+    Matching on the log alone would make them compete for one slot, and the
+    count test would then demote both — every record but the first to cite a
+    capture would lose its parsed verdict. Comparing the manifest as well keeps
+    the count meaningful: one record, one manifest, one result.
+
+    Examples
+    --------
+    Two records citing ``a.log`` with different manifests find one candidate
+    each, and both admit on their own facts; the same record appearing twice
+    still finds exactly one, because the binding seam de-duplicated it.
+    """
     method = record['method']
     source = record['verdict_source']
     log = source['log']
@@ -252,9 +267,15 @@ def _matching_verified_log_result(
         return None
     if tool not in context.log_parsers:
         return None
-    identity = (tool, str(log['path']), str(log['sha256']))
-    candidates = [result for result in context.verified_log_results
-                  if (result.tool, result.log_path, result.log_sha256) == identity]
+    artefact = manifest_artefact(record)
+    if artefact is None:
+        return None
+    identity = (tool, str(log['path']), str(log['sha256']), artefact)
+    candidates = [
+        result for result in context.verified_log_results
+        if (result.tool, result.log_path, result.log_sha256,
+            (result.manifest_path, result.manifest_sha256)) == identity
+    ]
     if len(candidates) != 1:
         return None
     if not candidates[0].matches_record(record):

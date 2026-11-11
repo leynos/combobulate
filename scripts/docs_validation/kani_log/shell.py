@@ -237,11 +237,20 @@ def _manifest_sources(document: Mapping[str, object]) -> tuple[tuple[str, str], 
     return tuple(bound)
 
 
-def _verified_result(decision, log_path: str, log_sha256: str) -> VerifiedLogResult:
-    """Render one decision in the shape the gate compares with the record."""
+def _verified_result(decision, log_path: str, log_sha256: str,
+                     manifest_path: str, manifest_sha256: str) -> VerifiedLogResult:
+    """Render one decision in the shape the gate compares with the record.
+
+    Both artefact identities travel with the facts. The decision was taken
+    against one manifest's harness list, so a result that named only the log
+    could stand in for a record bound to a different — or unparseable —
+    manifest that happened to cite the same capture.
+    """
     return VerifiedLogResult(
-        tool=KANI, log_path=log_path, log_sha256=log_sha256, outcome=decision.outcome,
-        bounds=decision.bounds, witness_statuses=decision.witness_statuses,
+        tool=KANI, log_path=log_path, log_sha256=log_sha256,
+        manifest_path=manifest_path, manifest_sha256=manifest_sha256,
+        outcome=decision.outcome, bounds=decision.bounds,
+        witness_statuses=decision.witness_statuses,
         negative_controls=decision.negative_controls, run_mode=decision.run_mode)
 
 
@@ -292,8 +301,10 @@ def bind_verdict(root: Path, record: Mapping[str, object]) -> VerifiedLogResult 
     try:
         log = parse(log_data.decode('utf-8', errors='replace'))
     except KaniLogError as error:
-        return _verified_result(from_error(error), log_path, log_sha256)
-    return _verified_result(decide(log, manifest), log_path, log_sha256)
+        return _verified_result(from_error(error), log_path, log_sha256,
+                                manifest_path, manifest_sha256)
+    return _verified_result(decide(log, manifest), log_path, log_sha256,
+                            manifest_path, manifest_sha256)
 
 
 def bound_sources(root: Path, record: Mapping[str, object]) -> Mapping[str, bytes] | MissingEvidence:
