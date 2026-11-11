@@ -1778,7 +1778,7 @@ reports 797,253,505, and both are identical across their five samples. The two
 runs differ in more than one way — the compiler moved and the candidate tree
 changed — so these numbers do not attribute the difference, and `du -sb`
 reports apparent size rather than a content hash either way. The cold Polars
-median fell from 50.15 s to 58.99 s while the target shrank, which is the
+median rose from 50.15 s to 58.99 s while the target shrank, which is the
 opposite of what a causal reading of size would predict; wall time on a hosted
 runner moves with the neighbourhood, which is why the control registers a
 ceiling an order of magnitude away from the measurement rather than a tight

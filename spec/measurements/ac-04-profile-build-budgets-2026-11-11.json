@@ -82,7 +82,7 @@
     {
       "id": "native-incremental",
       "description": "Incremental rebuild with no default features after touching the crate root.",
-      "command": "touch src/lib.rs; cargo build --workspace --no-default-features",
+      "command": "printf '\\n' >> src/lib.rs; cargo build --workspace --no-default-features; git checkout -- src/lib.rs",
       "metric": "Build wall time",
       "unit": "s",
       "samples": [
@@ -93,12 +93,12 @@
         0.15
       ],
       "median": 0.15,
-      "notes": "Run incremental, native-only profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up build. The timed region begins after the touch, and the touched file is restored with `git checkout` after each sample so that the next touch is what makes the rebuild incremental rather than a no-op."
+      "notes": "Run incremental, native-only profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up build. The timed region begins after the source change, and the file is restored with `git checkout -- <path>` after each sample so that the next sample's change makes the rebuild incremental rather than a no-op. The workflow appends a newline to the file with `printf` rather than running `touch`, so the timed build sees contents that differ from `HEAD`, not merely an mtime that is newer."
     },
     {
       "id": "polars-incremental",
       "description": "Incremental rebuild with default features after touching the crate root.",
-      "command": "touch src/lib.rs; cargo build --workspace",
+      "command": "printf '\\n' >> src/lib.rs; cargo build --workspace; git checkout -- src/lib.rs",
       "metric": "Build wall time",
       "unit": "s",
       "samples": [
@@ -109,12 +109,12 @@
         0.33
       ],
       "median": 0.33,
-      "notes": "Run incremental, polars-enabled profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up build, and the touched file is restored after each sample."
+      "notes": "Run incremental, polars-enabled profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up build; the source file is changed by appending a newline with `printf` and restored with `git checkout -- <path>` after each sample."
     },
     {
       "id": "proof-incremental",
       "description": "Incremental Kani codegen after touching the kernel crate root.",
-      "command": "touch crates/combobulate-kernel/src/lib.rs; kani-driver kani --only-codegen --manifest-path crates/combobulate-kernel/Cargo.toml",
+      "command": "printf '\\n' >> crates/combobulate-kernel/src/lib.rs; kani-driver kani --only-codegen --manifest-path crates/combobulate-kernel/Cargo.toml; git checkout -- crates/combobulate-kernel/src/lib.rs",
       "metric": "Build wall time",
       "unit": "s",
       "samples": [
@@ -125,7 +125,7 @@
         0.28
       ],
       "median": 0.28,
-      "notes": "Run incremental, proof profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up Kani codegen, and the touched kernel file is restored after each sample."
+      "notes": "Run incremental, proof profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up Kani codegen; the kernel source file is changed by appending a newline with `printf` and restored with `git checkout -- <path>` after each sample."
     }
   ]
 }
