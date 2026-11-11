@@ -1094,6 +1094,18 @@ fences in migration documents. It requires each fence to have a unique adjacent
 `tested-example` marker and reads the example from the published Markdown. Use
 it from documentation contract tests; it is not a general Markdown parser.
 
+The documentation style guide asks for a
+`docs/v<major>-<minor>-<patch>-migration-guide.md` whenever a release changes
+observable behaviour, and this repository deliberately has none. The guide is
+keyed to a release, and the crate is unreleased at `0.1.0` with
+`publish = false` under [ADR-0004](adrs/adr-0004-licence-and-publication.md);
+the repository does not even carry tags, so there is no previous release to
+name as the guide's other endpoint.
+[Library changes in this delivery](revision-0.3.md) serves the consumer
+instead: it states what changed since the last tagged state and says in its own
+opening that "upgrade" means moving to a later commit. Create the first real
+migration guide when a consumer can name a version they are leaving.
+
 The `scripts/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
 validation context. They do not replace repository Markdown lint or Rust
