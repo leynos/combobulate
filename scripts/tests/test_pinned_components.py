@@ -40,14 +40,14 @@ class PinnedToolchainTests(unittest.TestCase):
     def test_both_quote_styles_and_comments_are_read(self) -> None:
         """Single quotes, a trailing comment, and spacing are all layout."""
         for text in (
-            '[toolchain]\nchannel = "nightly-2026-08-27"\n',
-            "[toolchain]\nchannel = 'nightly-2026-08-27'\n",
-            '[toolchain]\nchannel   =   "nightly-2026-08-27"  # pin\n',
+            '[toolchain]\nchannel = "nightly-2026-11-06"\n',
+            "[toolchain]\nchannel = 'nightly-2026-11-06'\n",
+            '[toolchain]\nchannel   =   "nightly-2026-11-06"  # pin\n',
         ):
             with self.subTest(text=text):
                 result = components(text, 'pinned_toolchain')
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, 'nightly-2026-08-27', 'channel')
+                self.assertEqual(result.stdout, 'nightly-2026-11-06', 'channel')
 
 
 class PinnedComponentsTests(unittest.TestCase):

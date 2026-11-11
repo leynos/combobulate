@@ -91,8 +91,11 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
    longest required job; nearest-rank p90 over the 20 most recent runs, with
    any failed, timed-out, cancelled, or missing job failing the control; the
    window restarts empty on the new shape, so AC-07 is inconclusive when task
-   1.2.1 is ticked. The sponsor approves the final text, with measured job
-   sizes, at the EP-M3 checkpoint and before the first attempt on the new shape.
+   1.2.1 is ticked. **Amendment (2026-11-08):** the EP-M3 approval checkpoint
+   was withdrawn. ADR-0008's 2026-10-31 amendment (`684f687`) made an
+   acceptance control "an ordinary reviewed file", so the amended text lands
+   through a pull request and Git history is the record. The text above is the
+   one registered, and no separate approval precedes it.
 3. AC-04 amendment (DL-15). AC-04 registers "the 1.2.1 foundational probe in
    its three feature profiles" with the calibration probe's manifest as its
    only source. Recommended: rebind its sources to the workspace manifests and
@@ -154,8 +157,10 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
   under ADR-0008; newer releases (for example Kani 0.68.0) are not adopted by
   this task.
 - `.github/workflows/ci.yml` is a frozen AC-07 source (sha256 `a7df0545…`).
-  It must not change until the AC-07 amendment is sponsor-approved, and the
-  amendment and the change land in one commit.
+  It must not change until the AC-07 amendment is approved, and the amendment
+  and the change land in one commit. Under ADR-0008's 2026-10-31 amendment,
+  review of that pull request is the approval, so the one-commit rule is what
+  remains binding.
 - Every hosted `build-test` attempt counts towards AC-07, and any failed,
   timed-out, or cancelled attempt fails it. No push may add the Polars
   dependency to the facade until the approved CI shape lands in the same push.
@@ -548,9 +553,130 @@ directed on 2026-10-27 that Q3 join `in_scope_questions`. Trade-offs are in
     expected failure, and by adding a gate-only fixture and observing the
     bidirectional comparison reject it.
 - [ ] EP-M3. Feature profiles, `BuildProfile`, gate profiles, and CI shape.
-- [ ] EP-M4. Profile record, pin consistency, and ADR-0010.
+  - [x] (2026-11-07) Delivery-vehicle amendment (DL-20). PR #22 delivered
+    EP-M1 and EP-M2 against `main` and its head branch was deleted at merge,
+    which left EP-M3 to EP-M6 without a vehicle and contradicted DL-20's
+    one-stacked-PR-per-milestone shape. DL-20 now requires one pull request
+    for the whole plan, so the assessment scope, readiness gate, and delivered
+    branch are the same object. Branch `1-2-1-profiles-and-trust-audit`.
+  - [x] (2026-11-07) Postmortem of the premature readiness (PR #22). The PR
+    left draft at 2026-11-03T12:27:35Z on a completeness reply that cleared
+    only "EP-M1 and EP-M2, not … roadmap task 1.2.1", which
+    `pr-babysitting`'s clearing rule names as not cleared. Every assessment
+    request listed the four unimplemented milestones under `Known
+    limitations:`, so CodeRabbit answered the scope question the request
+    asked and the completeness question never arose.
+  - [x] (2026-11-07) The three readiness-contract gaps are filed upstream as
+    `leynos/agent-helper-scripts#271`, cross-referenced to the
+    `pr-babysitting` text each one sits beside, so the fix is a
+    cross-reference rather than a second copy of the rule.
+  - Status (2026-11-07): `BuildProfile`, both profile routes, snapshots, and
+    the native-consumer end-to-end test exist and `make typecheck` passed.
+    Gate profiles (DL-18) are present in the Makefile as `GATE_PROFILE` and
+    per-profile Cargo invocations.
+  - Status (2026-11-11): every EP-M3 item is ticked. The two single-feature
+    profiles `macros-only` and `polars-only` now exist and each has its own
+    BDD scenario in `tests/build_profiles.rs`, which is what makes a swapped
+    feature mapping fail; `tests/polars_surface_ui.rs` builds the
+    `polars-surface-absent` fixture and requires the gated names to be
+    unresolved. This box stays unticked until the settled-candidate gate set
+    passes, because the milestone closes only when its own gates and
+    conformance check pass together.
+  - [x] (2026-11-08) CI shape (DL-03, DL-14). Earlier drafts recorded this as
+    blocked on a sponsor checkpoint. That checkpoint no longer existed:
+    ADR-0008's 2026-10-31 amendment (`684f687`, on `main`) retired the
+    acceptance-control approval ceremony, so the amendment is an ordinary
+    reviewed file and the shape and the amendment land in one commit as DL-03
+    requires. `ci.yml` now has three required jobs — `build-test` on
+    `GATE_PROFILE: native-only`, `polars-lint` and `polars-test` on
+    `GATE_PROFILE: polars-enabled` — all on `ubuntu-24.04` with an eight-minute
+    timeout. `coverage-main.yml` names the same native-only features so the
+    ratchet compares like with like. `spec/acceptance-controls.json` registers
+    the amended workload as `ci-required-jobs`, and
+    `ci_controls.py`/`preregistration.py` accept one required job per
+    unconditioned `ci.yml` job. Because DL-14 restarts the 20-run window,
+    `AC-07` reads `inconclusive` when task 1.2.1 is ticked, not `pass`.
+  - Note (2026-11-07): `make lint` and `make test` iterate `GATE_PROFILES`, so
+    running them is what verifies DL-18's two-profile isolation. There is no
+    separate profile gate to run.
+- [x] EP-M4. Profile record, pin consistency, and ADR-0010.
+  - Status (2026-11-07): `spec/toolchain-profiles.json`, its schema,
+    `scripts/docs_validation/toolchain_profiles.py`, ADR-0010, and D16 exist.
+  - [x] (2026-10-22) Sponsor acceptance of D16 and ADR-0010, and the AC-04
+    amendment text. `spec/decisions.json` records D16 as accepted on
+    2026-10-22 with its approval reference, and ADR-0010's status line records
+    the same date. The AC-04 amendment needed no separate approval: ADR-0008's
+    2026-10-31 amendment (`684f687`) retired the acceptance-control approval
+    ceremony, so an acceptance control is an ordinary reviewed file.
 - [ ] EP-M5. Trust-audit scanner, Kani log parser, and gate binding.
-- [ ] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
+  - [x] (2026-11-07) Mutation census over both packages. mutmut 3.6.0, run from
+    a private virtualenv at `/tmp/mut-venv` rather than through `uv tool run`
+    as the plan's dependency note states; the census trees are `/tmp/mut-work2`
+    (`kani_log/`) and `/tmp/mut-trust` (`trust_audit/`). Measured, and
+    re-read from each tree's own `mutmut results --all true`:
+
+    | package       | mutants | killed | survived | timeout |
+    | ------------- | ------- | ------ | -------- | ------- |
+    | `kani_log/`   | 1077    | 1038   | 35       | 4       |
+    | `trust_audit/`| 923     | 839    | 75       | 9       |
+
+  - [x] (2026-11-07) `kani_log/` triage complete: 21 survivors killed by
+    `scripts/tests/test_kani_parser_survivors.py` and
+    `scripts/tests/test_kani_binding_survivors.py`, and 15 recorded as
+    equivalents in those modules' docstrings. The four timeouts are the
+    stall family, which the same suites now bound with a five-second
+    `SIGALRM` (`BoundedParserCase`), so a mutant that drops a consuming call
+    fails its case instead of hanging the gate. Every claim was re-measured
+    by writing the mutant into the live source and running the suites:
+    `/tmp/verify-parser-1-2-1-profiles-and-trust-audit.out`,
+    `/tmp/verify-bind-1-2-1-profiles-and-trust-audit.out`, and
+    `/tmp/verify-bind4-1-2-1-profiles-and-trust-audit.out`.
+  - Status (2026-11-07): `scripts/docs_validation/trust_audit/`, `kani_log/`,
+    `verified_evidence.py`, the evidence-binding shell, and the `"kani"`
+    registry entry exist.
+  - [x] (2026-11-07) `trust_audit/` triage complete: the widened
+        eleven-module census is 23 killed and 23 equivalent across 46 probes,
+        with nothing unaccounted for. Eleven modules is every
+        `scripts/tests/test_trust_audit*.py`; the earlier selection named only
+        seven, so six suites never ran under mutation and 42 mutants survived
+        on that alone. Two production defects and four real test gaps fell out
+        of the triage; the residual equivalents are argued in
+        `test_trust_audit_structure_survivors.py`'s module docstring. Recorded
+        with its probe-by-probe evidence in
+        `1-2-1-ep-m3-and-ep-m4.md`'s EP-M5 checklist; log
+        `/tmp/killmatrix-trust-1-2-1-profiles-and-trust-audit.out`.
+  - Status (2026-11-11): every EP-M5 item is ticked and its artefact exists.
+    The gate binds both artefacts a verdict is decided from, not just the
+    log: `VerifiedLogResult` carries the manifest path and digest, so a record
+    whose own manifest cannot be read no longer borrows a neighbour's verdict
+    for the same capture, and two records citing one capture against
+    different manifests keep one verdict each. This box stays unticked until
+    the settled-candidate gate set passes, for the same reason EP-M3's does.
+- [x] EP-M6. AC-04 measurement, documents, decisions, and roadmap tick.
+  - [x] (2026-11-08) AC-04 acceptance record.
+        `spec/measurements/ac-04-profile-build-budgets-2026-11-08.json` is
+        written from hosted run `42435047681` at `5f53ed6cc4eb`, every job
+        green, and the artefact carries the `ImageOS`/`ImageVersion` pair the
+        schema requires. All six medians are inside their registered
+        thresholds; the record's verdict is `pass`. Making the job able to
+        produce a bindable record took three hosted failures: it observed only
+        `rustc` and `kani` while AC-04 freezes five toolchains, and the Verus
+        and Z3 observations each needed their own fix. Recorded in
+        `1-2-1-ep-m3-and-ep-m4.md`'s EP-M4 checklist.
+  - [x] (2026-11-08) Documents, decisions, and tick. `spec/task-completion.json`
+        carries a `1.2.1` record citing D16, whose session approval reference
+        names that decision alone; `docs/roadmap.md` ticks the task; the
+        export and `docs/validation-results.json` are regenerated.
+        `check_docs.py` reports `roadmap-status: pass` with 5 of 72 tasks
+        ticked. The task's detail bullet stays unticked because
+        `export_roadmap.py` refuses a ticked detail. `AC-07` reads
+        `inconclusive` on this CI shape, as DL-14 records, not `pass`.
+  - [x] (2026-11-11) Milestone records reconciled. EP-M3 and EP-M5 now carry
+        dated status notes naming what is complete and why their boxes wait
+        for the settled-candidate gates, so a reader no longer has to infer
+        progress from an unticked box. The delivery note
+        `docs/revision-0.3.md` signposts the facade features, `BuildProfile`,
+        the native-only configuration, and the trust-audit command.
 
 Each Red step records its log path and the names of the failing tests here. A
 Red state is never committed on its own, because it fails `make test`; it is
@@ -584,13 +710,17 @@ committed together with its Green change.
 - Observation: Polars 0.55.2 is the newest Rust release and declares no
   `rust-version`. Evidence: `cargo info polars@0.55.2`. Impact: its supported
   compilers are established only by building it in each profile.
-- Observation: control AC-07 freezes `.github/workflows/ci.yml` by digest, and
-  the checker accepts exactly one `ci-build-test` workload and reads only the
-  `build-test` job's runner and timeout. Evidence:
+- Observation: control AC-07 once froze `.github/workflows/ci.yml` by digest
+  and the checker accepted exactly one `ci-build-test` workload, reading only
+  the `build-test` job's runner and timeout. Evidence:
   `scripts/docs_validation/acceptance_registration.py`,
   `scripts/docs_validation/ci_controls.py`,
-  `scripts/docs_validation/preregistration.py`. Impact: any CI change needs an
-  amendment and checker changes (DL-14).
+  `scripts/docs_validation/preregistration.py`. Impact: DL-14 changed the
+  workload to every required job, so the checker now reads one `RequiredJob`
+  per unconditioned job and the calibration check still reads the registered
+  `ci-build-test` record, which records the 220 s calibration p90 that set the
+  registered eight-minute budget. No source digest is bound by the control:
+  source identity is Git's job.
 - Observation: hosted CI never runs `make test`; its test step is the shared
   `generate-coverage` action with default features. Evidence:
   `.github/workflows/ci.yml` lines 105-126. Impact: profile checks need their
@@ -1601,9 +1731,19 @@ committed together with its Green change.
   adapter crate as a rejected option, to be revisited when task 1.2.6 or 4.2.1
   needs facade-owned traits in the adapter. Date/Author: 2026-10-22, planning
   agent.
-- DL-20. Decision: delivery uses one stacked PR per milestone (the
-  `github-stacks` skill), with a commit after each gated Green or Refactor
-  step. Date/Author: 2026-10-22, planning agent.
+- DL-20. Decision (amended 2026-11-07): delivery uses **one pull request for
+  the whole plan**, with a commit after each gated Green or Refactor step. The
+  original 2026-10-22 text specified one stacked PR per milestone through the
+  `github-stacks` skill. That shape was not executed: PR #22 carried EP-M1 and
+  EP-M2 together against `main`, and its head branch was deleted when it
+  merged, so EP-M3 to EP-M6 had no delivery vehicle and the plan's stated shape
+  contradicted its delivery. A single pull request makes the assessment scope,
+  the readiness gate, and the delivered branch the same object, so a readiness
+  decision cannot be read against one milestone while the plan requires six.
+  The milestone sequence is unchanged: each still ends with its own gates and
+  conformance check, and the pull request is not marked ready until CodeRabbit
+  has assessed it as a complete implementation of this plan. Date/Author:
+  2026-10-22, planning agent; amended 2026-11-07, implementation agent.
 - DL-21. Decision: prefer `rust-prover-tools` as installer and runner
   for Kani and Verus, following the `kani` and `verus` skills' project
   on-ramps. Pins live in `tools/kani/VERSION`, `tools/verus/VERSION`,
@@ -2097,7 +2237,8 @@ Every milestone ends with `make check-fmt`, `make lint`, `make test`,
 `make design-check`, `make markdownlint`, and `make spelling`, run sequentially
 by the `scrutineer` agent, plus the milestone's own commands. Every milestone
 records its Red evidence in `Progress`, ends with the conformance check in
-`Milestones and plateaus`, and is delivered as one stacked PR.
+`Milestones and plateaus`, and is delivered in one pull request covering the
+whole plan (DL-20, amended 2026-11-07).
 
 ### EP-M1. Prototype: toolchain, profile, and hosted-cost probes
 
@@ -2283,8 +2424,11 @@ the approved CI shape and the AC-07 amendment.
   `preregistration.py`, and their tests to accept the amended AC-07 workload.
   Record the amendment, with its new `ci.yml` digest, in
   `spec/acceptance-controls.json` in the same commit.
-- Checkpoint: the sponsor approves the AC-07 amendment text and job sizes
-  before this push. Status is `BLOCKED` until then.
+- Checkpoint: ~~the sponsor approves the AC-07 amendment text and job sizes
+  before this push.~~ **Withdrawn (2026-11-08).** ADR-0008's 2026-10-31
+  amendment (`684f687`) made an acceptance control an ordinary reviewed file,
+  so no separate approval precedes the push and this milestone is no longer
+  blocked on one. The delivered CI shape is recorded in `Progress`.
 - Green: rerun the scenarios, snapshots, end-to-end test, and both profile
   routes; then the common gates and the hosted CI on the push.
 - Acceptance: VO-4, VO-5, VO-14; both profiles lint and test locally; hosted
@@ -2385,7 +2529,20 @@ Feature: Build profiles report what was compiled
 
 - Red: add a check rejecting a `deferred` candidate ADR subject whose roadmap
   item is ticked; with CA3 and CA5 still deferred to 1.2.1, a trial tick in a
-  temporary copy must fail it.
+  temporary copy must fail it. **Done.**
+  `scripts/docs_validation/candidate_deferral.py` is the `candidate-deferral`
+  check, registered immediately before `roadmap-status` so its verdict is
+  recorded before closure reports ticks. The Red control is real rather than
+  hypothetical:
+  `scripts/tests/test_candidate_deferral.py::CommittedDeferrals::test_trial_tick_in_a_temporary_copy_fails`
+  copies the committed register, ticks `- [ ] 1.2.1.` to `- [x] 1.2.1.` in a
+  copy of `docs/roadmap.md`, re-exports `spec/roadmap.json` from that copy, and
+  requires the real register to fail naming both CA3 and CA5. Two faults beyond
+  the Red step are also rejected: a deferral naming an item the export does not
+  declare (otherwise a typo disables the guard silently), and a deferral that a
+  step-level tick has outrun, since D07 defers CA7 to the step `2.4` rather
+  than to a task. A step counts as ticked only when every task beneath it is,
+  so partly finished work leaves its deferral standing.
 - AC-04: extend `profile-measurements.yml` with the amended protocol: five cold
   and five warm builds per profile, profiles alternating run by run, one
   discarded warm-up; a fresh `CARGO_TARGET_DIR` for each cold run, deleted
@@ -2395,11 +2552,20 @@ Feature: Build profiles report what was compiled
   target; an untimed `cargo fetch --locked`; `CARGO_BUILD_JOBS=4`; one step per
   timed invocation; `nproc`, memory, and image version recorded; partial
   results uploaded with `if: always()`. The proof profile is Kani codegen of
-  the kernel through `make install-kani`, `make kani-check`, and
-  `prover-tools kani exec --cwd crates/combobulate-kernel` with
-  `--extra-arg=--only-codegen` (plus `-Z unstable-options` if Kani 0.67.0
-  requires it), timing only the `kani exec` step. Commit the acceptance record
-  to `spec/measurements/` and report its verdict honestly.
+  the kernel through `make install-kani`, `make kani-check`, and the **direct
+  driver** —
+  `kani-driver kani --only-codegen --manifest-path
+  crates/combobulate-kernel/Cargo.toml` —
+  timing only that step. The helper's `prover-tools kani exec` route cannot be
+  used: it refuses this repository's
+  `[profile.dev] codegen-backend = "cranelift"` with
+  `Kani exec cannot prove isolation of Cargo backend configuration`, which is
+  DL-24's recorded behaviour and the route the corpus already takes.
+  `--only-codegen` is a stable driver option, so `-Z unstable-options` is not
+  required. The kernel also needs `#[cfg(kani)] extern crate kani;` — Kani
+  refuses a `#![no_std]` input that never names it, and the kernel has no
+  harness until task 1.2.4. Commit the acceptance record to
+  `spec/measurements/` and report its verdict honestly.
 - Add `.github/workflows/formal.yml` (DL-23), not required for merging,
   triggered weekly and by manual dispatch, which runs `make install-kani`,
   `make kani-check`, `make kani-log-corpus`, `make install-verus`, and
@@ -2615,6 +2781,13 @@ Dependencies (caret requirements):
 - Python: none new; Hypothesis 6.168.5 and pytest 9.1.1 are already pinned.
   `mutmut` runs through `uv tool run` at a pinned version, not as a project
   dependency.
+  - Deviation (2026-11-07): the census ran as mutmut 3.6.0 from a private
+    virtualenv at `/tmp/mut-venv`, not through `uv tool run`. The version is
+    the same one this note pins, and running it from a throwaway environment
+    keeps it out of the project's dependency set for the same reason. `uv`
+    resolves `mutmut` from the network on each invocation, so pinning the
+    rebuild to a local environment is what made re-running the census
+    reproducible during triage.
 - Proof tools (not Cargo dependencies of shipped crates): Kani 0.67.0, Verus
   0.2026.09.06.8dea4a2, Z3 4.16.0, and `vstd` `=0.0.0-2026-09-06-0133` in the
   Verus probe's crate-based candidates only; the exact pin is required because

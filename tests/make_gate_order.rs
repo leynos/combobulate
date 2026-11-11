@@ -80,6 +80,53 @@ fn inherited_with_act_does_not_reach_nested_make_all() {
     );
 }
 
+/// Confirms an inherited hosted profile cannot narrow the asserted route.
+///
+/// A hosted job supplies the single profile it was scheduled to measure, and
+/// the Makefile honours it, so a nested run that accepted the value would
+/// record half the stages this file asserts — the failure hosted CI reported
+/// for the neighbouring Make contracts. Both delivery routes are injected,
+/// because they need different defences: an exported variable is stopped by
+/// removing it from the child, while a value replayed through `MAKEFLAGS`
+/// outranks the assignment a child `make` merely inherits and is displaced
+/// only by a command-line assignment on the child itself.
+#[test]
+fn inherited_gate_profile_does_not_narrow_the_asserted_route() {
+    let test_binary = std::env::current_exe().expect("find current test executable");
+    for (description, variable, value) in [
+        ("exported variable", "GATE_PROFILE", "polars-enabled"),
+        (
+            "MAKEFLAGS replay",
+            "MAKEFLAGS",
+            "-- GATE_PROFILE=polars-enabled",
+        ),
+    ] {
+        let output = Command::new(&test_binary)
+            .args([
+                "--exact",
+                "parallel_all_runs_each_gate_in_order",
+                "--nocapture",
+            ])
+            .env(variable, value)
+            .output()
+            .expect("run the exact gate-order test with a hosted profile supplied");
+        assert!(
+            output.status.success(),
+            "the gate-order test must pin the default route against a {description}: {}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        // The filter names one test; if that name changes, an exact filter can
+        // match nothing and the child still exits successfully, which would let
+        // this case pass without having run the assertion it exists to repeat.
+        let summary = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            summary.contains("running 1 test") && summary.contains("1 passed; 0 failed"),
+            "the nested run against a {description} must execute exactly the named test: {summary}"
+        );
+    }
+}
+
 /// Proves a failing Python docstring gate stops `make lint` at that stage.
 ///
 /// The `all` composite covers the same claim through its own test. This one
@@ -104,12 +151,15 @@ fn parallel_lint_stops_after_a_failing_interrogate_gate() {
             "prepare-ui-gate",
             "preflight",
             "doc",
-            "clippy",
+            "clippy-native-only",
+            "clippy-polars-enabled",
             "preflight",
-            "whitaker",
+            "whitaker-native-only",
+            "whitaker-polars-enabled",
             "interrogate"
         ],
-        "nothing may run after a failing Interrogate gate"
+        "nothing may run after a failing Interrogate gate; both Clippy profiles must precede \
+         Whitaker"
     );
 }
 
@@ -121,11 +171,15 @@ fn parallel_all_stops_after_the_first_failing_gate() {
         "gate-formatting",
         "markdown-formatting",
         "preflight",
-        "clippy",
-        "whitaker",
+        "clippy-native-only",
+        "clippy-polars-enabled",
+        "whitaker-native-only",
+        "whitaker-polars-enabled",
         "interrogate",
-        "nextest",
-        "doctest",
+        "nextest-native-only",
+        "doctest-native-only",
+        "nextest-polars-enabled",
+        "doctest-polars-enabled",
         "spelling",
     ] {
         let expected = expected_stages_through(failure);
@@ -242,13 +296,16 @@ fn assert_contaminated_lint_run(
             "prepare-ui-gate",
             "preflight",
             "doc",
-            "clippy",
+            "clippy-native-only",
+            "clippy-polars-enabled",
             "preflight",
-            "whitaker",
+            "whitaker-native-only",
+            "whitaker-polars-enabled",
             "interrogate"
         ]
         .map(str::to_owned),
-        "make -j lint must finish Whitaker before Interrogate"
+        "make -j lint must finish both Clippy profiles before Whitaker, and Whitaker before \
+         Interrogate"
     );
     assert_coverage_contamination(run.invocations);
     whitaker::assert_repository_route(
@@ -288,7 +345,7 @@ fn assert_clean_lint_run(
 fn parallel_lint_never_starts_whitaker_after_clippy_failure() {
     let probe = GateProbe::new().expect("create private gate probes");
     let output = probe
-        .run("lint", Some("clippy"))
+        .run("lint", Some("clippy-native-only"))
         .expect("execute failing Make lint");
     assert!(
         !output.status.success(),
@@ -303,9 +360,9 @@ fn parallel_lint_never_starts_whitaker_after_clippy_failure() {
             "prepare-ui-gate",
             "preflight",
             "doc",
-            "clippy"
+            "clippy-native-only"
         ],
-        "Whitaker must not start after Clippy fails"
+        "a failing native-only Clippy must stop the loop before the Polars-enabled profile"
     );
     assert!(
         probe.whitaker_records().is_err(),

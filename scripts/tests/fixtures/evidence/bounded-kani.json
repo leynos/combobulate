@@ -1,0 +1,90 @@
+{
+  "schema_version": 2,
+  "id": "EV-0103",
+  "component": "PF01.proof@1.2.4",
+  "claim": "Checked cardinality is exact for extents below 2^16.",
+  "recorded_on": "2026-11-07",
+  "evidence_kind": "bounded",
+  "outcome": "verified",
+  "outcome_detail": "The committed default_unwind capture verified its claim and rejected its seeded control.",
+  "bounds": {
+    "kind": "partial",
+    "statement": "Extents below 2^16."
+  },
+  "binding": {
+    "executable_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "specification_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "target": "x86_64-unknown-linux-gnu",
+    "features": [],
+    "semantic_policy": "checked shape/cost arithmetic",
+    "backend_profile": null,
+    "implementation_relation": "Must bind to the shipped analyser; no implementation exists in this pack."
+  },
+  "method": {
+    "tool": "kani",
+    "version": "0.67.0",
+    "solver": "cadical",
+    "solver_version": "2.0.0",
+    "command": "kani --harness harnesses::verified --harness harnesses::seeded_wrapping_mutant --exact --verbose --default-unwind 2",
+    "run_mode": "full-profile"
+  },
+  "declared_assumptions": [
+    "Pinned compiler, verifier and solver soundness.",
+    "The corpus's two `kani::assume` calls encode the claim's real precondition."
+  ],
+  "trust_audit": {
+    "status": "audited",
+    "items": [
+      {
+        "item": "assume",
+        "location": "tools/verifier-fixtures/kani-corpus/src/harnesses.rs:40:11",
+        "covered_by": "The corpus's two `kani::assume` calls encode the claim's real precondition."
+      },
+      {
+        "item": "assume",
+        "location": "tools/verifier-fixtures/kani-corpus/src/harnesses.rs:54:11",
+        "covered_by": "The corpus's two `kani::assume` calls encode the claim's real precondition."
+      },
+      {
+        "item": "assume",
+        "location": "tools/verifier-fixtures/kani-corpus/src/harnesses.rs:65:11",
+        "covered_by": "The corpus's two `kani::assume` calls encode the claim's real precondition."
+      },
+      {
+        "item": "should_panic",
+        "location": "tools/verifier-fixtures/kani-corpus/src/harnesses.rs:80:9",
+        "covered_by": "Pinned compiler, verifier and solver soundness."
+      }
+    ]
+  },
+  "success_witnesses": [
+    {
+      "id": "cover-nontrivial",
+      "description": "The boundary below saturation is reachable.",
+      "status": "satisfied"
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "seeded-wrapping-mutant",
+      "required": true,
+      "expected_failure": "assertion.1",
+      "observed": "rejected-as-intended"
+    }
+  ],
+  "verdict_source": {
+    "kind": "log-parser",
+    "log": {
+      "path": "scripts/tests/fixtures/kani_logs/default_unwind.log",
+      "sha256": "39a6814c6ee7587cdc1224f9ce9ade8faee37e0d20126d5625cb67ec71db6095"
+    }
+  },
+  "exception": null,
+  "result_artefacts": [
+    {
+      "path": "scripts/tests/fixtures/evidence/default-unwind-manifest.json",
+      "sha256": "9ecd2e905909152b2c9bf7df268abb1ca3295ba828bbbcad78f037d4a074244c"
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+name: Formal verification
+
+# Keep the verifier route warm until task 1.2.4 adds product harnesses.
+# Nothing here gates a merge: AC-01, AC-02, and the proof profile of AC-04 are
+# pre-registered controls measured on their own runs, and a weekly job whose
+# conclusion drifts would silently change a control's environment. This job
+# only fails when the pinned verifier installation or the corpus capture it
+# drives has rotted (DL-23).
+
+'on':
+  schedule:
+    # Weekly, offset from the daily mutation run and the Monday design check so
+    # the two do not contend for the same hosted minutes.
+    - cron: '43 5 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize runs per ref, and never cancel one: a dispatch during the weekly
+# run queues rather than racing it, and a cancelled capture would leave a
+# half-written corpus to be diagnosed later.
+concurrency:
+  group: formal-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verifier-route:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: '4'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
+      - name: Install the linker toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends clang lld mold
+      - name: Install the pinned build standard
+        run: make install-build-tools
+      - name: Install the pinned Kani release
+        run: make install-kani
+      - name: Require the calibrated Kani version
+        run: make kani-check
+      - name: Report the product-proof status
+        # Task 1.2.4 owns the product harnesses. `make kani` prints
+        # "FORMAL-SKIP: <target> has no product harnesses until task 1.2.4" and
+        # succeeds, which states the route honestly rather than implying a
+        # green proof that does not exist (DL-23).
+        run: make kani
+      - name: Capture the Kani log corpus
+        run: make kani-log-corpus
+      - name: Install the checksum-verified Verus release
+        run: make install-verus
+      - name: Compare the pinned Verus wiring candidates
+        run: make verus-probe
+      - name: Record the installed verifier versions
+        if: always()
+        run: |
+          mkdir -p formal-results
+          # The host facts are written first so they survive a probe failure and
+          # still identify the machine that produced the artifact.
+          nproc > formal-results/nproc
+          free -b > formal-results/memory
+          printf '%s\n' "${ImageOS-}" "${ImageVersion-}" > formal-results/image
+          # `uv run prover-tools` resolves a command from the project
+          # environment, which this repository does not have, so the earlier
+          # Make targets never made it available here. Read the pin the Makefile
+          # reads and run the helper from that source; a resolution or probe
+          # failure must fail the step rather than leave an error message in
+          # the artifact under the name of a version.
+          prover_tools_repository="$(awk '/^repository:/ { print $2 }' tools/rust-prover-tools/REF)"
+          prover_tools_ref="$(awk '/^ref:/ { print $2 }' tools/rust-prover-tools/REF)"
+          if ! printf '%s' "$prover_tools_ref" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "tools/rust-prover-tools/REF must pin a 40-hex ref; got '$prover_tools_ref'" >&2
+            exit 1
+          fi
+          prover_tools_source="git+${prover_tools_repository}@${prover_tools_ref}"
+          uv tool run --from "$prover_tools_source" prover-tools kani check-version \
+            --repo-root . --kani-command kani > formal-results/kani-version 2>&1
+          uv tool run --from "$prover_tools_source" prover-tools verus --help \
+            > formal-results/verus-help 2>&1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: formal-results
+          path: formal-results/

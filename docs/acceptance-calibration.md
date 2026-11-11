@@ -4,7 +4,10 @@ This report records how the pre-registered acceptance controls `AC-01` to
 `AC-07` in `spec/acceptance-controls.json` got their thresholds. Threshold
 selection (decision D12) rests on realistic measurements on the development
 machine, extrapolated to the GitHub-hosted runner class (4 vCPUs, 16 GB, x64),
-with the evidence recorded.
+with the evidence recorded. `AC-07`'s threshold came from the single
+`build-test` job that predated DL-03; DL-14 widened its workload to every
+required pull-request job without changing the threshold, and the window
+restarts empty on the new CI shape.
 [ADR-0008](adrs/adr-0008-acceptance-control-pre-registration.md) states the
 protocol. Calibration runs are not acceptance evidence: no control has been
 measured for acceptance yet, and every threshold is registered, not met.
@@ -14,13 +17,13 @@ measured for acceptance yet, and every threshold is registered, not met.
 Machine records live in `spec/calibration/`. Following decision D11, they name
 hardware by class only.
 
-| Record                         | Hardware class                                                   | Purpose                                 |
-| ------------------------------ | ---------------------------------------------------------------- | --------------------------------------- |
-| `shared-workloads-local.json`  | Shared development host: AMD Ryzen 9 3900, 12 cores, 24 threads  | Local half of the extrapolation factor  |
-| `shared-workloads-runner.json` | GitHub-hosted runner, `ubuntu-24.04` image 20261004.327          | Hosted half of the extrapolation factor |
-| `verifier-probe.json`          | Shared development host                                          | Verus and Kani costs (`AC-01`, `AC-02`) |
-| `builds.json`                  | Shared development host                                          | Build costs (`AC-04`; informs `AC-03`)  |
-| `ci-history.json`              | GitHub-hosted runners, last 20 job attempts regardless of result | Pull request CI critical path (`AC-07`) |
+| Record                         | Hardware class                                                            | Purpose                                 |
+| ------------------------------ | ------------------------------------------------------------------------- | --------------------------------------- |
+| `shared-workloads-local.json`  | Shared development host: AMD Ryzen 9 3900, 12 cores, 24 threads           | Local half of the extrapolation factor  |
+| `shared-workloads-runner.json` | GitHub-hosted runner, `ubuntu-24.04` image 20261004.327                   | Hosted half of the extrapolation factor |
+| `verifier-probe.json`          | Shared development host                                                   | Verus and Kani costs (`AC-01`, `AC-02`) |
+| `builds.json`                  | Shared development host                                                   | Build costs (`AC-04`; informs `AC-03`)  |
+| `ci-history.json`              | GitHub-hosted runners, last 20 `build-test` attempts regardless of result | Pre-DL-03 CI critical path (`AC-07`)    |
 
 _Table 1: Calibration records._
 
@@ -35,7 +38,9 @@ than tightening them.
 1. Toolchains. Rust nightly-2026-08-27 with the repository's Cranelift dev
    profile; Verus 0.2026.09.06.8dea4a2 (Rust 1.98.0) with Z3 4.16.0; Kani
    0.67.0 (CBMC with CaDiCaL); Python 3.14; Polars 0.55.2 with the `lazy`
-   feature, provisional until task 1.2.1 pins it.
+   feature, no longer provisional: task 1.2.1 pinned it in the facade manifest
+   and in `spec/toolchain-profiles.json` under ADR-0010, so the calibration
+   measured the release the gate now builds rather than a candidate.
 2. Probe. `tools/calibration/cardinality-probe/` is a standalone crate, outside
    the repository package and workspace, with a checked cardinality function
    (zero extent first, then checked multiplication), a Verus proof of its full
@@ -50,12 +55,26 @@ than tightening them.
    two Polars cold runs used a fresh Cargo target directory and
    `SCCACHE_RECACHE=1` through the managed cache wrapper so each compiler
    result was recomputed under the same admission queue.
-5. CI history. Select the 20 most recent eligible job attempts by job start
+5. CI history. Select the 20 most recent eligible workflow runs by run start
    time from the `Design contracts` and `CI` workflows on `main` and pull
    requests. Enumerate every rerun separately and do not filter by conclusion.
-   Record each duration and conclusion, excluding queue time. Failed,
-   timed-out, cancelled, and missing attempts remain in the window. For
-   `AC-07`, any such attempt fails independently of the duration percentile.
+   Record each run's longest required pull-request job, excluding queue time,
+   and that job's conclusion. Failed, timed-out, cancelled, and missing jobs
+   remain in the window. For `AC-07`, any such job fails its run independently
+   of the duration percentile, and an acceptance record therefore carries each
+   required job's own conclusion in `required_job_conclusions`: the longest
+   job's conclusion alone cannot state whether a shorter job failed. That map
+   must name every job the workflow declares, not merely one of them; the
+   checker compares it with the workflow's own required set and refuses a
+   record that omits a job, since an unlisted failure would otherwise read as a
+   success. A required job the run never created is recorded with the value
+   `missing`, which is the schema's own and not one of GitHub's conclusions:
+   omitting its key is a malformed record, and writing a conclusion nobody
+   observed would misreport the run. Recording `missing` fails AC-07 on its
+   own, independently of the duration percentile. The record in
+   `spec/calibration/ci-history.json` predates DL-14 and samples the single
+   `build-test` job instead, which is why its workload is registered as
+   `ci-build-test`.
 6. Extrapolation factor. The same workload ran on both machines: the design
    checks' `unittest` and pytest suites at commit 398d2f6. Hosted to local
    median ratios were 0.92 (`unittest`: 28.4 s against 30.9 s) and 1.17
@@ -80,7 +99,7 @@ than tightening them.
 | `AC-04` | Cold builds: native 2.02 s, proof-capable 4.08 s, Polars 163.21 s median across five runs (60–381.84 s) | Polars cold 10 minutes, frozen before the final two runs; every other profile and phase 1 minute |
 | `AC-05` | Not calibrated: no executor exists                                                                      | Upper bound of each runtime ratio at most 1.5 (design target)                                    |
 | `AC-06` | Not calibrated: a correctness bound                                                                     | No tracked peak above its admitted bound; no untracked allocation                                |
-| `AC-07` | CI `build-test` p90 over 20 attempts: 220 s                                                             | All attempts succeed; p90 within 8 minutes; timeout is 8 minutes                                 |
+| `AC-07` | Pre-DL-03 `build-test` p90 over 20 attempts: 220 s (workload `ci-build-test`)                           | Every required job succeeds; longest required-job p90 within 8 minutes; timeout is 8 minutes     |
 
 _Table 2: Calibrated measurements and registered thresholds._
 
@@ -104,7 +123,12 @@ _Table 2: Calibrated measurements and registered thresholds._
 - The calibration snapshot contains 20 eligible `build-test` attempts, all
   successful, with a nearest-rank p90 of 220 s. The `Design contracts` snapshot
   retains one failed attempt in its 20-attempt window; success status is not
-  used to choose the sample.
+  used to choose the sample. That window predates DL-03, so its per-job samples
+  are not per-run longest-job samples and cannot be re-read as one. DL-14
+  therefore registers the amended workload as `ci-required-jobs` and leaves the
+  registered eight-minute p90 budget in place; the new window starts empty when
+  the three-job shape lands, and `AC-07` reports `inconclusive` until 20 runs
+  have completed.
 
 ## Reproduction
 
@@ -133,8 +157,9 @@ gh run list --workflow ci.yml --limit 100
 ```
 
 Then enumerate every workflow run attempt and its jobs through the Actions REST
-API. Select the 20 most recently started eligible jobs without a conclusion
-filter. `recorded_on` for acceptance evidence is the measurement date, not the
-date when the record is committed. Record new calibration under
-`spec/calibration/` with the measurement-record schema, and change a threshold
-only with a calibration record that supports the new value.
+API. Select the 20 most recently started eligible workflow runs without a
+conclusion filter, and take each run's longest required job. `recorded_on` for
+acceptance evidence is the measurement date, not the date when the record is
+committed. Record new calibration under `spec/calibration/` with the
+measurement-record schema, and change a threshold only with a calibration
+record that supports the new value.

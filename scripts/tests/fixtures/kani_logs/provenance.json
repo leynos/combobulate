@@ -10,7 +10,7 @@
     "tools/verifier-fixtures/kani-corpus/Cargo.lock": "ast-sha256:d8747b36c8f26fb2073e58a53f85e96de77ed86d1efcb9c78152de8f57cbda50",
     "tools/verifier-fixtures/kani-corpus/src/lib.rs": "ast-sha256:2f47cc460c4effec0daa91c5ad514cce0edcb9cb7bc5e0f749f47335e6de8618",
     "tools/verifier-fixtures/kani-corpus/src/harnesses.rs": "ast-sha256:5cc6e6009b6331cc064423037bc92ca11f327160b74df6792b0464a7b6e23ea8",
-    "tools/verifier-fixtures/kani-corpus/harnesses.json": "ast-sha256:66ff155d44eeac62df361e9174f58676339014d85ab56de9fd74e24c211098d3",
+    "tools/verifier-fixtures/kani-corpus/harnesses.json": "ast-sha256:02ede7d589b0dc8fc1ec8173fb70f4cee43fdd0e7678f2e38074691487e6490e",
     "tools/verifier-fixtures/kani-corpus/kani-list.json": "ast-sha256:69e5ae2f473227735a936ed1626aa006f1755ed28512a32e46498190e597f0a2",
     "scripts/run_verifier_probes.py": "ast-sha256:9fc54a226e52d0cebc06088446213e01e4f47ac262a58d65a541f1bc96f67320",
     "scripts/kani_probe.py": "ast-sha256:6fb6116274dd37372f39eaf3244336709ba40dd4e042c1c3d5d3464970226c89",
@@ -254,6 +254,26 @@
       "exit_code": 0,
       "log": "scripts/tests/fixtures/kani_logs/in_place.log",
       "sha256": "474067388ff3f5cee3a556ab12deeebb087c1ba68c5a1e245a20a88927b517e2"
+    },
+    {
+      "id": "default_unwind",
+      "expected_exit": 1,
+      "command": [
+        "~/.kani/kani-0.67.0/bin/kani-driver",
+        "kani",
+        "--harness",
+        "harnesses::verified",
+        "--harness",
+        "harnesses::seeded_wrapping_mutant",
+        "--exact",
+        "--verbose",
+        "--default-unwind",
+        "2"
+      ],
+      "cwd": "tools/verifier-fixtures/kani-corpus",
+      "exit_code": 1,
+      "log": "scripts/tests/fixtures/kani_logs/default_unwind.log",
+      "sha256": "39a6814c6ee7587cdc1224f9ce9ade8faee37e0d20126d5625cb67ec71db6095"
     }
   ]
 }

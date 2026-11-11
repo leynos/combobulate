@@ -69,13 +69,21 @@ const CARGO_SCRIPT: &str = concat!(
     "fi\n",
     "if [ \"$#\" -eq 4 ] && [ \"$1\" = nextest ] && \\\n",
     "       [ \"$2\" = run ] && [ \"$3\" = --all-targets ] && \\\n",
-    "       [ \"$4\" = --all-features ]; then\n",
+    "       [ \"$4\" = --no-default-features ]; then\n",
+    "  :\n",
+    "elif [ \"$#\" -eq 3 ] && [ \"$1\" = nextest ] && \\\n",
+    "       [ \"$2\" = run ] && [ \"$3\" = --all-targets ]; then\n",
     "  :\n",
     "elif [ \"$#\" -eq 3 ] && [ \"$1\" = test ] && \\\n",
-    "       [ \"$2\" = --all-targets ] && [ \"$3\" = --all-features ]; then\n",
+    "       [ \"$2\" = --all-targets ] && [ \"$3\" = --no-default-features ]; then\n",
+    "  :\n",
+    "elif [ \"$#\" -eq 2 ] && [ \"$1\" = test ] && [ \"$2\" = --all-targets ]; then\n",
     "  :\n",
     "elif [ \"$#\" -eq 4 ] && [ \"$1\" = test ] && [ \"$2\" = --doc ] && \\\n",
-    "         [ \"$3\" = --workspace ] && [ \"$4\" = --all-features ]; then\n",
+    "         [ \"$3\" = --workspace ] && [ \"$4\" = --no-default-features ]; then\n",
+    "  :\n",
+    "elif [ \"$#\" -eq 3 ] && [ \"$1\" = test ] && [ \"$2\" = --doc ] && \\\n",
+    "         [ \"$3\" = --workspace ]; then\n",
     "  :\n",
     "else\n",
     "  exit 64\n",
@@ -156,6 +164,8 @@ pub(super) struct MakeOptions {
     pub(super) nextest_available: bool,
     /// Caller value intentionally overridden by Make's `WITH_ACT=0` assignment.
     pub(super) caller_with_act: Option<&'static str>,
+    /// Inherited `MAKEFLAGS`, used to replay a hosted job's variable override.
+    pub(super) caller_makeflags: Option<&'static str>,
     /// Supported caller flags forwarded to repository Cargo commands.
     pub(super) caller_rustflags: Option<&'static str>,
     /// Backend override used to prove preflight rejects a contaminated caller.
@@ -166,7 +176,21 @@ pub(super) struct MakeOptions {
 
 impl MakeOptions {
     /// Applies caller values after the harness removes unsupported ambient routing.
+    ///
+    /// A hosted job exports `GATE_PROFILE` for the single profile it was
+    /// scheduled to measure, and the Makefile honours that, so an inherited
+    /// value would halve the commands these tests assert. Pinning
+    /// `GATE_PROFILE=both` on the command line outranks an inherited value
+    /// however it arrives: a command-line assignment also beats the same
+    /// assignment replayed through `MAKEFLAGS`, and clearing the variable stops
+    /// an exported value from winning on level.
     fn apply_caller_environment(&self, command: &mut Command) {
+        command.arg("GATE_PROFILE=both").env_remove("GATE_PROFILE");
+        if let Some(makeflags) = self.caller_makeflags {
+            command.env("MAKEFLAGS", makeflags);
+        } else {
+            command.env_remove("MAKEFLAGS");
+        }
         if let Some(caller_with_act) = self.caller_with_act {
             command.env("WITH_ACT", caller_with_act);
         } else {

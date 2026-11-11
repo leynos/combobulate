@@ -1,6 +1,7 @@
 """Require the design checker to reject a stale roadmap export."""
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 import tempfile
@@ -16,6 +17,9 @@ from docs_validation.ledger import check_roadmap_export
 from export_roadmap import parse_roadmap
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# A roadmap task line: the checkbox marker followed by its dotted identifier.
+TASK_CHECKBOX = re.compile(r'^- \[([ x])\] (\d+(?:\.\d+)+)\.', re.M)
 
 
 class RoadmapExportGate(unittest.TestCase):
@@ -33,11 +37,21 @@ class RoadmapExportGate(unittest.TestCase):
 
     def test_export_preserves_completed_and_open_task_statuses(self):
         """Keep completed and open status when exporting the canonical roadmap."""
-        roadmap = parse_roadmap((ROOT / 'docs/roadmap.md').read_text(encoding='utf-8'))
+        text = (ROOT / 'docs/roadmap.md').read_text(encoding='utf-8')
+        roadmap = parse_roadmap(text)
         tasks = {task['id']: task for phase in roadmap['phases']
                  for step in phase['steps'] for task in step['tasks']}
-        self.assertEqual(tasks['1.1.1']['status'], 'done', 'a checked task must remain completed in the export')
-        self.assertEqual(tasks['1.2.1']['status'], 'open', 'an unchecked task must remain open in the export')
+        # Compare against the Markdown checkboxes rather than a named task, so
+        # ticking one cannot leave this test asserting a stale status, and so
+        # the rule still fails if the export inverts or ignores a checkbox.
+        checked = {identifier for mark, identifier in TASK_CHECKBOX.findall(text) if mark == 'x'}
+        open_ids = {identifier for mark, identifier in TASK_CHECKBOX.findall(text) if mark == ' '}
+        self.assertTrue(checked and open_ids,
+                        'the roadmap must keep a checked and an unchecked task to exercise both directions')
+        self.assertEqual({task_id for task_id, task in tasks.items() if task['status'] == 'done'}, checked,
+                         'every checked task must export as done')
+        self.assertEqual({task_id for task_id, task in tasks.items() if task['status'] == 'open'}, open_ids,
+                         'every unchecked task must export as open')
 
     def test_current_committed_export_passes_the_checker(self) -> None:
         """Accept the checked-in export when it matches a fresh canonical-roadmap export."""

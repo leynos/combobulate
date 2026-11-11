@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:combobulate:design:toolchain-profiles:0.1",
+  "title": "Combobulate toolchain, profile, and capability record",
+  "description": "The single source of pins (VO-7), the four build profiles, and the evidence status of every capability probe (VO-8). A pin recorded here must agree with every other site that names it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "revision",
+    "target",
+    "toolchains",
+    "pins",
+    "profiles",
+    "supported_toolchain_set",
+    "capabilities",
+    "trusted_computing_base"
+  ],
+  "properties": {
+    "revision": {"const": "0.1"},
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["triple", "usize_bits", "architecture"],
+      "properties": {
+        "triple": {"const": "x86_64-unknown-linux-gnu"},
+        "usize_bits": {"const": 64},
+        "architecture": {"const": "x64"}
+      }
+    },
+    "toolchains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "kani", "verus", "polars"],
+      "properties": {
+        "repository": {"$ref": "#/$defs/toolchain"},
+        "kani": {"$ref": "#/$defs/toolchain"},
+        "verus": {"$ref": "#/$defs/toolchain"},
+        "polars": {"$ref": "#/$defs/toolchain"}
+      }
+    },
+    "pins": {
+      "description": "Every pinned revision and where it is asserted, so VO-7 can compare the record with its sources.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_channel",
+        "repository_rustc_commit",
+        "kani_release",
+        "kani_toolchain",
+        "kani_cbmc",
+        "kani_cadical",
+        "verus_release",
+        "verus_rust",
+        "verus_z3",
+        "verus_vstd",
+        "polars_release",
+        "prover_tools_ref"
+      ],
+      "properties": {
+        "repository_channel": {"$ref": "#/$defs/pin"},
+        "repository_rustc_commit": {"$ref": "#/$defs/pin"},
+        "kani_release": {"$ref": "#/$defs/pin"},
+        "kani_toolchain": {"$ref": "#/$defs/pin"},
+        "kani_cbmc": {"$ref": "#/$defs/pin"},
+        "kani_cadical": {"$ref": "#/$defs/pin"},
+        "verus_release": {"$ref": "#/$defs/pin"},
+        "verus_rust": {"$ref": "#/$defs/pin"},
+        "verus_z3": {"$ref": "#/$defs/pin"},
+        "verus_vstd": {"$ref": "#/$defs/pin"},
+        "polars_release": {"$ref": "#/$defs/pin"},
+        "prover_tools_ref": {"$ref": "#/$defs/pin"}
+      }
+    },
+    "profiles": {
+      "description": "The four build profiles. `native-only` and `polars-enabled` are ordinary gate profiles; the two proof profiles are verifier compilations.",
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/profile"}
+    },
+    "supported_toolchain_set": {
+      "description": "Answers ToR Q3 in place of one MSRV: the toolchains the repository promises to build with, each with its role.",
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/supported_toolchain"}
+    },
+    "capabilities": {
+      "description": "Every backend capability probe from EP-M1, with its status and, where a status claims an observation, the committed log that shows it.",
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/capability"}
+    },
+    "trusted_computing_base": {
+      "description": "Each tool whose output this repository's evidence depends on, and why it is trusted.",
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/tcb_entry"}
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "role"],
+      "properties": {
+        "name": {"$ref": "#/$defs/text"},
+        "version": {"$ref": "#/$defs/text"},
+        "role": {"$ref": "#/$defs/text"},
+        "components": {"type": "array", "items": {"$ref": "#/$defs/text"}}
+      }
+    },
+    "pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "sites"],
+      "properties": {
+        "value": {"$ref": "#/$defs/text"},
+        "sites": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+$"}
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "crates", "features", "toolchain", "commands"],
+      "properties": {
+        "id": {"enum": ["native-only", "polars-enabled", "proof-kani", "proof-verus"]},
+        "crates": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+        "features": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["macros", "polars"],
+          "properties": {
+            "macros": {"type": "boolean"},
+            "polars": {"type": "boolean"}
+          }
+        },
+        "toolchain": {"$ref": "#/$defs/text"},
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/text"}
+        }
+      }
+    },
+    "supported_toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "role", "ordinary"],
+      "properties": {
+        "id": {"$ref": "#/$defs/text"},
+        "version": {"$ref": "#/$defs/text"},
+        "role": {"$ref": "#/$defs/text"},
+        "ordinary": {
+          "type": "boolean",
+          "description": "True when an ordinary consumer needs this toolchain; false when only proof work does."
+        }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^PC[0-9]{2}$"},
+        "name": {"$ref": "#/$defs/text"},
+        "status": {"enum": ["documented-upstream-opportunity", "tested", "unsupported", "inconclusive"]},
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": {
+            "path": {"type": "string", "pattern": "^(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+$"},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        },
+        "refusal_rule": {"$ref": "#/$defs/text"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"enum": ["tested", "unsupported", "inconclusive"]}}, "required": ["status"]},
+          "then": {"required": ["evidence"]},
+          "else": {"not": {"required": ["evidence"]}}
+        }
+      ]
+    },
+    "tcb_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "role", "trust_basis"],
+      "properties": {
+        "tool": {"$ref": "#/$defs/text"},
+        "role": {"$ref": "#/$defs/text"},
+        "trust_basis": {"$ref": "#/$defs/text"},
+        "verified": {
+          "type": "boolean",
+          "description": "False when the repository cannot check the distribution itself; the record says so rather than implying a review."
+        }
+      }
+    }
+  }
+}

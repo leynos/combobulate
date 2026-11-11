@@ -1,0 +1,68 @@
+"""Report the trust ADR-0009's vocabulary introduces, from Rust source (VO-9, VO-10).
+
+A proof is only as strong as what the author asked the verifier to accept
+without argument. ADR-0009 fixes the vocabulary that does so; this package
+finds it in real source, so the evidence gate can compare what a record claims
+against what the code actually contains instead of trusting the record.
+
+The package is split by what each part needs to know:
+
+- :mod:`~docs_validation.trust_audit.lexer` separates code from comments and
+  literals. It is the only module that must understand Rust's syntax.
+- :mod:`~docs_validation.trust_audit.matcher` applies DL-17's matching rule to
+  the lexed tokens, deciding which occurrences of a vocabulary word are trust.
+- :mod:`~docs_validation.trust_audit.manifest` decides which crate owns a
+  source and whether that crate expands literals, taking ownership from the
+  manifests the audit may trust rather than from the working tree.
+- :mod:`~docs_validation.trust_audit.command` resolves module files against a
+  repository root and renders the audit in the evidence schema's shape.
+
+The split is deliberate: the rule can be tested over token streams with no
+filesystem, the ownership rule can be tested with no Rust grammar, and the
+filesystem policy can be tested with no Rust grammar beyond ``mod``
+declarations.
+
+Examples
+--------
+>>> scan('kani::assume(x > 0);').items
+(TrustItem(item='assume', line=1, column=7),)
+>>> scan('// kani::assume(x > 0);').items
+()
+"""
+from .command import (
+    AuditedFile,
+    audit_bound_tree,
+    audit_tree,
+    is_procedural_macro_crate,
+    items_of,
+    resolve_repository_path,
+    scan_tree,
+)
+from .lexer import Kind, Token, TrustAuditError, literal_body, tokenize
+from .manifest import (
+    MANIFEST_NAME,
+    ManifestOwnership,
+    owning_manifest,
+    tracked_manifests,
+)
+from .matcher import (
+    KANI_VOCABULARY,
+    VERUS_VOCABULARY,
+    VOCABULARY,
+    InlineModule,
+    ModuleReference,
+    ScanResult,
+    TrustItem,
+    scan,
+)
+from .use_tree import alias_bindings, statement_end
+
+__all__ = [
+    'KANI_VOCABULARY', 'MANIFEST_NAME', 'VERUS_VOCABULARY', 'VOCABULARY', 'AuditedFile',
+    'InlineModule', 'Kind', 'ManifestOwnership',
+    'ModuleReference', 'ScanResult', 'Token', 'TrustAuditError', 'TrustItem',
+    'alias_bindings', 'audit_bound_tree', 'audit_tree', 'is_procedural_macro_crate', 'items_of',
+    'literal_body', 'owning_manifest', 'resolve_repository_path', 'scan', 'scan_tree',
+    'tracked_manifests',
+    'statement_end', 'tokenize',
+]

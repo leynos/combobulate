@@ -32,8 +32,12 @@ class ValidationReport(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        # `.github` holds registered acceptance-control sources; build outputs stay behind.
-        for folder in ('.github', 'docs', 'scripts', 'spec', 'tools'):
+        # `.github` holds registered acceptance-control sources; `tests` holds
+        # pin sites the toolchain record names. `src` and `crates` are workspace
+        # members without which `cargo metadata` cannot resolve the copied
+        # manifest. The copy is otherwise complete so the pin check's own site
+        # rule — a cited site must exist — is exercised rather than relaxed.
+        for folder in ('.github', 'crates', 'docs', 'scripts', 'spec', 'src', 'tests', 'tools'):
             shutil.copytree(ROOT / folder, self.root / folder, ignore=shutil.ignore_patterns('__pycache__', 'target'))
         for path in ROOT.iterdir():
             # Linked worktrees store a .git pointer file that is invalid in this fixture.
@@ -86,7 +90,7 @@ class ValidationReport(unittest.TestCase):
             },
             'runner_metadata': {'image_os': 'ubuntu24', 'image_version': '20261012.1'},
             'toolchains': {
-                'rust': 'nightly-2026-08-27', 'codegen_backend': 'Cranelift',
+                'rust': 'nightly-2026-11-06', 'codegen_backend': 'Cranelift',
                 'linker': 'mold 2.41.0',
                 'verus': '0.2026.09.06.8dea4a2 with Z3 4.16.0', 'kani': '0.67.0',
             },
@@ -189,6 +193,42 @@ class ValidationReport(unittest.TestCase):
             'the command path must reject a workflow runner that differs from AC-07',
         )
 
+    def test_an_omitted_required_job_is_rejected_by_composition(self) -> None:
+        """Reject an AC-07 record that omits a job the real workflow declares.
+
+        The required-job set is read from `.github/workflows/ci.yml` in the
+        fixture copy, so this exercises the seam the unit tests stub: the
+        workflow's job names reach the record check. Calling
+        `check_acceptance_controls` directly rather than the whole command keeps
+        the assertion about that seam; the full command would also run the
+        toolchain pin sweep, and a record naming a registered pin would be
+        refused for that unrelated reason instead.
+        """
+        self.write_ac07_record({'build-test': 'success', 'polars-lint': 'success'})
+        with self.assertRaisesRegex(AssertionError, r"missing \['polars-test'\]",
+                                    msg='the composition path must reject an AC-07 record that omits a job'):
+            check_acceptance_controls(ValidationContext(self.root), ())
+
+    def write_ac07_record(self, job_conclusions: dict[str, str]) -> None:
+        """Commit an otherwise-passing AC-07 window that records *job_conclusions*."""
+        register = json.loads((self.root / 'spec/acceptance-controls.json').read_text(encoding='utf-8'))
+        control = next(item for item in register['controls'] if item['id'] == 'AC-07')
+        record = self.acceptance_record('ac07-fixture', 'AC-07', control['frozen']['registered_on'])
+        attempt = {'attempt': 1, 'conclusion': 'success', 'wall_seconds': 60.0,
+                   'required_job_conclusions': dict(job_conclusions),
+                   'started_at': '2026-10-12T12:00:00Z', 'completed_at': '2026-10-12T12:01:00Z'}
+        record['workloads'] = [{
+            'id': 'ci-required-jobs', 'description': 'Every required PR job.',
+            'command': 'gh run view', 'metric': 'wall time', 'unit': 's',
+            'samples': [60.0] * 20, 'median': 60.0,
+            'attempts': [{**attempt, 'run_id': str(index), 'run_number': index,
+                          'url': f'https://github.com/leynos/combobulate/actions/runs/{index}'}
+                         for index in range(20, 0, -1)],
+        }]
+        measurements = self.root / 'spec/measurements'
+        measurements.mkdir(exist_ok=True)
+        (measurements / 'ac07-fixture.json').write_text(json.dumps(record), encoding='utf-8')
+
     def test_decoded_json_strings_cannot_hide_host_identities(self) -> None:
         """Reject escaped host identities in calibration and acceptance JSON."""
         calibration_path = self.root / 'spec/calibration/verifier-probe.json'
@@ -197,7 +237,9 @@ class ValidationReport(unittest.TestCase):
         control = next(item for item in register['controls'] if item['id'] == 'AC-01')
         recorded_on = (date.fromisoformat(control['frozen']['registered_on']) + timedelta(days=1)).isoformat()
         measurements = self.root / 'spec/measurements'
-        measurements.mkdir()
+        # The fixture copies `spec` wholesale, so this directory exists as soon
+        # as the repository commits its first acceptance record.
+        measurements.mkdir(exist_ok=True)
         measurement_path = measurements / 'escaped-identity.json'
         original_measurement = self.acceptance_record(
             'escaped-identity', 'AC-01', recorded_on,
@@ -334,7 +376,13 @@ class ValidationReport(unittest.TestCase):
         self.assertEqual(self.run_main([]), 0, 'supported completed tasks must pass the full checker')
         report = json.loads(self.report.read_text())
         closure = next(row for row in report['checks'] if row['check'] == 'roadmap-status')
-        self.assertEqual(closure['count'], 4, 'all four completed acceptance-control tasks must be validated')
+        # Derive the expected count from the fixture's own export rather than
+        # naming a number, so closing a further roadmap task does not churn
+        # this assertion while a skipped task still fails it.
+        ticked = sum(1 for phase in json.loads((self.root / 'spec/roadmap.json').read_text())['phases']
+                     for step in phase['steps'] for task in step['tasks'] if task['status'] == 'done')
+        self.assertGreater(ticked, 0, 'the fixture needs at least one completed task to exercise closure')
+        self.assertEqual(closure['count'], ticked, 'every completed task must be validated')
         self.assertEqual(closure['status'], 'pass', 'completion requires a passing evidence check')
 
     def test_completed_task_without_its_completion_record_fails_the_full_checker(self):

@@ -84,10 +84,13 @@ impl CargoProbe {
         let directory = parent.open_dir(&name)?;
         directory.write(
             "probe-cargo",
-            "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ \
-             \"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' 'cargo-nextest 0.9.0'; exit \
-             0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n \
-             \"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\n",
+            concat!(
+                "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ ",
+                "\"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' 'cargo-nextest 0.9.0'; \
+                 exit ",
+                "0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n ",
+                "\"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\n",
+            ),
         )?;
         directory.set_permissions("probe-cargo", Permissions::from_mode(0o700))?;
         directory.write(

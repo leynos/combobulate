@@ -41,6 +41,28 @@ def record(register: dict, decision_id: str) -> dict:
     return next(entry for entry in register['decisions'] if entry['id'] == decision_id)
 
 
+def free_identifier(register: dict, first: int) -> str:
+    """Return the first ``D<n>`` at or after ``first`` the register does not already use.
+
+    The suite builds replacement records on top of the committed register, so a
+    hard-coded identifier starts colliding the moment the register grows to it.
+    Allocating one keeps these cases about supersession rather than about which
+    numbers the repository happens to have taken.
+
+    Examples
+    --------
+    With D15 and D16 committed, asking from 16 names the next free record::
+
+        free_identifier(accepted_register(), 16)
+        # 'D17'
+    """
+    used = {str(entry['id']) for entry in register['decisions']}
+    candidate = first
+    while f'D{candidate}' in used:
+        candidate += 1
+    return f'D{candidate}'
+
+
 def accept(register: dict, decision_id: str) -> None:
     """Accept one decision in place through a session answer by the sponsor."""
     record(register, decision_id).update({
@@ -182,7 +204,8 @@ class RegisterInvariants(unittest.TestCase):
         accept(register, 'D04')
         live_proposal = copy.deepcopy(record(register, 'D03'))
         live_proposal.update({
-            'id': 'D17', 'subject': 'Open alternative for Q4', 'lifecycle': 'proposed',
+            'id': free_identifier(register, 16), 'subject': 'Open alternative for Q4',
+            'lifecycle': 'proposed',
             'decided_option': None, 'accepted_by': None, 'accepted_on': None,
             'approval_reference': None, 'adr': None, 'supersedes': [], 'superseded_by': None,
             'retired_statements': [],
@@ -196,17 +219,19 @@ class RegisterInvariants(unittest.TestCase):
     def test_proposed_replacement_cannot_supersede_an_accepted_record(self):
         """Reject a proposed replacement that claims to supersede an accepted record."""
         register = accepted_register()
+        replacement_id = free_identifier(register, 16)
         older = record(register, 'D03')
-        older.update(lifecycle='superseded', superseded_by='D16')
+        older.update(lifecycle='superseded', superseded_by=replacement_id)
         replacement = copy.deepcopy(older)
         replacement.update({
-            'id': 'D16', 'subject': 'Revised initial release scope',
+            'id': replacement_id, 'subject': 'Revised initial release scope',
             'lifecycle': 'proposed', 'decided_option': None, 'accepted_by': None,
             'accepted_on': None, 'approval_reference': None, 'adr': None,
             'supersedes': ['D03'], 'superseded_by': None,
         })
         register['decisions'].append(replacement)
-        self.assert_rejected(register, 'D16 must be accepted before superseding D03')
+        self.assert_rejected(
+            register, f'{replacement_id} must be accepted before superseding D03')
 
     def test_candidate_must_cite_a_known_decision(self):
         """Reject candidate ADR metadata that points to an absent decision."""

@@ -177,7 +177,7 @@ class OrchestrationTests(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text('', encoding='utf-8')
         (self.directory / 'rust-toolchain.toml').write_text(
-            '[toolchain]\nchannel = "nightly-2026-08-27"\n', encoding='utf-8'
+            '[toolchain]\nchannel = "nightly-2026-11-06"\n', encoding='utf-8'
         )
         self.module.staged_sources = Mock(return_value=[])
         self.module._stage_verifier_free_workspace = Mock()

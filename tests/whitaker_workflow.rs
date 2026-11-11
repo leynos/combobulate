@@ -51,16 +51,45 @@ fn check_install_step(step: &Value) -> Result<(), String> {
 fn check_installer(source: &str) -> Result<(), String> {
     // serde_yaml rejects duplicate mapping keys rather than choosing one.
     let workflow: Value = serde_yaml::from_str(source).map_err(|error| error.to_string())?;
-    let job = workflow
+    let jobs = workflow
         .get("jobs")
-        .and_then(|jobs| jobs.get("build-test"))
-        .ok_or("build-test job is missing")?;
-    check_job_versions(job)?;
-    let steps = job
-        .get("steps")
-        .and_then(Value::as_sequence)
-        .ok_or("build-test steps are missing")?;
-    check_steps(steps)
+        .and_then(Value::as_mapping)
+        .ok_or("CI jobs are missing")?;
+    // DL-03 installs Whitaker in two required jobs, and each is checked on its
+    // own: the capability gate, the installer, and the lint gate must all
+    // exist inside the job that runs them, so one job's correct prelude cannot
+    // stand in for another's.
+    for (name, job) in jobs {
+        let job_name = name.as_str().ok_or("a CI job name is not text")?;
+        check_job_versions(job)?;
+        let steps = job
+            .get("steps")
+            .and_then(Value::as_sequence)
+            .ok_or_else(|| format!("{job_name} steps are missing"))?;
+        // The requirement comes from the job's own steps. Selecting on "this
+        // job installs Whitaker" would let a renamed or deleted installer
+        // exempt its job from the gate entirely; selecting on "this job lints"
+        // makes a job that lints without provisioning a failure.
+        if steps.iter().any(is_lint_gate) || steps.iter().any(installs_whitaker) {
+            check_steps(steps)?;
+        }
+    }
+    Ok(())
+}
+
+/// Selects jobs that install Whitaker, so a test-only job need not carry the gate.
+fn installs_whitaker(step: &Value) -> bool {
+    step.get("uses")
+        .and_then(Value::as_str)
+        .is_some_and(|action| action.contains("install-whitaker"))
+}
+
+/// Selects the repository lint gate, which Whitaker's driver must run first.
+fn is_lint_gate(step: &Value) -> bool {
+    matches!(
+        step.get("run").and_then(Value::as_str).unwrap_or("").trim(),
+        "make lint" | "mkdir -p \"$DYLINT_DRIVER_PATH\"\nmake lint"
+    )
 }
 
 fn check_job_versions(job: &Value) -> Result<(), String> {
@@ -144,11 +173,7 @@ fn record_installer(
 }
 
 fn record_lint(step: &Value, index: usize, lint: &mut Option<usize>) -> Result<(), String> {
-    let run = step.get("run").and_then(Value::as_str).unwrap_or("");
-    if matches!(
-        run.trim(),
-        "make lint" | "mkdir -p \"$DYLINT_DRIVER_PATH\"\nmake lint"
-    ) {
+    if is_lint_gate(step) {
         if lint.replace(index).is_some() {
             return Err("more than one CI lint gate".into());
         }

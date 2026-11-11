@@ -17,6 +17,10 @@ import itertools
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, fields
 
+from .verified_evidence import (
+    VerifiedLogResult, VerifiedTrustAudit, manifest_artefact,
+)
+
 KINDS = ('deductive', 'bounded', 'test', 'trust-declaration', 'none')
 OUTCOMES = ('verified', 'counterexample', 'resource-exhausted', 'solver-unknown', 'unsupported', 'skipped',
             'not-run', 'tool-error')
@@ -70,35 +74,6 @@ class AbstractRecord:
 
 
 @dataclass(frozen=True, slots=True)
-class VerifiedLogResult:
-    """Facts re-derived by a parser from the exact log named by one record.
-
-    An adapter creates this value only after reading the log, verifying its
-    digest, and deriving every admission-relevant result from its contents.
-    The pure gate also checks that these facts match the submitted record.
-    """
-
-    tool: str
-    log_path: str
-    log_sha256: str
-    outcome: str
-    bounds: str
-    witness_statuses: tuple[str, ...]
-    negative_controls: tuple[tuple[bool, str], ...]
-    run_mode: str
-
-    def matches_record(self, record: Mapping[str, object]) -> bool:
-        """Confirm the parser-derived admission facts agree with the record."""
-        method = record['method']
-        bounds = record['bounds']
-        witnesses = tuple(str(item['status']) for item in record['success_witnesses'])
-        controls = tuple((bool(item['required']), str(item['observed'])) for item in record['negative_controls'])
-        return (self.outcome == record['outcome'] and self.bounds == bounds['kind']
-                and self.witness_statuses == witnesses and self.negative_controls == controls
-                and self.run_mode == method['run_mode'])
-
-
-@dataclass(frozen=True, slots=True)
 class AdmissionContext:
     """Carry caller-owned inputs used only while abstracting one evidence record."""
 
@@ -107,6 +82,7 @@ class AdmissionContext:
     as_of: datetime.date
     log_parsers: frozenset[str] = frozenset()
     verified_log_results: tuple[VerifiedLogResult, ...] = ()
+    verified_trust_audits: tuple[VerifiedTrustAudit, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -199,6 +175,39 @@ def trust_state(audit: Mapping[str, object], covers: frozenset[str]) -> str:
     return 'audited-all-covered' if all(item['covered_by'] in covers for item in items) else 'audited-uncovered'
 
 
+def _matching_trust_audit(record: Mapping[str, object],
+                          context: AdmissionContext) -> VerifiedTrustAudit | None:
+    """Find the scanner result bound to this record's manifest, if it found what the record lists.
+
+    A record that claims ``unaudited`` needs no scan: it is making the weaker
+    statement, and the gate already treats ``unaudited`` as blocking for
+    deductive and bounded evidence.
+    """
+    if record['trust_audit']['status'] != 'audited':
+        return None
+    if manifest_artefact(record) is None:
+        return None
+    candidates = [audit for audit in context.verified_trust_audits if audit.matches_record(record)]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def verified_trust_state(record: Mapping[str, object], context: AdmissionContext) -> str:
+    """Abstract the trust a record claims, requiring a scanner to have found it (DL-16).
+
+    A record's ``trust_audit`` is a claim about source code, and the gate cannot
+    read source. Without a scanner result bound to the record's manifest the
+    claim is therefore not evidence but self-reporting, so it is demoted to
+    ``unaudited`` — the state that blocks deductive and bounded admission. When
+    a scan does exist the record's own coverage labels decide between
+    ``audited-none``, ``audited-all-covered``, and ``audited-uncovered``, exactly
+    as MS-1 already reads them.
+    """
+    claimed = trust_state(record['trust_audit'], _trust_coverage(record))
+    if claimed == 'unaudited' or _matching_trust_audit(record, context) is not None:
+        return claimed
+    return 'unaudited'
+
+
 def witness_state(witnesses: list[Mapping[str, object]]) -> str:
     """Abstract success witnesses; one unsatisfied `cover` makes the evidence vacuous for its claim."""
     statuses = {witness['status'] for witness in witnesses}
@@ -232,7 +241,22 @@ def binding_state(record: Mapping[str, object], bindings: Mapping[str, Mapping[s
 def _matching_verified_log_result(
     record: Mapping[str, object], context: AdmissionContext,
 ) -> VerifiedLogResult | None:
-    """Find a registered adapter result bound to this record and its derived facts."""
+    """Find the registered adapter result bound to this record and its derived facts.
+
+    The identity is both artefacts the adapter read, not only the log. A verdict
+    is decided from the log *and* the record's harness manifest, so two records
+    citing one capture against different manifests are two distinct results.
+    Matching on the log alone would make them compete for one slot, and the
+    count test would then demote both — every record but the first to cite a
+    capture would lose its parsed verdict. Comparing the manifest as well keeps
+    the count meaningful: one record, one manifest, one result.
+
+    Examples
+    --------
+    Two records citing ``a.log`` with different manifests find one candidate
+    each, and both admit on their own facts; the same record appearing twice
+    still finds exactly one, because the binding seam de-duplicated it.
+    """
     method = record['method']
     source = record['verdict_source']
     log = source['log']
@@ -243,9 +267,15 @@ def _matching_verified_log_result(
         return None
     if tool not in context.log_parsers:
         return None
-    identity = (tool, str(log['path']), str(log['sha256']))
-    candidates = [result for result in context.verified_log_results
-                  if (result.tool, result.log_path, result.log_sha256) == identity]
+    artefact = manifest_artefact(record)
+    if artefact is None:
+        return None
+    identity = (tool, str(log['path']), str(log['sha256']), artefact)
+    candidates = [
+        result for result in context.verified_log_results
+        if (result.tool, result.log_path, result.log_sha256,
+            (result.manifest_path, result.manifest_sha256)) == identity
+    ]
     if len(candidates) != 1:
         return None
     if not candidates[0].matches_record(record):
@@ -271,6 +301,37 @@ def _trust_coverage(record: Mapping[str, object]) -> frozenset[str]:
     if exception_id is not None:
         covers.add(str(exception_id))
     return frozenset(covers)
+
+
+def relabels_parser_evidence(record: Mapping[str, object], context: AdmissionContext) -> bool:
+    """Report whether a record names a registered parser without claiming verifier evidence (DL-16).
+
+    A parser is registered to decide a tool's verdict from its own log. A record
+    for that tool that calls itself a test or a trust declaration has stepped
+    outside the parser's reach, so a failed run could be renamed a passing test
+    and the gate would never read the log. Requiring verifier evidence keeps the
+    registered tool's claims subject to the parser; a test record for that tool
+    is therefore malformed rather than merely weak.
+    """
+    return str(record['method']['tool']) in context.log_parsers and record['evidence_kind'] not in VERIFIERS
+
+
+def admit_evidence(record: Mapping[str, object], context: AdmissionContext) -> Admission:
+    """Admit one evidence record: the kind/tool check, then the abstract rule table.
+
+    The kind/tool check lives here rather than in :func:`admit` because it needs
+    the record's tool name, which the ten abstract fields deliberately do not
+    carry. Its rejection reuses ``schema-invalid``: the record breaks the
+    admissibility predicate, just not one of the abstract fields.
+
+    Examples
+    --------
+    A ``test`` record whose method names ``kani``, once ``kani`` is registered,
+    is rejected rather than admitted at ``tested``.
+    """
+    if relabels_parser_evidence(record, context):
+        return Admission(Level.REJECTED, ('schema-invalid',))
+    return admit(abstract_record(record, context))
 
 
 def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> AbstractRecord:
@@ -300,7 +361,7 @@ def abstract_record(record: Mapping[str, object], context: AdmissionContext) -> 
     return AbstractRecord(
         kind=str(record['evidence_kind']), outcome=str(record['outcome']), bounds=str(record['bounds']['kind']),
         witness=witness_state(record['success_witnesses']), controls=controls_state(record['negative_controls']),
-        trust=trust_state(record['trust_audit'], _trust_coverage(record)), exception=exception,
+        trust=verified_trust_state(record, context), exception=exception,
         binding=binding_state(record, context.bindings),
         run_mode=str(method['run_mode']), verdict_source='log-parser' if parsed else 'self-reported',
     )

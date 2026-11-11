@@ -114,7 +114,7 @@ Can a small public Rust program create and execute an array without Polars or
 custom Fn implementations? The result informs feature selection and the
 baseline dependency lock. See `technical-design.md` §§3-4, 7, 10.
 
-- [ ] 1.2.1. Establish the facade, macro, and internal semantic-kernel workspace
+- [x] 1.2.1. Establish the facade, macro, and internal semantic-kernel workspace
   with pinned feature/toolchain profiles.
   - Requires 1.1.1, 1.1.4.
   - See `technical-design.md` §§3, 10, 15, 17-19.

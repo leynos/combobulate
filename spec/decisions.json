@@ -3,6 +3,7 @@
   "in_scope_questions": [
     "Q1",
     "Q2",
+    "Q3",
     "Q4",
     "Q7",
     "Q8"
@@ -647,6 +648,50 @@
       "supersedes": [],
       "superseded_by": null,
       "retired_statements": []
+    },
+    {
+      "id": "D16",
+      "subject": "Workspace crate boundaries, build profiles, and the supported-toolchain set",
+      "questions": [
+        "Q3"
+      ],
+      "authority_roles": [
+        "sponsor",
+        "technical-owner"
+      ],
+      "options": [
+        {
+          "id": "A",
+          "summary": "A separate `combobulate-polars` adapter crate."
+        },
+        {
+          "id": "B",
+          "summary": "A crate-private Polars module inside the facade behind `cfg(feature = \"polars\")`, with a three-crate workspace and a supported-toolchain set rather than one MSRV."
+        },
+        {
+          "id": "C",
+          "summary": "Defer the facade Polars dependency to task 1.2.6."
+        }
+      ],
+      "recommendation": "B",
+      "rationale": "Option B keeps the three crates of technical design §3, keeps the kernel dependency-free so B01 stays testable, and keeps a native-only consumer free of Polars. Adapter-crate separation saves no CI time because the default build pulls Polars either way, and it would force a premature `combobulate-core` split. Q3 is answered with a supported-toolchain set because three toolchains with distinct roles build this repository and no single MSRV describes them.",
+      "lifecycle": "accepted",
+      "decided_option": "B",
+      "accepted_by": "leynos",
+      "accepted_on": "2026-10-22",
+      "approval_reference": {
+        "kind": "session",
+        "url": "https://lody.ai/leynos/sessions/9cc8f59f-14a7-4470-9239-a0dae798e739",
+        "author_login": "leynos",
+        "names_decisions": [
+          "D16"
+        ],
+        "answer": "… Decision D16 and ADR-0010 (DL-02). Recommended: D16 accepts ADR-0010, which records the crate boundary, dependency direction, feature profiles, gate feature lists, and the supported-toolchain set that answers ToR Q3 in place of one MSRV. The sponsor accepts D16 after EP-M4 publishes ADR-0010; the approval reference is committed before the tick. The sponsor also says whether Q3 joins in_scope_questions in spec/decisions.json. …"
+      },
+      "adr": "docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md",
+      "supersedes": [],
+      "superseded_by": null,
+      "retired_statements": []
     }
   ],
   "candidate_adrs": [
@@ -680,8 +725,10 @@
       "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
-        "kind": "deferred",
-        "roadmap_item": "1.2.1"
+        "kind": "adr",
+        "adrs": [
+          "ADR-0010"
+        ]
       }
     },
     {
@@ -702,9 +749,10 @@
       "source": "technical-design.md §15",
       "decision": "D07",
       "disposition": {
-        "kind": "deferred",
-        "roadmap_item": "1.2.1",
-        "bet": "B01"
+        "kind": "adr",
+        "adrs": [
+          "ADR-0010"
+        ]
       }
     },
     {

@@ -17,7 +17,14 @@ pub(super) const LINUX_TARGET: &str = "x86_64-unknown-linux-gnu";
 /// Makefile targets that build for development. A command in one either
 /// assigns `RUSTFLAGS` with the standard flags or assigns none and so takes
 /// the configuration's.
-const DEVELOPMENT_TARGETS: [&str; 5] = ["test", "typecheck", "lint", "build", "act-contract-smoke"];
+const DEVELOPMENT_TARGETS: [&str; 6] = [
+    "test",
+    "test-profiles",
+    "typecheck",
+    "lint",
+    "build",
+    "act-contract-smoke",
+];
 
 /// Makefile targets that measure or ship, so every command assigns
 /// `RUSTFLAGS` and none carries a standard flag.
@@ -36,8 +43,14 @@ const PREPARATION_TARGETS: [&str; 2] = ["prepare-dependencies", "prepare-ui-gate
 
 /// Development targets that must assign `RUSTFLAGS` in at least one command,
 /// so the restatement checks above cannot pass by finding nothing to check.
-pub(super) const ASSIGNING_TARGETS: [&str; 5] =
-    ["test", "typecheck", "lint", "build", "act-contract-smoke"];
+pub(super) const ASSIGNING_TARGETS: [&str; 6] = [
+    "test",
+    "test-profiles",
+    "typecheck",
+    "lint",
+    "build",
+    "act-contract-smoke",
+];
 
 /// A caller's own flags, distinct from anything a recipe adds, to prove a
 /// recipe composes an exported `RUSTFLAGS` with the standard flags rather than
@@ -168,6 +181,13 @@ fn expanded(value: &str, inherited: Option<&str>) -> Read<Flags> {
 ///
 /// `without_preparation` treats the preparation targets as already built, so
 /// the result holds only the requested target's own commands.
+///
+/// The profile route is pinned rather than inherited. These contracts assert
+/// what the default two-profile route emits, and a hosted job exports the
+/// single profile it was scheduled to measure; an inherited value would halve
+/// the recipes read here. Pinning it on the command line outranks an inherited
+/// value however it arrives, and removing the variable stops it winning on
+/// level.
 fn dry_run(
     target: &str,
     host: Host,
@@ -175,6 +195,7 @@ fn dry_run(
     without_preparation: bool,
 ) -> Read<String> {
     let mut make = Command::new("make");
+    make.arg("GATE_PROFILE=both").env_remove("GATE_PROFILE");
     make.args(["-n", "-B"]);
     if without_preparation {
         make.args(PREPARATION_TARGETS.map(|name| format!("--old-file={name}")));

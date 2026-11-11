@@ -28,6 +28,26 @@ def git_head_revision(root: Path) -> str:
     return output.decode('ascii').strip()
 
 
+def tracked_paths(root: Path) -> list[str]:
+    """List the repository-relative paths Git tracks, in a stable order.
+
+    The sweep this feeds must see files a change did not touch, so a manifest
+    maintained by hand would defeat it. ``--cached`` includes staged additions;
+    ``--others --exclude-standard`` adds untracked work that Git does not
+    ignore, so a new file cannot escape the sweep before it is committed.
+
+    Examples
+    --------
+    tracked_paths(Path('/repo')) returns ['Cargo.lock', 'Cargo.toml', ...].
+    """
+    output = _git_output(
+        root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+        'Cannot enumerate tracked files',
+    )
+    paths = (entry for entry in output.decode('utf-8').split('\0') if entry)
+    return sorted(set(paths))
+
+
 def git_bytes_at_revision(root: Path, revision: str, path: str) -> bytes | None:
     """Read a committed file; return None only when its path is absent.
 

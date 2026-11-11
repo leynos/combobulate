@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 22
+      "count": 23
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 108
+      "count": 118
     },
     {
       "check": "catalogue",
@@ -23,7 +23,7 @@
     {
       "check": "roadmap",
       "status": "pass",
-      "detail": "4 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
+      "detail": "5 of 72 tasks ticked; every task has success/design contracts, and the dependencies form an acyclic earlier-dependency graph.",
       "count": 72
     },
     {
@@ -35,8 +35,8 @@
     {
       "check": "decision-register",
       "status": "pass",
-      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 15 of 15 decisions are accepted. Acceptance is not verification.",
-      "count": 15
+      "detail": "Schema, identities, options, approvals, supersession, ADR status agreement, and governing-document links pass; 16 of 16 decisions are accepted. Acceptance is not verification.",
+      "count": 16
     },
     {
       "check": "kernel-contract-envelope",
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 104
+      "count": 163
     },
     {
       "check": "contract-examples",
@@ -129,16 +129,46 @@
       "count": 1
     },
     {
+      "check": "candidate-deferral",
+      "status": "pass",
+      "detail": "2 deferred candidate ADR subjects name a roadmap item the export declares and does not report as ticked.",
+      "count": 2
+    },
+    {
       "check": "roadmap-status",
       "status": "pass",
-      "detail": "4 of 72 tasks ticked (1.1.1, 1.1.2, 1.1.3, 1.1.4); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
-      "count": 4
+      "detail": "5 of 72 tasks ticked (1.1.1, 1.1.2, 1.1.3, 1.1.4, 1.2.1); each tick has ticked prerequisites, accepted decisions, resolvable completion artefacts, and satisfied obligation components. Eligible but unticked: none.",
+      "count": 5
     },
     {
       "check": "package-policy",
       "status": "pass",
       "detail": "Cargo.toml satisfies the enforced package rules: the ISC licence (D04); publish = false (D05).",
       "count": 2
+    },
+    {
+      "check": "toolchain-profiles",
+      "status": "pass",
+      "detail": "Pins agree with every site the record names, no unlisted site repeats a pin, and every capability status that claims an observation cites its log.",
+      "count": 21
+    },
+    {
+      "check": "trust-audit",
+      "status": "pass",
+      "detail": "No trust item appears in any workspace member; the fixture corpus still reports its seeded items.",
+      "count": 3
+    },
+    {
+      "check": "log-parser-registration",
+      "status": "pass",
+      "detail": "Every registered log parser has a committed corpus whose parsed decisions cover the outcomes and the unsatisfied-witness class VO-13 requires.",
+      "count": 1
+    },
+    {
+      "check": "polars-confinement",
+      "status": "pass",
+      "detail": "Polars paths appear only in src/polars_backend.rs; a seeded violation in a copy of the facade is still reported.",
+      "count": 3
     }
   ],
   "not_run": [

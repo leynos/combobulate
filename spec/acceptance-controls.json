@@ -73,7 +73,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -133,7 +133,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -193,7 +193,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -225,12 +225,12 @@
       ],
       "frozen": {
         "workload": {
-          "description": "Cold and incremental builds of the 1.2.1 foundational probe in its three feature profiles; calibrated on the repository package and the calibration probe."
+          "description": "Cold and incremental builds of the shipped workspace in its three feature profiles: native-only (`--no-default-features`), proof-capable (Kani codegen of `combobulate-kernel`) and Polars-enabled (default features). The workspace manifests are the only source; the 1.2.1 calibration probe is retired as a measurement input (DL-15)."
         },
         "control": null,
         "sizes": "Three profiles; cold (empty target directory) and incremental (after touching the crate root).",
         "seeds": "Not applicable.",
-        "timed_region": "The cargo invocation, excluding queueing for a compile slot.",
+        "timed_region": "The cargo or `kani exec` invocation, excluding queueing for a compile slot.",
         "metric": "Build wall time.",
         "unit": "minutes",
         "estimand": "Median build time per profile and phase.",
@@ -256,7 +256,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -265,14 +265,14 @@
         },
         "cache_policy": "No sccache; cold builds start from an empty target directory.",
         "proof_scope": "Not applicable.",
-        "measurement_tool": "Hosted runner step timing.",
+        "measurement_tool": "Hosted runner step timing from `.github/workflows/profile-measurements.yml`'s `build-budget` job, which records `ImageOS` and `ImageVersion` per run.",
         "analysis_script": null,
         "calibration": {
           "status": "calibrated",
           "record": "spec/calibration/builds.json",
           "derivation": "Each ceiling: local median x factor 1.2 x 2, rounded up to whole minutes, with 4 build jobs to match the runner."
         },
-        "registered_on": "2026-10-11"
+        "registered_on": "2026-11-07"
       }
     },
     {
@@ -316,7 +316,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -376,7 +376,7 @@
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
@@ -405,43 +405,43 @@
       ],
       "frozen": {
         "workload": {
-          "description": "The CI build-test job, the critical path of pull request checks; every eligible attempt counts."
+          "description": "Every required pull-request job in .github/workflows/ci.yml, measured as the longest such job in each workflow run; every eligible attempt counts. Calibrated against the pre-DL-03 single build-test job, recorded as workload ci-build-test. DL-14 changed the workload to every required job, so the 20-run window restarts empty on the new CI shape and AC-07 reads inconclusive until it refills."
         },
         "control": null,
         "sizes": "Every pull request.",
         "seeds": "Not applicable.",
-        "timed_region": "Job start to completion, excluding queueing.",
-        "metric": "Job wall time.",
+        "timed_region": "Workflow run start to its last required job completing.",
+        "metric": "Longest required-job wall time per workflow run.",
         "unit": "minutes",
-        "estimand": "The 90th percentile of durations for the 20 most recent eligible build-test job attempts, regardless of conclusion.",
-        "statistic": "Nearest-rank p90 over a rolling window of 20 job attempts; reruns and failed attempts remain in the window.",
+        "estimand": "The 90th percentile of per-run longest required-job durations for the 20 most recent eligible workflow runs, regardless of conclusion.",
+        "statistic": "Nearest-rank p90 over a rolling window of 20 workflow runs, each contributing its longest required job; reruns and failed attempts remain in the window.",
         "decision_rule": {
           "thresholds": {
             "p90_minutes": 8,
             "timeout_minutes": 8
           },
-          "pass_when": "All 20 attempts conclude success and their nearest-rank p90 is within the 8-minute budget; any failed, timed-out, cancelled, resource-exhausted, or missing attempt fails independently of p90.",
-          "inconclusive": "Fewer than 20 eligible attempts is inconclusive; an unsuccessful or missing attempt is a failure, even if the p90 is within budget.",
+          "pass_when": "All 20 runs conclude with every required job successful and their nearest-rank p90 is within the 8-minute budget; any failed, timed-out, cancelled, resource-exhausted, or missing required job fails independently of p90.",
+          "inconclusive": "Fewer than 20 eligible runs is inconclusive; any unsuccessful or missing required job is a failure, even if the p90 is within budget.",
           "extension": "No extension: a failed budget triggers a scope or implementation decision (technical design \u00a717.8)."
         },
         "warmup": "None.",
         "interleaving": "Not applicable.",
-        "samples": "The 20 most recently started build-test job attempts on main and pull requests, including every rerun and conclusion.",
+        "samples": "The 20 most recently started workflow runs on main and pull requests, each contributing its longest required job, including every rerun and conclusion.",
         "outlier_policy": "None.",
         "environment": {
           "image": "ubuntu-24.04",
           "runner_class": "GitHub-hosted standard Linux runner for public repositories: 4 vCPU, 16 GB memory, x64",
           "toolchains": {
-            "rust": "rust-toolchain.toml at the measured revision (nightly-2026-08-27 today)",
+            "rust": "rust-toolchain.toml at the measured revision",
             "codegen_backend": "Cranelift for dev builds, LLVM for release and coverage",
             "linker": "pinned mold 2.41.0 via the repository Clang wrapper",
             "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
             "kani": "0.67.0"
           }
         },
-        "cache_policy": "The workflow's own caches.",
+        "cache_policy": "The workflow's own caches, as created by the pinned setup-rust and generate-coverage actions; sccache saves only on main, and the coverage ratchet baseline publishes only from coverage-main.yml on main.",
         "proof_scope": "Not applicable.",
-        "measurement_tool": "GitHub Actions job timestamps from the REST API, with each workflow rerun recorded as an attempt.",
+        "measurement_tool": "GitHub Actions workflow-run and job timestamps from the REST API, with each workflow rerun recorded as an attempt and its longest required job as the sample.",
         "analysis_script": null,
         "calibration": {
           "status": "calibrated",

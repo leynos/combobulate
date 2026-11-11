@@ -49,6 +49,20 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
             "sudo apt-get update \\\n  && sudo apt-get install --yes --no-install-recommends \
              clang lld mold"
         ),
+        // DL-03: the wrapper Cargo is told to use must be runnable. Nothing
+        // errors if the variable is merely absent, so this step resolves it on
+        // `PATH` and prints the cache's own statistics, whose cache-location
+        // line names the backend in use. `--show-stats` needs no compile,
+        // which is why the evidence is available before any gate runs. The
+        // flag must be one the released binary accepts: `--show-config` does
+        // not exist in sccache 0.19.0 and exits 2, so a step using it failed
+        // the job it was added to make observable.
+        Some("Report sccache wiring") => concat!(
+            "set -euo pipefail\n",
+            "wrapper=\"${RUSTC_WRAPPER:?DL-03 requires a compiler wrapper}\"\n",
+            "command -v \"$wrapper\"\n",
+            "sccache --show-stats"
+        ),
         Some("Install the build standard") => "make install-build-tools",
         Some("Format") => "make check-fmt",
         Some("Check spelling") => "make spelling",
@@ -66,7 +80,12 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
             "echo \"Coverage CFLAGS: -fuse-ld=lld\"\n",
             "echo \"Coverage LDFLAGS: -fuse-ld=lld\""
         ),
-        Some("Test under Act") => "make test",
+        // `Test` is the Polars-enabled job's suite; `Test under Act` is the
+        // native-only fallback that hosted coverage replaces. The isolation
+        // step runs the single-feature profiles `make test` cannot reach —
+        // `test` builds `polars-enabled`, which selects both features.
+        Some("Test" | "Test under Act") => "make test",
+        Some("Test the single-feature isolation profiles") => "make test-profiles",
         _ => return false,
     };
     script.trim_end() == expected
@@ -80,7 +99,9 @@ fn valid_step_env(item: &Value, name: Option<&str>) -> bool {
             "DYLINT_DRIVER_PATH",
             "${{ runner.temp }}/combobulate-whitaker-driver",
         )],
-        Some("Test under Act") => &[("WITH_ACT", "0")],
+        // Both `make test` routes disable the nested Act pass, so neither job
+        // can recurse into Act or inherit an ambient `WITH_ACT=1`.
+        Some("Test" | "Test under Act") => &[("WITH_ACT", "0")],
         Some("Test and Measure Coverage") => &[
             ("CARGO_PROFILE_DEV_CODEGEN_BACKEND", "llvm"),
             ("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER", "clang"),

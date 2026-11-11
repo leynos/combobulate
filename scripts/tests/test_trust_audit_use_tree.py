@@ -1,0 +1,379 @@
+"""Kill the mutants in the ``use``-tree reader the matcher depends on (DL-17).
+
+``use kani::assume;`` and ``use kani as k;`` decide which names in a file reach
+a verifier's trust surface, so the reader that finds each statement's root,
+alias, and end is load-bearing for the audit's soundness. The cases here were
+left alive by the mutation census over :mod:`docs_validation.trust_audit`
+because the outcome suites assert what the matcher reports and never what the
+reader hands it.
+
+Two families are equivalents rather than gaps. ``statement_end``'s ``start``
+bound cannot matter: a ``use`` is lexed with its ``;`` present, so the first
+search succeeds before the bound is reached. ``use_alias``'s exclusion of a
+rename below the root is the guard that keeps a member import from renaming its
+crate; a mutant that dropped it is killed here rather than argued, since
+``use kani::{assume as a};`` is a real way to write the import.
+
+The grouped spelling ``use kani::{self as k};`` is the same renaming written
+with a brace, and a reader that treated every brace as "a member alias" left
+``k::assume`` unreported — a file described as trust-free while it assumed
+exactly what the vocabulary names. That case is why the brace is no longer what
+the reader keys on.
+
+Examples
+--------
+>>> statement_end(tokenize('use kani as k;'), 0)
+5
+"""
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from docs_validation.trust_audit.matcher import scan
+from docs_validation.trust_audit.lexer import tokenize
+from docs_validation.trust_audit.use_tree import (
+    alias_bindings, statement_end, use_alias, use_aliases, use_root, use_roots,
+)
+
+
+class StatementBounds(unittest.TestCase):
+    """Require a ``use`` tree's root to be read up to its own semicolon."""
+
+    def test_the_semicolon_ends_the_search(self):
+        """Require the search to report the first ``;`` so a later statement is not read."""
+        tokens = tokenize('use a; b;')
+        self.assertEqual(statement_end(tokens, 0), 2,
+                         'the first semicolon must end the statement')
+
+    def test_a_statement_without_a_semicolon_ends_at_end_of_file(self):
+        """Require the end of file to be the bound when no ``;`` appears."""
+        tokens = tokenize('use a')
+        self.assertEqual(statement_end(tokens, 0), len(tokens),
+                         'a statement with no semicolon must end at the last token')
+
+class ImportedRootAliases(unittest.TestCase):
+    """Require an aliased trust root to be recognised as the root it names.
+
+    Rust renames a crate on import: after ``use kani as k;``, ``k::assume`` is
+    the same call as ``kani::assume``. A reader that returned only the literal
+    root would leave the matcher reporting nothing for such a file, and the
+    audit would describe it as trust-free while it assumed exactly what the
+    vocabulary names.
+    """
+
+    def test_a_renamed_crate_is_reported_alongside_its_root(self):
+        """Require `use kani as k;` to bind both names."""
+        self.assertEqual(alias_bindings(tokenize('use kani as k;'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a renamed trust root must be reported with its alias')
+
+    def test_an_unaliased_import_reports_only_the_root(self):
+        """Require the plain form to keep working, so the fix is not a swap."""
+        self.assertEqual(alias_bindings(tokenize('use kani::assume;'), 'kani'),
+                         frozenset({'kani'}),
+                         'a named import must not invent an alias')
+
+    def test_an_alias_of_another_crate_is_not_reported(self):
+        """Require an unrelated alias to stay silent, so the rule is not a wildcard."""
+        self.assertEqual(alias_bindings(tokenize('use other as k;'), 'kani'),
+                         frozenset({'kani'}),
+                         'only an alias of the named root may be reported')
+
+    def test_a_glob_import_binds_no_crate_alias(self):
+        """Require `use kani::*;` not to be read as renaming the crate.
+
+        A glob binds items, not the crate name, so ``k::assume`` is unrelated
+        to it. Reading the statement as an alias would make every ``k::`` path
+        trust.
+        """
+        self.assertEqual(alias_bindings(tokenize('use kani::*;'), 'kani'),
+                         frozenset({'kani'}),
+                         'a glob import must not become a crate alias')
+
+    def test_a_grouped_import_renaming_a_member_binds_no_crate_alias(self):
+        """Require `use kani::{assume as a};` not to rename the crate itself.
+
+        The ``as`` belongs to the grouped member, not to the crate. Reading it
+        as a crate alias would make ``a::`` — a name the file never binds —
+        match every qualified ``a::`` path.
+        """
+        self.assertEqual(alias_bindings(tokenize('use kani::{assume as a};'), 'kani'),
+                         frozenset({'kani'}),
+                         'a grouped member alias must not rename the crate')
+
+    def test_a_grouped_self_alias_binds_the_crate(self):
+        """Require `use kani::{self as k};` to bind ``k`` for the crate.
+
+        ``self`` inside a grouped import names the crate itself, so ``self as
+        k`` is the same renaming the plain form makes. Reading the brace before
+        the ``as`` as "this is a member alias" made the matcher report nothing
+        for ``k::assume``, and the audit described a file as trust-free while
+        it assumed exactly what the vocabulary names.
+        """
+        self.assertEqual(alias_bindings(tokenize('use kani::{self as k};'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a grouped self alias must rename the crate')
+
+    def test_a_grouped_self_alias_beside_a_member_alias_binds_both_names(self):
+        """Require the two grouped aliases in one statement to stay distinguishable.
+
+        Only ``self`` renames the crate; the sibling member rename does not. A
+        reader that took the statement's last ``as`` would report ``a`` here and
+        miss ``k``.
+        """
+        tokens = tokenize('use kani::{assume as a, self as k};')
+        self.assertEqual(alias_bindings(tokens, 'kani'), frozenset({'kani', 'k'}),
+                         'only the self member of a grouped import renames the crate')
+
+    def test_a_path_alias_past_the_root_binds_no_crate_alias(self):
+        """Require `use kani::assume as a;` to stay a member alias.
+
+        The qualified path is the same renaming the grouped form writes with
+        braces, so the rule that excludes it must cover both spellings. A rule
+        that only excluded a brace would report ``a`` here and make every
+        ``a::`` path trust.
+        """
+        self.assertEqual(alias_bindings(tokenize('use kani::assume as a;'), 'kani'),
+                         frozenset({'kani'}),
+                         'a rename of a name below the root must not rename the crate')
+
+    def test_an_absolute_root_alias_is_still_read(self):
+        """Require `use ::kani as k;` to bind the alias, since the leading `::` is syntax.
+
+        An edition-2015-style absolute path names the same crate. A reader that
+        required the root to be the statement's *first* token would miss it.
+        """
+        self.assertEqual(alias_bindings(tokenize('use ::kani as k;'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a leading :: must not hide the crate being renamed')
+
+    def test_an_extern_crate_rename_binds_the_alias(self):
+        """Require `extern crate kani as k;` to bind both names.
+
+        The rename is the same one ``use kani as k;`` makes, spelled without a
+        ``use``. A reader that only looked for ``use`` reported the file as
+        trust-free while ``k::assume`` assumed exactly what the vocabulary
+        names.
+        """
+        self.assertEqual(alias_bindings(tokenize('extern crate kani as k;'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'an extern crate rename must bind the alias it declares')
+
+    def test_an_extern_crate_without_a_rename_reports_only_the_root(self):
+        """Require the plain form to be read without inventing an alias.
+
+        ``extern crate kani;`` binds the crate under its own name, which is
+        already in the set. Reading the token after the root as an alias would
+        report whatever followed the semicolon.
+        """
+        self.assertEqual(alias_bindings(tokenize('extern crate kani;'), 'kani'),
+                         frozenset({'kani'}),
+                         'an unaliased extern crate must not invent an alias')
+
+    def test_an_extern_crate_of_another_crate_binds_nothing(self):
+        """Require the root test, so the rule is not a wildcard over ``extern crate``."""
+        self.assertEqual(alias_bindings(tokenize('extern crate other as k;'), 'kani'),
+                         frozenset({'kani'}),
+                         'only an extern crate of the named root may be reported')
+
+    def test_an_extern_crate_statement_is_not_read_twice_as_a_use(self):
+        """Require the ``continue``, so the ``as`` is not also read as a member alias.
+
+        The extern branch answers the whole statement. Falling through to the
+        ``use`` reader as well would read ``as k`` again from a statement with
+        no ``use`` in it, which is the shape that reported a nonexistent root.
+        """
+        tokens = tokenize('extern crate kani as k; kani::assume(x);')
+        self.assertEqual(alias_bindings(tokens, 'kani'), frozenset({'kani', 'k'}),
+                         'an extern crate statement must not also be read as a use tree')
+
+
+class GroupedAliasReachesTheMatcher(unittest.TestCase):
+    """Require a grouped crate alias to make a qualified path report (DL-17).
+
+    The reader's own cases establish what it returns. These establish that the
+    matcher, which is what the audit records, acts on it: rule (i) resolves a
+    path through the name the file binds the root to, and the grouped spelling
+    is one of the ways to bind it.
+    """
+
+    def test_a_grouped_alias_makes_a_qualified_path_trust(self):
+        """Report `k::assume` after `use kani::{self as k};`."""
+        self.assertEqual([item.item for item in scan('use kani::{self as k};\nfn f() { k::assume(x); }').items],
+                         ['assume'],
+                         'a grouped crate alias must reach rule (i)')
+
+    def test_a_grouped_member_alias_makes_no_qualified_path_trust(self):
+        """Leave the `a::assume` on the use line's successor alone.
+
+        The fail-closed reading does not stretch to a name the statement did not
+        bind to the crate: rule (i) is about a path rooted at the trust root, and
+        ``a`` is a member of it, not the root under another name.
+
+        Only line 2 is asserted. Rule (iii) still reports the ``assume`` named in
+        the import on line 1, because a file importing from a trust root is
+        scanned fail-closed — a documented superset that is not what this case
+        is about.
+        """
+        reported = scan('use kani::{assume as a};\nfn f() { a::assume(x); }').items
+        self.assertEqual([item.line for item in reported], [1],
+                         'a member alias must not make a qualified path on a later line trust')
+
+
+class AliasReadingAgreesBetweenItsForms(unittest.TestCase):
+    """Require the single-name reader and the set reader to agree.
+
+    Both are public, and both answer the same question about the same statement.
+    A case where they disagree would make the audit depend on which one a caller
+    happened to reach for.
+    """
+
+    def test_each_spelling_reports_one_alias_through_both_readers(self):
+        """Require ``use_alias`` to report the name ``use_aliases`` returns."""
+        for statement in ('use kani as k;',
+                          'use kani::{self as k};',
+                          'use kani::{assume, self as k};',
+                          'use ::kani as k;'):
+            with self.subTest(statement=statement):
+                tokens = tokenize(statement)
+                end = statement_end(tokens, 1)
+                self.assertEqual(use_aliases(tokens, 1, end), frozenset({'k'}),
+                                 f'{statement!r} must bind exactly k')
+                self.assertEqual(use_alias(tokens, 1, end), 'k',
+                                 f'{statement!r} must report k to the single-name reader')
+
+    def test_a_statement_with_no_crate_alias_reports_none_through_both(self):
+        """Require both readers to stay silent on a member-only rename."""
+        tokens = tokenize('use kani::{assume as a};')
+        end = statement_end(tokens, 1)
+        self.assertEqual(use_aliases(tokens, 1, end), frozenset(),
+                         'a member rename must bind no crate alias')
+        self.assertIsNone(use_alias(tokens, 1, end),
+                          'the single-name reader must not report a member rename')
+
+
+class AGroupedRootListKeepsEveryRoot(unittest.TestCase):
+    """Require each crate of a brace-rooted import to be read with its alias.
+
+    ``use {std::mem, kani as k};`` is two imports. Reading only the leading
+    identifier made the alias disappear whenever another crate came first, and
+    ``use {kani as k, std::mem};`` still worked — an answer that depended on
+    member order rather than on the source. Both orders are asserted together
+    so a future first-root shortcut fails here instead of silently narrowing
+    the audit.
+    """
+
+    def test_the_reader_reports_each_root_and_its_own_alias(self):
+        """Require both orders of the same import to report the same bindings."""
+        for statement in ('use {std::mem, kani as k};',
+                          'use {kani as k, std::mem};'):
+            with self.subTest(statement=statement):
+                self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                                 frozenset({'kani', 'k'}),
+                                 f'{statement!r} must bind k regardless of member order')
+
+    def test_a_grouped_root_without_an_alias_is_still_a_root(self):
+        """Require the unaliased grouping to name its root for rule (iii)."""
+        tokens = tokenize('use {std::mem, kani};')
+        self.assertEqual(use_roots(tokens, 1, statement_end(tokens, 1)),
+                         (('std', None), ('kani', None)),
+                         'an unaliased grouped import must still report every root')
+
+    def test_a_nested_self_alias_renames_the_crate(self):
+        """Require `{kani::{self as k}, ..}` not to be read as a crate named self."""
+        self.assertEqual(alias_bindings(tokenize('use {kani::{self as k}, std::mem};'), 'kani'),
+                         frozenset({'kani', 'k'}),
+                         'a nested grouped self alias must rename kani')
+
+    def test_a_grouped_member_alias_beside_a_root_alias_renames_only_the_root(self):
+        """Keep a member rename from becoming a second crate name."""
+        tokens = tokenize('use {kani::{assume as a}, std::mem};')
+        self.assertEqual(alias_bindings(tokens, 'kani'), frozenset({'kani'}),
+                         'a nested member rename must not rename the crate')
+
+    def test_a_grouped_import_makes_a_qualified_path_trust(self):
+        """Report `k::assume` when kani is the second root of a grouped import."""
+        self.assertEqual(
+            [item.item for item in scan('use {std::mem, kani as k};\nfn f() { k::assume(x); }').items],
+            ['assume'],
+            'a grouped crate alias must reach rule (i) whatever its position')
+
+    def test_a_grouped_import_enables_the_bare_use_rule(self):
+        """Require `kani` to count as imported when it is not the leading root.
+
+        Rule (iii) is gated on the file importing from a trust root. Reading
+        only the first identifier left the set empty here, so a bare
+        vocabulary word was never reported and the file looked trust-free.
+        """
+        reported = scan('use {std::mem, kani};\nfn f() { assume(x); }').items
+        self.assertEqual([item.item for item in reported], ['assume'],
+                         'a grouped import must enable rule (iii) for its root')
+
+    def test_a_nested_root_group_still_reports_every_root(self):
+        """Require a group inside a group to be read as the same set of roots.
+
+        The Rust reference permits nested use trees, and
+        `use {{std::mem, kani as k}};` compiles: it is the flat pair one brace
+        deeper. Reading one root per outer member found `std` and stopped, so
+        `k::assume` was unreported again — the same defect one level down,
+        which is why each member is asked what form it is rather than assumed
+        to be a path.
+        """
+        for statement in ('use {{std::mem, kani as k}};',
+                          'use {{{kani as k}}};'):
+            with self.subTest(statement=statement):
+                self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                                 frozenset({'kani', 'k'}),
+                                 f'{statement!r} must bind k at any nesting depth')
+
+    def test_a_nested_root_group_reaches_the_qualified_path_rule(self):
+        """Require a doubly-braced import to make `k::assume` reach rule (i)."""
+        self.assertEqual(
+            [item.item for item in
+             scan('use {{std::mem, kani as k}};\nfn f() { k::assume(x); }').items],
+            ['assume'],
+            'a nested root group must not hide its crate from the audit')
+
+    def test_a_nested_root_group_without_an_alias_is_still_a_root(self):
+        """Require the unaliased nested spelling to name its root for rule (iii)."""
+        tokens = tokenize('use {{std::mem, kani}};')
+        self.assertEqual(use_roots(tokens, 1, statement_end(tokens, 1)),
+                         (('std', None), ('kani', None)),
+                         'a nested unaliased group must still report every root')
+
+    def test_a_crate_renamed_twice_keeps_both_names(self):
+        """Require both aliases of one crate to reach the matcher.
+
+        `use kani::{self as first, self as second};` compiles and binds both
+        names. A reader that reported one alias per crate kept `first` and
+        dropped `second`, so `second::assume` was unreported — the file looked
+        trust-free while it assumed what the vocabulary names.
+        """
+        statement = 'use kani::{self as first, self as second};'
+        self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                         frozenset({'kani', 'first', 'second'}),
+                         'a crate renamed twice must bind both names')
+
+    def test_a_crate_renamed_twice_reaches_the_qualified_path_rule(self):
+        """Require the second alias to make `second::assume` reach rule (i)."""
+        self.assertEqual(
+            [item.item for item in scan(
+                'use kani::{self as first, self as second};\n'
+                'fn f() { second::assume(x); }').items],
+            ['assume'],
+            'the second alias of a crate must not be dropped')
+
+    def test_a_grouped_crate_renamed_twice_keeps_both_names(self):
+        """Require both renames inside a grouped root to be reported."""
+        statement = 'use {kani::{self as a, self as b}, std};'
+        self.assertEqual(alias_bindings(tokenize(statement), 'kani'),
+                         frozenset({'kani', 'a', 'b'}),
+                         'a grouped crate renamed twice must bind both names')
+
+
+if __name__ == '__main__':
+    unittest.main()

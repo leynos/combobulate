@@ -153,6 +153,41 @@ fn cargo_and_nextest_controls_are_applied() {
     );
 }
 
+/// The profile pin must outrank an inherited value on every run.
+///
+/// `GATE_PROFILE` is the one caller setting the harness overrides rather than
+/// forwards: these tests assert the default two-profile route, so a hosted
+/// job's single-profile value would change what they measure. It therefore has
+/// to arrive as a command-line assignment and must never be inherited.
+#[rstest]
+#[case(None)]
+#[case(Some("-- GATE_PROFILE=polars-enabled"))]
+fn profile_pin_always_overrides_an_inherited_value(#[case] caller_makeflags: Option<&'static str>) {
+    let mut command = Command::new("unused");
+    command.env("GATE_PROFILE", "native-only");
+    MakeOptions {
+        caller_makeflags,
+        ..MakeOptions::default()
+    }
+    .apply_caller_environment(&mut command);
+
+    assert_eq!(
+        command.get_args().collect::<Vec<_>>(),
+        vec![OsString::from("GATE_PROFILE=both")],
+        "the profile pin must be a literal command-line assignment"
+    );
+    assert_eq!(
+        environment(&command).get(&OsString::from("GATE_PROFILE")),
+        Some(&None),
+        "an exported GATE_PROFILE must be removed from the child"
+    );
+    assert_eq!(
+        environment(&command).get(&OsString::from("MAKEFLAGS")),
+        Some(&caller_makeflags.map(OsString::from)),
+        "an inherited MAKEFLAGS must be forwarded or removed, never invented"
+    );
+}
+
 /// An absent flag override preserves an explicit value already on the child command.
 #[test]
 fn absent_caller_flags_leave_existing_child_value_untouched() {

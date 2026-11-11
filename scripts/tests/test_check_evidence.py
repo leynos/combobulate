@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'scripts/tests/fixtures/evidence'
 EXAMPLE = ROOT / 'spec/proof-evidence.example.json'
 WITH_BINDINGS = ('--bindings', str(FIXTURES / 'bindings.json'),)
+# The bounded Kani record names a different component, so it needs its own
+# registered profile for the binding to read as current.
+WITH_KANI_BINDINGS = ('--bindings', str(FIXTURES / 'bounded-kani-bindings.json'),)
 
 
 def run(*args: str) -> int:
@@ -57,6 +60,106 @@ def test_standalone_entrypoint_has_its_runtime_dependencies():
     ], 'standalone CLI reports the admitted level and reasons'
 
 
+def test_the_standalone_entry_point_admits_a_bounded_kani_record():
+    """Run the PEP 723 entry point for a Kani record and require its level.
+
+    The other bounded-Kani cases drive ``app`` in-process, which proves the
+    gate's decision but not that the shipped script reaches it: an import the
+    entry point never declares, an argument it drops, or a parser it does not
+    register all pass in-process. Ordinary ``tested`` evidence already had this
+    check; bounded admission did not, and it is the path that depends on the
+    log parser and the manifest binding being wired at the executable.
+    """
+    result = subprocess.run(
+        [
+            str(ROOT / 'scripts/check_evidence.py'),
+            '--as-of', '2026-11-11',
+            '--require', 'bounded',
+            *WITH_KANI_BINDINGS,
+            fixture('bounded-kani'),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=180,
+    )
+    assert result.returncode == 0, f'standalone CLI should admit bounded evidence: {result.stderr}'
+    assert result.stdout.splitlines() == [f"{fixture('bounded-kani')}: bounded []"], \
+        'the executable reports the admitted level and no blocking reason'
+    assert result.stderr == '', 'an admitted record produces no refusal on stderr'
+
+
+def test_the_standalone_entry_point_refuses_a_tampered_manifest(tmp_path):
+    """Require the shipped script, not just ``app``, to refuse a rewritten manifest.
+
+    The record is tampered exactly as the in-process case tampers it, so the
+    only difference between the two is the route into the gate. A boundary
+    that re-read or re-resolved the manifest on its way in would admit this
+    record while the in-process case still refused it.
+    """
+    record = json.loads((FIXTURES / 'bounded-kani.json').read_text(encoding='utf-8'))
+    record['result_artefacts'][0]['sha256'] = 'f' * 64
+    tampered = tmp_path / 'tampered.json'
+    tampered.write_text(json.dumps(record), encoding='utf-8')
+
+    result = subprocess.run(
+        [
+            str(ROOT / 'scripts/check_evidence.py'),
+            '--as-of', '2026-11-11',
+            '--require', 'bounded',
+            *WITH_KANI_BINDINGS,
+            str(tampered),
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=180,
+    )
+    assert result.returncode == 1, 'a tampered manifest must fail the standalone CLI'
+    assert 'verdict-self-reported' in result.stdout, \
+        'the refused verdict blocks bounded admission'
+    assert 'its digest differs from the one the record binds' in result.stderr, \
+        'the executable names the digest mismatch rather than some other refusal'
+
+
+def test_bounded_kani_record_is_admitted_through_the_command(capsys):
+    """Admit a Kani record at `bounded` through the real command, not a hand-built context.
+
+    Every other Kani case in the suite assembles an `AdmissionContext` itself,
+    which proves the gate's comparison but not that the CLI binds the
+    artefacts and registers the parser. This one starts from the command.
+    """
+    assert run('--as-of', '2026-11-11', '--require', 'bounded', *WITH_KANI_BINDINGS,
+               fixture('bounded-kani')) == 0, 'a committed log and manifest must admit the record at bounded'
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == [f'{fixture("bounded-kani")}: bounded []'], \
+        'the command reports the admitted level and no blocking reason'
+    assert captured.err == '', 'a record whose artefacts all bind produces no refusal'
+
+
+def test_a_manifest_with_a_rewritten_harness_list_is_refused_by_the_command(tmp_path, capsys):
+    """Refuse a record whose manifest bytes no longer match the digest it binds.
+
+    The record still cites the committed log, and the log still parses. Only
+    the manifest's digest is stale, so a gate that matched on the log identity
+    would admit the record anyway. The record is written to a scratch path and
+    keeps naming the *committed* manifest, because that is the artefact whose
+    bytes changed: a scratch manifest path would be refused earlier, for not
+    being a repository-relative path, and the digest check would never run.
+    """
+    record = json.loads((FIXTURES / 'bounded-kani.json').read_text(encoding='utf-8'))
+    record['result_artefacts'][0]['sha256'] = 'f' * 64
+    tampered = tmp_path / 'tampered.json'
+    tampered.write_text(json.dumps(record), encoding='utf-8')
+
+    assert run('--as-of', '2026-11-11', '--require', 'bounded', *WITH_KANI_BINDINGS,
+               str(tampered)) == 1, 'a manifest whose bytes changed cannot carry the record verdict'
+    captured = capsys.readouterr()
+    assert 'verdict-self-reported' in captured.out, 'the refused verdict blocks bounded admission'
+    assert 'its digest differs from the one the record binds' in captured.err, \
+        'the command names the digest mismatch rather than some other refusal'
+
+
 def test_complete_test_record_is_admitted_at_tested(capsys):
     """Accept complete test evidence at the CLI's default minimum level."""
     assert run('--as-of', '2026-10-10', *WITH_BINDINGS, fixture('complete-test')) == 0, 'tested meets the default'
@@ -65,10 +168,16 @@ def test_complete_test_record_is_admitted_at_tested(capsys):
 
 @pytest.mark.parametrize('required', ['bounded', 'proof'])
 def test_partial_bounds_stay_self_reported_without_a_parser_adapter(required, capsys):
-    """Keep verifier claims below bounded until an adapter verifies their cited log."""
+    """Keep verifier claims below bounded until an adapter verifies their cited log.
+
+    Two reasons, in the gate's rule order. The record claims an audit but binds
+    no manifest for a scanner to have audited, so DL-16 demotes the claim to
+    ``unaudited``; the trust rule is checked before the verdict-source rule and
+    is reported first.
+    """
     assert run('--as-of', '2026-10-10', '--require', required, *WITH_BINDINGS,
                fixture('partial-bounds-kani')) == 1, 'tool registration alone cannot satisfy a proof level'
-    assert ': rejected [verdict-self-reported]' in capsys.readouterr().out
+    assert ': rejected [trust-unaudited, verdict-self-reported]' in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(('name', 'reason'), [('resource-exhausted-kani', 'outcome-resource-exhausted'),
@@ -166,6 +275,28 @@ def test_every_record_is_reported_even_after_an_invalid_one(tmp_path, capsys):
     assert 'broken.json: unreadable' in captured.err, 'malformed JSON is reported as unreadable'
     assert 'missing.json: unreadable' in captured.err, 'a missing file is reported as unreadable'
     assert ': tested []' in captured.out, 'records after an invalid one are still admitted and reported'
+
+
+def test_a_schema_invalid_object_does_not_abort_the_binding_pass(tmp_path, capsys):
+    """Report a schema-invalid object as such while still admitting the valid records.
+
+    The object below parses as JSON but lacks ``verdict_source``, which
+    ``checked_inputs`` reads unguarded. Binding it raised ``KeyError``, the
+    ``except`` turned that into "cannot load configuration", and the run
+    returned 2 without reporting any record — including the valid ones.
+    """
+    invalid = tmp_path / 'incomplete.json'
+    invalid.write_text(json.dumps({'id': 'incomplete'}), encoding='utf-8')
+
+    code = run('--as-of', '2026-10-10', *WITH_BINDINGS, str(invalid), fixture('complete-test'))
+    captured = capsys.readouterr()
+
+    assert code == 2, 'a schema-invalid record still exits 2'
+    assert 'incomplete.json: schema-invalid' in captured.err, \
+        'the invalid object is diagnosed rather than reported as a configuration failure'
+    assert 'cannot load configuration' not in captured.err, \
+        'an invalid record is not a configuration failure'
+    assert ': tested []' in captured.out, 'the valid record after it must still be admitted'
 
 
 @pytest.mark.parametrize('args', [('--as-of', 'yesterday', str(EXAMPLE)), ('--as-of', '2026-10-10', '--require',

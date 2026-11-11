@@ -88,6 +88,14 @@
                 "conclusion": {
                   "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure"]
                 },
+                "required_job_conclusions": {
+                  "type": "object",
+                  "description": "The conclusion of every required pull-request job in this run, keyed by job name. AC-07 requires each of them to succeed, so recording only the longest job's conclusion would let a shorter failed job pass unrecorded. Every attempt must name each job the workload registers. A job the run never created is recorded as `missing`, not by omitting it: omitting the key is a malformed record the checker refuses, whereas a job that genuinely did not run has to be sayable, and AC-07 makes it a failure.",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "enum": ["success", "failure", "cancelled", "timed_out", "action_required", "neutral", "skipped", "stale", "startup_failure", "missing"]
+                  }
+                },
                 "wall_seconds": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "null"}]},
                 "started_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
                 "completed_at": {"oneOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
@@ -136,12 +144,20 @@
           "workloads": {
             "items": {
               "if": {
-                "properties": {"id": {"const": "ci-build-test"}},
+                "properties": {
+                  "id": {"const": "ci-required-jobs"}
+                },
                 "required": ["id"]
               },
               "then": {
+                "description": "The DL-14 workload measures every required job, so each attempt records each job's own conclusion. A pre-DL-14 `ci-build-test` series is calibration history: an acceptance record that names it falls to the ordinary branch and must carry measured samples, which the checker then rejects as the wrong workload.",
                 "required": ["attempts"],
-                "properties": {"attempts": {"minItems": 1}},
+                "properties": {
+                  "attempts": {
+                    "minItems": 1,
+                    "items": {"required": ["required_job_conclusions"]}
+                  }
+                },
                 "allOf": [
                   {
                     "if": {

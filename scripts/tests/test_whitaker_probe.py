@@ -27,6 +27,15 @@ def caller(reference: str) -> str:
     return f'jobs:\n  build-test:\n    steps:\n      - uses: {ACTION}@{reference}\n'
 
 
+def multi_job_caller(references: dict[str, str]) -> str:
+    """Build one required job per reference; e.g. two jobs pinning two commits."""
+    jobs = ''.join(
+        f'  {name}:\n    steps:\n      - uses: {ACTION}@{reference}\n'
+        for name, reference in references.items()
+    )
+    return f'jobs:\n{jobs}'
+
+
 class SourceBindingTests(unittest.TestCase):
     """A shape-valid SHA is accepted only after its own resolved source passes probes."""
 
@@ -44,6 +53,38 @@ class SourceBindingTests(unittest.TestCase):
             self.assertEqual(evidence['manifest_sha256'], hashlib.sha256(CAPABLE.encode()).hexdigest())
             self.assertEqual(evidence['scenarios'], 14)
         self.assertEqual(seen, [(ref, path) for ref in candidates for path in APPROVED])
+
+    def test_every_calling_job_must_pin_the_same_reviewed_source(self):
+        """A second job cannot install a different, unapproved Whitaker build.
+
+        DL-03 puts the installer in more than one required job, so the caller
+        reference is resolved per job. One shared reference is approved once;
+        two different references have no single source to approve and fail.
+        """
+        seen = []
+        def acquire(current, path):
+            """Record the single approved ref used for every requesting job."""
+            seen.append(current)
+            return APPROVED[path]
+        evidence = verify_workflow(
+            multi_job_caller({'build-test': 'a' * 40, 'polars-lint': 'a' * 40}), acquire)
+        self.assertEqual(evidence['reference'], 'a' * 40)
+        self.assertEqual(set(seen), {'a' * 40},
+                         'every approved source must be fetched at the one shared ref')
+        self.assertEqual(len(seen), len(APPROVED),
+                         'each approved source must be fetched exactly once')
+        with self.assertRaisesRegex(ValueError, 'same Whitaker reference'):
+            verify_workflow(
+                multi_job_caller({'build-test': 'a' * 40, 'polars-lint': 'b' * 40}),
+                lambda *_: self.fail('a split reference must not be fetched'))
+
+    def test_repeated_installer_in_one_job_is_rejected(self):
+        """One job installing Whitaker twice would run two builds behind one gate."""
+        source = ('jobs:\n  build-test:\n    steps:\n'
+                  f'      - uses: {ACTION}@{"a" * 40}\n'
+                  f'      - uses: {ACTION}@{"a" * 40}\n')
+        with self.assertRaisesRegex(ValueError, 'exactly one Whitaker installer'):
+            verify_workflow(source, lambda *_: self.fail('a repeated installer must not be fetched'))
 
     def test_old_capability_is_rejected_despite_valid_sha_shape(self):
         """The upstream pre-#522 manifest cannot satisfy the binary-only obligation."""

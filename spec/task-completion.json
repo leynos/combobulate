@@ -76,6 +76,28 @@
         "scripts/tests/fixtures/evidence_gate_rules.json",
         "scripts/check_evidence.py"
       ]
+    },
+    {
+      "task": "1.2.1",
+      "decisions": [
+        "D16"
+      ],
+      "artefacts": [
+        "spec/toolchain-profiles.json",
+        "spec/toolchain-profiles.schema.json",
+        "docs/adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md",
+        "docs/decision-register.md#d16",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
+        "scripts/docs_validation/toolchain_profiles.py",
+        "scripts/docs_validation/polars_confinement.py",
+        "scripts/docs_validation/trust_audit_check.py",
+        "scripts/docs_validation/kani_log/shell.py",
+        "tests/workspace_profiles.rs",
+        "tests/workspace_kernel_boundary.rs",
+        "tests/native_consumer_e2e.rs",
+        "tools/fixtures/native-consumer/Cargo.toml"
+      ]
     }
   ]
 }

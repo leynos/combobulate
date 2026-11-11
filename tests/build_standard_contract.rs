@@ -158,7 +158,7 @@ fn whitaker_clears_driver_overrides_and_checks_with_repository_defaults() {
         .expect("Whitaker must preflight the development build tools");
     let whitaker = recipe
         .lines()
-        .find(|line| line.contains(" --all -- "))
+        .find(|line| line.contains(" --lib whitaker_suite "))
         .expect("Make must invoke the Whitaker workspace check");
 
     for setting in [
@@ -189,9 +189,26 @@ fn whitaker_clears_driver_overrides_and_checks_with_repository_defaults() {
         "warnings-as-errors must reach the repository check through Dylint's supported input: \
          {whitaker}"
     );
+    // The suite is named rather than discovered. `--all` loads every published
+    // library, and the rolling release has published a lint crate both alone
+    // and inside `whitaker_suite`, which registers the same lint twice and
+    // aborts rustc. `--fail-on-no-libraries` keeps a missing suite a failure
+    // rather than a silent pass over nothing.
     assert!(
-        whitaker.ends_with("--all -- --all-targets --all-features"),
-        "the repository check must retain all targets and features: {whitaker}"
+        whitaker.contains(" --lib whitaker_suite --fail-on-no-libraries -- --all-targets $flags"),
+        "the repository check must name the suite, retain all targets, and forward the profile \
+         selection: {whitaker}"
+    );
+    // DL-18: the loop is what makes the check profile-complete. A recipe that
+    // ran Whitaker once, even with a correct argument list, would lint only the
+    // default features and leave the native-only `cfg(not(feature = "polars"))`
+    // code unchecked. `make -n` expands `GATE_PROFILES`, so the contracted
+    // string is the default route's expansion; the two profiles are the ones
+    // the pull-request lane builds, and a recipe that dropped or hard-coded
+    // either fails here.
+    assert!(
+        whitaker.contains("for profile in native-only polars-enabled"),
+        "Whitaker must check every gate profile, not the default one only: {whitaker}"
     );
 }
 

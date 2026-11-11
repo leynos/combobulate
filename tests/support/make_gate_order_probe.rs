@@ -24,7 +24,13 @@ mod scripts;
 type Read<T> = Result<T, Box<dyn Error>>;
 
 /// Caller variables that can change the Make gate route or its child flags.
+///
+/// `GATE_PROFILE` is removed here and re-pinned on the command line, because
+/// these contracts assert the default two-profile route: a hosted job exports
+/// the single profile it was scheduled to measure, and the Makefile honours it,
+/// so an inherited value would halve the stages they check.
 const CONTROLLED_CALLER_VARIABLES: &[&str] = &[
+    "GATE_PROFILE",
     "WITH_ACT",
     "RUSTFLAGS",
     "RUSTDOCFLAGS",
@@ -150,8 +156,8 @@ impl GateProbe {
             .args([
                 "WITH_ACT=0",
                 "BUILD_JOBS=",
-                "CARGO_FLAGS=--all-targets --all-features",
-                "TEST_FLAGS=--all-targets --all-features",
+                "CARGO_FLAGS=--all-targets",
+                "TEST_FLAGS=--all-targets",
             ]);
     }
 
@@ -173,7 +179,13 @@ impl GateProbe {
     }
 
     /// Controls caller contamination solely within the Make child process.
+    ///
+    /// The `GATE_PROFILE=both` assignment is what keeps the default route
+    /// intact whatever the caller exports: a command-line assignment outranks
+    /// an inherited value, including one replayed through inherited
+    /// `MAKEFLAGS`, while removing the variable stops it winning on level.
     fn configure_caller_environment(command: &mut Command, caller_environment: CallerEnvironment) {
+        command.arg("GATE_PROFILE=both");
         for variable in CONTROLLED_CALLER_VARIABLES {
             command.env_remove(variable);
         }

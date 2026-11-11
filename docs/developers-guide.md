@@ -72,12 +72,54 @@ generated file with the change. The gate derives it from the shared dictionary
 and `typos.local.toml`, so add repository-specific exceptions to the local
 overlay instead of editing generated output.
 
-Every pull request runs the hosted `build-test` job as the authoritative
-repository gate. Its Rust test suite includes workflow-structure and command
-contract tests: workflow YAML and pins are checked from source, while real Make
-recipes and shell scripts run with controlled external executors. These tests
-prove invocation shape, configuration, ordering, and failure propagation
-without compiling the repository again for each contract.
+Every pull request runs three required hosted jobs: `build-test` on the
+native-only profile, and `polars-lint` and `polars-test` on the Polars-enabled
+profile. `polars-test` also runs `make test-profiles`, because neither required
+job builds a single-feature profile and the modules gated on one would
+otherwise never run. `build-test` is the authoritative repository gate. Its
+Rust test suite includes workflow-structure and command contract tests:
+workflow YAML and pins are checked from source, while real Make recipes and
+shell scripts run with controlled external executors. These tests prove
+invocation shape, configuration, ordering, and failure propagation without
+compiling the repository again for each contract. Each job is contracted on its
+own, so a step, action, or `GATE_PROFILE` moved between jobs fails the contract
+rather than being satisfied by another job's prelude.
+
+All four hosted jobs declare `RUSTC_WRAPPER: sccache` and
+`SCCACHE_GHA_ENABLED: "true"` at job level and run `Report sccache wiring`
+after installing the linker, which resolves the wrapper on `PATH` and prints
+`sccache --show-stats`, whose cache-location line names the backend in use.
+DL-03 requires the GitHub Actions cache backend, and the pinned `setup-rust`
+action only provisions the binary: it exports `SCCACHE_PATH` and sets neither
+variable. An absent `RUSTC_WRAPPER` is not itself an error, so a job that
+omitted them compiled uncached and reported nothing; a wrapper Cargo cannot
+execute is a different case, and fails the build. The wiring step is the
+observable half of that declaration; `--show-stats` needs no compile, so it
+answers before any gate can fail and obscure the question. Use only flags the
+released binary accepts: sccache 0.19.0 has no `--show-config`, and a step that
+called it failed the three jobs it was added to make observable. The coverage
+steps are wrapped too, which is safe because sccache hashes the full rustc
+command line, so an instrumented object never shares a cache key with an
+uninstrumented one.
+
+DL-03 allows cache saves only on `main`, which is a policy the backend has no
+default for: `sccache` writes unless `SCCACHE_GHA_RW_MODE` says otherwise.
+Every hosted job that compiles therefore sets it, and the test is the ref
+rather than the event: both `ci.yml` and `coverage-main.yml` also declare
+`workflow_dispatch`, which may run from any branch. An event test cannot
+separate the two: a manual dispatch reports `github.event_name` as
+`workflow_dispatch`, so a test for `push` is false for every dispatch and makes
+even a dispatch from `main` read-only. Keying on `github.ref` gives
+`READ_WRITE` to `refs/heads/main` alone and `READ_ONLY` everywhere else, which
+holds for every declared trigger without enumerating them. Leaving the default
+cost something measurable: cache entries are scoped to the ref that wrote them,
+so a pull request's entries sit under `refs/pull/N/merge`, which no later run
+of the branch reads once that ref advances. One pull request had written 1.02
+GB that way against 154 MB on `main`, in a repository whose whole cache budget
+is 10 GB. The mode requires sccache 0.16.0 or later; the hosted action installs
+0.19.0. `profile-measurements.yml` is deliberately excluded — AC-04 measures
+with no cache at all, and its `build-budget` job asserts that `RUSTC_WRAPPER`
+is unset before the timed loop.
 
 Table-driven contract regressions use the `rstest` dev dependency with its
 optional asynchronous-timeout and crate-renaming features disabled. Private
@@ -90,6 +132,16 @@ protocol. The unset-environment assertion is shared only by the driver and
 configuration boundaries and their regression tests; each boundary owns its
 variable names and diagnostics. These helpers are not a cross-suite validation
 framework.
+
+A contract probe that shells out to `make` must pin `GATE_PROFILE=both` on the
+child command line and remove the variable from the child environment. Every
+hosted job exports the single profile it was scheduled to measure, and the
+Makefile honours it, so a probe asserting the default two-profile route would
+otherwise measure one profile on CI and two locally. The command-line
+assignment is what displaces a value replayed through an inherited `MAKEFLAGS`;
+the removal is what stops an exported value winning on level. A test that
+ignores this passes locally and fails hosted, which is the least useful place
+to learn about it.
 
 The separate `.github/workflows/act-validation.yml` workflow runs only on
 manual dispatch. It exercises the full workflow through Act in Docker to check
@@ -172,11 +224,12 @@ Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
 that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
 because nextest then has no process left to escalate to `SIGKILL`. Only the
-job's own `timeout-minutes` bounds it (`build-test` sets 8; `coverage-main.yml`
-sets none, so GitHub's 360-minute default applies, and nextest's limits do not
-cover `make prepare-ui-gate`, which runs before it), and a local `cargo test`
-run, which `make test` falls back to when cargo-nextest is missing, has no
-limit at all. Ordinary builds and sleeping children do end under nextest.
+job's own `timeout-minutes` bounds it (all three required jobs set 8;
+`coverage-main.yml` sets none, so GitHub's 360-minute default applies, and
+nextest's limits do not cover `make prepare-ui-gate`, which runs before it),
+and a local `cargo test` run, which `make test` falls back to when
+cargo-nextest is missing, has no limit at all. Ordinary builds and sleeping
+children do end under nextest.
 
 `make test-ui` is the one route with its own bound. It runs the recorded gate
 binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600
@@ -415,6 +468,129 @@ download, checksum, unpack, or toolchain installation fails.
 Install `clang`, `lld`, `python3`, and `cargo-audit` before running the full
 generated workflow locally on Linux. `make install-build-tools` supplies the
 pinned `mold` and nightly toolchain.
+
+## Gate profiles
+
+The facade's two optional features, `macros` and `polars`, are selected
+independently, so four builds exist. A gate that runs only some of them cannot
+see the others' code. `--all-features` reaches the Polars-enabled code but
+never the `cfg(not(feature = "polars"))` branches, and a plain default-feature
+run repeats what the Polars-enabled route already checks. Each profile is
+therefore its own Cargo invocation.
+
+| Profile          | Flags                                     | Reaches                                       |
+| ---------------- | ----------------------------------------- | --------------------------------------------- |
+| `native-only`    | `--no-default-features`                   | `cfg(not(feature = "polars"))`, no macros     |
+| `polars-enabled` | none (defaults)                           | `cfg(feature = "polars")` and the macro crate |
+| `macros-only`    | `--no-default-features --features macros` | the macro crate without Polars                |
+| `polars-only`    | `--no-default-features --features polars` | Polars without the macro crate                |
+
+The last two exist because every other route turns both features on or both
+off. A `BuildProfile::current()` that reported each flag as the other's would
+pass a default build and a native-only build alike; only a build with exactly
+one feature can tell them apart. `tests/build_profiles.rs` therefore binds one
+scenario per route, and each snapshots the line its own build renders.
+
+`GATE_PROFILE` selects which profiles a gate runs:
+
+- `GATE_PROFILE=both` (the default) runs `native-only` then `polars-enabled`,
+  which is what `make lint` and `make test` do.
+- `GATE_PROFILE=macros-only` or `GATE_PROFILE=polars-only` selects a single
+  feature, which is the isolation check for a change that touches either flag.
+- `GATE_PROFILE=native-only` or `GATE_PROFILE=polars-enabled` runs one of the
+  two profiles the pull-request lane builds, which is what a focused iteration
+  should use.
+- Any other value fails the Make parse with an error naming the accepted set.
+
+`both` deliberately does not include the two single-feature routes. `make lint`
+and `make test` iterate `GATE_PROFILES`, so under `both` they build the two
+profiles the pull-request lane budgets and never reach a single-feature build.
+
+`make test-profiles` is the route that does. It runs the `build_profiles`
+integration-test target once per single-feature profile, which is where the
+`macros_only` and `polars_only` modules are compiled. It ignores `GATE_PROFILE`
+on purpose: narrowing it to one profile would leave the other module unbuilt,
+which is the defect it exists to catch. It runs one test binary rather than the
+whole suite because the isolation claim is about `BuildProfile::current()`, and
+a full suite per profile would add two workspace compilations and the
+cardinality gate's nested build to a hosted job under AC-07's budget.
+
+The hosted pull-request lane runs it as the final step of `polars-test`, so the
+isolation profiles are exercised by a required job without adding a fourth one
+and restarting AC-07's 20-run window.
+
+`lint-whitaker` iterates the same list. Whitaker forwards every argument after
+`--` to `cargo check`, so an unflagged run type-checks only the default
+features — the `polars-enabled` profile — and the native-only
+`cfg(not(feature = "polars"))` code never reaches a lint. Each profile is
+therefore its own Whitaker invocation, and the stage order records
+`whitaker-native-only` then `whitaker-polars-enabled`. Both profiles in one run
+share a single `DYLINT_DRIVER_PATH`, so the first builds the driver and the
+second reuses it.
+
+Rustdoc stays profile-independent: it documents the default feature set rather
+than checking conditional compilation, so it runs once.
+
+## Workspace layout and module ownership
+
+The workspace holds three crates, and dependency edges point one way. The facade
+`combobulate` depends on both `combobulate-kernel` and `combobulate-macros`;
+neither of those depends on anything, and the macro crate never reaches the
+kernel. `tests/workspace_boundaries.rs` asserts that shape against live
+`cargo metadata` and `cargo tree` output, so a new edge fails a test rather
+than being noticed at review.
+
+| Path                                            | Role                                                   | Re-use boundary                                               |
+| ----------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
+| `crates/combobulate-kernel/`                    | `#![no_std]` without `alloc`; owns `TargetFacts`       | Target facts only; see the first policy below                 |
+| `crates/combobulate-macros/`                    | `proc-macro` crate; exports nothing until task 2.3.1   | Expansion boundary only; must not build `TargetFacts`         |
+| `src/lib.rs`                                    | Facade crate root                                      | Re-exports behind features; owns nothing below the facade     |
+| `src/profile.rs`                                | `BuildProfile`                                         | Reports features and target facts only                        |
+| `src/polars_backend.rs`                         | Crate-private Polars module, `cfg(feature = "polars")` | Wiring target for the pinned release; claims no capability    |
+| `scripts/docs_validation/trust_audit/`          | Trusted-item scanner behind the evidence gate          | The gate and the design check only                            |
+| `scripts/docs_validation/kani_log/`             | Kani log parser behind the evidence gate               | The gate's I/O shell only; the decision function is pure      |
+| `scripts/docs_validation/toolchain_profiles.py` | Pin checker for `spec/toolchain-profiles.json`         | Derives pins; other checks read the record instead of the pin |
+| `scripts/docs_validation/candidate_deferral.py` | Guard against a tick outrunning a deferred candidate   | Reads the roadmap export and D07's dispositions only          |
+
+*Table 1: Workspace modules, roles, and re-use boundaries.*
+
+Five re-use policies follow from that table. They are stated here because each
+one has already been tempting to break in a different file, and a boundary that
+lives only in a review comment is not a boundary.
+
+- `TargetFacts` is kernel-owned, and it is the single source of target facts
+  for checked rules and for the certificate keys that later tasks derive from
+  them. The macro crate must not construct it: a procedural macro runs on the
+  host, so a `TargetFacts` built there would describe the wrong machine. The
+  facade exposes only derived values, through `BuildProfile`'s
+  `target_usize_bits`.
+- `BuildProfile` reports compiled features and target facts only. It is not a
+  capability report. Task 1.2.6 owns the Polars capability statuses and must
+  not infer them from `BuildProfile`; a build that links Polars says only that,
+  never that an operation is supported.
+- `trust_audit` serves the evidence gate's I/O shell and the `trust-audit`
+  design check only. It reads the item shapes those two consumers need and is
+  not a general Rust parser: adding a caller means deciding whether it needs
+  the scanner or something else. Within the package, `manifest` owns crate
+  ownership: which `Cargo.toml` compiles a source, and whether that crate
+  expands literals. A bound walk takes ownership from the manifests its caller
+  verified plus the paths Git tracks, never from working-tree presence, because
+  a nested manifest deleted but not yet staged would otherwise let the
+  workspace root answer for a crate it does not own and switch literal scanning
+  off silently. When ownership cannot be established the walk refuses rather
+  than guessing, and names the manifest to bind. The index question is settled
+  before any candidate is selected, not only when the walk reaches its end: an
+  owner the walk concludes early is the same claim — that nothing sits nearer —
+  as one it concludes late, and it rests on the same evidence. Deciding it
+  first is what stops a bound ancestor from answering when Git could not say
+  which manifests exist.
+- `kani_log` serves the evidence gate's I/O shell only. Its decision function
+  is pure — it takes the parsed facts and the manifest and returns the
+  admission facts — so it must not read files, and a rule that needs another
+  input belongs in the shell that assembles the facts.
+- `toolchain_profiles` validates pins. Other checks read pins from
+  `spec/toolchain-profiles.json` rather than duplicating them, so a pin bump
+  edits one record and the sites it names, not every consumer.
 
 ## Spelling policy
 
@@ -674,7 +850,7 @@ column says when each is meant to shrink or go.
 | `scripts/docs_validation/grammar.py`           | Documentation model of the `comb!` corpus        | Deleted after the `trybuild` replay in task 2.3.1        |
 | `scripts/docs_validation/preregistration.py`   | Acceptance-control registration and outcomes     | Stays                                                    |
 
-*Table 1: Governance modules, ownership, and retirement.*
+*Table 2: Governance modules, ownership, and retirement.*
 
 Bet/task traceability is an internal documentation-pack validation rule.
 `check_bets_and_tasks` calls `check_bet_links` in
@@ -851,9 +1027,11 @@ Proof evidence for a record-sourced component goes in `spec/evidence/` as a
 schema version 2 record; run `scripts/check_evidence.py --as-of <date>` on it
 before committing, and see
 [evidence and decision records](evidence-and-decision-records.md) for the
-fields, levels, reason codes, and log-parser obligations. Until a log parser is
-registered for a verifier, its records are self-reported and cannot satisfy a
-`proof` or `bounded` component.
+fields, levels, reason codes, and log-parser obligations. `kani` is registered
+and has an adapter, so a Kani record citing a committed log, its harness
+manifest, and that manifest's sources is decided from those artefacts. A
+verifier with no registered adapter, such as Verus, remains self-reported and
+cannot satisfy a `proof` or `bounded` component.
 
 ### Compose the evidence-admission boundary
 
@@ -863,12 +1041,25 @@ and verified adapter results. The evidence-record and CLI adapters validate
 each record against the schema and assemble this context. A parser adapter may
 provide `VerifiedLogResult` only after reading the cited log, validating its
 digest, and deriving the admission-relevant facts. Tool registration alone is
-insufficient. The CLI currently has no verifier parser adapter, so verifier
-records remain self-reported there. `abstract_record(record, context)` maps a
-schema-valid record to the ten-field model; `admit` applies the pure MS-0 to
-MS-2 rules and returns an admission level with reason codes. Neither function
-reads files, the clock, the environment, or the network. Add producers at the
-adapter boundary and pass explicit inputs into the gate.
+insufficient. The CLI has one verifier adapter, `evidence_binding`: it reads a
+Kani record's committed log, its harness manifest, and that manifest's sources,
+binds them, and passes a `VerifiedLogResult` and `VerifiedTrustAudit` into the
+gate. The manifest's `sources` list must bind the `Cargo.toml` of every crate
+that owns one of those sources, because the trust scan reads it to decide
+whether the crate's literals are code; `audit_bound_tree` refuses a source
+whose owning manifest is absent from the bound set rather than reading it from
+the working tree. Both values carry the manifest identity as well as the log's,
+because a verdict is decided against a manifest: a result is matched to a
+record only when the tool, the log path and digest, and the manifest path and
+digest all agree, so two records citing one capture against different manifests
+are two verdicts and neither can answer for the other. A record whose log,
+manifest, or audit it cannot bind falls back to `self-reported` and is
+rejected; Verus has no adapter yet and is always self-reported.
+`abstract_record(record, context)` maps a schema-valid record to the ten-field
+model; `admit` applies the pure MS-0 to MS-2 rules and returns an admission
+level with reason codes. Neither function reads files, the clock, the
+environment, or the network. Add producers at the adapter boundary and pass
+explicit inputs into the gate.
 
 The `scripts/check_docs.py` composition root resolves the checked-out source
 revision through the Git adapter and places it in
@@ -915,6 +1106,18 @@ fences in migration documents. It requires each fence to have a unique adjacent
 `tested-example` marker and reads the example from the published Markdown. Use
 it from documentation contract tests; it is not a general Markdown parser.
 
+The documentation style guide asks for a
+`docs/v<major>-<minor>-<patch>-migration-guide.md` whenever a release changes
+observable behaviour, and this repository deliberately has none. The guide is
+keyed to a release, and the crate is unreleased at `0.1.0` with
+`publish = false` under [ADR-0004](adrs/adr-0004-licence-and-publication.md);
+the repository does not even carry tags, so there is no previous release to
+name as the guide's other endpoint.
+[Library changes in this delivery](revision-0.3.md) serves the consumer
+instead: it states what changed since the last tagged state and says in its own
+opening that "upgrade" means moving to a later commit. Create the first real
+migration guide when a consumer can name a version they are leaving.
+
 The `scripts/docs_validation/` modules belong only to the documentation-pack
 checker. They consume `spec/` and explicit design-document inputs and share its
 validation context. They do not replace repository Markdown lint or Rust
@@ -935,9 +1138,32 @@ loading in the composition path rooted at `check_acceptance_controls` in
 `scripts/docs_validation/preregistration.py` and its shared `ValidationContext`.
 `ValidationContext.load_yaml` converts parser failures into checker errors.
 The composition path passes the small `AcceptanceWorkflowSettings` value to the
-pure rules. The original named imports remain re-exported from preregistration
-for focused tests; these helpers are not general GitHub Actions parsers,
-measurement libraries, or repository file APIs.
+pure rules; it carries one `RequiredJob` (name, runner image, timeout) per
+unconditioned `ci.yml` job, because DL-14 makes every required pull-request job
+part of `AC-07`'s workload. Each job is checked against the registered runner
+and timeout, so adding, renaming, or resizing a required job fails the control
+until `spec/acceptance-controls.json` records the same shape. An attempt's
+`conclusion` is its longest required job's own conclusion, which is also the
+run's duration sample, so it cannot state whether a shorter job failed; the
+schema therefore requires `required_job_conclusions` for the `ci-required-jobs`
+workload, and `check_ci_measurement` fails the record when any job in that map
+is not `success`. A schema cannot say *which* jobs a map must contain, because
+the workflow is not its input, so `AcceptanceWorkflowSettings.job_names` —
+derived once from the same parsed workflow the runner and timeout checks use —
+is passed to `check_ci_measurement` and `verdict`, and every attempt's map must
+name exactly that set. An omitted job is refused rather than read as success:
+the map can only state conclusions that were written, so a record could
+otherwise leave a failed job out and pass on the jobs it did record. A job the
+run never created is a separate case and carries its own value, `missing` — the
+schema's, not GitHub's, because GitHub reports nothing for a job it never
+created. Recording it fails AC-07 independently of the p90, and its diagnostic
+names the job. The calibration check reads the single pre-DL-14 `ci-build-test`
+workload, because that is the record the registered threshold was derived from;
+it moved to `scripts/docs_validation/ci_calibration.py` so `ci_controls.py`
+keeps one contract — what a current record must say — and stays within the
+file-size limit. The original named imports remain re-exported from
+preregistration for focused tests; these helpers are not general GitHub Actions
+parsers, measurement libraries, or repository file APIs.
 
 The `make design-check` target runs `check_acceptance_controls` as part of the
 documentation-pack validation. The control register is
@@ -949,9 +1175,9 @@ Keep calibration records in `spec/calibration/` and acceptance measurements in
 control. Validation checks that every control defines the registered fields and
 that each measurement record binds to its control, registration date, runner
 and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner,
-and `build-test` has an eight-minute timeout. The matching
-`make act-validation` target maps that job to the configured `ubuntu-24.04` Act
-runner image. See the
+and every required pull-request job has an eight-minute timeout. The matching
+`make act-validation` target maps `build-test` to the configured `ubuntu-24.04`
+Act runner image; the two Polars jobs are not run under Act. See the
 [acceptance calibration report](acceptance-calibration.md) for methodology,
 tool versions, and reproduction commands, and the standalone
 [cardinality probe](../tools/calibration/cardinality-probe/) for its Verus and
@@ -1051,6 +1277,21 @@ Task 1.2.1's probes are tool observations, not proofs of Combobulate. Run
 commit gates do not install or execute a verifier. `make kani` and
 `make kani-full` visibly report `FORMAL-SKIP` until task 1.2.4;
 `FORMAL_STRICT=1` rejects those placeholders.
+
+`make install-verus` unpacks the pinned release into `.verus/<version>/` in the
+worktree it runs in, and it does so per worktree rather than once per host. The
+pins are `Kani 0.67.0` in `tools/kani/VERSION` and `Verus 0.2026.09.06.8dea4a2`
+on Rust 1.98.0 with Z3 4.16.0 in `tools/verus/VERSION` and `SHA256SUMS`;
+`tools/rust-prover-tools/REF` pins the helper that installs and runs both, and
+`spec/toolchain-profiles.json` binds each of those to the sites that assert it.
+That is a real cost: measured on 2026-11-07, `.verus/` held 1,530,050,105 bytes
+(1.5 GB allocated), of which `verus/deps/` was 1,209,809,341 bytes and
+`verus/build/` 121,147,739. The upstream `x86-linux` archive is 456,338,154
+bytes, and the rest is the unpacked tree; the count includes no build products
+of this repository. Four worktrees therefore cost about 6 GB before any Cargo
+output, which is worth knowing before installing the verifier in each one.
+`.verus/` is Git-ignored and listed in the Markdown lint ignores, so a local
+installation cannot enter a commit, a Markdown scan, or a spelling scan.
 
 The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
 private `kani_probe` module owns the Kani route builders and their capture
@@ -1194,7 +1435,11 @@ Kani harness inventory (all subjects are deliberately separate fixture bodies):
 Run definitions, the tool-produced inventory, source digests, exact commands,
 and statuses accompany the captured logs. Exit status alone cannot establish a
 verdict: the impossible-cover subject exits successfully. The corpus is not
-registered as an evidence parser until task 1.2.1's parser milestone passes.
+itself an evidence parser; `kani` is registered in
+`spec/evidence-reason-codes.json` and read by the adapter described under
+[the evidence-admission boundary](#compose-the-evidence-admission-boundary). A
+record still cites the corpus's inventory as its manifest, and a manifest whose
+digest differs from the one the record binds is refused.
 
 `uv run --script scripts/run_verifier_probes.py verifier-free` builds the
 comparison sources in a rootless container without verifier installations. This

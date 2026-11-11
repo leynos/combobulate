@@ -3,6 +3,9 @@
 /// Direct regressions for the composed hosted CI route.
 #[path = "act_workflow_route_tests.rs"]
 mod ci_route;
+/// Job environment, cache write policy, and the manual Act route.
+#[path = "act_workflow_env_tests.rs"]
+mod environment;
 /// Direct regression corpus for the independent event predicates.
 #[path = "act_workflow_event_tests.rs"]
 mod events;
@@ -10,7 +13,9 @@ mod events;
 #[path = "act_workflow_policy_tests.rs"]
 mod step_policy;
 
-use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, contracts_hold};
+use serde_yaml::Value;
+
+use super::{ACT_VALIDATION_WORKFLOW, CI_WORKFLOW, Read, contracts_hold};
 
 #[test]
 fn hosted_gate_and_manual_act_have_distinct_routes() {
@@ -50,7 +55,7 @@ fn workflow_mutations_break_the_contract() {
         ),
         (
             "missing installer",
-            CI_WORKFLOW.replace("- name: Install Whitaker", "- name: Missing Whitaker"),
+            CI_WORKFLOW.replacen("- name: Install Whitaker", "- name: Missing Whitaker", 1),
         ),
         (
             "suppressed failure",
@@ -132,70 +137,146 @@ fn workflow_execution_mutations_break_the_contract() {
     }
 }
 
+/// One job-scoped mutation a contract case applies before re-checking.
+///
+/// The helpers are fallible rather than panicking: they live outside a
+/// `#[test]` body, where the repository's strict `expect_used` lint applies,
+/// and a missing structure is a test-fixture fault worth reporting.
+type Mutation = fn(&mut Value) -> Read<()>;
+
+/// Each required job is contracted on its own, so moving work between them fails.
+///
+/// Every mutation below touches only a `polars-*` job. A contract that resolved
+/// its steps, actions, or profile from `build-test` alone would accept them.
+///
+/// The baseline is what makes the per-case check mean anything. `apply_mutation`
+/// re-serialises the parsed document, and `serde_yaml` never reproduces the
+/// committed bytes: comments, quoting, and layout all change. Comparing a
+/// mutation's text against `CI_WORKFLOW` would therefore pass even for a no-op
+/// helper, and comparing the parsed documents is what proves the helper
+/// actually removed or inserted something. The baseline is also required to
+/// satisfy the contract, because otherwise every case could pass for the wrong
+/// reason: a round-trip that already broke the contract would make each
+/// mutation's failure indistinguishable from serialization noise.
 #[test]
-fn workflow_environment_mutations_break_the_contract() {
-    for (reason, changed) in [
+fn polars_job_mutations_break_the_contract() {
+    let baseline = apply_mutation(CI_WORKFLOW, "polars-lint", |_| Ok(()))
+        .expect("the unmutated workflow must round-trip");
+    assert!(
+        contracts_hold(&baseline.source, ACT_VALIDATION_WORKFLOW),
+        "an unmutated round-trip must still satisfy the contract"
+    );
+    for (reason, job, mutate) in [
         (
-            "lost coverage LLVM",
-            CI_WORKFLOW.replace(
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm",
-                "CARGO_PROFILE_DEV_CODEGEN_BACKEND: cranelift",
-            ),
+            "lost Polars profile selection",
+            "polars-lint",
+            clear_profile as Mutation,
         ),
         (
-            "disabled PR updates",
-            CI_WORKFLOW.replace("[opened, synchronize, reopened]", "[closed]"),
+            "Polars job left on the native profile",
+            "polars-test",
+            native_profile,
         ),
         (
-            "different job cwd",
-            CI_WORKFLOW.replace(
-                "  build-test:\n",
-                "  build-test:\n    defaults:\n      run:\n        working-directory: /tmp\n",
-            ),
+            "Polars lint job loses its Whitaker installer",
+            "polars-lint",
+            drop_installer,
         ),
         (
-            "different lint cwd",
-            CI_WORKFLOW.replace(
-                "- name: Lint\n",
-                "- name: Lint\n        working-directory: /tmp\n",
-            ),
-        ),
-        (
-            "different lint shell",
-            CI_WORKFLOW.replace("- name: Lint\n", "- name: Lint\n        shell: sh\n"),
+            "Polars test job gains a coverage measurement",
+            "polars-test",
+            add_coverage,
         ),
     ] {
+        let changed = apply_mutation(CI_WORKFLOW, job, mutate)
+            .unwrap_or_else(|error| panic!("{reason}: {error}"));
         assert_ne!(
-            changed, CI_WORKFLOW,
-            "mutation must change source: {reason}"
+            changed.value, baseline.value,
+            "mutation must change the document: {reason}"
         );
         assert!(
-            !contracts_hold(&changed, ACT_VALIDATION_WORKFLOW),
+            !contracts_hold(&changed.source, ACT_VALIDATION_WORKFLOW),
             "contract must detect {reason}"
         );
     }
-    let enabled_pr_act = ACT_VALIDATION_WORKFLOW.replace(
-        "  workflow_dispatch:",
-        "  pull_request:\n  workflow_dispatch:",
-    );
-    assert_ne!(
-        enabled_pr_act, ACT_VALIDATION_WORKFLOW,
-        "PR Act mutation must change source"
-    );
-    assert!(
-        !contracts_hold(CI_WORKFLOW, &enabled_pr_act),
-        "Act must not repeat full validation on pull requests"
-    );
-    let wrong_manual_pin =
-        ACT_VALIDATION_WORKFLOW.replace("47b337e4f230b591891656534d4ffad868131740", "main");
-    assert_ne!(
-        wrong_manual_pin, ACT_VALIDATION_WORKFLOW,
-        "manual pin mutation must change source"
-    );
-    assert!(
-        !contracts_hold(CI_WORKFLOW, &wrong_manual_pin),
-        "manual Act's action revision must stay pinned"
-    );
+}
+
+/// A mutated workflow, held both parsed and serialized.
+///
+/// [`contracts_hold`] reads source text, so each result is serialized for it.
+/// The mutation check compares parsed values instead, because serialization
+/// alone differs from the committed bytes with or without a mutation.
+struct Mutated {
+    /// The document as the mutation left it.
+    value: Value,
+    /// That document serialized, for the contract's text interface.
+    source: String,
+}
+
+/// Applies one job-scoped mutation and keeps both of its representations.
+fn apply_mutation(source: &str, job: &str, mutate: Mutation) -> Read<Mutated> {
+    let mut changed = super::document(source)?;
+    mutate(polars_job(&mut changed, job)?)?;
+    Ok(Mutated {
+        value: changed.clone(),
+        source: serde_yaml::to_string(&changed)?,
+    })
+}
+
+/// Selects one job mapping for a mutation scoped to that job alone.
+fn polars_job<'a>(workflow: &'a mut Value, job: &str) -> Read<&'a mut Value> {
+    workflow
+        .get_mut("jobs")
+        .and_then(|jobs| jobs.get_mut(job))
+        .ok_or_else(|| format!("the committed workflow must declare the {job} job").into())
+}
+
+/// Removes the job environment key that selects its Make profile.
+fn clear_profile(job: &mut Value) -> Read<()> {
+    job.get_mut("env")
+        .and_then(Value::as_mapping_mut)
+        .ok_or("the job must declare its environment")?
+        .remove("GATE_PROFILE");
+    Ok(())
+}
+
+/// Points one job at the profile the other job measures.
+fn native_profile(job: &mut Value) -> Read<()> {
+    job.get_mut("env")
+        .and_then(Value::as_mapping_mut)
+        .ok_or("the job must declare its environment")?
+        .insert("GATE_PROFILE".into(), "native-only".into());
+    Ok(())
+}
+
+/// Removes the step that provisions the Whitaker dependency a lint job uses.
+fn drop_installer(job: &mut Value) -> Read<()> {
+    job.get_mut("steps")
+        .and_then(Value::as_sequence_mut)
+        .ok_or("the job must declare steps")?
+        .retain(|step| {
+            !step
+                .get("uses")
+                .and_then(Value::as_str)
+                .is_some_and(|uses| uses.contains("install-whitaker"))
+        });
+    Ok(())
+}
+
+/// Gives a test-only job a measured coverage step the native job owns.
+fn add_coverage(job: &mut Value) -> Read<()> {
+    let steps = job
+        .get_mut("steps")
+        .and_then(Value::as_sequence_mut)
+        .ok_or("the job must declare steps")?;
+    let mut coverage: Value =
+        serde_yaml::from_str("uses: leynos/shared-actions/.github/actions/generate-coverage@ok")?;
+    coverage
+        .as_mapping_mut()
+        .ok_or("the coverage fixture must be a mapping")?
+        .insert("if".into(), Value::String("env.ACT != 'true'".into()));
+    steps.push(coverage);
+    Ok(())
 }
 
 #[test]

@@ -20,15 +20,16 @@ from .acceptance_evidence import (
     verdict,
 )
 from .acceptance_registration import FROZEN_FIELDS, check_completeness, check_registration_declarations
+from .ci_calibration import check_ci_calibration
 from .ci_controls import (
-    OUTCOME_VERDICTS, AcceptanceWorkflowSettings, check_acceptance_workflow, check_ci_calibration,
+    OUTCOME_VERDICTS, AcceptanceWorkflowSettings, RequiredJob, check_acceptance_workflow,
     check_ci_measurement,
 )
 from .context import ValidationContext, require
 
 __all__ = [
-    'AcceptanceWorkflowSettings', 'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'check_acceptance_controls',
-    'check_acceptance_workflow', 'check_calibration_record',
+    'FROZEN_FIELDS', 'OUTCOME_VERDICTS', 'AcceptanceWorkflowSettings', 'RequiredJob',
+    'check_acceptance_controls', 'check_acceptance_workflow', 'check_calibration_record',
     'check_calibration_reference', 'check_ci_calibration', 'check_ci_measurement', 'check_completeness',
     'check_control_bindings', 'check_host_identity', 'check_measurement_binding', 'check_registration_declarations',
     'verdict',
@@ -38,13 +39,25 @@ HOST_PATTERNS = (re.compile(r'/home/'), re.compile(r'/Users/'))
 
 
 def _workflow_settings(workflow: object) -> AcceptanceWorkflowSettings:
-    """Adapt parsed CI YAML into AC-07 values; e.g. extract image and job timeout."""
+    """Adapt parsed CI YAML into AC-07 values; e.g. one entry per required job.
+
+    DL-14 makes every pull-request job part of the workload, so this reads the
+    whole `jobs` mapping rather than one named job. A job with no `if`
+    condition is required by definition; a conditional job is only scheduled
+    for some events and would make the per-run longest job depend on which
+    event fired.
+    """
     jobs = workflow.get('jobs', {}) if isinstance(workflow, Mapping) else {}
-    job = jobs.get('build-test') if isinstance(jobs, Mapping) else None
-    return AcceptanceWorkflowSettings(
-        runner_image=job.get('runs-on') if isinstance(job, Mapping) else None,
-        timeout_minutes=job.get('timeout-minutes') if isinstance(job, Mapping) else None,
-    )
+    required = [
+        RequiredJob(
+            name=str(name),
+            runner_image=job.get('runs-on') if isinstance(job, Mapping) else None,
+            timeout_minutes=job.get('timeout-minutes') if isinstance(job, Mapping) else None,
+        )
+        for name, job in (jobs.items() if isinstance(jobs, Mapping) else ())
+        if isinstance(job, Mapping) and 'if' not in job
+    ]
+    return AcceptanceWorkflowSettings(jobs=tuple(required))
 
 
 def check_host_identity(name: str, text: str, extra_names: Iterable[str] = ()) -> None:
@@ -166,10 +179,11 @@ def check_acceptance_controls(context: ValidationContext, extra_names: Iterable[
     require(len(ids) == len(set(ids)), 'Duplicate acceptance control ID')
     controls_by_id = {control['id']: control for control in controls}
     workflow = context.load_yaml('.github/workflows/ci.yml')
-    check_acceptance_workflow(_workflow_settings(workflow), controls_by_id['AC-07'])
+    workflow_settings = _workflow_settings(workflow)
+    check_acceptance_workflow(workflow_settings, controls_by_id['AC-07'])
     check_ci_calibration(controls_by_id['AC-07'], records)
     _check_acceptance_measurements(controls_by_id, records, measurements)
-    _check_registered_controls(controls, records, measurements)
+    _check_registered_controls(controls, records, measurements, workflow_settings.job_names)
     context.record('acceptance-controls', 'Typed protocols are complete; measurement records bind known controls, '
                                           'registered dates and the hosted image; calibration evidence is '
                                           'excluded from acceptance verdicts.', len(ids))
@@ -220,11 +234,12 @@ def _check_acceptance_measurements(
 
 def _check_registered_controls(
     controls: list[dict], records: Mapping[str, dict], measurements: list[dict],
+    required_jobs: frozenset[str],
 ) -> None:
     """Check every frozen control; for example, reject calibration used as acceptance evidence."""
     for control in controls:
         check_completeness(control)
         check_calibration_reference(control, records)
-        require(verdict(control, records.values()) == 'not-run',
+        require(verdict(control, records.values(), required_jobs) == 'not-run',
                 f"{control['id']} has acceptance evidence in the calibration directory")
-        verdict(control, measurements)
+        verdict(control, measurements, required_jobs)

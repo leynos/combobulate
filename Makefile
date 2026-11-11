@@ -7,7 +7,7 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
-.PHONY: help all clean test test-ui prepare-dependencies prepare-ui-gate act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
+.PHONY: help all clean test test-profiles test-ui prepare-dependencies prepare-ui-gate act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker lint-python docstring-coverage check-python-sources fmt check-fmt markdownlint spelling nixie \
   audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
@@ -97,8 +97,38 @@ PACKAGE_FLAGS ?= -p combobulate \
 	--config "patch.crates-io.combobulate-macros.path='$(CURDIR)/crates/combobulate-macros'"
 RUSTDOC_FLAGS ?=
 RUSTDOC_FLAGS := --cfg docsrs -D warnings $(POLONIUS_FLAGS) $(RUSTDOC_FLAGS)
-CARGO_FLAGS ?= --all-targets --all-features
-CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
+# DL-18: ordinary gates select a named feature profile rather than
+# `--all-features`. `--all-features` would let a future verifier feature enter
+# every route, and it never lints the `cfg(not(feature = "polars"))` code the
+# native-only route exists to cover. Every profile runs locally by default;
+# `GATE_PROFILE` selects one.
+#
+# Each profile is a separate Cargo invocation. Sharing one would let feature
+# unification mask a profile: Polars pulls in dependencies that would then
+# satisfy the native-only route's graph too, so the native-only route would
+# stop proving that the facade builds without them.
+#
+# `native-only` and `polars-enabled` are the two profiles CI runs on every
+# pull request, and `both` runs them. `macros-only` and `polars-only` are also
+# accepted, so the two features Cargo can select independently are each built
+# without the other: a build claiming one backend while compiled with the other
+# passed every other route, because each of those turns both on or both off.
+# They are not named by `both`, because the pull-request lane measures the two
+# profiles AC-07 budgets and a cold Polars build in the same job would spend it.
+GATE_PROFILE ?= both
+GATE_PROFILES = $(strip $(if $(filter both,$(GATE_PROFILE)),native-only polars-enabled,\
+	$(filter native-only polars-enabled macros-only polars-only,$(GATE_PROFILE))))
+ifeq ($(GATE_PROFILES),)
+$(error GATE_PROFILE must be one of native-only, polars-enabled, macros-only, \
+	polars-only, or both; got '$(GATE_PROFILE)')
+endif
+# The per-profile flags are the only difference between the routes, so they are
+# named once and reused by every gate below.
+PROFILE_FLAGS_native-only := --no-default-features
+PROFILE_FLAGS_polars-enabled :=
+PROFILE_FLAGS_macros-only := --no-default-features --features macros
+PROFILE_FLAGS_polars-only := --no-default-features --features polars
+CARGO_FLAGS ?= --all-targets
 TEST_FLAGS ?= $(CARGO_FLAGS)
 TEST_CMD := $(if $(shell $(CARGO) nextest --version 2>/dev/null),nextest run,test)
 # The cardinality compile-fail gate is its own workspace: `tools/` is excluded
@@ -148,9 +178,48 @@ clean: ## Remove build artefacts
 BUILD_STANDARD_ENV = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)"
 
 test: prepare-ui-gate ## Run tests with warnings treated as errors
-	$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $(BUILD_JOBS)
-	$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" $(CARGO) test --doc --workspace --all-features
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== test profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
+		esac; \
+		$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) $(TEST_FLAGS) $$flags $(BUILD_JOBS); \
+		$(BUILD_STANDARD_ENV) RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" \
+			$(CARGO) test --doc --workspace $$flags; \
+	done
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
+
+# The two single-feature isolation profiles are absent from `both` by design,
+# so no ordinary route builds them: `native-only` selects neither feature and
+# `polars-enabled` selects both, and a swap of the two flags satisfies both.
+# `tests/build_profiles.rs` therefore gates one module on each exact feature
+# pair, and those modules exist only inside these two profiles. This target is
+# the route that reaches them, so a required pull-request gate can run them.
+#
+# It runs one integration-test target rather than the whole suite. Running
+# `make test` per isolation profile costs two further compilations of the
+# workspace and the cardinality gate's nested `trybuild` build, which a hosted
+# job under AC-07's eight-minute budget cannot absorb. The isolation claim is
+# about `BuildProfile::current()`, and `build_profiles` is the only target that
+# asserts it.
+#
+# `GATE_PROFILE` is deliberately ignored: this is a two-profile comparison, and
+# narrowing it to one would leave the other module unbuilt — exactly the defect
+# the target exists to catch.
+ISOLATION_PROFILES = macros-only polars-only
+
+test-profiles: ## Run the build-profile isolation tests under each single-feature profile
+	@set -euo pipefail; for profile in $(ISOLATION_PROFILES); do \
+		printf '\n== isolation profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
+		esac; \
+		$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) --test build_profiles $$flags $(BUILD_JOBS); \
+	done
 
 # Every Rust command a development route runs must compose the caller's
 # RUSTFLAGS with the standard flags, and only an assignment does that: without
@@ -280,6 +349,48 @@ lint: prepare-dependencies prepare-ui-gate ## Run rustdoc, Clippy, Whitaker, and
 	+$(MAKE) lint-whitaker
 	+$(MAKE) lint-python
 
+# DL-18: each gate profile is its own Cargo invocation. Sharing one invocation
+# would let feature unification mask a profile: a dependency enabled by the
+# Polars route would silently satisfy the native-only route's graph too.
+#
+# The profiles run in one shell loop rather than through recursive `$(MAKE)`.
+# Make expands `TEST_CMD`'s `$(shell cargo nextest --version)` once per process,
+# so a recursive route would probe Nextest again for every profile, and that
+# probe is a Cargo call the route contracts count. The loop also keeps one
+# `lint` or `test` run to a single shell, so a caller's exported flags reach
+# every profile unchanged.
+#
+# `lint-whitaker` below follows the same rule. Whitaker shells out to `cargo
+# check` and forwards every argument after `--`, so it type-checks whatever
+# feature selection those arguments name. Running it once with no profile flags
+# would check only the default features, which is exactly the Polars-enabled
+# profile: the `cfg(not(feature = "polars"))` code the native-only profile
+# exists to cover would never reach a lint, and a Whitaker finding that lives
+# only there would go unreported. Rustdoc runs once, because it documents the
+# default feature set rather than checking conditional compilation.
+#
+# Both route contracts change with it: Whitaker appears twice in the stage order
+# (`whitaker-native-only`, `whitaker-polars-enabled`) and its argv carries the
+# profile's flags after `--`.
+#
+# `--all-features` could never reach the native-only profile's
+# `cfg(not(feature = "polars"))` code, and a plain default-feature run repeats
+# only what the Polars-enabled profile checks, so each profile is its own
+# invocation.
+lint-clippy: check-build-tools ## Run rustdoc, then Clippy for every gate profile
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== lint profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
+		esac; \
+		RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+			$(CARGO) clippy $(CARGO_FLAGS) $$flags -- $(RUST_FLAGS); \
+	done
+
 # Discover Python sources from Git so hidden workflow/action paths and new
 # repository areas are included without maintaining a second source manifest.
 PYTHON_TARGETS_FROM_GIT := $(if $(filter undefined,$(origin PYTHON_TARGETS)),1,0)
@@ -304,22 +415,49 @@ lint-python: ## Require complete Interrogate coverage for all Python sources
 docstring-coverage: check-python-sources ## Check docstrings in tracked and untracked Python files
 	$(UV) tool run --python 3.14 --from interrogate==$(INTERROGATE_VERSION) interrogate --fail-under 100 $(PYTHON_TARGETS)
 
-lint-clippy: check-build-tools ## Run rustdoc and Clippy with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) doc --no-deps
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 
 WHITAKER_CLEAN_ENV = env -u RUSTFLAGS -u CARGO_ENCODED_RUSTFLAGS \
 	-u CARGO_PROFILE_DEV_CODEGEN_BACKEND -u CARGO_BUILD_TARGET \
 	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER \
 	-u CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS -u CFLAGS -u LDFLAGS
 
+# Whitaker is named by library, not discovered with `--all`. The rolling lint
+# release may publish a crate both on its own and inside `whitaker_suite`; in
+# that state `--all` loads both copies, which register each shared lint twice
+# and abort rustc with "duplicate specification of lint ...". Naming the suite
+# explicitly loads one library that already bundles every lint crate, so the
+# checked lint set is unchanged.
 lint-whitaker: ## Run Whitaker with clean driver inputs and repository Cargo defaults
 	@$(WHITAKER_CLEAN_ENV) $(CHECK_BUILD_TOOLS)
 	@echo "Whitaker binary: $(WHITAKER)"
-	$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== Whitaker profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
+		esac; \
+		$(WHITAKER_CLEAN_ENV) PATH="$(USER_BIN_PATH):$(PATH)" \
+			DYLINT_RUSTFLAGS="$(RUST_FLAGS) $(POLONIUS_FLAGS)" \
+			$(WHITAKER) --lib whitaker_suite --fail-on-no-libraries -- $(CARGO_FLAGS) $$flags; \
+	done
 
-typecheck: check-build-tools ## Type-check without building
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" $(CARGO) check $(CARGO_FLAGS)
+# Type-checks each gate profile in its own invocation, for the same reason the
+# lint and test gates do: one default-feature run never reaches the
+# `cfg(not(feature = "polars"))` code the native-only route exists to cover.
+typecheck: check-build-tools ## Type-check every gate profile without building
+	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
+		printf '\n== typecheck profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			native-only) flags="$(PROFILE_FLAGS_native-only)" ;; \
+			polars-enabled) flags="$(PROFILE_FLAGS_polars-enabled)" ;; \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
+		esac; \
+		RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)" \
+			$(CARGO) check $(CARGO_FLAGS) $$flags; \
+	done
 
 install-build-tools: ## Install pinned `mold` and the repository toolchain
 	@scripts/install-build-tools.sh

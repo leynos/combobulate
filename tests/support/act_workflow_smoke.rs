@@ -55,6 +55,10 @@ impl ActSmoke {
         if !contract::valid_actions(&workflow) {
             return Err("an action pin or input lacks its approved fixture mapping".into());
         }
+        // Act runs one job, so the fixture rewrites only that job's actions.
+        // Every other job keeps its committed pins; their contracts are static
+        // and are checked by `contracts_hold` rather than by this smoke.
+        let job = contract::smoke_job_name();
         let original = workflow.clone();
         let root = Utf8PathBuf::from_path_buf(std::env::temp_dir())
             .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
@@ -71,28 +75,27 @@ impl ActSmoke {
         directory.create_dir_all(".github/workflows")?;
         directory.create_dir_all(".github/actions")?;
         directory.create_dir_all("fixture-bin")?;
-        Self::replace_actions(&mut workflow, &directory)?;
-        Self::verify_rewrite(&workflow, &original)?;
+        Self::replace_actions(&mut workflow, job, &directory)?;
+        Self::verify_rewrite(&workflow, job, &original)?;
         fixture.write_tools(&directory, &workflow)?;
         Ok(fixture)
     }
 
-    /// Replaces only approved action references with local interface fixtures.
-    fn replace_actions(workflow: &mut Value, directory: &Dir) -> Read<()> {
+    /// Replaces the smoke job's approved action references with local fixtures.
+    fn replace_actions(workflow: &mut Value, job: &str, directory: &Dir) -> Read<()> {
+        let contracts = contract::smoke_action_contracts();
         let steps = workflow
             .get_mut("jobs")
-            .and_then(|jobs| jobs.get_mut("build-test"))
-            .and_then(|job| job.get_mut("steps"))
+            .and_then(|jobs| jobs.get_mut(job))
+            .and_then(|mapping| mapping.get_mut("steps"))
             .and_then(Value::as_sequence_mut)
-            .ok_or("the hosted build-test steps are missing")?;
+            .ok_or_else(|| format!("the hosted {job} steps are missing"))?;
         let mut action_index = 0;
         for step in steps {
             let Some(uses) = step.get("uses").and_then(Value::as_str) else {
                 continue;
             };
-            let (expected, _, inputs) = contract::ACTIONS
-                .get(action_index)
-                .ok_or("unmapped action")?;
+            let (expected, _, inputs) = contracts.get(action_index).ok_or("unmapped action")?;
             if !contract::matches_action_revision(uses, expected) {
                 return Err(format!("unmapped action: {uses}").into());
             }
@@ -111,27 +114,27 @@ impl ActSmoke {
             );
             action_index += 1;
         }
-        if action_index != contract::ACTIONS.len() {
+        if action_index != contracts.len() {
             return Err("one or more fixture actions were not reached".into());
         }
         Ok(())
     }
 
     /// Restores action references to prove every other workflow field is unchanged.
-    fn verify_rewrite(workflow: &Value, original: &Value) -> Read<()> {
+    fn verify_rewrite(workflow: &Value, job: &str, original: &Value) -> Read<()> {
         let mut restored = workflow.clone();
         let restored_steps = restored
             .get_mut("jobs")
-            .and_then(|jobs| jobs.get_mut("build-test"))
-            .and_then(|job| job.get_mut("steps"))
+            .and_then(|jobs| jobs.get_mut(job))
+            .and_then(|mapping| mapping.get_mut("steps"))
             .and_then(Value::as_sequence_mut)
-            .ok_or("derived workflow lost its build-test steps")?;
+            .ok_or_else(|| format!("derived workflow lost its {job} steps"))?;
         let original_actions = original
             .get("jobs")
-            .and_then(|jobs| jobs.get("build-test"))
-            .and_then(|job| job.get("steps"))
+            .and_then(|jobs| jobs.get(job))
+            .and_then(|mapping| mapping.get("steps"))
             .and_then(Value::as_sequence)
-            .ok_or("the original workflow lost its build-test steps")?
+            .ok_or_else(|| format!("the original workflow lost its {job} steps"))?
             .iter()
             .filter_map(|step| step.get("uses").and_then(Value::as_str))
             .collect::<Vec<_>>();
@@ -160,7 +163,10 @@ impl ActSmoke {
     /// Writes the derived YAML and rejecting shell tools into a scratch checkout.
     fn write_tools(&self, directory: &Dir, workflow: &Value) -> Read<()> {
         directory.write(".github/workflows/ci.yml", serde_yaml::to_string(workflow)?)?;
-        for executable in ["make", "cargo", "rustc", "sudo", "uv"] {
+        // `sccache` is here because DL-03's wiring report resolves the wrapper
+        // on `PATH` before any gate runs. Without a stub the derived job would
+        // fail at that step and the smoke would never reach the suite routes.
+        for executable in ["make", "cargo", "rustc", "sccache", "sudo", "uv"] {
             directory.write(format!("fixture-bin/{executable}"), STUB)?;
             directory.set_permissions(
                 format!("fixture-bin/{executable}"),
@@ -187,7 +193,7 @@ impl ActSmoke {
                 "--workflows",
                 ".github/workflows/ci.yml",
                 "--job",
-                "build-test",
+                contract::smoke_job_name(),
                 "--env",
                 "ACT=true",
                 "--platform",
@@ -246,6 +252,8 @@ const STUB: &str = concat!(
     "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm \
      cargo-audit') ;;\n",
     "  'rustc:--version') printf '%s\\n' 'rustc fixture'; exit 0 ;;\n",
+    "  'sccache:--show-stats') printf '%s\\n' 'Cache location                  GitHub Actions \
+     Cache'; exit 0 ;;\n",
     "  'uv:run --with PyYAML==6.0.3 python scripts/whitaker_probe.py --workflow \
      .github/workflows/ci.yml') ;;\n",
     "  'sudo:apt-get update'|'sudo:apt-get install --yes --no-install-recommends clang lld mold') \

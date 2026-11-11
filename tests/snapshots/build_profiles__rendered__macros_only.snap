@@ -1,0 +1,5 @@
+---
+source: tests/build_profiles.rs
+expression: "BuildProfile::current().to_string()"
+---
+features: native, macros; target usize: 64 bits

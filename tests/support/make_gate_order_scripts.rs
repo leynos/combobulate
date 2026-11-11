@@ -39,16 +39,27 @@ case "$1" in
     [ "$#" -eq 2 ] && [ "$2" = --no-deps ] || stage=unexpected-cargo
     ;;
   clippy)
-    stage=clippy
-    [ "$#" -eq 6 ] && [ "$2" = --all-targets ] && [ "$3" = --all-features ] &&
-      [ "$4" = -- ] && [ "$5" = -D ] && [ "$6" = warnings ] || stage=unexpected-cargo
+    # DL-18: one clippy invocation per gate profile, and each gets its own
+    # stage. Collapsing both onto one stage would let the argument assertion
+    # compare the native-only command against the Polars-enabled record and
+    # fail, or, worse, be loosened until neither exact command was checked.
+    if [ "$#" -eq 6 ] && [ "$2" = --all-targets ] && \
+        [ "$3" = --no-default-features ] && [ "$4" = -- ] && \
+        [ "$5" = -D ] && [ "$6" = warnings ]; then
+      stage=clippy-native-only
+    elif [ "$#" -eq 5 ] && [ "$2" = --all-targets ] && [ "$3" = -- ] && \
+        [ "$4" = -D ] && [ "$5" = warnings ]; then
+      stage=clippy-polars-enabled
+    else stage=unexpected-cargo; fi
     ;;
   nextest)
     if [ "$#" -eq 2 ] && [ "$2" = --version ]; then
       stage=nextest-version-probe
     elif [ "$#" -eq 4 ] && [ "$2" = run ] && [ "$3" = --all-targets ] &&
-        [ "$4" = --all-features ]; then
-      stage=nextest
+        [ "$4" = --no-default-features ]; then
+      stage=nextest-native-only
+    elif [ "$#" -eq 3 ] && [ "$2" = run ] && [ "$3" = --all-targets ]; then
+      stage=nextest-polars-enabled
     else stage=unexpected-cargo; fi
     ;;
   test)
@@ -58,8 +69,10 @@ case "$1" in
     # that record and leave the root UI test without a path to run. Accepting
     # the old shape would let that regression pass the contract silently.
     if [ "$#" -eq 4 ] && [ "$2" = --doc ] && [ "$3" = --workspace ] &&
-        [ "$4" = --all-features ]; then
-      stage=doctest
+        [ "$4" = --no-default-features ]; then
+      stage=doctest-native-only
+    elif [ "$#" -eq 3 ] && [ "$2" = --doc ] && [ "$3" = --workspace ]; then
+      stage=doctest-polars-enabled
     else stage=unexpected-cargo; fi
     ;;
   *) stage=unexpected-cargo ;;
@@ -153,6 +166,13 @@ exit 64
 "#;
 
 /// Whitaker fixture proves private cache warmth and repository Cargo settings.
+///
+/// DL-18: Whitaker forwards everything after `--` to `cargo check`, so it must
+/// run once per gate profile and each run gets its own stage. A single
+/// unflagged run would check only the default features — the Polars-enabled
+/// profile — and the native-only `cfg(not(feature = "polars"))` code would
+/// never reach a lint. Collapsing both onto one stage would let the argument
+/// assertion compare one profile's argv against the other's record.
 pub(super) const WHITAKER_SCRIPT: &str = r#"
 cache="$DYLINT_DRIVER_PATH/driver-marker"
 if [ -f "$cache" ]; then
@@ -161,13 +181,20 @@ else
   mkdir -p "$DYLINT_DRIVER_PATH" && : > "$cache" || exit 1
   cache_state=cold
 fi
-if [ "$#" -ne 4 ] || [ "$1" != --all ] || [ "$2" != -- ] ||
-   [ "$3" != --all-targets ] || [ "$4" != --all-features ]; then
+if [ "$#" -eq 6 ] && [ "$1" = --lib ] && [ "$2" = whitaker_suite ] && \
+   [ "$3" = --fail-on-no-libraries ] && [ "$4" = -- ] && \
+   [ "$5" = --all-targets ] && [ "$6" = --no-default-features ]; then
+  stage=whitaker-native-only
+elif [ "$#" -eq 5 ] && [ "$1" = --lib ] && [ "$2" = whitaker_suite ] && \
+   [ "$3" = --fail-on-no-libraries ] && [ "$4" = -- ] && \
+   [ "$5" = --all-targets ]; then
+  stage=whitaker-polars-enabled
+else
   record_invocation "$GATE_LOG" unexpected-whitaker "${0##*/}" "$cache_state" none '' "$@"
   exit 64
 fi
-record_invocation "$GATE_LOG" whitaker "${0##*/}" "$cache_state" none '' "$@"
-if [ "${GATE_FAIL_AT-}" = whitaker ]; then exit 1; fi
+record_invocation "$GATE_LOG" "$stage" "${0##*/}" "$cache_state" none '' "$@"
+if [ "${GATE_FAIL_AT-}" = "$stage" ]; then exit 1; fi
 record_repository_config() {
   query=$1
   output=$(cargo -Z unstable-options config get "$query") || return 1

@@ -31,6 +31,10 @@ fn coverage_step_is_safe(step: &Value) -> bool {
         && string(step, &["env", "RUSTFLAGS"]).is_some_and(coverage_flags_are_isolated)
 }
 
+/// Every job must set up Rust once, preserving Cargo's development defaults.
+///
+/// Both required profiles are built with Cranelift, so only measured coverage
+/// may select another backend, and it does so on its own step.
 fn setup_problem(steps: &[Value]) -> Option<&'static str> {
     let setup = steps
         .iter()
@@ -47,18 +51,35 @@ fn setup_problem(steps: &[Value]) -> Option<&'static str> {
     None
 }
 
-fn measured_coverage_problem(steps: &[Value]) -> Option<&'static str> {
-    let coverage = steps.iter().filter(|step| {
-        string(step, &["uses"]).is_some_and(|action| action.contains("/generate-coverage@"))
-    });
-    if coverage.count() != 1 {
-        return Some("expected one measured coverage step");
-    }
-    if !steps.iter().any(|step| {
-        string(step, &["uses"]).is_some_and(|action| action.contains("/generate-coverage@"))
-            && coverage_step_is_safe(step)
-    }) {
+/// A coverage step must measure the native-only profile on the LLVM backend.
+fn coverage_step_problem(step: &Value) -> Option<&'static str> {
+    if !coverage_step_is_safe(step) {
         return Some("coverage must use LLVM and lld without development flags");
+    }
+    // DL-03/DL-18: the pull-request lane and the `main` baseline must measure
+    // the same features or the ratchet compares two different builds.
+    if string(step, &["with", "with-default-features"]) != Some("false")
+        || string(step, &["with", "features"]) != Some("")
+    {
+        return Some("coverage must name the native-only profile explicitly");
+    }
+    None
+}
+
+/// A job either measures coverage once or not at all, and ordinary tests keep Cranelift.
+fn measured_coverage_problem(steps: &[Value]) -> Option<&'static str> {
+    let coverage = steps
+        .iter()
+        .filter(|step| is_coverage_step(step))
+        .collect::<Vec<_>>();
+    if coverage.len() > 1 {
+        return Some("expected at most one measured coverage step");
+    }
+    if let Some(problem) = coverage
+        .first()
+        .and_then(|step| coverage_step_problem(step))
+    {
+        return Some(problem);
     }
     if steps.iter().any(|step| {
         string(step, &["run"]) == Some("make test")
@@ -67,6 +88,11 @@ fn measured_coverage_problem(steps: &[Value]) -> Option<&'static str> {
         return Some("ordinary tests must retain Cranelift");
     }
     None
+}
+
+/// Selects the measured coverage action by its shared-actions path.
+fn is_coverage_step(step: &Value) -> bool {
+    string(step, &["uses"]).is_some_and(|action| action.contains("/generate-coverage@"))
 }
 
 /// Explain a hosted job's first missing backend or setup requirement.
@@ -88,14 +114,56 @@ fn hosted_coverage_selects_llvm_and_excludes_development_flags() {
             !jobs.is_empty(),
             "{file} must contain a hosted coverage job"
         );
-        for job in jobs.values() {
+        let measuring = jobs
+            .values()
+            .filter(|job| {
+                path(job, &["steps"])
+                    .and_then(Value::as_sequence)
+                    .is_some_and(|steps| steps.iter().any(is_coverage_step))
+            })
+            .count();
+        assert_eq!(
+            measuring, 1,
+            "{file} must measure coverage in exactly one job; a second measurement would split \
+             the ratchet baseline"
+        );
+        for (name, job) in jobs {
             let problem = hosted_job_problem(job);
             assert!(
                 problem.is_none(),
-                "{file} backend route failed: {problem:?}"
+                "{file} job {name:?} backend route failed: {problem:?}"
             );
         }
     }
+}
+
+/// One job's step sequence, so an absent job fails rather than passing vacuously.
+fn job_steps<'a>(document: &'a Value, job: &str) -> &'a [Value] {
+    path(document, &["jobs", job, "steps"])
+        .and_then(Value::as_sequence)
+        .map_or_else(|| panic!("{job} must declare steps"), Vec::as_slice)
+}
+
+/// The Polars jobs must not measure coverage; the native-only job owns it.
+#[test]
+fn only_the_native_only_job_measures_coverage() {
+    let document = parse_workflow(CI).expect("parse the hosted coverage fixture");
+    for name in ["polars-lint", "polars-test"] {
+        assert!(
+            !job_steps(&document, name).iter().any(is_coverage_step),
+            "{name} must not publish a second coverage measurement"
+        );
+        assert_eq!(
+            string(&document, &["jobs", name, "env", "GATE_PROFILE"]),
+            Some("polars-enabled"),
+            "{name} must select the Polars-enabled profile"
+        );
+    }
+    assert_eq!(
+        string(&document, &["jobs", "build-test", "env", "GATE_PROFILE"]),
+        Some("native-only"),
+        "build-test must select the profile its coverage artefact measures"
+    );
 }
 
 #[test]
@@ -151,4 +219,73 @@ fn act_setup_preserves_cranelift_defaults() {
         Some(""),
         "Act Rust setup must leave Cargo's defaults active"
     );
+}
+
+/// The cache write mode that permits a save, and the one that forbids it.
+const WRITE_MODE: &str = "${{ github.ref == 'refs/heads/main' && 'READ_WRITE' || 'READ_ONLY' }}";
+
+/// `coverage-main.yml` may save only from `main`, including on dispatch.
+///
+/// The workflow declares `workflow_dispatch` beside its main-only push filter,
+/// and a dispatch may select any branch. An earlier revision set `READ_WRITE`
+/// outright on the reasoning that the workflow ran only on pushes to `main`,
+/// which its own trigger list contradicted. The mode is therefore tested from
+/// the ref: `main` writes, and every other ref reads without saving.
+#[test]
+fn coverage_main_saves_only_from_main() {
+    let document = parse_workflow(MAIN).expect("parse the coverage workflow");
+    assert_eq!(
+        string(
+            &document,
+            &["jobs", "coverage-upload", "env", "SCCACHE_GHA_RW_MODE"]
+        ),
+        Some(WRITE_MODE),
+        "coverage-main.yml must select its cache mode from the ref, so a dispatch from a branch \
+         cannot save"
+    );
+}
+
+/// A dropped, unconditional, or event-keyed mode must each fail the contract.
+#[test]
+fn coverage_main_cache_mutations_break_the_contract() {
+    for (reason, mutated) in [
+        (
+            "cache write mode dropped",
+            MAIN.replace(&format!("      SCCACHE_GHA_RW_MODE: {WRITE_MODE}\n"), ""),
+        ),
+        (
+            "cache writes unconditionally",
+            MAIN.replace(WRITE_MODE, "READ_WRITE"),
+        ),
+        (
+            // The round-2 spelling: a dispatch reports its own event name, so
+            // this test makes every dispatch read-only, `main` included.
+            "cache mode keyed on the event",
+            MAIN.replace(
+                "github.ref == 'refs/heads/main'",
+                "github.event_name == 'push'",
+            ),
+        ),
+    ] {
+        assert_ne!(mutated, MAIN, "mutation must change source: {reason}");
+        assert!(
+            !coverage_main_saves_from_main_only(&mutated),
+            "contract must detect {reason}"
+        );
+    }
+}
+
+/// Re-checks the mode condition after a mutation, without re-reading the file.
+fn coverage_main_saves_from_main_only(source: &str) -> bool {
+    parse_workflow(source)
+        .ok()
+        .and_then(|document| {
+            string(
+                &document,
+                &["jobs", "coverage-upload", "env", "SCCACHE_GHA_RW_MODE"],
+            )
+            .map(str::to_owned)
+        })
+        .as_deref()
+        == Some(WRITE_MODE)
 }

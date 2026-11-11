@@ -68,7 +68,47 @@ pub(super) const RECORDING_HELPERS: &str = concat!(
     "}\n",
 );
 
+/// The per-profile argv each Whitaker run must pass to `cargo check`.
+///
+/// DL-18: Whitaker forwards everything after `--`, so the profile selection
+/// reaches the lint through these arguments and nowhere else. A run without
+/// `--no-default-features` checks only the default features, which is the
+/// Polars-enabled profile, leaving the native-only `cfg(not(feature =
+/// "polars"))` code unlinted.
+///
+/// The library is named rather than discovered. `--all` loads every published
+/// library, and the rolling release has published a lint crate both alone and
+/// inside `whitaker_suite`; both copies register the same lint, and rustc
+/// aborts with a duplicate-specification error. `--fail-on-no-libraries` keeps
+/// a missing suite a failure instead of a silent pass over nothing.
+const WHITAKER_PROFILE_ARGUMENTS: [&[&str]; 2] = [
+    &[
+        "--lib",
+        "whitaker_suite",
+        "--fail-on-no-libraries",
+        "--",
+        "--all-targets",
+        "--no-default-features",
+    ],
+    &[
+        "--lib",
+        "whitaker_suite",
+        "--fail-on-no-libraries",
+        "--",
+        "--all-targets",
+    ],
+];
+
 /// Verifies Whitaker's repository-side Cargo route and driver cache evidence.
+///
+/// `cache_states` names one entry per *lint run* — `["cold"]` for a single run
+/// and `["cold", "warm"]` for two — and each run produces one Whitaker
+/// invocation per gate profile, in the profile order the Makefile's loop uses.
+///
+/// Only the run's first profile observes the incoming state. Every later
+/// profile in the same run must find the driver already built, because they
+/// share one `DYLINT_DRIVER_PATH`: a recipe that rebuilt the driver per profile
+/// would report `cold` there and fail, which is the reuse this pins.
 pub(super) fn assert_repository_route(
     gate_invocations: &[Invocation],
     config_invocations: &[Invocation],
@@ -77,21 +117,43 @@ pub(super) fn assert_repository_route(
 ) {
     let whitaker_invocations = gate_invocations
         .iter()
-        .filter(|invocation| invocation.stage == "whitaker")
+        .filter(|invocation| is_whitaker_stage(&invocation.stage))
         .collect::<Vec<_>>();
+    let per_run = WHITAKER_PROFILE_ARGUMENTS.len();
     assert_eq!(
         whitaker_invocations.len(),
-        cache_states.len(),
-        "each expected Whitaker run must have one structured invocation record"
+        cache_states.len() * per_run,
+        "each lint run must check every gate profile, so each expected run needs one Whitaker \
+         record per profile"
     );
-    for (invocation, expected_cache_state) in whitaker_invocations.iter().zip(cache_states) {
-        assert_whitaker_command(invocation, expected_cache_state);
+    let expected = cache_states
+        .iter()
+        .flat_map(|run_state| {
+            WHITAKER_PROFILE_ARGUMENTS
+                .iter()
+                .enumerate()
+                .map(move |(index, arguments)| {
+                    let state = if index == 0 { *run_state } else { "warm" };
+                    (state, *arguments)
+                })
+        })
+        .collect::<Vec<_>>();
+    for (invocation, (expected_cache_state, expected_arguments)) in
+        whitaker_invocations.iter().zip(expected)
+    {
+        assert_whitaker_command(invocation, expected_cache_state, expected_arguments);
         assert_boundary_environment(invocation, EnvironmentBoundary::Driver);
         assert_lint_policy(invocation);
         assert_whitaker_context(invocation, driver_path);
     }
-    assert_repository_config(config_invocations, cache_states.len());
+    assert_repository_config(
+        config_invocations,
+        cache_states.len() * WHITAKER_PROFILE_ARGUMENTS.len(),
+    );
 }
+
+/// Reports whether a recorded stage is one of the per-profile Whitaker runs.
+fn is_whitaker_stage(stage: &str) -> bool { stage.starts_with("whitaker-") }
 
 /// Checks each effective repository Cargo setting and its probe invocation.
 fn assert_repository_config(config_invocations: &[Invocation], run_count: usize) {
@@ -134,7 +196,11 @@ fn assert_env(invocation: &Invocation, name: &str, expected: &EnvironmentValue, 
 }
 
 /// Checks the Whitaker executable, workspace, arguments, and cache state.
-fn assert_whitaker_command(invocation: &Invocation, expected_cache_state: &str) {
+fn assert_whitaker_command(
+    invocation: &Invocation,
+    expected_cache_state: &str,
+    expected_arguments: &[&str],
+) {
     assert_eq!(
         invocation.executable, "probe-whitaker",
         "Make must invoke the controlled Whitaker executable"
@@ -146,13 +212,12 @@ fn assert_whitaker_command(invocation: &Invocation, expected_cache_state: &str) 
     );
     assert_eq!(
         invocation.arguments,
-        vec![
-            "--all".to_owned(),
-            "--".to_owned(),
-            "--all-targets".to_owned(),
-            "--all-features".to_owned(),
-        ],
-        "the repository checking arguments must reach Whitaker unchanged"
+        expected_arguments
+            .iter()
+            .map(|argument| (*argument).to_owned())
+            .collect::<Vec<_>>(),
+        "each profile's checking arguments must reach Whitaker unchanged, stage {}",
+        invocation.stage
     );
     assert_eq!(
         invocation.cache_state, expected_cache_state,

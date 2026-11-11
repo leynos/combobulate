@@ -42,7 +42,7 @@ def record(outcome: str, purpose: str = 'acceptance') -> dict:
              'hardware': {'class': 'github-hosted-runner', 'cpu_model': 'fixture', 'cores': 4, 'threads': 4,
                           'vcpus': 4, 'memory_gib': 16, 'architecture': 'x64',
                           'os_family': 'Ubuntu 24.04', 'kernel_major': 6},
-             'toolchains': {'rust': 'nightly-2026-08-27', 'codegen_backend': 'Cranelift',
+             'toolchains': {'rust': 'nightly-2026-11-06', 'codegen_backend': 'Cranelift',
                             'linker': 'mold 2.41.0', 'verus': '0.2026.09.06.8dea4a2 with Z3 4.16.0',
                             'kani': '0.67.0'},
              'workloads': [{'id': 'w', 'description': 'Fixture.', 'command': 'true',
@@ -56,19 +56,30 @@ def record(outcome: str, purpose: str = 'acceptance') -> dict:
 
 
 def ci_record(outcome: str, conclusions: list[tuple[str, float]]) -> dict:
-    """Build an AC-07 record in newest-first order with timestamped job attempts."""
+    """Build an AC-07 record in newest-first order with timestamped job attempts.
+
+    ``conclusions`` pairs each run's overall conclusion with its duration. The
+    overall conclusion is the longest required job's own conclusion, so the
+    per-job map repeats it for ``build-test`` and reports the two shorter jobs
+    as successful: a run whose only failure is the longest job is the case these
+    fixtures describe.
+    """
     entry = record(outcome)
     entry['control_ids'] = [CI_CONTROL['id']]
     entry['recorded_on'] = CI_MEASUREMENT_DATE
     workload = entry['workloads'][0]
-    workload['id'] = 'ci-build-test'
+    workload['id'] = 'ci-required-jobs'
     attempts = []
     newest_start = datetime(2026, 10, 12, 12, tzinfo=UTC)
     for index, (conclusion, seconds) in enumerate(conclusions):
         start = newest_start - timedelta(minutes=index)
         finish = start + timedelta(seconds=seconds)
         attempts.append({'run_id': str(index + 1), 'run_number': index + 1, 'attempt': 1,
-                         'conclusion': conclusion, 'wall_seconds': seconds,
+                         'conclusion': conclusion,
+                         'required_job_conclusions': {'build-test': conclusion,
+                                                      'polars-lint': 'success',
+                                                      'polars-test': 'success'},
+                         'wall_seconds': seconds,
                          'started_at': start.isoformat().replace('+00:00', 'Z'),
                          'completed_at': finish.isoformat().replace('+00:00', 'Z'),
                          'url': f'https://github.com/leynos/combobulate/actions/runs/{index + 1}'})

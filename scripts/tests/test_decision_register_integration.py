@@ -36,8 +36,12 @@ class RealRegister(unittest.TestCase):
         context = ValidationContext(ROOT, source_revision=git_head_revision(ROOT))
         collect_checks(context)
         result = next(row for row in context.results if row['check'] == 'decision-register')
-        self.assertEqual(result['count'], 15,
-                         'the composed documentation checker validates all 15 decisions')
+        # The expected count is read from the register rather than written out,
+        # because a literal has to be edited by every decision that is added —
+        # which turns an unrelated change into a failure that teaches nothing.
+        expected = len(context.load('spec/decisions.json')['decisions'])
+        self.assertEqual(result['count'], expected,
+                         f'the composed documentation checker validates all {expected} decisions')
 
     def test_decision_register_generator_is_in_the_generated_document_catalogue(self) -> None:
         """Pair the rendered register with its checked-in source and generator."""

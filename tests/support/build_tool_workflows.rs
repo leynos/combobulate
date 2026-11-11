@@ -1,18 +1,15 @@
 //! Contract tests for build-tool provisioning across reachable workflow suites.
 
-use std::{error::Error, process::Command};
+use std::error::Error;
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_yaml::Value;
 
-pub(super) type Read<T> = Result<T, Box<dyn Error>>;
+#[path = "build_tool_workflow_commands.rs"]
+mod commands;
 
-/// One shell line with its tokens retained for conservative suite detection.
-struct WorkflowCommand<'a> {
-    source: &'a str,
-    words: Vec<&'a str>,
-}
+pub(super) type Read<T> = Result<T, Box<dyn Error>>;
 
 /// Traverse optional YAML mappings without panicking on changed workflow shape.
 fn path<'a>(value: &'a Value, keys: &[&str]) -> Option<&'a Value> {
@@ -117,103 +114,13 @@ fn matrix_runner(expression: &str, job: &Value) -> Option<bool> {
 /// Resolve a supported matrix runner expression against its declared values.
 fn runner_is_linux(job: &Value) -> Option<bool> { runner_label(job.get("runs-on")?, job) }
 
-/// Detect a test suite in a dry-run of a Make goal, including prerequisites.
-fn make_goal_runs_suite(goal: &str) -> Read<bool> {
-    let output = Command::new("make")
-        .args([
-            "-n",
-            "-B",
-            "CARGO=probe-cargo",
-            "CHECK_BUILD_TOOLS=true",
-            goal,
-        ])
-        .current_dir(env!("CARGO_MANIFEST_DIR"))
-        .output()?;
-    if !output.status.success() {
-        return Err(format!("cannot inspect Make goal {goal}").into());
-    }
-    let commands = String::from_utf8_lossy(&output.stdout);
-    Ok(commands.contains("probe-cargo test")
-        || commands.contains("probe-cargo nextest run")
-        || commands.contains("probe-cargo llvm-cov"))
-}
-
-/// Resolve one Make command, failing closed on options or dynamic goals.
-fn make_line_reaches_suite(command: &WorkflowCommand<'_>) -> Read<bool> {
-    for (index, word) in command.words.iter().enumerate() {
-        if !matches!(*word, "make" | "$(MAKE)") {
-            continue;
-        }
-        let goal = command
-            .words
-            .get(index + 1)
-            .map(|value| value.trim_end_matches(';'))
-            .ok_or_else(|| format!("Make invocation has no goal: {}", command.source))?;
-        if goal.starts_with('-') || goal.contains('$') {
-            return Err(format!("unresolved Make goal in workflow: {}", command.source).into());
-        }
-        if make_goal_runs_suite(goal)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
-/// Resolve one direct Cargo command without mistaking binstall for a suite.
-fn cargo_line_reaches_suite(command: &WorkflowCommand<'_>) -> Read<bool> {
-    let Some(index) = command.words.iter().position(|word| *word == "cargo") else {
-        return Ok(false);
-    };
-    let arguments = command
-        .words
-        .get(index + 1..)
-        .ok_or("Cargo command has no arguments")?;
-    if cargo_arguments_reach_suite(arguments) {
-        return Ok(true);
-    }
-    if arguments.iter().any(|argument| argument.contains('$')) {
-        return Err(format!("unresolved Cargo command in workflow: {}", command.source).into());
-    }
-    Ok(false)
-}
-
-/// Recognize suite subcommands even after a toolchain or Cargo option.
-fn cargo_arguments_reach_suite(arguments: &[&str]) -> bool {
-    arguments.contains(&"test")
-        || arguments.contains(&"llvm-cov")
-        || arguments.windows(2).any(|pair| pair == ["nextest", "run"])
-}
-
-/// Recognize directly invoked test tools and Make goals in a workflow script.
-fn run_reaches_suite(script: &str) -> Read<bool> {
-    for line in script
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.starts_with('#'))
-    {
-        let command = WorkflowCommand {
-            source: line,
-            words: line.split_whitespace().collect(),
-        };
-        if command.words.first().is_some_and(|word| {
-            matches!(*word, "bash" | "sh" | "source" | "eval") || word.starts_with("./")
-        }) {
-            return Err(format!("unresolved shell command in workflow: {line}").into());
-        }
-        if cargo_line_reaches_suite(&command)? || make_line_reaches_suite(&command)? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 /// Recognize a suite action or an executable suite command.
 fn suite_step(step: &Value) -> Read<bool> {
     if string(step, &["uses"]).is_some_and(|action| action.contains("/generate-coverage@")) {
         return Ok(true);
     }
     string(step, &["run"])
-        .map(run_reaches_suite)
+        .map(commands::run_reaches_suite)
         .transpose()
         .map(|result| result.unwrap_or(false))
 }

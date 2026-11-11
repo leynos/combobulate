@@ -12,7 +12,9 @@
     "bounded",
     "tested"
   ],
-  "registered_log_parsers": [],
+  "registered_log_parsers": [
+    "kani"
+  ],
   "reason_codes": {
     "schema-invalid": "The record breaks the validity predicate (evidence kind, outcome, and bounds disagree).",
     "outcome-counterexample": "The verifier or test found a counterexample.",

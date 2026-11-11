@@ -471,18 +471,57 @@ Answer, quoted verbatim:
 
 ADR: none yet.
 
+### D16
+
+Subject: Workspace crate boundaries, build profiles, and the
+supported-toolchain set.
+
+Terms-of-reference questions: Q3. Authority: sponsor, technical owner.
+
+Lifecycle: accepted.
+
+Options:
+
+- A. A separate `combobulate-polars` adapter crate.
+- B. A crate-private Polars module inside the facade behind
+  `cfg(feature = "polars")`, with a three-crate workspace and a
+  supported-toolchain set rather than one MSRV. (recommended)
+- C. Defer the facade Polars dependency to task 1.2.6.
+
+Recommendation rationale: Option B keeps the three crates of technical design
+§3, keeps the kernel dependency-free so B01 stays testable, and keeps a
+native-only consumer free of Polars. Adapter-crate separation saves no CI time
+because the default build pulls Polars either way, and it would force a
+premature `combobulate-core` split. Q3 is answered with a supported-toolchain
+set because three toolchains with distinct roles build this repository and no
+single MSRV describes them.
+
+Decision: option B, accepted on 2026-10-22 by `leynos`
+([session answer](https://lody.ai/leynos/sessions/9cc8f59f-14a7-4470-9239-a0dae798e739)).
+
+Answer, quoted verbatim:
+
+> … Decision D16 and ADR-0010 (DL-02). Recommended: D16 accepts ADR-0010,
+> which records the crate boundary, dependency direction, feature profiles,
+> gate feature lists, and the supported-toolchain set that answers ToR Q3 in
+> place of one MSRV. The sponsor accepts D16 after EP-M4 publishes ADR-0010;
+> the approval reference is committed before the tick. The sponsor also says
+> whether Q3 joins in_scope_questions in spec/decisions.json. …
+
+ADR: [ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md).
+
 ## Candidate ADR subjects
 
 - CA1. Numerical and array semantics (technical-design.md §15): recorded in
   ADR-0006; disposition decided by [D07](#d07).
 - CA2. Macro staging and stable-Rust application (technical-design.md §15):
   recorded in ADR-0007; disposition decided by [D07](#d07).
-- CA3. Backend and cell separation (technical-design.md §15): deferred to task
-  1.2.1; disposition decided by [D07](#d07).
+- CA3. Backend and cell separation (technical-design.md §15): recorded in
+  ADR-0010; disposition decided by [D07](#d07).
 - CA4. Initial feature and release scope (technical-design.md §15): recorded in
   ADR-0003; disposition decided by [D07](#d07).
-- CA5. Shared semantic kernel (technical-design.md §15): deferred to task 1.2.1
-  (B01); disposition decided by [D07](#d07).
+- CA5. Shared semantic kernel (technical-design.md §15): recorded in ADR-0010;
+  disposition decided by [D07](#d07).
 - CA6. Public proof compatibility (technical-design.md §15): recorded in
   ADR-0005 and ADR-0009; disposition decided by [D07](#d07).
 - CA7. Resource certification (technical-design.md §15): deferred to step 2.4

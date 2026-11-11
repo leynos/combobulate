@@ -55,15 +55,21 @@ impl LinkerFixture {
         directory.symlink("mold", "bin/ld.mold")?;
         directory.write(
             "clang",
-            "#!/bin/sh\nselected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\ncase \" $* \
-             \" in\n  *' -print-prog-name=ld.mold '*) printf '%s\\n' \"$selected\" ;;\n  *' -### \
-             '*) printf ' \"%s\" \"--hash-style=gnu\"\\n' \"$selected\" >&2 ;;\n  *) printf \
-             '%s\\n' invoked > \"$LINKER_LOG\" ;;\nesac\n",
+            concat!(
+                "#!/bin/sh\nselected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\ncase \
+                 \" $* ",
+                "\" in\n  *' -print-prog-name=ld.mold '*) printf '%s\\n' \"$selected\" ;;\n  *' \
+                 -### ",
+                "'*) printf ' \"%s\" \"--hash-style=gnu\"\\n' \"$selected\" >&2 ;;\n  *) printf ",
+                "'%s\\n' invoked > \"$LINKER_LOG\" ;;\nesac\n",
+            ),
         )?;
         directory.write(
             "rustup",
-            "#!/bin/sh\nif [ \"$1\" = show ]; then printf 'Default host: %s\\n' \
-             \"$FAKE_HOST_TRIPLE\"; else exit 1; fi\n",
+            concat!(
+                "#!/bin/sh\nif [ \"$1\" = show ]; then printf 'Default host: %s\\n' ",
+                "\"$FAKE_HOST_TRIPLE\"; else exit 1; fi\n",
+            ),
         )?;
         for executable in ["bin/mold", "clang", "rustup"] {
             directory.set_permissions(executable, Permissions::from_mode(0o700))?;
