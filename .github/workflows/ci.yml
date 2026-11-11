@@ -325,3 +325,13 @@ jobs:
         env:
           WITH_ACT: '0'
         run: make test
+      - name: Test the single-feature isolation profiles
+        # `make test` above builds `polars-enabled`, which selects both
+        # features. Neither required job builds a single-feature profile, so
+        # the `macros_only` and `polars_only` modules in
+        # `tests/build_profiles.rs` exist but never run. Their target runs
+        # exactly one integration-test binary under each profile, which is why
+        # it fits here rather than adding a fourth job: this job's own AC-07
+        # measurement has the headroom, and a new job would restart the
+        # registered 20-run window again.
+        run: make test-profiles

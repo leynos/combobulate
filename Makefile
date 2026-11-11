@@ -7,7 +7,7 @@ MDTABLEFIX ?= mdtablefix
 MDTABLEFIX_SELECT = --git --include-untracked
 MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
-.PHONY: help all clean test test-ui prepare-dependencies prepare-ui-gate act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
+.PHONY: help all clean test test-profiles test-ui prepare-dependencies prepare-ui-gate act-validation act-contract-smoke whitaker-driver-integration build release package coverage \
   lint lint-clippy lint-whitaker lint-python docstring-coverage check-python-sources fmt check-fmt markdownlint spelling nixie \
   audit rust-audit install-build-tools check-build-tools check-coverage-tools
 
@@ -191,6 +191,35 @@ test: prepare-ui-gate ## Run tests with warnings treated as errors
 			$(CARGO) test --doc --workspace $$flags; \
 	done
 	if [ "$(WITH_ACT)" = "1" ]; then $(MAKE) act-validation; fi
+
+# The two single-feature isolation profiles are absent from `both` by design,
+# so no ordinary route builds them: `native-only` selects neither feature and
+# `polars-enabled` selects both, and a swap of the two flags satisfies both.
+# `tests/build_profiles.rs` therefore gates one module on each exact feature
+# pair, and those modules exist only inside these two profiles. This target is
+# the route that reaches them, so a required pull-request gate can run them.
+#
+# It runs one integration-test target rather than the whole suite. Running
+# `make test` per isolation profile costs two further compilations of the
+# workspace and the cardinality gate's nested `trybuild` build, which a hosted
+# job under AC-07's eight-minute budget cannot absorb. The isolation claim is
+# about `BuildProfile::current()`, and `build_profiles` is the only target that
+# asserts it.
+#
+# `GATE_PROFILE` is deliberately ignored: this is a two-profile comparison, and
+# narrowing it to one would leave the other module unbuilt — exactly the defect
+# the target exists to catch.
+ISOLATION_PROFILES = macros-only polars-only
+
+test-profiles: ## Run the build-profile isolation tests under each single-feature profile
+	@set -euo pipefail; for profile in $(ISOLATION_PROFILES); do \
+		printf '\n== isolation profile: %s ==\n' "$$profile"; \
+		case "$$profile" in \
+			macros-only) flags="$(PROFILE_FLAGS_macros-only)" ;; \
+			polars-only) flags="$(PROFILE_FLAGS_polars-only)" ;; \
+		esac; \
+		$(BUILD_STANDARD_ENV) $(CARGO) $(TEST_CMD) --test build_profiles $$flags $(BUILD_JOBS); \
+	done
 
 # Every Rust command a development route runs must compose the caller's
 # RUSTFLAGS with the standard flags, and only an assignment does that: without

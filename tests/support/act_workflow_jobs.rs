@@ -154,6 +154,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Install the build standard"),
             Some("Install test runner"),
             Some("Test"),
+            Some("Test the single-feature isolation profiles"),
         ],
         actions: &[
             "actions/checkout",

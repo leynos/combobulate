@@ -81,8 +81,11 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
             "echo \"Coverage LDFLAGS: -fuse-ld=lld\""
         ),
         // `Test` is the Polars-enabled job's suite; `Test under Act` is the
-        // native-only fallback that hosted coverage replaces.
+        // native-only fallback that hosted coverage replaces. The isolation
+        // step runs the single-feature profiles `make test` cannot reach —
+        // `test` builds `polars-enabled`, which selects both features.
         Some("Test" | "Test under Act") => "make test",
+        Some("Test the single-feature isolation profiles") => "make test-profiles",
         _ => return false,
     };
     script.trim_end() == expected

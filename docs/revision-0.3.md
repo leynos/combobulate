@@ -7,8 +7,8 @@ repository has never been published to crates.io and carries no tags, so
 "upgrade" here means moving to a later commit from an earlier one.
 
 The crate remains `0.1.0` with `publish = false`
-([ADR-0004](adrs/adr-0004-licence-and-publication.md)). Nothing in this note is
-a stability promise; [ADR-0005][adr-0005] still governs that.
+([ADR-0004](adrs/adr-0004-licence-and-publication.md)). Nothing in this note
+is a stability promise; [ADR-0005][adr-0005] still governs that.
 
 ## Who should read this
 
@@ -17,8 +17,8 @@ a stability promise; [ADR-0005][adr-0005] still governs that.
 - A producer who writes or checks proof-evidence records.
 - A contributor who runs the gate profiles by hand.
 
-If you only consume the design documents, nothing here changes them. The
-design revision is recorded separately in [Revision 0.2](revision-0.2.md).
+If you only consume the design documents, nothing here changes them. The design
+revision is recorded separately in [Revision 0.2](revision-0.2.md).
 
 ## Facade features and the native-only build
 
@@ -37,8 +37,8 @@ facade exactly this way and asserts that its dependency graph contains no
 Polars, glam, Kani, or Verus package.
 
 `polars` is pinned to `0.55.2` with `default-features = false` and
-`features = ["lazy"]`, matching the calibrated measurement. The choice, and
-the reasoning behind a crate-private module rather than a fourth crate, are in
+`features = ["lazy"]`, matching the calibrated measurement. The choice, and the
+reasoning behind a crate-private module rather than a fourth crate, are in
 [ADR-0010](adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md).
 
 ## The `BuildProfile` item
@@ -67,8 +67,10 @@ a capability report: nothing may infer that an operation is supported from it.
 single-feature isolation profiles `macros-only` and `polars-only`. A profile is
 its own Cargo invocation, so feature unification cannot let one profile mask
 another. `macros-only` and `polars-only` are deliberately not part of `both`:
-they exist to catch a swap of the two feature flags, and adding their cold
-builds to the pull-request lane would spend the AC-07 budget.
+they exist to catch a swap of the two feature flags. Their full suites would
+spend the AC-07 budget, so the pull-request lane runs `make test-profiles`,
+which builds only the `build_profiles` target under each of them, as the last
+step of `polars-test`.
 
 ## The trust-audit command
 

@@ -130,15 +130,16 @@ fn the_polars_gated_items_are_absent_without_the_feature() {
     }
 }
 
-/// The same names resolve when the feature is on.
-///
-/// This module only compiles under `polars`, so its presence in the built test
-/// binary is the positive half of the contract: a removed re-export or a
-/// `cfg` narrowed from the wrong item fails this file's own compilation. The
-/// body then exercises the resolved items, so the type relationship they are
-/// meant to have is checked as well as their existence.
 #[cfg(feature = "polars")]
 mod present {
+    //! The same names resolve when the feature is on.
+    //!
+    //! This module only compiles under `polars`, so its presence in the built
+    //! test binary is the positive half of the contract: a removed re-export or
+    //! a `cfg` narrowed from the wrong item fails this file's own compilation.
+    //! The body then exercises the resolved items, so the type relationship
+    //! they are meant to have is checked as well as their existence.
+
     /// Both items resolve, and the probe returns the backend's own error type.
     #[test]
     fn the_polars_gated_items_are_present_with_the_feature() {

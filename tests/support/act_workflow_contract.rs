@@ -208,6 +208,7 @@ fn valid_ci_commands(ci: &Value) -> bool {
         && with_act == Some("0")
         && condition == Some("env.ACT == 'true'")
         && valid_test_step(ci)
+        && valid_isolation_profiles_step(ci)
         && valid_coverage_route(ci)
 }
 
@@ -262,6 +263,22 @@ fn valid_test_step(ci: &Value) -> bool {
             && at(item, &["if"]).is_none()
     })
 }
+
+/// Requires the isolation profiles to run in a required job, unguarded.
+///
+/// `make test` builds `polars-enabled`, which selects both features, so
+/// neither required job would otherwise compile `macros-only` or `polars-only`.
+/// The modules gated on those feature pairs would exist and never run, which is
+/// the defect the step repairs. A guard would reintroduce it silently: the step
+/// must be unconditional, so a skipped run cannot read as a passing one.
+fn valid_isolation_profiles_step(ci: &Value) -> bool {
+    step(ci, "polars-test", ISOLATION_STEP).is_some_and(|(_, item)| {
+        text(item, &["run"]) == Some("make test-profiles") && at(item, &["if"]).is_none()
+    })
+}
+
+/// The hosted step that runs the single-feature isolation profiles.
+const ISOLATION_STEP: &str = "Test the single-feature isolation profiles";
 
 /// Requires hosted coverage to use LLVM and remain skipped in Act.
 fn valid_coverage_route(ci: &Value) -> bool {

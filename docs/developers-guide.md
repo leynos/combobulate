@@ -74,14 +74,16 @@ overlay instead of editing generated output.
 
 Every pull request runs three required hosted jobs: `build-test` on the
 native-only profile, and `polars-lint` and `polars-test` on the Polars-enabled
-profile. `build-test` is the authoritative repository gate. Its Rust test suite
-includes workflow-structure and command contract tests: workflow YAML and pins
-are checked from source, while real Make recipes and shell scripts run with
-controlled external executors. These tests prove invocation shape,
-configuration, ordering, and failure propagation without compiling the
-repository again for each contract. Each job is contracted on its own, so a
-step, action, or `GATE_PROFILE` moved between jobs fails the contract rather
-than being satisfied by another job's prelude.
+profile. `polars-test` also runs `make test-profiles`, because neither required
+job builds a single-feature profile and the modules gated on one would
+otherwise never run. `build-test` is the authoritative repository gate. Its
+Rust test suite includes workflow-structure and command contract tests:
+workflow YAML and pins are checked from source, while real Make recipes and
+shell scripts run with controlled external executors. These tests prove
+invocation shape, configuration, ordering, and failure propagation without
+compiling the repository again for each contract. Each job is contracted on its
+own, so a step, action, or `GATE_PROFILE` moved between jobs fails the contract
+rather than being satisfied by another job's prelude.
 
 All four hosted jobs declare `RUSTC_WRAPPER: sccache` and
 `SCCACHE_GHA_ENABLED: "true"` at job level and run `Report sccache wiring`
@@ -500,12 +502,22 @@ scenario per route, and each snapshots the line its own build renders.
   should use.
 - Any other value fails the Make parse with an error naming the accepted set.
 
-`both` deliberately does not include the two single-feature routes: the hosted
-pull-request lane measures the AC-07 budgets against the two jobs above, and a
-cold Polars build for `polars-only` in the same job would spend them.
+`both` deliberately does not include the two single-feature routes. `make lint`
+and `make test` iterate `GATE_PROFILES`, so under `both` they build the two
+profiles the pull-request lane budgets and never reach a single-feature build.
 
-Because `make lint` and `make test` already iterate the profile list, running
-them is the profile-isolation check; there is no separate profile target.
+`make test-profiles` is the route that does. It runs the `build_profiles`
+integration-test target once per single-feature profile, which is where the
+`macros_only` and `polars_only` modules are compiled. It ignores `GATE_PROFILE`
+on purpose: narrowing it to one profile would leave the other module unbuilt,
+which is the defect it exists to catch. It runs one test binary rather than the
+whole suite because the isolation claim is about `BuildProfile::current()`, and
+a full suite per profile would add two workspace compilations and the
+cardinality gate's nested build to a hosted job under AC-07's budget.
+
+The hosted pull-request lane runs it as the final step of `polars-test`, so the
+isolation profiles are exercised by a required job without adding a fourth one
+and restarting AC-07's 20-run window.
 
 `lint-whitaker` iterates the same list. Whitaker forwards every argument after
 `--` to `cargo check`, so an unflagged run type-checks only the default
@@ -1024,14 +1036,13 @@ gate. Both values carry the manifest identity as well as the log's, because a
 verdict is decided against a manifest: a result is matched to a record only
 when the tool, the log path and digest, and the manifest path and digest all
 agree, so two records citing one capture against different manifests are two
-verdicts and neither can answer for the other. A record whose log, manifest,
-or audit it cannot bind falls back to `self-reported` and is rejected; Verus
-has no adapter yet and is always self-reported.
-`abstract_record(record, context)` maps a schema-valid record to the ten-field
-model; `admit` applies the pure MS-0 to MS-2 rules and returns an
-admission level with reason codes. Neither function reads files, the clock, the
-environment, or the network. Add producers at the adapter boundary and pass
-explicit inputs into the gate.
+verdicts and neither can answer for the other. A record whose log, manifest, or
+audit it cannot bind falls back to `self-reported` and is rejected; Verus has
+no adapter yet and is always self-reported. `abstract_record(record, context)`
+maps a schema-valid record to the ten-field model; `admit` applies the pure
+MS-0 to MS-2 rules and returns an admission level with reason codes. Neither
+function reads files, the clock, the environment, or the network. Add producers
+at the adapter boundary and pass explicit inputs into the gate.
 
 The `scripts/check_docs.py` composition root resolves the checked-out source
 revision through the Git adapter and places it in
@@ -1385,9 +1396,9 @@ and statuses accompany the captured logs. Exit status alone cannot establish a
 verdict: the impossible-cover subject exits successfully. The corpus is not
 itself an evidence parser; `kani` is registered in
 `spec/evidence-reason-codes.json` and read by the adapter described under
-[the evidence-admission boundary](#compose-the-evidence-admission-boundary).
-A record still cites the corpus's inventory as its manifest, and a manifest
-whose digest differs from the one the record binds is refused.
+[the evidence-admission boundary](#compose-the-evidence-admission-boundary). A
+record still cites the corpus's inventory as its manifest, and a manifest whose
+digest differs from the one the record binds is refused.
 
 `uv run --script scripts/run_verifier_probes.py verifier-free` builds the
 comparison sources in a rootless container without verifier installations. This

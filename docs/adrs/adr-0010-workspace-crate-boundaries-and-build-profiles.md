@@ -268,11 +268,14 @@ per route, each gated on the exact feature pair it describes, so a build with
 exactly one feature asserts that the report names that feature and not the
 other. Each route snapshots its rendered line.
 
-The two new profiles are deliberately absent from `GATE_PROFILE=both`. The
-hosted pull-request lane measures the AC-07 build budgets against the two jobs
-`both` runs, and adding a cold Polars build for `polars-only` to the same job
-would spend them. They are the isolation check for a change that touches either
-flag, not a second pull-request lane.
+The two new profiles are deliberately absent from `GATE_PROFILE=both`, because
+the hosted pull-request lane measures the AC-07 build budgets against the two
+jobs `both` runs. Leaving them out of `both` left the modules that assert them
+compiled by nothing, so `make test-profiles` exists to reach them:
+`polars-test` runs it as its final step, building one integration-test target
+under each single-feature profile. Full suites under those profiles cost far
+more than that job's AC-07 headroom, and a fourth required job would restart
+AC-07's window again, so the focused target is the route a required gate takes.
 
 `spec/toolchain-profiles.json` still records four profiles, because a profile
 there pins a toolchain and neither single-feature build pins a different one.
