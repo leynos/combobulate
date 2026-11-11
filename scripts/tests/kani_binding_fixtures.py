@@ -19,9 +19,7 @@ Examples
 """
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import io
 import sys
 import tempfile
 import unittest
@@ -29,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from docs_validation.evidence_binding import _refusal
+from docs_validation.evidence_binding import Refusal, refusal_for
 from docs_validation.kani_log.shell import MissingEvidence, bind_verdict
 from git_fixtures import run_git
 
@@ -42,11 +40,8 @@ MANIFEST = 'scripts/tests/fixtures/evidence/default-unwind-manifest.json'
 
 
 def report(record: dict, missing: MissingEvidence) -> str:
-    """Return the line ``_refusal`` prints, without its trailing newline."""
-    captured = io.StringIO()
-    with contextlib.redirect_stderr(captured):
-        _refusal(record, missing)
-    return captured.getvalue().rstrip('\n')
+    """Return the line a refusal renders as, without its trailing newline."""
+    return str(refusal_for(record, missing))
 
 
 def file_digest(relative: str) -> str:
@@ -74,25 +69,23 @@ def record(**overrides) -> dict:
 
 
 def captured_against(root: Path, adapter, document: dict) -> str:
-    """Return the refusal report for one record against one root."""
-    captured = io.StringIO()
-    with contextlib.redirect_stderr(captured):
-        adapter(root, document, KANI)
-    return captured.getvalue().strip()
+    """Return the refusal one adapter returns for one record against one root.
+
+    An adapter that binds reports no refusal, which renders as the empty string
+    so a case can assert on the whole line whether or not one was produced.
+    """
+    result = adapter(root, document, KANI)
+    return str(result) if isinstance(result, Refusal) else ''
 
 
 def refused_by(adapter, document: dict) -> str | None:
-    """Return the refusal an adapter reports for one record, or None when it binds."""
-    captured = io.StringIO()
-    with contextlib.redirect_stderr(captured):
-        result = adapter(ROOT, document, KANI)
-    if result is not None:
-        return None
-    return captured.getvalue().strip()
+    """Return the refusal an adapter returns for one record, or None when it binds."""
+    result = adapter(ROOT, document, KANI)
+    return str(result) if isinstance(result, Refusal) else None
 
 
 def refused_directly(document: dict) -> str:
-    """Return the line ``bind_verdict``'s own refusal prints, without the seam's filters.
+    """Return ``bind_verdict``'s own refusal, without the seam's filters.
 
     ``evidence_binding.log_result`` returns before dispatch for a tool it has no
     adapter for, so the adapter's own shape checks are reachable only by calling

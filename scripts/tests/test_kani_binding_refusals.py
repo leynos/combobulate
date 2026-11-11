@@ -3,8 +3,8 @@
 The gate can only say ``verdict-self-reported`` or ``trust-unaudited``, and it
 says the same two words whether a log was tampered with, untracked, or merely
 named at the wrong path. The refusal detail exists for exactly one reader — the
-record's author — so it is printed to standard error, and this module is the
-only thing that reads it back.
+record's author — so the adapter returns it, the CLI renders it, and this module
+is where the whole line is asserted.
 
 Every case here therefore drives one refusal end to end and asserts the whole
 line: the record's id, the artefact class, the path as it was written, and the

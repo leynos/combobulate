@@ -22,15 +22,20 @@ all, which leaves the record ``self-reported`` — the fail-closed direction
 ADR-0009 states, because tool registration alone must never admit a verdict
 (C-EP-10).
 
-A refusal is reported rather than swallowed. The gate can name only the reason
+A refusal is returned rather than printed. The gate can name only the reason
 code it produced, and every refusal collapses to the same one, so the artefact,
-the path, and the reason an adapter refused are printed on standard error where
-the record's author can act on them.
+the path, and the reason an adapter refused would otherwise be lost. Returning
+them keeps the queries queries: nothing here writes to a stream, so a caller
+that only wants admissions is not made to launder a diagnostic it never asked
+for, and a caller that does want one — the CLI, or a validation gate — renders
+:class:`Refusal` through :func:`report`. The refusals travel with the checked
+values because they describe the same pass over the same records.
 """
 from __future__ import annotations
 
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 from .evidence_gate import VerifiedLogResult, VerifiedTrustAudit
@@ -67,22 +72,68 @@ def _adapter_for(record: Mapping[str, object], parsers: frozenset[str], table: M
     return table.get(tool)
 
 
-def _refusal(record: Mapping[str, object], missing: MissingEvidence) -> None:
-    """Report one refused claim on standard error, naming the artefact that failed.
+@dataclass(frozen=True, slots=True)
+class Refusal:
+    """Why one record's claim was refused, in the words its author can act on.
 
     The gate can only say ``verdict-self-reported`` or ``trust-unaudited``,
     which are the same two words whether a log was tampered with, untracked, or
     simply named at the wrong path. A record's author has no other channel, so
-    the refusal detail is reported here rather than discarded; the trust audit
-    already reports its scanner failures the same way.
+    the artefact, the path, and the reason are carried here until a boundary
+    renders them.
+
+    A value rather than a printed line, because binding runs inside queries
+    whose callers may and may not want a diagnostic. Printing chose for them:
+    a checker that admits records as one step among many had its standard error
+    filled by a seam it never called for, and a caller that needed the detail as
+    data had to capture a stream to get it back.
     """
-    print(f'{record.get("id", "record")}: {missing.what} {missing.path!r} was refused: '
-          f'{missing.reason}', file=sys.stderr)
+
+    record: str
+    what: str
+    path: str
+    reason: str
+
+    def __str__(self) -> str:
+        """
+        Render the line a reader scans for the id, the class, the path, and the reason.
+
+        Examples
+        --------
+        >>> str(Refusal('EV-1', 'log', 'a.log', 'it is not tracked'))
+        "EV-1: log 'a.log' was refused: it is not tracked"
+        """
+        return f'{self.record}: {self.what} {self.path!r} was refused: {self.reason}'
+
+
+def refusal_for(record: Mapping[str, object], missing: MissingEvidence) -> Refusal:
+    """Return the refusal one failed binding produces for ``record``.
+
+    A record with no id is labelled rather than left blank: the fallback is the
+    only name a reader gets for a record that cannot name itself.
+    """
+    return Refusal(str(record.get('id', 'record')), missing.what, missing.path, missing.reason)
+
+
+def report(refusals: Iterable[Refusal]) -> None:
+    """Write each refusal on its own line of standard error.
+
+    This is the boundary's job rather than the query's. :func:`checked_inputs`
+    returns what it could not bind, and the caller that owns a human audience —
+    the CLI, or a validation gate — is the one that decides the detail belongs
+    on standard error, beside the other diagnostics the gate writes there.
+
+    Examples
+    --------
+    >>> report([])
+    """
+    for refusal in refusals:
+        print(refusal, file=sys.stderr)
 
 
 def log_result(root: Path, record: Mapping[str, object],
-               parsers: frozenset[str]) -> VerifiedLogResult | None:
-    """Re-derive one record's verdict, or return None when no adapter may.
+               parsers: frozenset[str]) -> VerifiedLogResult | Refusal | None:
+    """Re-derive one record's verdict, or say why no adapter could.
 
     Parameters
     ----------
@@ -95,17 +146,18 @@ def log_result(root: Path, record: Mapping[str, object],
 
     Returns
     -------
-    VerifiedLogResult | None
-        The parser's facts, or None when the record claims no parsed verdict,
-        names an unregistered tool, or names a tool this seam has no adapter
-        for. An adapter that *is* run and cannot bind its artefacts also
-        returns None, after reporting the refusal on standard error: the gate
-        then judges the record as self-reported.
+    VerifiedLogResult | Refusal | None
+        The parser's facts; a :class:`Refusal` when an adapter ran and could
+        not bind its artefacts; or None when no adapter had anything to do —
+        the record claims no parsed verdict, or names an unregistered tool.
+        The third case is not a refusal: nothing was attempted, so there is no
+        artefact to name. The gate judges both non-results as self-reported.
 
     Examples
     --------
     A record whose ``method.tool`` is ``"Verus"`` returns None even though it
-    cites a log, because no Verus adapter exists yet.
+    cites a log, because no Verus adapter exists yet. A record citing a log
+    whose bytes changed returns a refusal naming the log.
     """
     if not _claims_parsed_verdict(record):
         return None
@@ -114,14 +166,13 @@ def log_result(root: Path, record: Mapping[str, object],
         return None
     result = adapter(root, record)
     if isinstance(result, MissingEvidence):
-        _refusal(record, result)
-        return None
+        return refusal_for(record, result)
     return result
 
 
 def trust_audit(root: Path, record: Mapping[str, object],
-                parsers: frozenset[str]) -> VerifiedTrustAudit | None:
-    """Scan the sources one record's manifest names, or return None.
+                parsers: frozenset[str]) -> VerifiedTrustAudit | Refusal | None:
+    """Scan the sources one record's manifest names, or say why it could not.
 
     The audit is bound to the record's single result artefact, which is the
     harness manifest: the gate compares that identity with the record's, so an
@@ -138,12 +189,12 @@ def trust_audit(root: Path, record: Mapping[str, object],
 
     Returns
     -------
-    VerifiedTrustAudit | None
-        What the scanner found in the manifest's sources, or None when the
-        record is not claiming a parsed verdict, claims no audit, names no
-        adapter, or cites a source the scanner cannot read. None demotes the
-        record's trust claim to ``unaudited`` (DL-16), which blocks verifier
-        evidence, and a refusal is reported on standard error.
+    VerifiedTrustAudit | Refusal | None
+        What the scanner found in the manifest's sources; a :class:`Refusal`
+        when the scanner ran and could not read what the record cites; or None
+        when the record claims no audit to perform. Every non-result demotes
+        the record's trust claim to ``unaudited`` (DL-16), which blocks
+        verifier evidence.
 
     Examples
     --------
@@ -157,8 +208,7 @@ def trust_audit(root: Path, record: Mapping[str, object],
         return None
     sources = scanner(root, record)
     if isinstance(sources, MissingEvidence):
-        _refusal(record, sources)
-        return None
+        return refusal_for(record, sources)
     try:
         # The bound walk, not the working-tree one: `bound_sources` has already
         # checked each source's digest, and re-reading the files here would
@@ -166,17 +216,48 @@ def trust_audit(root: Path, record: Mapping[str, object],
         # set does not name, which is the same DL-16 escape one level down.
         files = audit_bound_tree(root, sources)
     except TrustAuditError as error:
-        print(f'{record.get("id", "record")}: trust audit refused: {error}', file=sys.stderr)
-        return None
+        return Refusal(str(record.get('id', 'record')), 'trust audit',
+                       str(record['result_artefacts'][0]['path']), str(error))
     artefact = record['result_artefacts'][0]
     items = tuple((str(item['item']), str(item['location'])) for item in items_of(files))
     return VerifiedTrustAudit(manifest_path=str(artefact['path']),
                               manifest_sha256=str(artefact['sha256']), items=items)
 
 
+@dataclass(frozen=True, slots=True)
+class CheckedInputs:
+    """Everything one admission pass derived from the records it was given.
+
+    The refusals travel with the values because they describe the same pass
+    over the same records: a caller that wanted only the two de-duplicated value
+    lists would have to bind every record a second time to learn why the rest
+    contributed nothing. A refusal is not an error — the gate already treats an
+    unbound record as self-reported, and that verdict is unchanged — so it is
+    returned here rather than raised.
+    """
+
+    logs: tuple[VerifiedLogResult, ...]
+    audits: tuple[VerifiedTrustAudit, ...]
+    refusals: tuple[Refusal, ...]
+
+    def pair(self) -> tuple[tuple[VerifiedLogResult, ...], tuple[VerifiedTrustAudit, ...]]:
+        """Return the two value lists in the shape :func:`admit_record` accepts.
+
+        The gate reads only these two, so the admission call sites take them as
+        a pair rather than the whole value: which is also why the refusals are
+        not silently iterable alongside them. A caller that discarded a refusal
+        by unpacking should have to say so.
+
+        Examples
+        --------
+        >>> CheckedInputs((), (), ()).pair()
+        ((), ())
+        """
+        return self.logs, self.audits
+
+
 def checked_inputs(root: Path, records: list[Mapping[str, object]],
-                   parsers: frozenset[str]) -> tuple[tuple[VerifiedLogResult, ...],
-                                                      tuple[VerifiedTrustAudit, ...]]:
+                   parsers: frozenset[str]) -> CheckedInputs:
     """Bind every record's cited artefacts once, for one admission pass.
 
     Parameters
@@ -190,10 +271,12 @@ def checked_inputs(root: Path, records: list[Mapping[str, object]],
 
     Returns
     -------
-    tuple[tuple[VerifiedLogResult, ...], tuple[VerifiedTrustAudit, ...]]
+    CheckedInputs
         The parser results and scanner audits, each in record order and each
-        distinct value exactly once. A record no adapter could bind contributes
-        nothing.
+        distinct value exactly once, plus the refusals that kept the other
+        records from contributing anything. Only the values are de-duplicated:
+        two records may cite the same broken log, and each author needs the
+        refusal that names their own record.
 
     Examples
     --------
@@ -203,14 +286,14 @@ def checked_inputs(root: Path, records: list[Mapping[str, object]],
     demote it to ``verdict-self-reported``. Equal values came from the same
     bytes, so they are one fact.
     """
-    logs, audits = [], []
+    logs, audits, refusals = [], [], []
     for record in records:
         result = log_result(root, record, parsers)
         audit = trust_audit(root, record, parsers)
-        if result is not None:
-            logs.append(result)
-        if audit is not None:
-            audits.append(audit)
+        refusals.extend(item for item in (result, audit) if isinstance(item, Refusal))
+        logs.extend(item for item in (result,) if isinstance(item, VerifiedLogResult))
+        audits.extend(item for item in (audit,) if isinstance(item, VerifiedTrustAudit))
     # Both value types are frozen dataclasses over hashable fields, so
     # `dict.fromkeys` is an ordered de-duplication that preserves record order.
-    return tuple(dict.fromkeys(logs)), tuple(dict.fromkeys(audits))
+    return CheckedInputs(tuple(dict.fromkeys(logs)), tuple(dict.fromkeys(audits)),
+                         tuple(refusals))

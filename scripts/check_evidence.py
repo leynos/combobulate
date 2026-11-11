@@ -242,7 +242,7 @@ def main(
         Zero when all records reach the required level, one when any falls
         short, or two for invalid records, configuration, or usage.
     """
-    from docs_validation.evidence_binding import checked_inputs
+    from docs_validation.evidence_binding import checked_inputs, report
     from docs_validation.evidence_gate import AdmissionContext, Level
 
     try:
@@ -262,10 +262,16 @@ def main(
         parsers = frozenset(load_json(ROOT / 'spec/evidence-reason-codes.json')['registered_log_parsers'])
         reviewed = [record for record in (readable_record(path) for path in records)
                     if record is not None and validator.is_valid(record)]
-        verified_logs, trust_audits = checked_inputs(ROOT, reviewed, parsers)
+        checked = checked_inputs(ROOT, reviewed, parsers)
     except (OSError, ValueError, KeyError, TypeError) as error:
         print(f'usage error: cannot load configuration: {error}', file=sys.stderr)
         return 2
+    # The seam returns what it could not bind; this is the boundary that owns a
+    # human reader, so this is where the detail goes. It is written before the
+    # per-record lines, which is why an author sees the reason above the verdict
+    # it explains.
+    report(checked.refusals)
+    verified_logs, trust_audits = checked.pair()
     admission_context = AdmissionContext(register, current, date, parsers,
                                          verified_logs, trust_audits)
     configuration = EvidenceCliConfiguration(validator, admission_context, wanted.value)

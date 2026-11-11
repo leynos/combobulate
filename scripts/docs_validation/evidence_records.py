@@ -109,8 +109,9 @@ def admitted_evidence(context: ValidationContext) -> dict[str, list[ClosureEvide
     records = [record for _, record in committed_records(context)]
     checked = checked_inputs(context.root, records, inputs[2])
     evidence: dict[str, list[ClosureEvidence]] = {}
+    pair = checked.pair()
     for record in records:
-        facts = closure_evidence(record, admit_record(record, context, inputs, checked))
+        facts = closure_evidence(record, admit_record(record, context, inputs, pair))
         evidence.setdefault(facts.component_id, []).append(facts)
     return evidence
 
@@ -136,7 +137,7 @@ def check_evidence_gate(context: ValidationContext) -> None:
     for path, record in records:
         validator.validate(record)
     checked = checked_inputs(context.root, [example], inputs[2])
-    planned = admit_record(example, context, inputs, checked)
+    planned = admit_record(example, context, inputs, checked.pair())
     require(planned.level is Level.REJECTED and 'not-run' in planned.reasons, 'The planned example must be rejected as not run')
     context.record('evidence-gate', 'Gate reason codes and levels match the registry; P3 and P4 hold over all valid '
                                     'abstract states; every committed evidence record validates against schema '

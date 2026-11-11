@@ -34,7 +34,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from docs_validation.evidence_binding import checked_inputs, log_result, trust_audit
+from docs_validation.evidence_binding import Refusal, checked_inputs, log_result, trust_audit
 from docs_validation.evidence_gate import AdmissionContext, Level, admit_evidence
 from git_fixtures import run_git
 
@@ -57,7 +57,7 @@ def fixture_bindings() -> dict:
 
 def admit(root: Path, record: dict, parsers: frozenset[str] = KANI) -> object:
     """Admit one record through the real binding seam, as the CLI does."""
-    logs, audits = checked_inputs(root, [record], parsers)
+    logs, audits = checked_inputs(root, [record], parsers).pair()
     return admit_evidence(record, AdmissionContext(
         exceptions={}, bindings=fixture_bindings(), as_of=AS_OF,
         log_parsers=parsers, verified_log_results=logs, verified_trust_audits=audits))
@@ -114,7 +114,7 @@ class AdmittedFixture(unittest.TestCase):
         bytes, so they are one fact.
         """
         record = fixture_record('bounded-kani')
-        logs, audits = checked_inputs(ROOT, [record, record], KANI)
+        logs, audits = checked_inputs(ROOT, [record, record], KANI).pair()
         self.assertEqual(len(logs), 1,
                          'one log cited by two records must bind to one result')
         self.assertEqual(len(audits), 1,
@@ -168,8 +168,8 @@ class TamperedEvidence(ScratchCheckout, unittest.TestCase):
         run_git(self.root, 'add', '-A')
         run_git(self.root, 'commit', '-q', '-m', 'Tamper with the log')
         record = self.record()
-        self.assertIsNone(log_result(self.root, record, KANI),
-                          'a log whose bytes differ from its digest must not bind')
+        self.assertIsInstance(log_result(self.root, record, KANI), Refusal,
+                              'a log whose bytes differ from its digest must be refused')
         self.assertIn('verdict-self-reported', admit(self.root, record).reasons,
                       'a record citing a tampered log is self-reported')
 
@@ -182,8 +182,8 @@ class TamperedEvidence(ScratchCheckout, unittest.TestCase):
         run_git(self.root, 'add', '-A')
         run_git(self.root, 'commit', '-q', '-m', 'Tamper with the manifest')
         record = self.record()
-        self.assertIsNone(trust_audit(self.root, record, KANI),
-                          'a manifest whose bytes differ from its digest must not bind')
+        self.assertIsInstance(trust_audit(self.root, record, KANI), Refusal,
+                              'a manifest whose bytes differ from its digest must be refused')
         self.assertIn('trust-unaudited', admit(self.root, record).reasons,
                       'an unbound manifest leaves the trust claim unaudited')
 
@@ -205,15 +205,16 @@ class TamperedEvidence(ScratchCheckout, unittest.TestCase):
             'path': 'scripts/tests/fixtures/kani_logs/unreviewed.log',
             'sha256': digest(untracked),
         }
-        missing = log_result(self.root, record, KANI)
-        self.assertIsNone(missing, 'an untracked log must not bind even when its digest matches')
+        refused = log_result(self.root, record, KANI)
+        self.assertIsInstance(refused, Refusal,
+                              'an untracked log must be refused even when its digest matches')
 
     def test_a_path_outside_the_repository_is_refused(self):
         """Require repository-relative paths, so a record cannot cite the host's files."""
         record = self.record()
         record['verdict_source']['log'] = {'path': '../outside.log', 'sha256': 'a' * 64}
-        self.assertIsNone(log_result(ROOT, record, KANI),
-                          'a path escaping the repository must not bind')
+        self.assertIsInstance(log_result(ROOT, record, KANI), Refusal,
+                              'a path escaping the repository must be refused')
 
     def test_a_fact_that_disagrees_with_the_log_is_refused(self):
         """Require the gate to compare the parser's facts with the record's claims."""
@@ -265,8 +266,8 @@ class BoundAuditStopsAtTheManifest(ScratchCheckout, unittest.TestCase):
         self._commit(MANIFEST, json.dumps(document, indent=2) + '\n', 'Narrow the manifest')
         record = self.record()
         record['result_artefacts'][0]['sha256'] = digest(self.root / MANIFEST)
-        self.assertIsNone(
-            trust_audit(self.root, record, KANI),
+        self.assertIsInstance(
+            trust_audit(self.root, record, KANI), Refusal,
             'a module the manifest does not bind must refuse the audit, not be read')
 
 
