@@ -469,24 +469,40 @@ pinned `mold` and nightly toolchain.
 
 ## Gate profiles
 
-The facade has two feature profiles, and a gate that runs only one of them
-cannot see the other's code. `--all-features` reaches the Polars-enabled code
-but never the `cfg(not(feature = "polars"))` branches, and a plain
-default-feature run repeats what the Polars-enabled route already checks. Each
-profile is therefore its own Cargo invocation.
+The facade's two optional features, `macros` and `polars`, are selected
+independently, so four builds exist. A gate that runs only some of them cannot
+see the others' code. `--all-features` reaches the Polars-enabled code but
+never the `cfg(not(feature = "polars"))` branches, and a plain default-feature
+run repeats what the Polars-enabled route already checks. Each profile is
+therefore its own Cargo invocation.
 
-| Profile          | Flags                   | Reaches                                       |
-| ---------------- | ----------------------- | --------------------------------------------- |
-| `native-only`    | `--no-default-features` | `cfg(not(feature = "polars"))`, no macros     |
-| `polars-enabled` | none (defaults)         | `cfg(feature = "polars")` and the macro crate |
+| Profile          | Flags                                     | Reaches                                       |
+| ---------------- | ----------------------------------------- | --------------------------------------------- |
+| `native-only`    | `--no-default-features`                   | `cfg(not(feature = "polars"))`, no macros     |
+| `polars-enabled` | none (defaults)                           | `cfg(feature = "polars")` and the macro crate |
+| `macros-only`    | `--no-default-features --features macros` | the macro crate without Polars                |
+| `polars-only`    | `--no-default-features --features polars` | Polars without the macro crate                |
+
+The last two exist because every other route turns both features on or both
+off. A `BuildProfile::current()` that reported each flag as the other's would
+pass a default build and a native-only build alike; only a build with exactly
+one feature can tell them apart. `tests/build_profiles.rs` therefore binds one
+scenario per route, and each snapshots the line its own build renders.
 
 `GATE_PROFILE` selects which profiles a gate runs:
 
 - `GATE_PROFILE=both` (the default) runs `native-only` then `polars-enabled`,
   which is what `make lint` and `make test` do.
-- `GATE_PROFILE=native-only` or `GATE_PROFILE=polars-enabled` runs one, which is
-  what a focused iteration should use.
+- `GATE_PROFILE=macros-only` or `GATE_PROFILE=polars-only` selects a single
+  feature, which is the isolation check for a change that touches either flag.
+- `GATE_PROFILE=native-only` or `GATE_PROFILE=polars-enabled` runs one of the
+  two profiles the pull-request lane builds, which is what a focused iteration
+  should use.
 - Any other value fails the Make parse with an error naming the accepted set.
+
+`both` deliberately does not include the two single-feature routes: the hosted
+pull-request lane measures the AC-07 budgets against the two jobs above, and a
+cold Polars build for `polars-only` in the same job would spend them.
 
 Because `make lint` and `make test` already iterate the profile list, running
 them is the profile-isolation check; there is no separate profile target.

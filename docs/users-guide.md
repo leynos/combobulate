@@ -80,6 +80,44 @@ Build with `default-features = false` to get a native-only build with no Polars
 dependency and no macro crate. That route is what a consumer that must avoid
 Polars entirely should select.
 
+## Audit a source tree for trusted items
+
+Run `scripts/trust_audit.py` to report every trusted item in Rust sources, in
+the shape the evidence schema's `trust_audit.items` entries use.
+
+```bash
+scripts/trust_audit.py crates/combobulate-kernel
+```
+
+```json
+[
+  {
+    "source": "crates/combobulate-kernel/src/lib.rs",
+    "items": []
+  }
+]
+```
+
+Each argument is a file or a directory, and the command writes one JSON object
+per audited source. A directory is expanded to the entry points Rust would
+compile from it — `lib.rs`, `main.rs`, `mod.rs`, and every file under `tests/`,
+`benches/`, and `examples/` — and the walk then follows `mod` declarations, so
+a submodule is reported when, and only when, the crate compiles it.
+
+An item carries its `item`, its `location` as `path:line:column`, and
+`covered_by`, which is `null` unless the item names an assumption or an
+exception declared in the repository's policy files. Use
+`scripts/check_evidence.py` to admit evidence that cites an audit; see
+[check proof-evidence records](#check-proof-evidence-records).
+
+The command reads sources inside the repository only, because the driver paths
+in its output are repository-relative and a path outside it has no such name.
+It exits `0` when every source was audited, `1` when a source could not be — an
+unreadable file, a path outside the repository, or a directory holding no Rust
+entry point — and `2` for a usage error. A refusal matters: an empty audit is a
+claim that a source holds no trusted items, so a source that could not be read
+must fail the run rather than report nothing.
+
 ## Check proof-evidence records
 
 Run

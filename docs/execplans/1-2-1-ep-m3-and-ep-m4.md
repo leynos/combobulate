@@ -3,9 +3,13 @@
 This is a continuation record for
 `docs/execplans/1-2-1-establish-workspace-and-profiles.md`. The parent plan is
 long and is the authority for every milestone; this file records the working
-state of the milestones currently in progress so a later session can resume
-without re-deriving what has already been built and what has already been ruled
-out.
+state of EP-M3 to EP-M6 so a later session can resume without re-deriving what
+has already been built and what has already been ruled out.
+
+Each milestone's own checklist is complete. EP-M4 and EP-M6 are delivered and
+the parent plan ticks them; EP-M3 and EP-M5 stay unticked there because each
+closes only when its gates and conformance check pass together, which is the
+settled-candidate gate run rather than any item on the checklist below.
 
 It is a **living document**: update the checklists and the notes as work
 proceeds, not at the end.
@@ -28,9 +32,16 @@ reusable once its claims become true, but it must not be applied before then.
 
 `1-2-1-profiles-and-trust-audit`, branched from `main` at `408aba7`.
 
-## EP-M3 status: in progress
+## EP-M3 status: checklist complete, pending the candidate gates (2026-11-11)
 
 Specification: parent plan lines 2250-2320.
+
+Every item below is ticked and its artefact exists in the tree. The milestone
+does not close here: the parent plan's status note requires the milestone's own
+gates and conformance check to pass together, and the run that would establish
+that is the settled-candidate gate set on this branch's final head. Ticking
+this section would claim a verification that has not yet happened; the heading
+names that instead.
 
 - [x] Red recorded: `tests/features/build_profiles.feature`,
   `tests/build_profiles.rs`, the snapshot tests,
@@ -201,9 +212,17 @@ Specification: parent plan lines 2250-2320.
   the per-profile invocation is that feature unification cannot mask a profile,
   which holds only while each profile builds in a separate Cargo process.
 
-## EP-M4 status: in progress
+## EP-M4 status: delivered (2026-11-11)
 
 Specification: parent plan lines 2322-2348.
+
+Delivered, and the parent plan records the milestone as ticked. Every checklist
+item below is ticked and its artefact is in the tree: the profile record and
+its schema, `toolchain_profiles.py` with VO-7 and VO-8's cases, ADR-0010
+accepted on 2026-10-22, and D16 accepted the same day with its sponsor approval
+reference committed before the tick. The AC-04 acceptance record exists at
+`spec/measurements/ac-04-profile-build-budgets-2026-11-08.json` and
+`check_measurement_binding` accepts it.
 
 - [x] `spec/toolchain-profiles.schema.json`: draft 2020-12, `$id`
   `urn:combobulate:design:toolchain-profiles:0.1`. Requires `revision`,
@@ -425,10 +444,16 @@ validates a claim's shape, not its truth. Ticking 1.2.1 does **not** claim
 AC-07 passes: DL-14 restarts the 20-run window on the new three-job shape, so
 the control reads `inconclusive` until the window refills.
 
-## EP-M5 status: in progress
+## EP-M5 status: checklist complete, pending the candidate gates (2026-11-11)
 
 Specification: parent plan lines 2350-2383, and VO-9 to VO-13 at lines
 1957-2046.
+
+Every item below is ticked and its artefact is in the tree, including the
+ADR-0009 amendment for DL-10, DL-16, and DL-17, and both mutation censuses
+closed. The parent plan's EP-M5 box stays unticked for the same reason EP-M3's
+does: the milestone closes on its gates and conformance check passing together,
+and that run is the settled-candidate gate set on this branch's final head.
 
 - [x] `scripts/docs_validation/trust_audit/` (lexer, matcher, command), each
   module under 400 lines, with DL-17's rule and `scripts/trust_audit.py` as its

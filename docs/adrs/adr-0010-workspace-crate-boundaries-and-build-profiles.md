@@ -141,6 +141,12 @@ Four profiles are recorded in `spec/toolchain-profiles.json`:
 its own Cargo invocation precisely so feature unification cannot let one
 profile mask another.
 
+`make` also accepts `macros-only` and `polars-only`. Neither is a record in
+`spec/toolchain-profiles.json`, because neither pins a toolchain: each is one
+of the two build profiles above with a different feature selection. Both are
+absent from `GATE_PROFILE=both`; see the addendum below for why they exist and
+why that lane omits them.
+
 ### The supported-toolchain set (Q3)
 
 Q3 asks for a Rust/MSRV and feature matrix. The record answers it with a set,
@@ -239,3 +245,34 @@ that.
   before EP-M6 measures.
 - The final job sizing for the parallel Polars-enabled jobs, from hosted
   measurements of the facade.
+
+## Addendum: the single-feature gate profiles (2026-11-11)
+
+The "Gate feature lists" section above originally listed two build profiles and
+two proof profiles. It now also records `macros-only` and `polars-only` as
+`make`-only gate profiles.
+
+This is not a decision that changes the ADR's outcome. It records the defect
+that motivated the addition, so a later reader does not delete the two profiles
+as redundant. Every shipped route before this change turned `macros` and
+`polars` on together or off together: `native-only` has neither and
+`polars-enabled` has both. `src/profile.rs` reads each flag separately with
+`cfg!(feature = ...)`, so a swap of the two — `has_macros` reporting the Polars
+flag and `has_polars` reporting the macro flag — would satisfy both existing
+routes. No test could have distinguished a correct implementation from that one.
+
+The repair has three parts. `make` now accepts `GATE_PROFILE=macros-only` and
+`GATE_PROFILE=polars-only`, each running the existing per-profile loops with
+the single feature selected. `tests/build_profiles.rs` binds one BDD scenario
+per route, each gated on the exact feature pair it describes, so a build with
+exactly one feature asserts that the report names that feature and not the
+other. Each route snapshots its rendered line.
+
+The two new profiles are deliberately absent from `GATE_PROFILE=both`. The
+hosted pull-request lane measures the AC-07 build budgets against the two jobs
+`both` runs, and adding a cold Polars build for `polars-only` to the same job
+would spend them. They are the isolation check for a change that touches either
+flag, not a second pull-request lane.
+
+`spec/toolchain-profiles.json` still records four profiles, because a profile
+there pins a toolchain and neither single-feature build pins a different one.
