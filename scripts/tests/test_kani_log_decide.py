@@ -27,7 +27,7 @@ Examples
 >>> facts.decision_for((facts.HarnessFact('h::c', CLAIM, facts.SUCCESS),)).outcome
 'verified'
 >>> len(list(facts.occurrences(1)))
-24
+25
 """
 from __future__ import annotations
 

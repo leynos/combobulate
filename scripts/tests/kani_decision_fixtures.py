@@ -55,6 +55,12 @@ UNSUPPORTED_ASSERTION = 'UNSUPPORTED_ASSERTION'
 # library's name, and the block still prints ``FAILED``. Nothing the manifest
 # declares failed, yet the run disproved something the claim depends on.
 FOREIGN_FAILURE = 'FOREIGN_FAILURE'
+# A block whose only failed check is a library routine's *unwinding* assertion.
+# Kani emits unwinding assertions per loop, so the bound that was too small can
+# be the one on a routine the harness calls. That failure is not a disproof but
+# a resource limit wherever it is reported, so the decision must reach
+# ``resource-exhausted`` rather than fall through to the block's verdict.
+FOREIGN_UNWIND_FAILURE = 'FOREIGN_UNWIND_FAILURE'
 # A block Kani declared `FAILED` whose captured checks all succeeded. The
 # failure exists — Kani printed the verdict and reconciled a failure count — but
 # it is not among the checks this decision can attribute, so nothing in
@@ -75,6 +81,9 @@ UNSUPPORTED_WORDING = 'TerminatorKind::InlineAsm is not currently supported by K
 # The library check the corpus's own logs report, so a constructed block names a
 # check Kani really prints rather than one invented here.
 LIBRARY_CHECK = "core::fmt::Arguments::<'_>::from_str.assertion.1"
+# The routine owning the checks above, written once so the unwinding class names
+# the same function rather than a second invented one.
+LIBRARY_OWNER = LIBRARY_CHECK.rpartition('.')[0].rpartition('.')[0]
 BOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --unwind 2 --sat-solver cadical`'
 UNBOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --sat-solver cadical`'
 # The statuses whose failure the block explains in `Failed Checks:`.
@@ -82,7 +91,7 @@ UNBOUNDED_SOLVER = '[Kani] Running: `cbmc --object-bits 16 --sat-solver cadical`
 # absent explanation are the class, and listing one would make the block
 # something the reader would refuse as self-contradictory.
 FAILING = (FAILURE, AS_INTENDED, OTHERWISE, UNWIND_FAILURE, UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION,
-           FOREIGN_FAILURE)
+           FOREIGN_FAILURE, FOREIGN_UNWIND_FAILURE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,8 +134,12 @@ class HarnessFact:
 
 def _checks(fact: HarnessFact) -> list[PropertyResult]:
     """Build the checks this fact's block reports, in the order Kani lists them."""
-    checks = (_foreign_checks(fact.name) if fact.status == FOREIGN_FAILURE
-              else _owned_checks(fact))
+    if fact.status == FOREIGN_FAILURE:
+        checks = _foreign_checks(fact.name)
+    elif fact.status == FOREIGN_UNWIND_FAILURE:
+        checks = _foreign_unwind_checks(fact.name)
+    else:
+        checks = _owned_checks(fact)
     if fact.cover != NOTHING:
         checks.append(PropertyResult(f'{fact.name}.cover.1', fact.cover, fact.witness))
     return checks
@@ -169,6 +182,19 @@ def _foreign_checks(name: str) -> list[PropertyResult]:
             PropertyResult(f'{name}.assertion.1', 'SUCCESS',
                            "This is a placeholder message; Kani doesn't support message "
                            'formatted at runtime')]
+
+
+def _foreign_unwind_checks(name: str) -> list[PropertyResult]:
+    """Build a block whose own check passes while a library loop's bound fails.
+
+    Unwinding assertions are emitted per loop, so the failed one names the
+    routine it was generated for, exactly as a foreign assertion does. The
+    block's verdict is still ``FAILED``; what differs from
+    ``FOREIGN_FAILURE`` is the rank the failed check carries, which is the
+    distinction the decision must not lose.
+    """
+    return [PropertyResult(f'{LIBRARY_OWNER}.unwind.0', 'FAILURE', 'unwinding assertion loop 0'),
+            PropertyResult(f'{name}.assertion.1', 'SUCCESS', 'the assertion holds')]
 
 
 def block_of(fact: HarnessFact) -> HarnessBlock | None:
@@ -244,17 +270,20 @@ def claim_variants(name: str = 'h::c') -> tuple[HarnessFact, ...]:
     harness still has a cover the manifest names, and that cover is what VO-11b
     must report as unsatisfied).
 
-    ``FOREIGN_FAILURE`` and ``UNATTRIBUTED_FAILURE`` are outcomes in their own
-    right, not variants of ``FAILURE``. Both have a `FAILED` verdict with no
-    failure among the checks the harness owns, so a decision that reads
-    ownership alone cannot tell either from a clean run; they differ in where
-    the missing failure went. In the first it is a listed check owned by a
-    routine the harness called, which the decision can still weigh. In the
-    second it was never listed at all, so the verdict is the only fact left.
+    ``FOREIGN_FAILURE``, ``FOREIGN_UNWIND_FAILURE``, and ``UNATTRIBUTED_FAILURE``
+    are outcomes in their own right, not variants of ``FAILURE``. Each has a
+    `FAILED` verdict with no failure among the checks the harness owns, so a
+    decision that reads ownership alone cannot tell any of them from a clean
+    run; they differ in where the missing failure went. In the foreign cases it
+    is a listed check owned by a routine the harness called, which the decision
+    can still weigh — and can rank, since an assertion and an unwinding
+    assertion carry different ranks. In the unattributed case it was never
+    listed at all, so the verdict is the only fact left.
     """
     outcomes = (HarnessFact(name, CLAIM, status) for status in
-                (SUCCESS, FAILURE, FOREIGN_FAILURE, UNATTRIBUTED_FAILURE, TIMEOUT, UNDETERMINED,
-                 UNWIND_FAILURE, UNSUPPORTED_CHECK, UNSUPPORTED_ASSERTION))
+                (SUCCESS, FAILURE, FOREIGN_FAILURE, FOREIGN_UNWIND_FAILURE, UNATTRIBUTED_FAILURE,
+                 TIMEOUT, UNDETERMINED, UNWIND_FAILURE, UNSUPPORTED_CHECK,
+                 UNSUPPORTED_ASSERTION))
     witnesses = (HarnessFact(name, CLAIM, SUCCESS, cover) for cover in COVER_STATUSES[1:])
     panics = (HarnessFact(name, CLAIM, FAILURE, should_panic=True, note=note) for note in (True, False))
     absent = (HarnessFact(name, CLAIM, ABSENT, cover) for cover in (NOTHING, SATISFIED))

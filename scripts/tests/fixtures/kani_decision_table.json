@@ -71,6 +71,14 @@
       "why": "An unwinding failure says the bound was too small, not that the property is false."
     },
     {
+      "id": "foreign-unwinding-failure-is-a-resource-limit",
+      "harnesses": [
+        {"name": "h::claim", "role": "claim", "status": "FOREIGN_UNWIND_FAILURE", "verdict": "FAILED"}
+      ],
+      "outcome": "resource-exhausted",
+      "why": "The failing assertion was generated for a loop in a routine the harness called, not for the harness's own. Kani still reported a bound that was too small, and VO-11b ranks that as resource exhaustion wherever it appears; reading only the harness's own unwinding checks would let the block's FAILED verdict call it a counterexample."
+    },
+    {
       "id": "undetermined-with-unsupported-construct",
       "harnesses": [
         {"name": "h::claim", "role": "claim", "status": "UNDETERMINED", "verdict": "SUCCESSFUL"}

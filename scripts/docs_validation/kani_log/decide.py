@@ -116,6 +116,22 @@ class _Observed:
                      and not item.is_unwinding and item.kind != UNSUPPORTED_KIND)
 
     @property
+    def foreign_unwinding_failures(self) -> tuple[PropertyResult, ...]:
+        """Return the block's unwinding failures that belong to a routine it called.
+
+        Unwinding assertions are emitted per loop and per function, so the one
+        that fails can be a library routine's rather than the harness's own.
+        :attr:`foreign_failures` excludes those to keep them out of the
+        counterexample rank, but VO-11b still ranks an unwinding failure as
+        resource exhaustion, and the failure says the bound was too small
+        wherever it was reported. Leaving them out of both sets let a foreign
+        unwinding failure fall through to the verdict and decide
+        ``counterexample``.
+        """
+        return tuple(item for item in self.unattributed
+                     if item.status == 'FAILURE' and item.is_unwinding)
+
+    @property
     def indeterminate(self) -> bool:
         """Report whether any of this owner's checks was left undecided.
 
@@ -262,16 +278,18 @@ def _outcome(log: KaniLog, claims: list[_Observed | None], manifest: Manifest) -
     attributes a check to the function owning its source line, so an assertion
     in a routine the harness calls is owned by that routine; ``owned`` drops it,
     and a `FAILED` verdict would then decide ``verified``. Only *failures* are
-    recovered this way, and only at the counterexample rank: a library
-    ``UNREACHABLE`` is routine and must not turn a clean run into
-    ``solver-unknown``.
+    recovered this way, and only at the rank their kind carries: a foreign
+    assertion is a counterexample, a foreign unwinding failure is resource
+    exhaustion. A library ``UNREACHABLE`` is routine and must not turn a clean
+    run into ``solver-unknown``.
     """
     reported = [item for item in claims if item is not None]
     if any(_counts_as_counterexample(item, manifest) for item in reported):
         return COUNTEREXAMPLE
     if any(item.foreign_failures for item in reported):
         return COUNTEREXAMPLE
-    if any(item.timed_out or item.unwinding_failures for item in reported):
+    if any(item.timed_out or item.unwinding_failures or item.foreign_unwinding_failures
+           for item in reported):
         return RESOURCE_EXHAUSTED
     if any(_is_unsupported(log, item) for item in reported):
         return UNSUPPORTED
