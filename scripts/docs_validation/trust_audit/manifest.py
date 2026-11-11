@@ -245,11 +245,19 @@ def _bound_owner(root: Path, relative: str, bound: Mapping[str, bytes],
     bytes answer, or it is unbound and the walk refuses rather than reaching for
     a shallower crate that does not own the file.
 
-    Reaching the end means no manifest exists above the source. That is only a
-    fact when Git answered the index question; without it, a manifest deleted
-    from disk is indistinguishable from one that never existed, and the two
-    carry opposite answers, so the walk refuses.
+    The index question is settled before the walk, not after it. Without the
+    tracked manifests a nested manifest deleted from disk is indistinguishable
+    from one that never existed, and those carry opposite answers; walking
+    anyway would return a bound ancestor whenever the deleted manifest happened
+    to sit nearer than it, which is the one answer the index was needed to rule
+    out. Ending the walk early on a bound ancestor is not a safer case than
+    ending it late, because it is the same conclusion drawn from the same
+    incomplete evidence.
     """
+    if tracked is None:
+        raise TrustAuditError(
+            f'{relative}: Git cannot report the manifests it tracks, so whether a crate owns '
+            f'this source cannot be verified')
     for path in _candidate_paths(relative):
         if path in bound:
             return ManifestOwnership(path, bound[path])
@@ -257,10 +265,6 @@ def _bound_owner(root: Path, relative: str, bound: Mapping[str, bytes],
             raise TrustAuditError(
                 f'{relative}: its crate manifest {path} is not bound to a digest, so whether '
                 f'the crate expands literals cannot be verified')
-    if tracked is None:
-        raise TrustAuditError(
-            f'{relative}: Git cannot report the manifests it tracks, so whether a crate owns '
-            f'this source cannot be verified')
     return None
 
 

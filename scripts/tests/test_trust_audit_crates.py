@@ -688,4 +688,33 @@ class BoundAuditStopsAtTheVerifiedSet(unittest.TestCase):
         self.assertIn('Git cannot report the manifests', str(raised.exception),
                       'the refusal must attribute the gap to Git, not to the source')
 
+    def test_an_unreadable_index_refuses_before_a_bound_ancestor_answers(self):
+        """Refuse even when a bound ancestor would end the walk before the gap.
+
+        Ending the candidate walk early is not a different case from reaching
+        its end: both conclude that a manifest is the owner, and both need the
+        same fact — that no manifest sits nearer. When the index cannot say so,
+        a removed nested manifest is invisible, and the bound workspace root is
+        returned as though the nested crate had never existed. That answer
+        switches literal scanning off for a proc-macro crate's sources while
+        the audit reports success, which is the failure the index question
+        exists to prevent. The refusal must name the source, not the ancestor.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            outside = Path(directory)
+            (outside / 'Cargo.toml').write_text('[package]\nname = "root"\n', encoding='utf-8')
+            (outside / 'crates/macros/src').mkdir(parents=True)
+            source = 'crates/macros/src/lib.rs'
+            literal = 'let s = r#"kani::assume"#;'
+            (outside / source).write_text(literal, encoding='utf-8')
+            bound = {'Cargo.toml': b'[package]\nname = "root"\n',
+                     source: literal.encode('utf-8')}
+            with self.assertRaises(TrustAuditError) as raised:
+                audit_bound_tree(outside, bound)
+        message = str(raised.exception)
+        self.assertIn('Git cannot report the manifests', message,
+                      'the bound ancestor must not answer the ownership question alone')
+        self.assertIn('cannot be verified', message,
+                      'the refusal must say which decision it could not take')
+
 

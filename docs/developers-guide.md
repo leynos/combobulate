@@ -578,7 +578,12 @@ lives only in a review comment is not a boundary.
   a nested manifest deleted but not yet staged would otherwise let the
   workspace root answer for a crate it does not own and switch literal scanning
   off silently. When ownership cannot be established the walk refuses rather
-  than guessing, and names the manifest to bind.
+  than guessing, and names the manifest to bind. The index question is settled
+  before any candidate is selected, not only when the walk reaches its end: an
+  owner the walk concludes early is the same claim — that nothing sits nearer —
+  as one it concludes late, and it rests on the same evidence. Deciding it
+  first is what stops a bound ancestor from answering when Git could not say
+  which manifests exist.
 - `kani_log` serves the evidence gate's I/O shell only. Its decision function
   is pure — it takes the parsed facts and the manifest and returns the
   admission facts — so it must not read files, and a rule that needs another
