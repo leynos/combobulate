@@ -1,0 +1,131 @@
+{
+  "id": "ac-04-profile-build-budgets-2026-11-11",
+  "purpose": "acceptance",
+  "control_ids": [
+    "AC-04"
+  ],
+  "recorded_on": "2026-11-11",
+  "runner_image": "ubuntu-24.04",
+  "runner_metadata": {
+    "image_os": "ubuntu24",
+    "image_version": "20261101.360.1"
+  },
+  "outcome": "pass",
+  "hardware": {
+    "class": "github-hosted-runner",
+    "cpu_model": "GitHub-hosted standard Linux runner (x64)",
+    "cores": 4,
+    "threads": 4,
+    "vcpus": 4,
+    "memory_gib": 16,
+    "architecture": "x64",
+    "os_family": "Ubuntu 24.04",
+    "kernel_major": 6
+  },
+  "toolchains": {
+    "rust": "rustc 1.101.0-nightly (249c1e4e3 2026-11-05) (channel nightly-2026-11-06 per rust-toolchain.toml)",
+    "codegen_backend": "Cranelift for dev builds (cargo 1.101.0-nightly), LLVM for the proof profile",
+    "linker": "mold 2.41.0 (7c4c0addcb833120bf41cc3db7b2652694e0d814; compatible with GNU ld)",
+    "verus": "0.2026.09.06.8dea4a2 with Z3 4.16.0",
+    "kani": "cargo-kani 0.67.0"
+  },
+  "conditions": "Hosted GitHub Actions ubuntu-24.04 runner, 4 vCPU and 16 GiB, x64. CARGO_INCREMENTAL=0 and an empty RUSTC_WRAPPER, asserted by the job before the timed steps so that a wrapper exported by any provisioning step would fail it rather than cache the samples. Five samples per profile and phase, profiles interleaved run by run, medians selected.",
+  "workloads": [
+    {
+      "id": "native-cold",
+      "description": "Cold build of the shipped workspace with no default features.",
+      "command": "cargo build --workspace --no-default-features",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.71,
+        0.29,
+        0.28,
+        0.3,
+        0.3
+      ],
+      "median": 0.3,
+      "notes": "Run cold, native-only profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each cold sample starts from an empty CARGO_TARGET_DIR, which the workflow now deletes before the timed build rather than trusting the previous pass to have left none, and each measured 486692 bytes by `du -sb` apparent size, identical across the five samples. The first sample includes a cold filesystem and is retained rather than discarded, because dropping it would be an outlier policy the control does not register; the median is the third of the five sorted samples and is unaffected by it."
+    },
+    {
+      "id": "polars-cold",
+      "description": "Cold build of the shipped workspace with default (Polars) features.",
+      "command": "cargo build --workspace",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        59.52,
+        59.99,
+        56.72,
+        58.97,
+        58.99
+      ],
+      "median": 58.99,
+      "notes": "Run cold, polars-enabled profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each cold sample starts from an empty CARGO_TARGET_DIR and each measured 797253505 bytes by `du -sb` apparent size, identical across the five samples. The previous record's artefact, run 42650004173, reports 826044445 bytes for the same profile, so the cold target shrank by 28790940 bytes between the two measurements. That measurement predates this branch's rebase onto the toolchain move in `95de530`, so the two runs differ in both the compiler and the candidate tree; these numbers do not say which of them accounts for the difference, and apparent size is not a content hash either way. The median is inside the ten-minute ceiling by a factor of ten."
+    },
+    {
+      "id": "proof-cold",
+      "description": "Cold Kani codegen of combobulate-kernel.",
+      "command": "kani-driver kani --only-codegen --manifest-path crates/combobulate-kernel/Cargo.toml",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.37,
+        0.37,
+        0.38,
+        0.37,
+        0.38
+      ],
+      "median": 0.37,
+      "notes": "Run cold, proof profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. The workflow writes the launcher once and each timed step invokes that script, so the environment selecting the verifier's own LLVM backend and the release's bundled toolchain is in one place that the artefact preserves; each cold sample starts from an empty CARGO_TARGET_DIR and measured 21421 bytes."
+    },
+    {
+      "id": "native-incremental",
+      "description": "Incremental rebuild with no default features after touching the crate root.",
+      "command": "touch src/lib.rs; cargo build --workspace --no-default-features",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.13,
+        0.15,
+        0.15,
+        0.15,
+        0.15
+      ],
+      "median": 0.15,
+      "notes": "Run incremental, native-only profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up build. The timed region begins after the touch, and the touched file is restored with `git checkout` after each sample so that the next touch is what makes the rebuild incremental rather than a no-op."
+    },
+    {
+      "id": "polars-incremental",
+      "description": "Incremental rebuild with default features after touching the crate root.",
+      "command": "touch src/lib.rs; cargo build --workspace",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.32,
+        0.34,
+        0.33,
+        0.33,
+        0.33
+      ],
+      "median": 0.33,
+      "notes": "Run incremental, polars-enabled profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up build, and the touched file is restored after each sample."
+    },
+    {
+      "id": "proof-incremental",
+      "description": "Incremental Kani codegen after touching the kernel crate root.",
+      "command": "touch crates/combobulate-kernel/src/lib.rs; kani-driver kani --only-codegen --manifest-path crates/combobulate-kernel/Cargo.toml",
+      "metric": "Build wall time",
+      "unit": "s",
+      "samples": [
+        0.31,
+        0.28,
+        0.28,
+        0.28,
+        0.28
+      ],
+      "median": 0.28,
+      "notes": "Run incremental, proof profile, from `.github/workflows/profile-measurements.yml` `build-budget` in run 43001010726 at candidate `a18b95d`. Each incremental sample follows one discarded warm-up Kani codegen, and the touched kernel file is restored after each sample."
+    }
+  ]
+}

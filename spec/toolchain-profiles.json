@@ -57,7 +57,8 @@
         "scripts/tests/test_toolchain_profiles.py",
         "scripts/tests/test_validation_report.py",
         "scripts/tests/test_verifier_free_container.py",
-        "scripts/tests/test_verifier_free_orchestration.py"
+        "scripts/tests/test_verifier_free_orchestration.py",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json"
       ]
     },
     "repository_rustc_commit": {
@@ -83,6 +84,7 @@
         "spec/calibration/verifier-probe.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json",
         "tests/support/prover_tools_probe.rs",
         "tools/kani/VERSION",
         "tools/verifier-fixtures/kani-corpus/kani-list.json"
@@ -125,6 +127,7 @@
         "spec/calibration/verifier-probe.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json",
         "tools/verifier-fixtures/verus-wiring-probe/provenance.json",
         "tests/prover_tools_contract.rs",
         "scripts/tests/test_preregistration.py",
@@ -154,6 +157,7 @@
         "spec/calibration/verifier-probe.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
+        "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json",
         "scripts/tests/test_preregistration.py",
         "scripts/tests/test_preregistration_measurements.py",
         "scripts/tests/test_validation_report.py",

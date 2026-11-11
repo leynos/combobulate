@@ -1737,3 +1737,62 @@ de-duplication the sweep enforces everywhere else: a literal that has an owning
 record is not restated in a second place where it can rot. VO-7's substance is
 unchanged, because the agreement it asks for is now checked against the owner
 rather than against a copy of the owner's old value.
+
+## AC-04 re-measured on the toolchain `main` now pins (2026-11-11)
+
+`95de530` moved the repository pin, and the control's environment requirement
+was reduced to `rust-toolchain.toml at the measured revision` so that the value
+is read from the pin record rather than restated in prose. Both earlier AC-04
+records were honestly measured under `nightly-2026-08-27`, and the plan already
+chose re-measurement over an inference; that choice expired with the pin, not
+because the records were wrong but because they describe a compiler the
+repository no longer builds with. `9835151` is also not an ancestor of this
+candidate — the branch was rebased — so the earlier record's run predates the
+tree that would ship.
+
+The third measurement is `workflow_dispatch` run 43001010726 on `a18b95d`, the
+candidate head `a18b95d383f9b617808bca8682ad77441b52c32c`, transcribed to
+`spec/measurements/ac-04-profile-build-budgets-2026-11-11.json`. Every job in
+the run concluded `success`, including `measure-profile (whitaker)`, which had
+failed in `install-whitaker` in the previous run and made that run's overall
+badge read `failure` while `build-budget` itself passed. This run does not
+depend on that reading: `build-budget` is the only job AC-04 registers, and it
+succeeded on its own.
+
+| Workload           | Median  | Ceiling |
+| ------------------ | ------- | ------- |
+| native-cold        | 0.30 s  | 60 s    |
+| polars-cold        | 58.99 s | 600 s   |
+| proof-cold         | 0.37 s  | 60 s    |
+| native-incremental | 0.15 s  | 60 s    |
+| polars-incremental | 0.33 s  | 60 s    |
+| proof-incremental  | 0.28 s  | 60 s    |
+
+Every median is inside its ceiling. Five of the six are within 0.12 s of the
+previous measurement, which is what a toolchain bump of one nightly should look
+like on workloads this small.
+
+**The Polars cold target shrank by 28,790,940 bytes.** The previous artefact,
+run 42650004173, reports 826,044,445 bytes for the Polars cold target; this one
+reports 797,253,505, and both are identical across their five samples. The two
+runs differ in more than one way — the compiler moved and the candidate tree
+changed — so these numbers do not attribute the difference, and `du -sb`
+reports apparent size rather than a content hash either way. The cold Polars
+median fell from 50.15 s to 58.99 s while the target shrank, which is the
+opposite of what a causal reading of size would predict; wall time on a hosted
+runner moves with the neighbourhood, which is why the control registers a
+ceiling an order of magnitude away from the measurement rather than a tight
+bound.
+
+The record names four pins, so it joins their `sites` lists in
+`spec/toolchain-profiles.json`: `repository_channel` (it is the first AC-04
+record to name the live channel), `kani_release`, `verus_release`, and
+`verus_z3`. The two older records are deliberately absent from
+`repository_channel`'s list for the reason the section above gives: they name
+`nightly-2026-08-27`, which is no longer a current pin value, so the sweep no
+longer reports them for it.
+
+`check_measurement_binding` accepts the record, `acceptance_evidence.verdict`
+reads `pass`, and `scripts/check_docs.py` is exit 0 with the pinned Python 3.14
+— the structural digests in the suite move between 3.12 and 3.14, so the host's
+`python3` is not a substitute for it.
