@@ -158,8 +158,8 @@ The ExecPlan file itself is excluded from every size count below.
   nightly-2026-11-06 (1.101). The verified and shipped object code come from
   different compilers. Severity: medium. Likelihood: certain. Mitigation: the
   same source is verified and shipped. Compiler agreement on this `core`-only
-  subset is a declared axiom (AX-3), and the ordinary unit and property tests
-  exercise the shipped object code.
+  subset is a declared axiom (AXIOM-3), and the ordinary unit and property
+  tests exercise the shipped object code.
 - Risk: a naive tree walk over a shared directed acyclic graph (DAG) is
   exponential. `let y = add().apply(&x, &x)` repeated 64 times would never
   finish. Deep `Arc` chains also overflow the stack in recursive traversal and
@@ -332,7 +332,7 @@ item is `TargetFacts`, and it already declares
 Key terms:
 
 - Value (materialized value): an `Array` holding an actual buffer.
-- Expression handle: an `AExpr`, a cheap clonable reference to an immutable
+- Expression handle: an `AExpr`, a cheap cloneable reference to an immutable
   graph node that denotes a deferred result and holds no result itself
   (`docs/context.md:75`).
 - Descriptor: a reusable operation such as `identity()` (a `Unary`) or
@@ -616,14 +616,14 @@ trust items. This shows the proof is not discharged by an assumption.
 
 ### Axioms (trusted, not verified here)
 
-- AX-1. The pinned Verus (0.2026.09.06.8dea4a2) and Z3 4.16.0 are sound for
+- AXIOM-1. The pinned Verus (0.2026.09.06.8dea4a2) and Z3 4.16.0 are sound for
   the features used.
-- AX-2. vstd's specifications for slice `len`, slice indexing, mutable index
+- AXIOM-2. vstd's specifications for slice `len`, slice indexing, mutable index
   assignment and, if used, `i64::checked_add` match Rust semantics. These are
   vstd `assume_specification` items outside workspace sources.
-- AX-3. Rust 1.98.0 (Verus) and nightly-2026-11-06 (ordinary) give the same
+- AXIOM-3. Rust 1.98.0 (Verus) and nightly-2026-11-06 (ordinary) give the same
   semantics to the kernel's `core`-only source.
-- AX-4. `Arc<[T]>` from a `TrustedLen` iterator allocates once, and
+- AXIOM-4. `Arc<[T]>` from a `TrustedLen` iterator allocates once, and
   `Arc::make_mut` on a unique `Arc` does not clone. G3 confirms these
   behaviours by pointer observation, not by assumption.
 
