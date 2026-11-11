@@ -40,12 +40,14 @@ updates:
     schedule:
       interval: "daily"
 
-  # The calibration probe and the compile-fail gate are each their own workspace
-  # root with their own lockfile, so the root entry above does not reach them.
+  # The calibration probe, the consumer fixtures, and the compile-fail gate are
+  # each their own workspace root with their own lockfile, so the root entry
+  # above does not reach them.
   - package-ecosystem: "cargo"
     directories:
       - "/tools/calibration/cardinality-probe"
       - "/tools/fixtures/native-consumer"
+      - "/tools/fixtures/polars-surface-absent"
       - "/tools/gates/cardinality-ui"
     groups:
       minor-and-patch:

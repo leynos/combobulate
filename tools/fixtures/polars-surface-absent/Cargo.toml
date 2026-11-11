@@ -1,0 +1,19 @@
+# nested-cargo-allow: manifest a consumer fixture: `tests/polars_surface_ui.rs` builds
+# it from the root suite and requires the build to fail, so the fixture must stay its
+# own workspace rather than inherit the repository's feature selection.
+[package]
+name = "polars-surface-absent"
+version = "0.1.0"
+edition = "2024"
+license = "ISC"
+publish = false
+
+[workspace]
+
+[lints.rust]
+missing_docs = "deny"
+
+# The native-only consumer: default features off, so nothing in this graph may be
+# Polars. The whole point of the fixture is that `src/main.rs` does not compile.
+[dependencies]
+combobulate = { path = "../../..", version = "0.1.0", default-features = false }
