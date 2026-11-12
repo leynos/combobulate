@@ -1,4 +1,4 @@
-//! Contract for the approved binary-only Whitaker installer in pull-request CI.
+//! Contract for the binary-only Whitaker installer in pull-request CI.
 
 use serde_yaml::Value;
 
@@ -7,8 +7,8 @@ const CI: &str = include_str!("../.github/workflows/ci.yml");
 #[path = "support/action_ref.rs"]
 mod action_ref;
 // Shared-actions #522 establishes the binary-only installer behaviour. Dependabot
-// may advance its SHA; the preceding source-bound capability gate approves the
-// complete execution content, while these contracts protect the caller interface.
+// may advance its SHA; the preceding caller-bound capability gate probes the
+// manifest at that commit, while these contracts protect the caller interface.
 const INSTALL_ACTION_PATH: &str = "leynos/shared-actions/.github/actions/install-whitaker";
 
 fn check_install_step(step: &Value) -> Result<(), String> {
@@ -120,7 +120,7 @@ fn check_steps(steps: &[Value]) -> Result<(), String> {
     }
 }
 
-/// Requires exact caller-bound source verification before executing the dependency.
+/// Requires caller-bound manifest verification before executing the dependency.
 fn record_capability(
     step: &Value,
     index: usize,
@@ -310,7 +310,7 @@ fn duplicate_workflow_keys_are_rejected() {
     );
 }
 
-/// Advancing a reference retains the source-verification gate and caller interface.
+/// Advancing a reference retains the manifest-verification gate and caller interface.
 #[test]
 fn whitaker_action_bumps_do_not_require_test_pin_updates() {
     let changed = action_ref::repoint_action(CI, INSTALL_ACTION_PATH, &"0".repeat(40))
