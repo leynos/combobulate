@@ -7,6 +7,7 @@ a planted symbolic link, or a mismatched staged tree is caught without podman.
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import unittest
@@ -296,6 +297,18 @@ class StagedInputsTests(unittest.TestCase):
             staged.symlink_to(outside)
 
             with self.assertRaisesRegex(RuntimeError, r'symbolic links=\[.*Cargo\.toml'):
+                module._verify_staged_workspace(workspace, inputs)
+
+    def test_a_special_file_in_the_staged_tree_is_refused(self) -> None:
+        """A pipe is neither a link nor a regular file, so no set would name it."""
+        module = _module()
+        with _boundary() as boundary:
+            workspace = boundary / 'workspace'
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
+            inputs = module.staged_inputs(workspace)
+            os.mkfifo(workspace / 'probe/fifo')
+
+            with self.assertRaisesRegex(RuntimeError, r'irregular entries=\[.*fifo'):
                 module._verify_staged_workspace(workspace, inputs)
 
     def test_a_symlinked_workspace_root_is_refused(self) -> None:

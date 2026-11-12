@@ -165,9 +165,12 @@ def verify_staged_workspace(
     regular target, so a link at an expected path would pass the set
     comparison while the digest read content from outside the workspace.
     The workspace root is checked separately because ``rglob`` enumerates a
-    replacement link's target without yielding the link itself. Staging
-    dereferences links, so one can only appear through local tampering;
-    rejecting it keeps the recorded digest bound to the workspace.
+    replacement link's target without yielding the link itself. A special
+    file, such as a named pipe, is refused too: it is neither a directory nor
+    a regular file, so the set comparison would pass while the build received
+    an entry the record does not bind. Staging dereferences links, so either
+    can only appear through local tampering; rejecting them keeps the recorded
+    digest bound to the workspace.
 
     Parameters
     ----------
@@ -179,8 +182,9 @@ def verify_staged_workspace(
     Raises
     ------
     RuntimeError
-        If the workspace root or a path it contains is a symbolic link, or if
-        regular files are extra or missing, naming each path.
+        If the workspace root or a path it contains is a symbolic link, if a
+        path is neither a directory nor a regular file, or if regular files
+        are extra or missing, naming each path.
 
     Examples
     --------
@@ -199,6 +203,16 @@ def verify_staged_workspace(
         raise RuntimeError(
             "the staged workspace does not match the recorded inputs: "
             f"symbolic links={links}"
+        )
+    irregular = sorted(
+        str(path)
+        for path in entries
+        if not path.is_dir() and not path.is_file()
+    )
+    if irregular:
+        raise RuntimeError(
+            "the staged workspace does not match the recorded inputs: "
+            f"irregular entries={irregular}"
         )
     actual = {path for path in entries if path.is_file()}
     extra = sorted(str(path) for path in actual - expected)

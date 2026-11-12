@@ -1479,8 +1479,9 @@ resolved workspace must sit strictly inside `<repo>/target`. Before anything is
 copied, every source path from the repository root down is checked for symbolic
 links, because copying dereferences them; a linked fixture file or a linked
 directory such as `.cargo` fails the run. The staged tree is then compared with
-the mapped inputs; a symbolic link, including at the workspace root, or any
-extra or missing regular file, fails the run before the image is prepared, so a
-link cannot make the digest name content outside the workspace. The workspace
-is mounted read-write for the build, and the fixed path is shared by concurrent
-local runs, so two local probes must not run at the same time.
+the mapped inputs; a symbolic link, including at the workspace root, a special
+file such as a named pipe, or any extra or missing regular file, fails the run
+before the image is prepared, so neither a link nor an unrecorded entry can
+reach the build. The workspace is mounted read-write for the build, and the
+fixed path is shared by concurrent local runs, so two local probes must not run
+at the same time.
