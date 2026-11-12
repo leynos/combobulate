@@ -3,10 +3,12 @@
 
 Example: ``python scripts/whitaker_probe.py --workflow .github/workflows/ci.yml``.
 The caller must pin the action to a full commit, which fixes the content the
-probe fetches. Only manifest acquisition uses the network; capability probes use
-private fake executors. The probes ask what the pinned action does, not whether
-its files match a recorded digest, so a Dependabot bump passes whenever the
-behaviour holds.
+probe fetches. Manifest acquisition is the only deliberate network access, but
+the capability probes are not an operating-system sandbox: they supply private
+fake executors that intercept bare command names, so a fragment naming an
+absolute executable path could still reach the network. The probes ask what the
+pinned action does, not whether its files match a recorded digest, so a
+Dependabot bump passes whenever the behaviour holds.
 """
 from __future__ import annotations
 
