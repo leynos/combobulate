@@ -149,7 +149,7 @@ class SourcedPins(ScratchTree):
         This is the drift the record's own site list is supposed to prevent:
         the record keeps promising a site long after the site moved on.
         """
-        site = self.root / 'tests/prover_tools_contract.rs'
+        site = self.root / 'tools/verus/SHA256SUMS'
         self.assertTrue(site.is_file(), 'the fixture tree must contain the cited site')
         site.write_text(site.read_text(encoding='utf-8').replace('0.2026.09.06.8dea4a2', 'X'),
                         encoding='utf-8')

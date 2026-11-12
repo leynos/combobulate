@@ -8,6 +8,21 @@ use rstest::{fixture, rstest};
 mod probe;
 use probe::ProverProbe;
 
+/// Structural readers for the verifier release pins.
+#[path = "support/prover_pins.rs"]
+mod pins;
+
+/// The PEP 723 helper pin embedded in the probe script.
+#[path = "support/prover_script_pin.rs"]
+mod script_pin;
+
+/// Shape and relationship regressions for the release-pin readers.
+#[path = "support/prover_pins_tests.rs"]
+mod pin_tests;
+
+use pins::{kani_version, pinned_ref, verus_checksum_row, verus_version};
+use script_pin::script_matches_reference;
+
 /// Reports fixture and command failures without mutating the parent environment.
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -36,33 +51,32 @@ fn prover() -> TestResult<ProverProbe> {
     Ok(prepared)
 }
 
-/// Requires a commit-qualified helper source and all verifier release pins.
+/// Requires a commit-qualified helper source and a consistent verifier release.
 #[test]
 fn prover_release_pins_are_complete() -> TestResult {
     let reference = read("tools/rust-prover-tools/REF")?;
-    let commit = reference
-        .lines()
-        .find_map(|line| line.strip_prefix("ref: "));
-    check(
-        commit
-            .is_some_and(|value| value.len() == 40 && value.bytes().all(|b| b.is_ascii_hexdigit())),
-        format_args!("prover-tools must identify a complete Git commit; got {commit:?}"),
+    pinned_ref("tools/rust-prover-tools/REF", &reference)?;
+
+    kani_version("tools/kani/VERSION", &read("tools/kani/VERSION")?)?;
+
+    let verus = read("tools/verus/VERSION")?;
+    let version = verus_version("tools/verus/VERSION", &verus)?;
+    verus_checksum_row(
+        "tools/verus/SHA256SUMS",
+        &read("tools/verus/SHA256SUMS")?,
+        version,
     )?;
-    check(
-        read("tools/kani/VERSION")?.trim() == "0.67.0",
-        "Kani must retain its calibrated release",
+    Ok(())
+}
+
+/// Requires the PEP 723 probe dependency to name the same helper as REF.
+#[test]
+fn probe_script_matches_the_prover_tools_pin() -> TestResult {
+    script_matches_reference(
+        &read("scripts/run_verifier_probes.py")?,
+        &read("tools/rust-prover-tools/REF")?,
     )?;
-    check(
-        read("tools/verus/VERSION")?.trim() == "0.2026.09.06.8dea4a2",
-        "Verus must retain its calibrated release",
-    )?;
-    check(
-        read("tools/verus/SHA256SUMS")?.contains(concat!(
-            "13d01e134c0620c3b29770874707d16c33b3d227c843a489c8ceb744d43c0a16  ",
-            "verus-0.2026.09.06.8dea4a2-x86-linux.zip"
-        )),
-        "the checksum must bind the configured Verus archive",
-    )
+    Ok(())
 }
 
 /// Prevents repository recipes from reimplementing prover installation.
@@ -192,10 +206,7 @@ fn environment_cannot_unlock_the_helper(prover: TestResult<ProverProbe>) -> Test
         "the dry-run must parse successfully",
     )?;
     let reference = read("tools/rust-prover-tools/REF")?;
-    let pin = reference
-        .lines()
-        .find_map(|line| line.strip_prefix("ref: "))
-        .ok_or("missing prover-tools ref")?;
+    let pin = pinned_ref("tools/rust-prover-tools/REF", &reference)?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     check(
         stdout.contains("uv tool run --from") && stdout.contains(pin),
