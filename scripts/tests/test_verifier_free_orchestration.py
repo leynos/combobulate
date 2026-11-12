@@ -19,7 +19,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
 
 from verifier_probe_loader import load_structural_digest, load_verifier_free_probe
@@ -29,7 +29,7 @@ is_structural_digest = load_structural_digest().is_structural_digest
 FIXTURES = Path(__file__).resolve().parents[2] / 'tools/verifier-fixtures'
 
 
-def _module():
+def _module() -> ModuleType:
     """Return the verifier-free module loaded with the probe helper stubbed.
 
     Examples
@@ -302,9 +302,11 @@ class OrchestrationTests(unittest.TestCase):
         original_digest = self.module.structural_digest(source)
         real_stage = self.module._stage_verifier_free_workspace
 
-        def stage_then_mutate(directory, **kwargs):
+        def stage_then_mutate(
+            directory: Path, *, boundary: Path | None = None
+        ) -> None:
             """Stage first, then change the source behind the staged copy."""
-            real_stage(directory, **kwargs)
+            real_stage(directory, boundary=boundary)
             source.write_text('value = 2\n', encoding='utf-8')
             (self.module.ROOT / 'rust-toolchain.toml').write_text(
                 '[toolchain]\nchannel = "nightly-1999-01-01"\n', encoding='utf-8'
@@ -345,9 +347,11 @@ class OrchestrationTests(unittest.TestCase):
         outside.mkdir()
         real_stage = self.module._stage_verifier_free_workspace
 
-        def stage_then_link(directory, **kwargs):
+        def stage_then_link(
+            directory: Path, *, boundary: Path | None = None
+        ) -> None:
             """Replace a staged input directory with a link to an empty tree."""
-            real_stage(directory, **kwargs)
+            real_stage(directory, boundary=boundary)
             nested = directory / 'probe/nested'
             shutil.rmtree(nested)
             nested.symlink_to(outside, target_is_directory=True)

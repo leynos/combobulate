@@ -10,11 +10,12 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import ModuleType
 
 from verifier_probe_loader import load_verifier_free_probe
 
 
-def _module():
+def _module() -> ModuleType:
     """Return the verifier-free module loaded with the probe helper stubbed.
 
     Examples
@@ -142,6 +143,23 @@ class StagedInputsTests(unittest.TestCase):
             (workspace / 'probe/Cargo.toml').unlink()
 
             with self.assertRaisesRegex(RuntimeError, r'missing=\[.*Cargo\.toml'):
+                module._verify_staged_workspace(workspace, inputs)
+
+    def test_a_symbolic_link_in_the_staged_tree_is_refused(self) -> None:
+        """A link at an expected path would digest content from outside."""
+        module = _module()
+        with tempfile.TemporaryDirectory() as directory:
+            boundary = Path(directory)
+            workspace = boundary / 'workspace'
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
+            inputs = module.staged_inputs(workspace)
+            outside = boundary / 'outside.toml'
+            outside.write_text('outside = true\n', encoding='utf-8')
+            staged = workspace / 'probe/Cargo.toml'
+            staged.unlink()
+            staged.symlink_to(outside)
+
+            with self.assertRaisesRegex(RuntimeError, r'symbolic links=\[.*Cargo\.toml'):
                 module._verify_staged_workspace(workspace, inputs)
 
 

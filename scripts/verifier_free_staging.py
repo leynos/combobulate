@@ -78,6 +78,12 @@ def verify_staged_workspace(
     nothing. Comparing both directions closes either gap before the image is
     prepared.
 
+    Symbolic links are refused outright. ``is_file`` follows a link to a
+    regular target, so a link at an expected path would pass the set
+    comparison while the digest read content from outside the workspace.
+    Staging dereferences links, so one can only appear through local
+    tampering; rejecting it keeps the recorded digest bound to the workspace.
+
     Parameters
     ----------
     workspace
@@ -88,8 +94,8 @@ def verify_staged_workspace(
     Raises
     ------
     RuntimeError
-        If the workspace holds extra or missing regular files, naming each
-        path.
+        If the workspace holds a symbolic link, or extra or missing regular
+        files, naming each path.
 
     Examples
     --------
@@ -98,7 +104,14 @@ def verify_staged_workspace(
         verify_staged_workspace(workspace, staged_inputs(workspace))
     """
     expected = {*inputs.values(), workspace / "Containerfile"}
-    actual = {path for path in workspace.rglob("*") if path.is_file()}
+    entries = list(workspace.rglob("*"))
+    links = sorted(str(path) for path in entries if path.is_symlink())
+    if links:
+        raise RuntimeError(
+            "the staged workspace does not match the recorded inputs: "
+            f"symbolic links={links}"
+        )
+    actual = {path for path in entries if path.is_file()}
     extra = sorted(str(path) for path in actual - expected)
     missing = sorted(str(path) for path in expected - actual)
     if extra or missing:

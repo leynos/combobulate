@@ -1467,7 +1467,9 @@ The staging workspace `<repo>/target/epm1-verifier-free-workspace` is removed
 and recreated on every run, so a source deleted from the repository cannot
 survive as a staged file that Cargo still sees. Removal is bounded: a symlinked
 workspace is refused, and the resolved workspace must sit strictly inside
-`<repo>/target`. The staged tree is then compared with the mapped inputs, and
-any extra or missing regular file fails the run before the image is prepared.
-The workspace is mounted read-write for the build, and the fixed path is shared
-by concurrent local runs, so two local probes must not run at the same time.
+`<repo>/target`. The staged tree is then compared with the mapped inputs; a
+symbolic link, or any extra or missing regular file, fails the run before the
+image is prepared, so a link cannot make the digest name content outside the
+workspace. The workspace is mounted read-write for the build, and the fixed
+path is shared by concurrent local runs, so two local probes must not run at
+the same time.
