@@ -1,6 +1,6 @@
 # Relevant upstream fragments only; tests do not bind a live caller to this fixture.
-# Source: leynos/shared-actions@5a99aed78ce68dcebd3052b75c31e6f173162b1e
-# Path: .github/actions/install-whitaker/action.yml; full blob 3f407b59e538a954af688e816dc514ce2a488786
+# Source: leynos/shared-actions@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+# Path: .github/actions/install-whitaker/action.yml; full blob 69ad613774362e1779370f3270d0ff0ecdd84827
 name: Install Whitaker
 description: Install the Whitaker Dylint suite with a cached installer
 
@@ -15,7 +15,7 @@ inputs:
       action pins, and must be 0.2.9 or later: that is the first release with
       --no-source-fallback, which the action always passes.
     required: false
-    default: "0.2.11"
+    default: "0.2.12"
   installer-sha256:
     description: >-
       SHA-256 digest of the whitaker-installer release archive for this
