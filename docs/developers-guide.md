@@ -1293,6 +1293,31 @@ output, which is worth knowing before installing the verifier in each one.
 `.verus/` is Git-ignored and listed in the Markdown lint ignores, so a local
 installation cannot enter a commit, a Markdown scan, or a spelling scan.
 
+### Bumping a verifier pin
+
+A prover-tools change edits `tools/rust-prover-tools/REF` and the
+`rust-prover-tools` requirement in the PEP 723 block of
+`scripts/run_verifier_probes.py` together. PEP 723 metadata cannot read another
+file, so the script restates the repository and revision;
+`probe_script_matches_the_prover_tools_pin` in `tests/prover_tools_contract.rs`
+requires the embedded `git+<repository>@<revision>` to equal the `repository:`
+and `ref:` rows in `REF`. A mismatch fails the test instead of leaving the
+probe to fetch a different helper revision.
+
+The Kani and Verus `VERSION` files each hold one release, and
+`tools/verus/SHA256SUMS` holds one `sha256sum` row whose archive name is
+`verus-<VERSION>-x86-linux.zip`. `prover_release_pins_are_complete` checks
+those shapes and the relationship between the two Verus files; it compares no
+literal release, so a legitimate bump does not also edit the test. Archive
+verification against `SHA256SUMS` remains with the commit-pinned helper.
+
+A prover-tools revision change can alter the probe commands or the provenance
+writers, so recapture the genuine Kani and Verus observations with
+`make kani-log-corpus` and `make verus-probe` and commit them with their
+provenance. `source_digests` binds the parsed input rather than its bytes, so
+reformatting alone leaves a record valid; a change to a parsed token requires
+the recapture.
+
 The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
 private `kani_probe` module owns the Kani route builders and their capture
 loops; the private `verus_probe` module owns solver resolution, the Verus
