@@ -84,12 +84,15 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
     whole tree makes the staged and recorded sets the same set.
 
     Removal is deliberately narrow. A boundary or workspace that is a
-    symbolic link is refused rather than followed, and the workspace is
-    resolved before containment, so a ``..`` component cannot step outside.
-    The resolved workspace must sit strictly inside ``boundary``. Without the
-    boundary check, a linked ``target`` would resolve outside the repository
-    and its containment would be measured against the link target, so removal
-    could reach a directory the probe does not own.
+    symbolic link is refused rather than followed, and every directory between
+    the boundary and the workspace is checked for links, because ``resolve``
+    would otherwise follow an intermediate link to a directory the probe does
+    not own. The workspace is resolved before containment, so a ``..``
+    component cannot step outside. The resolved workspace must sit strictly
+    inside ``boundary``. Without the boundary check, a linked ``target`` would
+    resolve outside the repository and its containment would be measured
+    against the link target, so removal could reach a directory the probe does
+    not own.
 
     Parameters
     ----------
@@ -101,9 +104,9 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
     Raises
     ------
     ValueError
-        If ``boundary`` or ``directory`` is a symbolic link, if ``directory``
-        is not a real directory, or if it does not resolve to a path strictly
-        inside ``boundary``.
+        If ``boundary``, ``directory``, or a directory between them is a
+        symbolic link, if ``directory`` is not a real directory, or if it does
+        not resolve to a path strictly inside ``boundary``.
 
     Examples
     --------
@@ -117,11 +120,22 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
         raise ValueError(
             f'the staging boundary {boundary} must not be a symbolic link'
         )
-    owned = boundary.resolve()
     if directory.is_symlink():
         raise ValueError(
             f'the staging workspace {directory} must not be a symbolic link'
         )
+    try:
+        intermediates = list(_link_components(directory.parent, boundary))
+    except ValueError:
+        raise ValueError(
+            f'the staging workspace {directory} must be strictly inside {boundary}'
+        ) from None
+    if intermediates:
+        raise ValueError(
+            'the staging workspace must not be reached through symbolic links: '
+            f'{[str(link) for link in intermediates]}'
+        )
+    owned = boundary.resolve()
     workspace = directory.resolve()
     if workspace == owned or not workspace.is_relative_to(owned):
         raise ValueError(

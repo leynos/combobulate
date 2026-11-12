@@ -90,6 +90,23 @@ class WorkspaceGuardTests(unittest.TestCase):
             self.assertTrue(marker.is_file(), 'the symlink target must remain untouched')
             self.assertTrue(boundary.is_symlink(), 'the refused link must remain in place')
 
+    def test_a_linked_intermediate_directory_is_refused_and_its_target_survives(self) -> None:
+        """Resolving the path would remove the directory behind the link."""
+        module = _module()
+        with _boundary() as boundary:
+            real = boundary / 'real'
+            real.mkdir()
+            marker = real / 'keep.txt'
+            marker.write_text('keep', encoding='utf-8')
+            alias = boundary / 'alias'
+            alias.symlink_to(real, target_is_directory=True)
+
+            with self.assertRaisesRegex(ValueError, 'must not be reached through symbolic links'):
+                module._recreate_workspace(alias / 'workspace', boundary)
+
+            self.assertTrue(marker.is_file(), 'the link target must remain untouched')
+            self.assertFalse((real / 'workspace').exists(), 'no workspace may be created through a link')
+
     def test_a_parent_path_at_the_boundary_is_refused(self) -> None:
         """A ``..`` component must not resolve removal to the boundary parent."""
         module = _module()
