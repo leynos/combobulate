@@ -14,6 +14,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
+from unittest.mock import patch
 
 from verifier_probe_loader import load_verifier_free_probe
 
@@ -159,10 +160,10 @@ class SourceLinkTests(unittest.TestCase):
             pin = root / name
             pin.parent.mkdir(parents=True, exist_ok=True)
             pin.write_text('', encoding='utf-8')
-        self.addCleanup(setattr, module, 'ROOT', module.ROOT)
-        self.addCleanup(setattr, module, 'FIXTURES', module.FIXTURES)
-        module.ROOT = root
-        module.FIXTURES = root / 'fixtures'
+        for name, value in (('ROOT', root), ('FIXTURES', root / 'fixtures')):
+            patcher = patch.object(module, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         return module, fixture
 
     def test_a_symbolic_link_among_the_sources_is_refused_before_staging(self) -> None:

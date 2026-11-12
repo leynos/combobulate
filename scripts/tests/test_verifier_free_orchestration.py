@@ -20,7 +20,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from verifier_probe_loader import load_structural_digest, load_verifier_free_probe
 
@@ -261,10 +261,17 @@ class OrchestrationTests(unittest.TestCase):
             {str(path.relative_to(self.module.ROOT)) for path in self.module.staged_sources()},
             'the record must bind every staged source under its repository-relative key',
         )
+        workspace = self.module.ROOT / 'target/epm1-verifier-free-workspace'
+        staged = self.module.staged_inputs(workspace)
         for key, digest in record['source_digests'].items():
             self.assertTrue(
                 is_structural_digest(digest),
                 f'{key} must carry a versioned structural SHA-256 value',
+            )
+            self.assertEqual(
+                digest,
+                self.module.structural_digest(staged[key]),
+                f'{key} must bind the staged copy the container built',
             )
         self.assertEqual(self.module._capture.call_count, 2, 'the build and the run must both be captured')
 
@@ -312,9 +319,10 @@ class OrchestrationTests(unittest.TestCase):
                 '[toolchain]\nchannel = "nightly-1999-01-01"\n', encoding='utf-8'
             )
 
-        self.module._stage_verifier_free_workspace = stage_then_mutate
-
-        self._run_to_success()
+        with patch.object(
+            self.module, '_stage_verifier_free_workspace', stage_then_mutate
+        ):
+            self._run_to_success()
 
         record = json.loads((fixture / 'verifier-free.json').read_text())
         key = str(source.relative_to(self.module.ROOT))
@@ -356,14 +364,16 @@ class OrchestrationTests(unittest.TestCase):
             shutil.rmtree(nested)
             nested.symlink_to(outside, target_is_directory=True)
 
-        self.module._stage_verifier_free_workspace = stage_then_link
-        self.module._capture = Mock()
-
-        with self.assertRaisesRegex(RuntimeError, 'does not match the recorded inputs'):
-            self.module.run_verifier_free()
+        with patch.object(
+            self.module, '_stage_verifier_free_workspace', stage_then_link
+        ), patch.object(self.module, '_capture') as capture:
+            with self.assertRaisesRegex(
+                RuntimeError, 'does not match the recorded inputs'
+            ):
+                self.module.run_verifier_free()
 
         self.module.ensure_base_image.assert_not_called()
-        self.module._capture.assert_not_called()
+        capture.assert_not_called()
 
 
 if __name__ == '__main__':
