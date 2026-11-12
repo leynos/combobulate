@@ -55,7 +55,7 @@ jobs:
         # (41163302274 and 41227443972). These timings feed pre-registered
         # controls, so a tool release between runs must not change them.
         run: cargo binstall --no-confirm --locked cargo-nextest@0.9.150 cargo-llvm-cov@0.9.1
-      - uses: leynos/shared-actions/.github/actions/install-whitaker@6dea5677a84fec60ca51b07202570e3af12ffdb4
+      - uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2
         with:
           # 0.2.9 ships cargo-dylint 6.0.1, whose driver build checks out
           # rust-clippy's `master`, renamed to `main` on 2026-10-28. 0.2.11

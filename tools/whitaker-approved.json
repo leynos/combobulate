@@ -1,30 +1,30 @@
 {
   "repository": "leynos/shared-actions",
   "action_directory": ".github/actions/install-whitaker",
-  "provenance_commit": "5a99aed78ce68dcebd3052b75c31e6f173162b1e",
-  "provenance_pr": 651,
+  "provenance_commit": "0eabb6bc07148981de5da395e30cd78d83f5c7c2",
+  "provenance_pr": 673,
   "scope": "Complete composite manifest, all local helpers (stdlib/utility-only), the installer archive digest manifest, and the Clippy snapshot table with its digest manifest. Nested action refs are covered by the manifest digest. Installer archives and Clippy snapshots are authenticated by the upstream digest manifests; external nested action implementations are trusted pinned dependencies, not downloaded recursively.",
   "files": {
-    "action.yml": "254e6baacfa7c17f5d95a2aa44d99f09bc695b074427dcbe1901e3928c0857ca",
-    "installer-digests.sha256": "182b666f9dc372566a2767f5f61550abeb6ce16457c205d4a417f6686b21d674",
+    "action.yml": "619b6113ab97a7c7d9153082fcfd6a8c697c314e79d327b38cdd2389792451e6",
+    "installer-digests.sha256": "944d87baf1d2889927c02250a7beeaefe668e4beca2b24a304ee0e25911bb613",
     "scripts/resolve-release.sh": "592a7dc472c705b4d328f1e41e8a400c5f52b5fb02aecce9cfc547ceaf311bd3",
     "scripts/extract-zip.py": "a934c8604004de87ec80bb82a6b88484601af991df228ac31b94c4523e87aa05",
     "scripts/verify_rolling_assets.py": "244f0430be39cf2ff3aef5bd0bfcfee0e6eb76655f8151661937c2a76cfdccf4",
     "scripts/bootstrap-paths.sh": "11b5e2863eb71334beb3d9e249fc5028492371d1cb682dbb31fd03fe2a5bc264",
-    "scripts/resolve-snapshot.sh": "28f5a79b7228a050c05d27a308c19c80101fb3589df4f9c6863c00c44246ec0e",
-    "clippy-snapshots.tsv": "0fb2e1404f2d59014698061705ab9fc2cebf7349dfb265e0464c274c10c90a92",
-    "snapshot-digests.sha256": "5d6e7969b57c65702bac85c225c28ab5c09194ccb65bea0e9d82b35c1750eabe"
+    "scripts/resolve-snapshot.sh": "d0d13c34232e3b93f21d4424ccb5d0bc551fd2ae844b479b28a4ba8c12fbcc61",
+    "clippy-snapshots.tsv": "18a7cb001444b283a4bfbd65289fd92ddc72e6f64edc892164c1d4fdc4db05e1",
+    "snapshot-digests.sha256": "81faea305a5e144309973128265c3244dffa2c83a2fb4acd628b22b70314e3de"
   },
   "source_blob_sha1": {
-    "action.yml": "3f407b59e538a954af688e816dc514ce2a488786",
-    "installer-digests.sha256": "5d73247d3e0f58caa87157667a5af9f2bb2e9156",
+    "action.yml": "69ad613774362e1779370f3270d0ff0ecdd84827",
+    "installer-digests.sha256": "db7c307c23140118b37f210f25fc032b049f5f3a",
     "scripts/resolve-release.sh": "a3b089c3578cc6e33ae8ce885d92b7ca344e1cfd",
     "scripts/extract-zip.py": "8d4174c57be4701275cf097ff039f179c9f5189f",
     "scripts/verify_rolling_assets.py": "6951f25e0648477b83d6dacbc70fcbec8496d906",
     "scripts/bootstrap-paths.sh": "42da00a3fed3cc5d54ef2a6ea99db5d1de4fc671",
-    "scripts/resolve-snapshot.sh": "1111f26a3df1d4f24651ed8a32b54da5f33a64d5",
-    "clippy-snapshots.tsv": "65dd7e4f412fb62a8e7d0729cfcd3b7727832ca8",
-    "snapshot-digests.sha256": "10a7dff1c307f94d9d8719a41dc3460583c3ef5e"
+    "scripts/resolve-snapshot.sh": "042a4489be34c8acfd60fcf2e64d432b1653fe86",
+    "clippy-snapshots.tsv": "938707e89c12fcd8c31f5452db20be0156efd677",
+    "snapshot-digests.sha256": "978a8c7b0040a6d4b53bc6680e3c943c9e6f9186"
   },
   "nested_actions": [
     "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
