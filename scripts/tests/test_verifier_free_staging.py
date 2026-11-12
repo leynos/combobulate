@@ -2,13 +2,15 @@
 
 These cases exercise the staging helpers directly with real filesystem
 operations and no container, so a stale destination file, a refused removal,
-or a mismatched staged tree is caught without podman.
+a planted symbolic link, or a mismatched staged tree is caught without podman.
 """
 
 from __future__ import annotations
 
 import tempfile
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
 
@@ -27,15 +29,33 @@ def _module() -> ModuleType:
     return load_verifier_free_probe()
 
 
+@contextmanager
+def _boundary() -> Iterator[Path]:
+    """Yield a temporary staging boundary with a nested workspace path.
+
+    Both test runners collect these cases, so the shared setup is a helper
+    rather than a pytest fixture; unittest never passes fixture arguments.
+
+    Examples
+    --------
+    The caller adds the state each case needs::
+
+        with _boundary() as boundary:
+            workspace = boundary / 'workspace'
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        boundary = Path(directory) / 'target'
+        boundary.mkdir()
+        yield boundary
+
+
 class WorkspaceGuardTests(unittest.TestCase):
     """Refuse to remove anything outside the directory the probe owns."""
 
     def test_a_symlinked_workspace_is_refused_and_its_target_survives(self) -> None:
         """Following the link would delete a directory the probe does not own."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory) / 'target'
-            boundary.mkdir()
+        with _boundary() as boundary:
             target = boundary / 'real-workspace'
             target.mkdir()
             marker = target / 'keep.txt'
@@ -49,13 +69,28 @@ class WorkspaceGuardTests(unittest.TestCase):
             self.assertTrue(marker.is_file(), 'the symlink target must remain untouched')
             self.assertTrue(link.is_symlink(), 'the refused link must remain in place')
 
+    def test_a_symlinked_boundary_is_refused_and_its_target_survives(self) -> None:
+        """A linked boundary would resolve outside the repository."""
+        module = _module()
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'real-target'
+            target.mkdir()
+            marker = target / 'keep.txt'
+            marker.write_text('keep', encoding='utf-8')
+            boundary = Path(directory) / 'target'
+            boundary.symlink_to(target, target_is_directory=True)
+
+            with self.assertRaisesRegex(ValueError, r'staging boundary .* must not be a symbolic link'):
+                module._recreate_workspace(boundary / 'workspace', boundary)
+
+            self.assertTrue(marker.is_file(), 'the symlink target must remain untouched')
+            self.assertTrue(boundary.is_symlink(), 'the refused link must remain in place')
+
     def test_a_workspace_outside_the_boundary_is_refused(self) -> None:
         """A mistaken path must not remove or create a sibling tree."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory) / 'target'
-            boundary.mkdir()
-            outside = Path(directory) / 'outside'
+        with _boundary() as boundary:
+            outside = boundary.parent / 'outside'
 
             with self.assertRaisesRegex(ValueError, 'must be strictly inside'):
                 module._recreate_workspace(outside, boundary)
@@ -65,9 +100,7 @@ class WorkspaceGuardTests(unittest.TestCase):
     def test_the_boundary_itself_is_refused(self) -> None:
         """Removing the boundary would take the whole owned tree with it."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory) / 'target'
-            boundary.mkdir()
+        with _boundary() as boundary:
             marker = boundary / 'keep.txt'
             marker.write_text('keep', encoding='utf-8')
 
@@ -79,9 +112,7 @@ class WorkspaceGuardTests(unittest.TestCase):
     def test_a_regular_file_at_the_workspace_path_is_refused(self) -> None:
         """A file where the workspace belongs is not a stale directory."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory) / 'target'
-            boundary.mkdir()
+        with _boundary() as boundary:
             workspace = boundary / 'workspace'
             workspace.write_text('not a directory', encoding='utf-8')
 
@@ -97,8 +128,7 @@ class StagedInputsTests(unittest.TestCase):
     def test_fixture_and_pin_sources_map_to_their_staged_copies(self) -> None:
         """Keys stay repository-relative while values name the staged copy."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory)
+        with _boundary() as boundary:
             workspace = boundary / 'workspace'
             module._stage_verifier_free_workspace(workspace, boundary=boundary)
 
@@ -121,8 +151,7 @@ class StagedInputsTests(unittest.TestCase):
     def test_an_unknown_fixture_file_is_reported(self) -> None:
         """A staged file the record does not bind is a different build input."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory)
+        with _boundary() as boundary:
             workspace = boundary / 'workspace'
             module._stage_verifier_free_workspace(workspace, boundary=boundary)
             inputs = module.staged_inputs(workspace)
@@ -135,8 +164,7 @@ class StagedInputsTests(unittest.TestCase):
     def test_a_missing_staged_file_is_reported(self) -> None:
         """A digest for an absent file would bind nothing the build read."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory)
+        with _boundary() as boundary:
             workspace = boundary / 'workspace'
             module._stage_verifier_free_workspace(workspace, boundary=boundary)
             inputs = module.staged_inputs(workspace)
@@ -148,8 +176,7 @@ class StagedInputsTests(unittest.TestCase):
     def test_a_symbolic_link_in_the_staged_tree_is_refused(self) -> None:
         """A link at an expected path would digest content from outside."""
         module = _module()
-        with tempfile.TemporaryDirectory() as directory:
-            boundary = Path(directory)
+        with _boundary() as boundary:
             workspace = boundary / 'workspace'
             module._stage_verifier_free_workspace(workspace, boundary=boundary)
             inputs = module.staged_inputs(workspace)
@@ -160,6 +187,20 @@ class StagedInputsTests(unittest.TestCase):
             staged.symlink_to(outside)
 
             with self.assertRaisesRegex(RuntimeError, r'symbolic links=\[.*Cargo\.toml'):
+                module._verify_staged_workspace(workspace, inputs)
+
+    def test_a_symlinked_workspace_root_is_refused(self) -> None:
+        """``rglob`` would enumerate a replacement link's target silently."""
+        module = _module()
+        with _boundary() as boundary:
+            workspace = boundary / 'workspace'
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
+            inputs = module.staged_inputs(workspace)
+            real = boundary / 'real-workspace'
+            workspace.rename(real)
+            workspace.symlink_to(real, target_is_directory=True)
+
+            with self.assertRaisesRegex(RuntimeError, r'staged workspace .* must not be a symbolic link'):
                 module._verify_staged_workspace(workspace, inputs)
 
 

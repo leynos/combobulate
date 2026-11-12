@@ -22,10 +22,12 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
     record would describe different inputs from the ones built. Recreating the
     whole tree makes the staged and recorded sets the same set.
 
-    Removal is deliberately narrow. A workspace that is a symbolic link is
-    refused rather than followed, and the resolved workspace must sit strictly
-    inside ``boundary``; that keeps a mistaken path or a planted link from
-    deleting a directory the probe does not own.
+    Removal is deliberately narrow. A boundary or workspace that is a
+    symbolic link is refused rather than followed, and the resolved workspace
+    must sit strictly inside ``boundary``. Without the boundary check, a
+    linked ``target`` would resolve outside the repository and its containment
+    would be measured against the link target, so removal could reach a
+    directory the probe does not own.
 
     Parameters
     ----------
@@ -37,8 +39,9 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
     Raises
     ------
     ValueError
-        If ``directory`` is a symbolic link, is not a real directory, or does
-        not resolve to a path strictly inside ``boundary``.
+        If ``boundary`` or ``directory`` is a symbolic link, if ``directory``
+        is not a real directory, or if it does not resolve to a path strictly
+        inside ``boundary``.
 
     Examples
     --------
@@ -48,6 +51,10 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
             ROOT / 'target/epm1-verifier-free-workspace', ROOT / 'target'
         )
     """
+    if boundary.is_symlink():
+        raise ValueError(
+            f'the staging boundary {boundary} must not be a symbolic link'
+        )
     owned = boundary.resolve()
     if directory.is_symlink():
         raise ValueError(
@@ -81,8 +88,10 @@ def verify_staged_workspace(
     Symbolic links are refused outright. ``is_file`` follows a link to a
     regular target, so a link at an expected path would pass the set
     comparison while the digest read content from outside the workspace.
-    Staging dereferences links, so one can only appear through local
-    tampering; rejecting it keeps the recorded digest bound to the workspace.
+    The workspace root is checked separately because ``rglob`` enumerates a
+    replacement link's target without yielding the link itself. Staging
+    dereferences links, so one can only appear through local tampering;
+    rejecting it keeps the recorded digest bound to the workspace.
 
     Parameters
     ----------
@@ -94,8 +103,8 @@ def verify_staged_workspace(
     Raises
     ------
     RuntimeError
-        If the workspace holds a symbolic link, or extra or missing regular
-        files, naming each path.
+        If the workspace root or a path it contains is a symbolic link, or if
+        regular files are extra or missing, naming each path.
 
     Examples
     --------
@@ -103,6 +112,10 @@ def verify_staged_workspace(
 
         verify_staged_workspace(workspace, staged_inputs(workspace))
     """
+    if workspace.is_symlink():
+        raise RuntimeError(
+            f"the staged workspace {workspace} must not be a symbolic link"
+        )
     expected = {*inputs.values(), workspace / "Containerfile"}
     entries = list(workspace.rglob("*"))
     links = sorted(str(path) for path in entries if path.is_symlink())
