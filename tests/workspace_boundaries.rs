@@ -10,7 +10,7 @@
 //! boundary in `workspace_kernel_boundary.rs`. Splitting them keeps each file
 //! under the repository's length limit without narrowing what is checked.
 
-use std::error::Error;
+use std::{error::Error, ffi::OsStr};
 
 use googletest::prelude::*;
 use rstest::rstest;
@@ -35,9 +35,12 @@ use cargo::{
 
 /// The `cargo fetch` arguments that populate every target's packages.
 ///
-/// The suite never runs this; `make prepare-dependencies` does. The contract
-/// below still pins its shape, so the preparation step and the offline checks
-/// cannot drift apart.
+/// The suite never runs this; `make prepare-dependencies` does. The constant
+/// records only the locked, target-free fetch form the offline reads assume.
+/// It is not wired to the recipe, so the constant and the real fetch can drift
+/// apart without failing this suite. `parallel_all_runs_each_gate_in_order` in
+/// `tests/make_gate_order.rs` checks the root fetch's actual argv and working
+/// directory.
 ///
 /// `--target` takes a target triple, not `all`, so it must not appear here:
 /// a plain `cargo fetch --locked` already resolves the whole lockfile graph,
@@ -46,9 +49,9 @@ const FETCH_ARGUMENTS: [&str; 2] = ["fetch", "--locked"];
 
 /// Contract: the live checks stay lockfile-pinned, offline, and flag-neutral.
 ///
-/// No caller build selector survives into the live child, and the fetch that
-/// makes the offline tree calls resolvable is stated here so it cannot drift
-/// away from the Make preparation step that actually runs it.
+/// No caller build selector survives into the live child. The fetch assertions
+/// below check only the local constant; the Make gate test named on
+/// `FETCH_ARGUMENTS` checks the fetch the recipe actually runs.
 #[test]
 fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
     let tree = cargo::tree_command(&["-p", KERNEL, "--target", "all"]);
@@ -62,6 +65,20 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
             "the live tree check must pass {expected}: {tree_arguments:?}"
         );
     }
+
+    // `--offline` is the argv half of the contract; this is the environment
+    // half. Both must be present, because either can be dropped on its own.
+    let environment: Vec<(&OsStr, Option<&OsStr>)> = tree.get_envs().collect();
+    let offline_setting = environment
+        .iter()
+        .find(|entry| entry.0 == OsStr::new("CARGO_NET_OFFLINE"))
+        .copied();
+    assert_eq!(
+        offline_setting,
+        Some((OsStr::new("CARGO_NET_OFFLINE"), Some(OsStr::new("true")))),
+        "the live tree check must set CARGO_NET_OFFLINE=true so a cold cache fails instead of \
+         fetching mid-test: {environment:?}"
+    );
 
     let fetch_arguments: Vec<String> = FETCH_ARGUMENTS
         .iter()
