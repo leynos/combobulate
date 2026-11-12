@@ -15,6 +15,12 @@ from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 ROOT = SCRIPTS.parent
+# The probe modules import their sibling helpers by bare name, exactly as the
+# script entry point does. Pytest adds SCRIPTS through ``conftest``; unittest
+# discovery only adds ``scripts/tests``, so add the real source directory here
+# for both runners.
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
 SUPPORT_FUNCTIONS = (
     '_capture',
     '_digest',

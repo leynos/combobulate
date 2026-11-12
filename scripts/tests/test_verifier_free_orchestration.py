@@ -89,29 +89,49 @@ class StagedSourcesTests(unittest.TestCase):
 
 
 class StagingTests(unittest.TestCase):
-    """Copy the fixture and its pins into the scratch workspace."""
+    """Copy the fixture and its pins into a freshly recreated workspace."""
 
     def test_staging_places_the_fixture_and_the_pins(self) -> None:
         """The container builds ``probe/`` with the pins beside it."""
         module = _module()
         with tempfile.TemporaryDirectory() as directory:
-            workspace = Path(directory) / 'workspace'
+            boundary = Path(directory)
+            workspace = boundary / 'workspace'
 
-            module._stage_verifier_free_workspace(workspace)
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
 
             self.assertTrue((workspace / 'probe/Cargo.toml').is_file(), 'the fixture must be staged as `probe/`')
             self.assertTrue((workspace / 'Containerfile').is_file(), 'the container recipe must be written')
             for name in module.STAGING_FILES:
                 self.assertTrue((workspace / name).is_file(), f'the pinned {name} must be copied')
 
-    def test_staging_is_idempotent(self) -> None:
-        """A rerun must refresh the copied files rather than fail."""
+    def test_restaging_removes_a_stale_destination_file(self) -> None:
+        """A file deleted from the repository must not survive in the workspace."""
         module = _module()
         with tempfile.TemporaryDirectory() as directory:
-            workspace = Path(directory) / 'workspace'
+            boundary = Path(directory)
+            workspace = boundary / 'workspace'
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
+            stale_marker = workspace / 'probe/target/marker'
+            stale_marker.parent.mkdir(parents=True)
+            stale_marker.write_text('stale', encoding='utf-8')
+            unknown = workspace / 'probe/unknown.toml'
+            unknown.write_text('stale = true', encoding='utf-8')
 
-            module._stage_verifier_free_workspace(workspace)
-            module._stage_verifier_free_workspace(workspace)
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
+
+            self.assertFalse(stale_marker.exists(), 'stale build output must be removed')
+            self.assertFalse(unknown.exists(), 'an unknown fixture file must be removed')
+
+    def test_staging_is_idempotent(self) -> None:
+        """A rerun must recreate the workspace rather than fail."""
+        module = _module()
+        with tempfile.TemporaryDirectory() as directory:
+            boundary = Path(directory)
+            workspace = boundary / 'workspace'
+
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
 
             self.assertTrue((workspace / 'probe/Cargo.toml').is_file(), 'a second staging run must succeed')
 
@@ -119,9 +139,10 @@ class StagingTests(unittest.TestCase):
         """A stale record inside the build must not ride along."""
         module = _module()
         with tempfile.TemporaryDirectory() as directory:
-            workspace = Path(directory) / 'workspace'
+            boundary = Path(directory)
+            workspace = boundary / 'workspace'
 
-            module._stage_verifier_free_workspace(workspace)
+            module._stage_verifier_free_workspace(workspace, boundary=boundary)
 
             staged = workspace / 'probe'
             self.assertFalse((staged / 'provenance.json').exists(), 'provenance must not be staged')
@@ -163,31 +184,38 @@ class BaseImageTests(unittest.TestCase):
 
 
 class OrchestrationTests(unittest.TestCase):
-    """Check each failure branch of ``run_verifier_free`` before it runs podman."""
+    """Check each branch of ``run_verifier_free`` with real staging and digesting."""
 
     def setUp(self) -> None:
-        """Replace every process and record boundary with a fake."""
+        """Build a small real fixture tree and replace only the process boundary."""
         self.module = _module()
         self.directory = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.directory, ignore_errors=True)
         self.module.ROOT = self.directory
         self.module.FIXTURES = self.directory / 'fixtures'
-        (self.module.FIXTURES / 'verus-wiring-probe').mkdir(parents=True)
+        fixture = self.module.FIXTURES / 'verus-wiring-probe'
+        (fixture / 'nested').mkdir(parents=True)
+        (fixture / 'Cargo.toml').write_text(
+            '[package]\nname = "probe"\nversion = "0.1.0"\n', encoding='utf-8'
+        )
+        (fixture / 'nested/input.toml').write_text('value = 1\n', encoding='utf-8')
         for name in self.module.STAGING_FILES:
             target = self.directory / name
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text('', encoding='utf-8')
+            content = '0.0.0\n' if target.name == 'VERSION' else ''
+            target.write_text(content, encoding='utf-8')
         (self.directory / 'rust-toolchain.toml').write_text(
             '[toolchain]\nchannel = "nightly-2026-11-06"\n', encoding='utf-8'
         )
-        self.module.staged_sources = Mock(return_value=[])
-        self.module._stage_verifier_free_workspace = Mock()
         self.module.ensure_base_image = Mock()
         self.module.container_run_command = Mock(return_value=['podman', 'run'])
         self.module.os = SimpleNamespace(environ={})
 
-    def tearDown(self) -> None:
-        """Remove the scratch tree."""
-        shutil.rmtree(self.directory, ignore_errors=True)
+    def _run_to_success(self) -> None:
+        """Capture a successful build and run, then execute the orchestrator."""
+        self.module._capture = Mock(side_effect=[{'exit_code': 0}, {'exit_code': 0}])
+
+        self.module.run_verifier_free()
 
     def test_a_host_wrapper_is_recorded_as_inconclusive_and_refused(self) -> None:
         """Removing admission would defeat the isolation being measured."""
@@ -224,27 +252,114 @@ class OrchestrationTests(unittest.TestCase):
 
     def test_a_successful_run_records_status_and_source_digests(self) -> None:
         """The passing record must bind the staged inputs it actually built."""
-        self.module.staged_sources = Mock(return_value=[self.directory / 'rust-toolchain.toml'])
-        self.module._capture = Mock(side_effect=[{'exit_code': 0}, {'exit_code': 0}])
-
-        self.module.run_verifier_free()
+        self._run_to_success()
 
         record = json.loads((self.module.FIXTURES / 'verus-wiring-probe/verifier-free.json').read_text())
         self.assertEqual(record['status'], 'pass', 'the record must report the passing status')
         self.assertEqual(
-            list(record['source_digests']),
-            ['rust-toolchain.toml'],
-            'the record must bind every staged source',
+            set(record['source_digests']),
+            {str(path.relative_to(self.module.ROOT)) for path in self.module.staged_sources()},
+            'the record must bind every staged source under its repository-relative key',
         )
-        self.assertTrue(
-            is_structural_digest(record['source_digests']['rust-toolchain.toml']),
-            'each digest must be a versioned structural SHA-256 value',
+        for key, digest in record['source_digests'].items():
+            self.assertTrue(
+                is_structural_digest(digest),
+                f'{key} must carry a versioned structural SHA-256 value',
+            )
+        self.assertEqual(self.module._capture.call_count, 2, 'the build and the run must both be captured')
+
+    def test_deleting_a_source_between_runs_removes_it_from_the_stage_and_record(self) -> None:
+        """A deleted source must not stay available to Cargo or the record."""
+        fixture = self.module.FIXTURES / 'verus-wiring-probe'
+        obsolete = fixture / 'obsolete.toml'
+        obsolete.write_text('value = 1\n', encoding='utf-8')
+        self.module.STAGING_FILES = ('rust-toolchain.toml',)
+        self.module._capture = Mock(side_effect=[{'exit_code': 0}] * 4)
+        workspace = self.module.ROOT / 'target/epm1-verifier-free-workspace'
+        key = str(obsolete.relative_to(self.module.ROOT))
+
+        self.module.run_verifier_free()
+
+        first = json.loads((fixture / 'verifier-free.json').read_text())
+        self.assertTrue((workspace / 'probe/obsolete.toml').is_file(), 'the first run must stage the input')
+        self.assertIn(key, first['source_digests'], 'the first record must bind the extra input')
+
+        obsolete.unlink()
+        self.module.run_verifier_free()
+
+        second = json.loads((fixture / 'verifier-free.json').read_text())
+        self.assertFalse(
+            (workspace / 'probe/obsolete.toml').exists(),
+            'a source deleted before the second run must not survive staging',
+        )
+        self.assertNotIn(key, second['source_digests'], 'the second record must not bind a deleted source')
+
+    def test_a_source_change_after_staging_does_not_move_the_recorded_digest(self) -> None:
+        """The record must bind the staged copy, not a source changed after copying."""
+        fixture = self.module.FIXTURES / 'verus-wiring-probe'
+        source = fixture / 'nested/input.toml'
+        staged = self.module.ROOT / 'target/epm1-verifier-free-workspace/probe/nested/input.toml'
+        original_digest = self.module.structural_digest(source)
+        real_stage = self.module._stage_verifier_free_workspace
+
+        def stage_then_mutate(directory, **kwargs):
+            """Stage first, then change the source behind the staged copy."""
+            real_stage(directory, **kwargs)
+            source.write_text('value = 2\n', encoding='utf-8')
+            (self.module.ROOT / 'rust-toolchain.toml').write_text(
+                '[toolchain]\nchannel = "nightly-1999-01-01"\n', encoding='utf-8'
+            )
+
+        self.module._stage_verifier_free_workspace = stage_then_mutate
+
+        self._run_to_success()
+
+        record = json.loads((fixture / 'verifier-free.json').read_text())
+        key = str(source.relative_to(self.module.ROOT))
+        self.assertEqual(
+            record['source_digests'][key],
+            self.module.structural_digest(staged),
+            'the recorded digest must describe the staged copy',
         )
         self.assertEqual(
-            self.module._capture.call_count,
-            2,
-            'the build and the run must both be captured',
+            record['source_digests'][key],
+            original_digest,
+            'the recorded digest must describe the bytes the container builds',
         )
+        self.assertNotEqual(
+            record['source_digests'][key],
+            self.module.structural_digest(source),
+            'a source changed after staging must not satisfy the record',
+        )
+        self.assertEqual(
+            self.module.container_run_command.call_args.args[3],
+            'nightly-2026-11-06',
+            'the channel must come from the staged toolchain',
+        )
+
+    def test_a_directory_symlink_in_the_staged_tree_fails_before_image_preparation(
+        self,
+    ) -> None:
+        """A swapped directory changes the input set before any image is built."""
+        outside = self.directory / 'outside'
+        outside.mkdir()
+        real_stage = self.module._stage_verifier_free_workspace
+
+        def stage_then_link(directory, **kwargs):
+            """Replace a staged input directory with a link to an empty tree."""
+            real_stage(directory, **kwargs)
+            nested = directory / 'probe/nested'
+            shutil.rmtree(nested)
+            nested.symlink_to(outside, target_is_directory=True)
+
+        self.module._stage_verifier_free_workspace = stage_then_link
+        self.module._capture = Mock()
+
+        with self.assertRaisesRegex(RuntimeError, 'does not match the recorded inputs'):
+            self.module.run_verifier_free()
+
+        self.module.ensure_base_image.assert_not_called()
+        self.module._capture.assert_not_called()
 
 
 if __name__ == '__main__':

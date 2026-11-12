@@ -1323,12 +1323,15 @@ file must be touched immediately before each build. The provenance writers
 `_write_kani_provenance` and `_write_verus_provenance` and the guard
 `require_captured_output` live in `probe_provenance`. The verifier-free
 workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
-`_write_inconclusive_record`, `_stage_verifier_free_workspace`,
-`ensure_base_image`, `container_run_command`, and `run_verifier_free`. These
-helpers are private to the probe scripts. They exist so each route step can be
-read and tested on its own. They are not a public API, must not be imported by
-the support module, the evidence gate, or product code, and a new probe route
-composes them instead of adding a parallel capture path.
+`_write_inconclusive_record`, `_stage_verifier_free_workspace`, `staged_inputs`,
+`ensure_base_image`, `container_run_command`, and `run_verifier_free`. Its
+workspace lifecycle — `recreate_workspace` and `verify_staged_workspace` —
+lives in the private `verifier_free_staging` module, so the orchestrator stays
+within the repository's 400-line module limit. These helpers are private to the
+probe scripts. They exist so each route step can be read and tested on its own.
+They are not a public API, must not be imported by the support module, the
+evidence gate, or product code, and a new probe route composes them instead of
+adding a parallel capture path.
 
 Committed metadata must not publish host detail. `capture` still executes the
 real argument vector but stores a portable copy, replacing the repository root
@@ -1452,6 +1455,19 @@ the container build and probe logs in the adjacent `observations/` directory.
 The record carries `source_digests` for every file the staging step copies: the
 fixture tree minus evidence records and build output, plus the root toolchain,
 linker, build-tool, and mold pin files. The hosted record is excluded from the
-staged set so it can bind the inputs without hashing itself. The recorded
+staged set so it can bind the inputs without hashing itself. Each key stays
+repository-relative, but the digest is taken from the staged copy the container
+actually builds, so a source changed after copying cannot satisfy the record.
+The container channel is read from the staged `rust-toolchain.toml`, so the
+selected channel and the recorded digest describe the same file. The recorded
 observation must be recaptured whenever the build script or a staged input
 changes, so the stored command, digests, and the code under test stay the same.
+
+The staging workspace `<repo>/target/epm1-verifier-free-workspace` is removed
+and recreated on every run, so a source deleted from the repository cannot
+survive as a staged file that Cargo still sees. Removal is bounded: a symlinked
+workspace is refused, and the resolved workspace must sit strictly inside
+`<repo>/target`. The staged tree is then compared with the mapped inputs, and
+any extra or missing regular file fails the run before the image is prepared.
+The workspace is mounted read-write for the build, and the fixed path is shared
+by concurrent local runs, so two local probes must not run at the same time.
