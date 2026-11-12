@@ -1455,10 +1455,13 @@ remove the wrapper; the separate hosted observation job uses a fresh runner.
 Its record is
 `tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
 the container build and probe logs in the adjacent `observations/` directory.
-The record carries `source_digests` for every file the staging step copies: the
-fixture tree minus evidence records and build output, plus the root toolchain,
-linker, build-tool, and mold pin files. The hosted record is excluded from the
-staged set so it can bind the inputs without hashing itself. Each key stays
+Any earlier record is deleted before the run begins, so a failure during
+staging, input verification, or the container build cannot leave an earlier
+passing record in place to be mistaken for a record of this run. The record
+carries `source_digests` for every file the staging step copies: the fixture
+tree minus evidence records and build output, plus the root toolchain, linker,
+build-tool, and mold pin files. The hosted record is excluded from the staged
+set so it can bind the inputs without hashing itself. Each key stays
 repository-relative, but the digest is taken from the staged copy the container
 actually builds, so a source changed after copying cannot satisfy the record.
 The container channel is read from the staged `rust-toolchain.toml`, so the

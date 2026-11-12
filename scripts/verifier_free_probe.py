@@ -351,6 +351,9 @@ def run_verifier_free() -> None:
     """
     environment = dict(os.environ)
     record = FIXTURES / "verus-wiring-probe/verifier-free.json"
+    # A record describes one run. An earlier pass must not survive a failure
+    # below, because nothing would distinguish it from a record of this run.
+    record.unlink(missing_ok=True)
     if environment.get("RUSTC_WRAPPER"):
         _write_inconclusive_record(record)
         raise RuntimeError(

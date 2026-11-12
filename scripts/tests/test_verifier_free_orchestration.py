@@ -238,6 +238,21 @@ class OrchestrationTests(unittest.TestCase):
         self.module._capture.assert_called_once()
         self.assertIn('podman', self.module._capture.call_args.args[0], 'the build must go through podman')
 
+    def test_a_failure_before_staging_removes_an_earlier_passing_record(self) -> None:
+        """A stale pass would describe inputs this run never even staged."""
+        record = self.module.FIXTURES / 'verus-wiring-probe/verifier-free.json'
+        record.write_text('{"status": "pass"}\n', encoding='utf-8')
+
+        with patch.object(
+            self.module,
+            '_stage_verifier_free_workspace',
+            side_effect=RuntimeError('staging refused'),
+        ), self.assertRaisesRegex(RuntimeError, 'staging refused'):
+            self.module.run_verifier_free()
+
+        self.assertFalse(record.exists(), 'a failed run must not leave an earlier pass in place')
+        self.module.ensure_base_image.assert_not_called()
+
     def test_a_failed_container_run_is_reported(self) -> None:
         """A compiler failure inside the container must not be recorded as a pass."""
         self.module._capture = Mock(side_effect=[{'exit_code': 0}, {'exit_code': 2}])
