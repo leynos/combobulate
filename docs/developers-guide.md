@@ -1100,6 +1100,9 @@ explicitly, so they can exercise isolated repository roots without mutating
 process-wide module state. Script dependencies remain pinned in
 `scripts/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
+Suites must remain collectable by both unittest discovery and pytest, because
+`make design-check` runs both; shared setup for `unittest.TestCase` cases
+therefore uses a helper or context manager rather than a pytest fixture.
 
 `scripts/tests/markdown_examples.py` is the shared loader for marked JSON
 fences in migration documents. It requires each fence to have a unique adjacent
@@ -1325,13 +1328,13 @@ file must be touched immediately before each build. The provenance writers
 workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
 `_write_inconclusive_record`, `_stage_verifier_free_workspace`, `staged_inputs`,
 `ensure_base_image`, `container_run_command`, and `run_verifier_free`. Its
-workspace lifecycle — `recreate_workspace` and `verify_staged_workspace` —
-lives in the private `verifier_free_staging` module, so the orchestrator stays
-within the repository's 400-line module limit. These helpers are private to the
-probe scripts. They exist so each route step can be read and tested on its own.
-They are not a public API, must not be imported by the support module, the
-evidence gate, or product code, and a new probe route composes them instead of
-adding a parallel capture path.
+workspace lifecycle — `verify_source_links`, `recreate_workspace`, and
+`verify_staged_workspace` — lives in the private `verifier_free_staging`
+module, so the orchestrator stays within the repository's 400-line module
+limit. These helpers are private to the probe scripts. They exist so each route
+step can be read and tested on its own. They are not a public API, must not be
+imported by the support module, the evidence gate, or product code, and a new
+probe route composes them instead of adding a parallel capture path.
 
 Committed metadata must not publish host detail. `capture` still executes the
 real argument vector but stores a portable copy, replacing the repository root

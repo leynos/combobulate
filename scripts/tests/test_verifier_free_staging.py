@@ -33,8 +33,10 @@ def _module() -> ModuleType:
 def _boundary() -> Iterator[Path]:
     """Yield a temporary staging boundary with a nested workspace path.
 
-    Both test runners collect these cases, so the shared setup is a helper
-    rather than a pytest fixture; unittest never passes fixture arguments.
+    Both test runners collect these cases. Unittest discovery never passes
+    pytest fixtures, so this shared setup is deliberately a context manager
+    rather than a fixture: the documented exception to the fixture rule for
+    unittest-compatible cases.
 
     Examples
     --------
@@ -86,6 +88,18 @@ class WorkspaceGuardTests(unittest.TestCase):
             self.assertTrue(marker.is_file(), 'the symlink target must remain untouched')
             self.assertTrue(boundary.is_symlink(), 'the refused link must remain in place')
 
+    def test_a_parent_path_at_the_boundary_is_refused(self) -> None:
+        """A ``..`` component must not resolve removal to the boundary parent."""
+        module = _module()
+        with _boundary() as boundary:
+            marker = boundary.parent / 'keep.txt'
+            marker.write_text('keep', encoding='utf-8')
+
+            with self.assertRaisesRegex(ValueError, 'must be strictly inside'):
+                module._recreate_workspace(boundary / '..', boundary)
+
+            self.assertTrue(marker.is_file(), 'the boundary parent must not be removed')
+
     def test_a_workspace_outside_the_boundary_is_refused(self) -> None:
         """A mistaken path must not remove or create a sibling tree."""
         module = _module()
@@ -120,6 +134,35 @@ class WorkspaceGuardTests(unittest.TestCase):
                 module._recreate_workspace(workspace, boundary)
 
             self.assertTrue(workspace.is_file(), 'the refused file must remain')
+
+
+class SourceLinkTests(unittest.TestCase):
+    """Refuse a repository source that copying would dereference."""
+
+    def test_a_symbolic_link_among_the_sources_is_refused_before_staging(self) -> None:
+        """copytree would turn the link into a regular staged file."""
+        module = _module()
+        with _boundary() as boundary:
+            root = boundary.parent / 'repo'
+            fixture = root / 'fixtures/verus-wiring-probe'
+            fixture.mkdir(parents=True)
+            outside = boundary.parent / 'outside.toml'
+            outside.write_text('outside = true\n', encoding='utf-8')
+            (fixture / 'Cargo.toml').symlink_to(outside)
+            for name in module.STAGING_FILES:
+                pin = root / name
+                pin.parent.mkdir(parents=True, exist_ok=True)
+                pin.write_text('', encoding='utf-8')
+            self.addCleanup(setattr, module, 'ROOT', module.ROOT)
+            self.addCleanup(setattr, module, 'FIXTURES', module.FIXTURES)
+            module.ROOT = root
+            module.FIXTURES = root / 'fixtures'
+            workspace = boundary / 'workspace'
+
+            with self.assertRaisesRegex(ValueError, 'must not be symbolic links'):
+                module._stage_verifier_free_workspace(workspace, boundary=boundary)
+
+            self.assertFalse(workspace.exists(), 'a refused source set must not be staged')
 
 
 class StagedInputsTests(unittest.TestCase):

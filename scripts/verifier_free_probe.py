@@ -19,6 +19,7 @@ from rust_prover_tools.commands import CommandSpec, run_command
 from structural_digest import structural_digest
 from verifier_free_staging import (
     recreate_workspace as _recreate_workspace,
+    verify_source_links as _verify_source_links,
     verify_staged_workspace as _verify_staged_workspace,
 )
 from verifier_probe_support import FIXTURES, ROOT, _capture
@@ -131,6 +132,8 @@ def _stage_verifier_free_workspace(
     left behind by an earlier build cannot reach Cargo. ``boundary`` defaults
     to ``ROOT / "target"`` at call time rather than definition time, so a
     test or a relocated composition root supplies the right owned directory.
+    A symbolic link among the sources is refused before the workspace is
+    touched, because copying would dereference it into a regular staged file.
 
     Parameters
     ----------
@@ -148,11 +151,13 @@ def _stage_verifier_free_workspace(
             ROOT / 'target/epm1-verifier-free-workspace'
         )
     """
+    fixture = FIXTURES / "verus-wiring-probe"
+    _verify_source_links([fixture, *staged_sources()])
     _recreate_workspace(
         directory, ROOT / "target" if boundary is None else boundary
     )
     shutil.copytree(
-        FIXTURES / "verus-wiring-probe",
+        fixture,
         directory / "probe",
         ignore=shutil.ignore_patterns(*STAGING_IGNORES),
     )

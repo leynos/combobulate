@@ -10,7 +10,41 @@ record binds. Container orchestration stays in ``verifier_free_probe``.
 from __future__ import annotations
 
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
+
+
+def verify_source_links(sources: Iterable[Path]) -> None:
+    """Refuse to stage a source that is a symbolic link.
+
+    ``shutil.copytree`` and ``shutil.copy2`` dereference links by default, so
+    a linked source would enter the workspace as a regular file holding
+    content from outside the repository. The staged-tree check cannot see
+    that, because the link itself is gone by then. Checking the repository
+    entries before copying keeps the recorded digest tied to repository
+    content.
+
+    Parameters
+    ----------
+    sources
+        Repository entries the staging step will copy.
+
+    Raises
+    ------
+    ValueError
+        If any source is a symbolic link, naming each link.
+
+    Examples
+    --------
+    The fixture root and each file it contributes are both checked::
+
+        verify_source_links([fixture, *staged_sources()])
+    """
+    links = sorted(str(path) for path in sources if path.is_symlink())
+    if links:
+        raise ValueError(
+            f'the staged sources must not be symbolic links: {links}'
+        )
 
 
 def recreate_workspace(directory: Path, boundary: Path) -> None:
@@ -23,11 +57,12 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
     whole tree makes the staged and recorded sets the same set.
 
     Removal is deliberately narrow. A boundary or workspace that is a
-    symbolic link is refused rather than followed, and the resolved workspace
-    must sit strictly inside ``boundary``. Without the boundary check, a
-    linked ``target`` would resolve outside the repository and its containment
-    would be measured against the link target, so removal could reach a
-    directory the probe does not own.
+    symbolic link is refused rather than followed, and the workspace is
+    resolved before containment, so a ``..`` component cannot step outside.
+    The resolved workspace must sit strictly inside ``boundary``. Without the
+    boundary check, a linked ``target`` would resolve outside the repository
+    and its containment would be measured against the link target, so removal
+    could reach a directory the probe does not own.
 
     Parameters
     ----------
@@ -60,18 +95,18 @@ def recreate_workspace(directory: Path, boundary: Path) -> None:
         raise ValueError(
             f'the staging workspace {directory} must not be a symbolic link'
         )
-    workspace = directory.parent.resolve() / directory.name
+    workspace = directory.resolve()
     if workspace == owned or not workspace.is_relative_to(owned):
         raise ValueError(
             f'the staging workspace {workspace} must be strictly inside {owned}'
         )
-    if directory.exists() and not directory.is_dir():
+    if workspace.exists() and not workspace.is_dir():
         raise ValueError(
             f'the staging workspace {directory} must be a real directory'
         )
-    if directory.exists():
-        shutil.rmtree(directory)
-    directory.mkdir(parents=True)
+    if workspace.exists():
+        shutil.rmtree(workspace)
+    workspace.mkdir(parents=True)
 
 
 def verify_staged_workspace(
