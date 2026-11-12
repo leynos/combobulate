@@ -196,6 +196,22 @@ class SourceLinkTests(unittest.TestCase):
 
             self.assertFalse(workspace.exists(), 'a refused source set must not be staged')
 
+    def test_a_linked_directory_inside_the_fixture_is_refused(self) -> None:
+        """copytree would copy the linked directory's external contents."""
+        with _boundary() as boundary:
+            module, fixture = self._relocated_module(boundary)
+            external = boundary.parent / 'external'
+            external.mkdir()
+            (external / 'payload.toml').write_text('outside = true\n', encoding='utf-8')
+            (fixture / 'nested').mkdir()
+            (fixture / 'nested/linked').symlink_to(external, target_is_directory=True)
+            workspace = boundary / 'workspace'
+
+            with self.assertRaisesRegex(ValueError, r'symbolic links: \[.*linked'):
+                module._stage_verifier_free_workspace(workspace, boundary=boundary)
+
+            self.assertFalse(workspace.exists(), 'a refused source set must not be staged')
+
 
 class StagedInputsTests(unittest.TestCase):
     """Map, check, and digest the staged copies the record actually binds."""

@@ -99,6 +99,28 @@ def _write_inconclusive_record(record: Path) -> None:
     )
 
 
+def staged_fixture_entries() -> list[Path]:
+    """Return every fixture entry the staging copy visits, directories included.
+
+    ``staged_sources`` keeps regular files because only those carry digests,
+    but ``copytree`` also descends directories. The staging step checks these
+    entries for links, so a linked directory cannot carry in outside content
+    that the file-only source list would never name.
+    """
+    fixture = FIXTURES / "verus-wiring-probe"
+    return [
+        fixture,
+        *sorted(
+            path
+            for path in fixture.rglob("*")
+            if not any(
+                part in STAGING_IGNORES
+                for part in path.relative_to(fixture).parts
+            )
+        ),
+    ]
+
+
 def staged_sources() -> list[Path]:
     """Return every repository file the verifier-free build stages.
 
@@ -113,13 +135,7 @@ def staged_sources() -> list[Path]:
         staged_sources()
         # [PosixPath('.../verus-wiring-probe/Cargo.toml'), ..., PosixPath('.../rust-toolchain.toml')]
     """
-    fixture = FIXTURES / "verus-wiring-probe"
-    copied = [
-        path
-        for path in sorted(fixture.rglob("*"))
-        if path.is_file()
-        and not any(part in STAGING_IGNORES for part in path.relative_to(fixture).parts)
-    ]
+    copied = [path for path in staged_fixture_entries() if path.is_file()]
     return copied + [ROOT / name for name in STAGING_FILES]
 
 
@@ -152,7 +168,9 @@ def _stage_verifier_free_workspace(
         )
     """
     fixture = FIXTURES / "verus-wiring-probe"
-    _verify_source_links([fixture, *staged_sources()], ROOT)
+    _verify_source_links(
+        [*staged_fixture_entries(), *staged_sources()], ROOT
+    )
     _recreate_workspace(
         directory, ROOT / "target" if boundary is None else boundary
     )
