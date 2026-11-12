@@ -10,37 +10,64 @@ record binds. Container orchestration stays in ``verifier_free_probe``.
 from __future__ import annotations
 
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 
-def verify_source_links(sources: Iterable[Path]) -> None:
-    """Refuse to stage a source that is a symbolic link.
+def _link_components(source: Path, root: Path) -> Iterator[Path]:
+    """Yield every symbolic link between ``root`` and ``source``.
+
+    Examples
+    --------
+    A linked ``.cargo`` directory is reported even when the file is regular::
+
+        list(_link_components(ROOT / '.cargo/config.toml', ROOT))
+    """
+    relative = source.relative_to(root)
+    for index in range(1, len(relative.parts) + 1):
+        candidate = root.joinpath(*relative.parts[:index])
+        if candidate.is_symlink():
+            yield candidate
+
+
+def verify_source_links(sources: Iterable[Path], root: Path) -> None:
+    """Refuse to stage a source reached through a symbolic link.
 
     ``shutil.copytree`` and ``shutil.copy2`` dereference links by default, so
     a linked source would enter the workspace as a regular file holding
-    content from outside the repository. The staged-tree check cannot see
-    that, because the link itself is gone by then. Checking the repository
-    entries before copying keeps the recorded digest tied to repository
+    content from outside the repository. A link can also sit in a directory
+    component: if ``.cargo`` is a link, ``.cargo/config.toml`` is not itself a
+    link. The staged-tree check cannot see either case, because the link is
+    gone by then. Checking every component between the repository root and a
+    source before copying keeps the recorded digest tied to repository
     content.
 
     Parameters
     ----------
     sources
         Repository entries the staging step will copy.
+    root
+        Repository root that must contain every source without a link.
 
     Raises
     ------
     ValueError
-        If any source is a symbolic link, naming each link.
+        If any component between ``root`` and a source is a symbolic link,
+        naming each link.
 
     Examples
     --------
     The fixture root and each file it contributes are both checked::
 
-        verify_source_links([fixture, *staged_sources()])
+        verify_source_links([fixture, *staged_sources()], ROOT)
     """
-    links = sorted(str(path) for path in sources if path.is_symlink())
+    links = sorted(
+        {
+            str(link)
+            for source in sources
+            for link in _link_components(source, root)
+        }
+    )
     if links:
         raise ValueError(
             f'the staged sources must not be symbolic links: {links}'

@@ -7,6 +7,7 @@ a planted symbolic link, or a mismatched staged tree is caught without podman.
 
 from __future__ import annotations
 
+import shutil
 import tempfile
 import unittest
 from collections.abc import Iterator
@@ -139,27 +140,58 @@ class WorkspaceGuardTests(unittest.TestCase):
 class SourceLinkTests(unittest.TestCase):
     """Refuse a repository source that copying would dereference."""
 
+    def _relocated_module(self, boundary: Path) -> tuple[ModuleType, Path]:
+        """Point the module at a temporary repository and return its fixture.
+
+        The pins are created as empty files; only their paths matter here.
+
+        Examples
+        --------
+        The caller adds the link under test::
+
+            module, fixture = self._relocated_module(boundary)
+        """
+        module = _module()
+        root = boundary.parent / 'repo'
+        fixture = root / 'fixtures/verus-wiring-probe'
+        fixture.mkdir(parents=True)
+        for name in module.STAGING_FILES:
+            pin = root / name
+            pin.parent.mkdir(parents=True, exist_ok=True)
+            pin.write_text('', encoding='utf-8')
+        self.addCleanup(setattr, module, 'ROOT', module.ROOT)
+        self.addCleanup(setattr, module, 'FIXTURES', module.FIXTURES)
+        module.ROOT = root
+        module.FIXTURES = root / 'fixtures'
+        return module, fixture
+
     def test_a_symbolic_link_among_the_sources_is_refused_before_staging(self) -> None:
         """copytree would turn the link into a regular staged file."""
-        module = _module()
         with _boundary() as boundary:
-            root = boundary.parent / 'repo'
-            fixture = root / 'fixtures/verus-wiring-probe'
-            fixture.mkdir(parents=True)
+            module, fixture = self._relocated_module(boundary)
             outside = boundary.parent / 'outside.toml'
             outside.write_text('outside = true\n', encoding='utf-8')
             (fixture / 'Cargo.toml').symlink_to(outside)
-            for name in module.STAGING_FILES:
-                pin = root / name
-                pin.parent.mkdir(parents=True, exist_ok=True)
-                pin.write_text('', encoding='utf-8')
-            self.addCleanup(setattr, module, 'ROOT', module.ROOT)
-            self.addCleanup(setattr, module, 'FIXTURES', module.FIXTURES)
-            module.ROOT = root
-            module.FIXTURES = root / 'fixtures'
             workspace = boundary / 'workspace'
 
             with self.assertRaisesRegex(ValueError, 'must not be symbolic links'):
+                module._stage_verifier_free_workspace(workspace, boundary=boundary)
+
+            self.assertFalse(workspace.exists(), 'a refused source set must not be staged')
+
+    def test_a_symbolic_link_in_a_source_directory_is_refused(self) -> None:
+        """A linked directory hides the link behind a regular leaf path."""
+        with _boundary() as boundary:
+            module, _ = self._relocated_module(boundary)
+            real_cargo = boundary.parent / 'real-cargo'
+            real_cargo.mkdir()
+            (real_cargo / 'config.toml').write_text('outside = true\n', encoding='utf-8')
+            cargo = module.ROOT / '.cargo'
+            shutil.rmtree(cargo)
+            cargo.symlink_to(real_cargo, target_is_directory=True)
+            workspace = boundary / 'workspace'
+
+            with self.assertRaisesRegex(ValueError, r'symbolic links: \[.*\.cargo'):
                 module._stage_verifier_free_workspace(workspace, boundary=boundary)
 
             self.assertFalse(workspace.exists(), 'a refused source set must not be staged')

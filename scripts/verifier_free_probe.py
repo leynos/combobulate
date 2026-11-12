@@ -152,7 +152,7 @@ def _stage_verifier_free_workspace(
         )
     """
     fixture = FIXTURES / "verus-wiring-probe"
-    _verify_source_links([fixture, *staged_sources()])
+    _verify_source_links([fixture, *staged_sources()], ROOT)
     _recreate_workspace(
         directory, ROOT / "target" if boundary is None else boundary
     )
