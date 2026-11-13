@@ -29,8 +29,11 @@ def _load_workflow(name: str) -> dict:
     return cast('dict', document)
 
 
-def _setup_uv_uses(workflow: dict, name: str, job: str) -> str:
-    """Return the sole ``setup-uv`` reference declared by one job.
+def _setup_uv_step(workflow: dict, name: str, job: str) -> tuple[int, str]:
+    """Return the index and sole ``setup-uv`` reference declared by one job.
+
+    The index lets ordering assertions bind to the step that really carries
+    the action, rather than to whichever step happens to share its name.
 
     Raises
     ------
@@ -38,16 +41,17 @@ def _setup_uv_uses(workflow: dict, name: str, job: str) -> str:
         When the job declares no ``setup-uv`` step or more than one.
     """
     steps = workflow['jobs'][job]['steps']
-    uses = [
-        step['uses'] for step in steps
+    matches = [
+        (index, step['uses']) for index, step in enumerate(steps)
         if step.get('uses', '').startswith('astral-sh/setup-uv@')
     ]
-    if len(uses) != 1:
+    if len(matches) != 1:
         raise AssertionError(
             f'{name} job {job!r} must declare exactly one setup-uv step, '
-            f'found {len(uses)}'
+            f'found {len(matches)}'
         )
-    return cast('str', uses[0])
+    index, uses = matches[0]
+    return index, cast('str', uses)
 
 
 @dataclass(frozen=True)
@@ -205,13 +209,12 @@ class DesignWorkflowContract(unittest.TestCase):
         """Verify CI installs and caches the design-check dependencies."""
         workflow = _load_workflow('design.yml')
         steps = workflow['jobs']['design-check']['steps']
+        uv_step_index, uv_uses = _setup_uv_step(
+            workflow, 'design.yml', 'design-check',
+        )
         python_step_index = next(
             index for index, step in enumerate(steps)
             if step.get('uses', '').startswith('actions/setup-python@')
-        )
-        uv_step_index = next(
-            index for index, step in enumerate(steps)
-            if step.get('name') == 'Setup uv'
         )
         dependencies_step_index = next(
             index for index, step in enumerate(steps)
@@ -233,12 +236,13 @@ class DesignWorkflowContract(unittest.TestCase):
             'python3 -m pip install -r scripts/requirements.txt',
             'CI must install the relocated documentation requirements file',
         )
-        uv_uses = _setup_uv_uses(workflow, 'design.yml', 'design-check')
         self.assertIsNotNone(
             SETUP_UV_PIN.fullmatch(uv_uses),
             f'the design workflow must pin uv to a full commit SHA, got {uv_uses!r}',
         )
-        ci_uses = _setup_uv_uses(_load_workflow('ci.yml'), 'ci.yml', 'build-test')
+        _, ci_uses = _setup_uv_step(
+            _load_workflow('ci.yml'), 'ci.yml', 'build-test',
+        )
         self.assertEqual(
             uv_uses, ci_uses,
             'design.yml and ci.yml must select one pinned uv setup action: '

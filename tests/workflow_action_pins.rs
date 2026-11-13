@@ -52,12 +52,20 @@ fn committed_workflows_pin_every_action_to_one_revision() {
     );
 }
 
-/// Equal pins and a live exception must satisfy the contract.
+/// Equal pins pass, and a declared exception permits one known divergence.
 #[test]
-fn agreeing_pins_and_declared_exceptions_are_accepted() {
-    let shared = format!("owner/action@{SHA_ONE}");
+fn equal_pins_pass_and_a_declared_exception_permits_divergence() {
+    let shared = format!("owner/setup@{SHA_ONE}");
     let excepted = format!("owner/setup@{SHA_TWO}");
-    let documents = documents(&[
+    let agreeing = documents(&[
+        ("ci.yml", workflow(&[("Build", shared.as_str())])),
+        ("audit.yml", workflow(&[("Audit", shared.as_str())])),
+    ]);
+    assert!(
+        pins::workflow_violations(&agreeing, &[]).is_empty(),
+        "equal pins must satisfy the consistency contract"
+    );
+    let diverging = documents(&[
         ("ci.yml", workflow(&[("Build", shared.as_str())])),
         ("audit.yml", workflow(&[("Audit", excepted.as_str())])),
     ]);
@@ -67,8 +75,20 @@ fn agreeing_pins_and_declared_exceptions_are_accepted() {
         reason: "fixture exception",
     }];
     assert!(
-        pins::workflow_violations(&documents, &exceptions).is_empty(),
-        "agreeing pins and a live exception must satisfy the contract"
+        pins::workflow_violations(&diverging, &exceptions).is_empty(),
+        "a declared exception must permit the audit pin to differ"
+    );
+    let violations = pins::workflow_violations(&diverging, &[]);
+    assert_eq!(
+        violations.len(),
+        1,
+        "without the exception the divergence must be reported: {violations:?}"
+    );
+    assert!(
+        violations
+            .first()
+            .is_some_and(|violation| violation.contains("more than one revision")),
+        "the violation must be the consistency check: {violations:?}"
     );
 }
 
