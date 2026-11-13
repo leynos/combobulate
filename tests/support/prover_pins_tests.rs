@@ -207,6 +207,27 @@ fn script_helper_source_is_read() {
     );
 }
 
+/// A bare `#` line is empty metadata, and helper names normalize.
+#[test]
+fn bare_comment_lines_and_normalized_names_are_accepted() {
+    let revision = "a".repeat(40);
+    let source = format!(
+        concat!(
+            "# /// script\n#\n# dependencies = [\"rust_prover_tools @ git+",
+            "https://example.test/tools.git@{revision}\"]\n# ///\n"
+        ),
+        revision = revision
+    );
+    assert_eq!(
+        script_dependency("script.py", &source),
+        Ok(ScriptDependency {
+            repository: "https://example.test/tools.git".to_owned(),
+            revision,
+        }),
+        "a bare comment line and a normalized helper name must be accepted"
+    );
+}
+
 /// A malformed PEP 723 block names the rule it broke.
 #[test]
 fn script_blocks_are_rejected() {
@@ -225,6 +246,11 @@ fn script_blocks_are_rejected() {
         (
             "non-comment line",
             "# /// script\nrequires-python = \">=3.14\"\n# ///\n".to_owned(),
+            "comment",
+        ),
+        (
+            "missing metadata space",
+            "# /// script\n#dependencies = []\n# ///\n".to_owned(),
             "comment",
         ),
         (
@@ -255,6 +281,13 @@ fn helper_requirements_are_rejected() {
         (
             "two helpers",
             script_with(&format!("\"{helper}\",\n#   \"{helper}\"")),
+            "exactly once",
+        ),
+        (
+            "normalized duplicate",
+            script_with(&format!(
+                "\"{helper}\",\n#   \"rust_prover_tools @ git+https://example.test/tools.git@{revision}\""
+            )),
             "exactly once",
         ),
         (

@@ -132,8 +132,7 @@
         "scripts/tests/test_preregistration.py",
         "scripts/tests/test_preregistration_measurements.py",
         "scripts/tests/test_validation_report.py",
-        "scripts/tests/test_verifier_probe_provenance.py",
-        "scripts/tests/test_toolchain_profiles.py"
+        "scripts/tests/test_verifier_probe_provenance.py"
       ]
     },
     "verus_rust": {

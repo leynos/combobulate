@@ -3,7 +3,7 @@
 `VERSION` holds the Verus release, and `SHA256SUMS` holds one `sha256sum` row
 that binds that release's archive:
 
-```text
+```plaintext
 <64 lowercase hex digest>  verus-<VERSION>-x86-linux.zip
 ```
 

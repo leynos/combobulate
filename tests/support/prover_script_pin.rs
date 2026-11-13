@@ -79,8 +79,14 @@ fn script_metadata(file: &str, source: &str) -> Result<String, PinError> {
             _ if is_open => {
                 let text = line
                     .strip_prefix("# ")
-                    .or_else(|| line.strip_prefix('#'))
-                    .ok_or_else(|| PinError::new(file, "every PEP 723 line must be a comment"))?;
+                    .or_else(|| line.strip_prefix('#').filter(|rest| rest.is_empty()))
+                    .ok_or_else(|| {
+                        PinError::new(
+                            file,
+                            "every PEP 723 line must be a comment of the form `# <metadata>` or \
+                             `#`",
+                        )
+                    })?;
                 metadata.push_str(text);
                 metadata.push('\n');
             }
@@ -113,7 +119,7 @@ fn sole_helper_requirement<'a>(
         let requirement = dependency
             .as_str()
             .ok_or_else(|| PinError::new(file, "every embedded dependency must be a string"))?;
-        if requirement_name(requirement) == "rust-prover-tools" {
+        if is_helper_requirement(requirement) {
             if found.is_some() {
                 return Err(PinError::new(
                     file,
@@ -125,6 +131,14 @@ fn sole_helper_requirement<'a>(
     }
     found.ok_or_else(|| PinError::new(file, "must list a rust-prover-tools dependency"))
 }
+
+/// Reports whether a requirement names the helper under PEP 503 normalization.
+fn is_helper_requirement(requirement: &str) -> bool {
+    is_helper_name(requirement_name(requirement))
+}
+
+/// Reports whether a distribution name normalizes to the helper's name.
+fn is_helper_name(name: &str) -> bool { normalized_name(name) == "rust-prover-tools" }
 
 /// Returns the distribution name from a PEP 508 requirement.
 fn requirement_name(requirement: &str) -> &str {
@@ -140,16 +154,42 @@ fn requirement_name(requirement: &str) -> &str {
         .unwrap_or_default()
 }
 
+/// Applies PEP 503 normalization so `rust_prover_tools` cannot slip past a
+/// uniqueness check written for `rust-prover-tools`.
+fn normalized_name(name: &str) -> String {
+    let mut normalized = String::with_capacity(name.len());
+    for character in name.to_lowercase().chars() {
+        if matches!(character, '-' | '_' | '.') {
+            if !normalized.ends_with('-') {
+                normalized.push('-');
+            }
+        } else {
+            normalized.push(character);
+        }
+    }
+    normalized
+}
+
 /// Requires the helper requirement to be a `git+` reference with a full commit.
 fn parse_helper_requirement(file: &str, requirement: &str) -> Result<ScriptDependency, PinError> {
-    let source = requirement
-        .strip_prefix("rust-prover-tools @ git+")
-        .ok_or_else(|| {
-            PinError::new(
-                file,
-                "rust-prover-tools must use `@ git+<repository>@<revision>`",
-            )
-        })?;
+    let Some((name, location)) = requirement.split_once(" @ ") else {
+        return Err(PinError::new(
+            file,
+            "rust-prover-tools must use `@ git+<repository>@<revision>`",
+        ));
+    };
+    if !is_helper_name(name) {
+        return Err(PinError::new(
+            file,
+            format!("expected the rust-prover-tools requirement, got {name:?}"),
+        ));
+    }
+    let source = location.strip_prefix("git+").ok_or_else(|| {
+        PinError::new(
+            file,
+            "rust-prover-tools must use `@ git+<repository>@<revision>`",
+        )
+    })?;
     let Some((repository, revision)) = source.rsplit_once('@') else {
         return Err(PinError::new(
             file,

@@ -151,7 +151,10 @@ class SourcedPins(ScratchTree):
         """
         site = self.root / 'tools/verus/SHA256SUMS'
         self.assertTrue(site.is_file(), 'the fixture tree must contain the cited site')
-        site.write_text(site.read_text(encoding='utf-8').replace('0.2026.09.06.8dea4a2', 'X'),
+        # Derive the value from the record so a legitimate release bump does
+        # not leave this test replacing a literal the site no longer holds.
+        pin = record_at(self.root)['pins']['verus_release']['value']
+        site.write_text(site.read_text(encoding='utf-8').replace(pin, 'X'),
                         encoding='utf-8')
         self.assert_fails('verus_release cites a site that does not contain')
 
