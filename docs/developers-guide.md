@@ -662,9 +662,13 @@ Equality checks accept any shared revision, so a coordinated bump passes. They
 cannot distinguish a coordinated downgrade from an upgrade: if every caller
 moved back to an older revision together, the pins would still agree. That is
 accepted because Dependabot only moves pins forward; a deliberate downgrade is
-a reviewed change, not an automated one. Behavioural assertions remain, so a
-shared pin that lost a required capability still fails: CI and Act must keep
-`rustflags: ""`, which leaves Cargo's development defaults active.
+a reviewed change, not an automated one. Contracts also keep asserting the
+caller-visible behaviour they can observe: CI and Act must still pass
+`rustflags: ""`, which leaves Cargo's development defaults active. How the
+pinned action interprets that input belongs to the shared action's own
+contract. These tests read the workflow YAML this repository owns; they cannot
+execute a remote action, so they cannot detect a revision that changed what an
+input means.
 
 If a workflow depends on a particular capability, verify that capability before
 executing the dependency. A comment records provenance; it does not enforce a
