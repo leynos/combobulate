@@ -1455,21 +1455,23 @@ remove the wrapper; the separate hosted observation job uses a fresh runner.
 Its record is
 `tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
 the container build and probe logs in the adjacent `observations/` directory.
-Any earlier record is deleted before the run begins, so a failure during
-staging, input verification, or the container build cannot leave an earlier
-passing record in place to be mistaken for a record of this run. The record
-carries `source_digests` for every file the staging step copies: the fixture
-tree minus evidence records and build output, plus the root toolchain, linker,
-build-tool, and mold pin files. The hosted record is excluded from the staged
-set so it can bind the inputs without hashing itself. Each key stays
-repository-relative, but the digest is taken from the staged copy the container
-actually builds. The digest is structural: it hashes the parsed form, so a
-change to what was parsed invalidates the record, while a formatting-only or
-comment-only edit to a TOML input leaves it unchanged. The container channel is
-read from the staged `rust-toolchain.toml`, so the selected channel and the
-recorded digest describe the same file. The recorded observation must be
-recaptured whenever the build script or a staged input changes, so the stored
-command, digests, and the code under test stay the same.
+Every component of the record's path is checked for symbolic links before the
+run touches it, because both the deletion and the inconclusive write follow the
+path. After that check, any earlier record is deleted before the run begins, so
+a failure during staging, input verification, or the container build cannot
+leave an earlier passing record in place to be mistaken for a record of this
+run. The record carries `source_digests` for every file the staging step
+copies: the fixture tree minus evidence records and build output, plus the root
+toolchain, linker, build-tool, and mold pin files. The hosted record is
+excluded from the staged set so it can bind the inputs without hashing itself.
+Each key stays repository-relative, but the digest is taken from the staged
+copy the container actually builds. The digest is structural: it hashes the
+parsed form, so a change to what was parsed invalidates the record, while a
+formatting-only or comment-only edit to a TOML input leaves it unchanged. The
+container channel is read from the staged `rust-toolchain.toml`, so the
+selected channel and the recorded digest describe the same file. The recorded
+observation must be recaptured whenever the build script or a staged input
+changes, so the stored command, digests, and the code under test stay the same.
 
 The staging workspace `<repo>/target/epm1-verifier-free-workspace` is removed
 and recreated on every run, so a source deleted from the repository cannot

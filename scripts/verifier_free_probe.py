@@ -349,8 +349,11 @@ def run_verifier_free() -> None:
 
         run_verifier_free()
     """
-    environment = dict(os.environ)
     record = FIXTURES / "verus-wiring-probe/verifier-free.json"
+    # Unlinking and the inconclusive write both follow the path, so a linked
+    # fixture directory must be refused before either can leave the repository.
+    _verify_source_links([record], ROOT)
+    environment = dict(os.environ)
     # A record describes one run. An earlier pass must not survive a failure
     # below, because nothing would distinguish it from a record of this run.
     record.unlink(missing_ok=True)

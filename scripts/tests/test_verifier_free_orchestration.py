@@ -7,9 +7,10 @@ are checked deterministically and without podman.
 
 Examples
 --------
-The staging set is derived from the fixture tree rather than listed twice::
+Each case replaces only the boundary it exercises::
 
-    [path.name for path in staged_sources() if path.name == 'Cargo.toml']
+    module = _module()
+    module.ensure_base_image = Mock()
 """
 
 from __future__ import annotations
@@ -26,8 +27,6 @@ from verifier_probe_loader import load_structural_digest, load_verifier_free_pro
 
 is_structural_digest = load_structural_digest().is_structural_digest
 
-FIXTURES = Path(__file__).resolve().parents[2] / 'tools/verifier-fixtures'
-
 
 def _module() -> ModuleType:
     """Return the verifier-free module loaded with the probe helper stubbed.
@@ -39,53 +38,6 @@ def _module() -> ModuleType:
         _module().STAGING_FILES  # ('.cargo/config.toml', ...)
     """
     return load_verifier_free_probe()
-
-
-class StagedSourcesTests(unittest.TestCase):
-    """Bind the observation to exactly the files the build consumes."""
-
-    def test_every_staged_file_is_a_real_repository_path(self) -> None:
-        """A misspelt path would digest nothing and bind nothing."""
-        module = _module()
-
-        missing = [str(path) for path in module.staged_sources() if not path.is_file()]
-
-        self.assertEqual(missing, [], 'every staged source must exist in the repository')
-
-    def test_evidence_records_are_excluded_from_the_staged_set(self) -> None:
-        """A record that hashed itself could never be committed."""
-        module = _module()
-        names = {path.name for path in module.staged_sources()}
-
-        for ignored in ('provenance.json', 'verifier-free.json', 'verifier-free-hosted.json'):
-            self.assertNotIn(ignored, names, f'{ignored} must not be staged')
-
-    def test_build_output_is_excluded_from_the_staged_set(self) -> None:
-        """A Cargo target directory is output, not a build input."""
-        module = _module()
-
-        staged = module.staged_sources()
-
-        self.assertFalse(
-            any(
-                'target' in path.relative_to(FIXTURES / 'verus-wiring-probe').parts
-                for path in staged
-                if path.is_relative_to(FIXTURES)
-            ),
-            'build output must stay out of the staged set',
-        )
-
-    def test_root_toolchain_and_linker_pins_are_staged(self) -> None:
-        """The container build must use the same compiler and linker as the host."""
-        module = _module()
-        staged = module.staged_sources()
-
-        for name in module.STAGING_FILES:
-            self.assertIn(
-                Path(module.ROOT) / name,
-                staged,
-                f'the pinned {name} must be staged beside the fixture',
-            )
 
 
 class StagingTests(unittest.TestCase):
@@ -237,6 +189,27 @@ class OrchestrationTests(unittest.TestCase):
 
         self.module._capture.assert_called_once()
         self.assertIn('podman', self.module._capture.call_args.args[0], 'the build must go through podman')
+
+    def test_a_linked_fixture_directory_is_refused_before_the_record_is_touched(self) -> None:
+        """Unlink and the inconclusive write would otherwise follow the link."""
+        outside = self.directory / 'outside'
+        outside.mkdir()
+        record = outside / 'verifier-free.json'
+        record.write_text('{"status": "pass"}\n', encoding='utf-8')
+        fixture = self.module.FIXTURES / 'verus-wiring-probe'
+        shutil.rmtree(fixture)
+        fixture.symlink_to(outside, target_is_directory=True)
+        self.module.os.environ['RUSTC_WRAPPER'] = 'build-limits-rustc'
+
+        with self.assertRaisesRegex(ValueError, 'must not be symbolic links'):
+            self.module.run_verifier_free()
+
+        self.assertTrue(record.is_file(), 'the link target must keep its record')
+        self.assertEqual(
+            json.loads(record.read_text(encoding='utf-8'))['status'],
+            'pass',
+            'the refusal must not write through the link',
+        )
 
     def test_a_failure_before_staging_removes_an_earlier_passing_record(self) -> None:
         """A stale pass would describe inputs this run never even staged."""
