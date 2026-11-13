@@ -6,7 +6,7 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 23
+      "count": 24
     },
     {
       "check": "local-links",
