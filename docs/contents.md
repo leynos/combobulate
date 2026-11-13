@@ -65,7 +65,7 @@ implemented API or completed verification.
 [adr-0008]: adrs/adr-0008-acceptance-control-pre-registration.md
 [adr-0009]: adrs/adr-0009-proof-first-policy-and-evidence-gate.md
 [adr-0010]: adrs/adr-0010-workspace-crate-boundaries-and-build-profiles.md
-[adr-0011]: adrs/adr-0011-keep-rust-prover-tools-at-9c4a27a8-until-kani-recapture.md
+[adr-0011]: adrs/adr-0011-keep-rust-prover-tools-at-9c4a27a8-until-the-kani-evidence-is-recaptured.md
 
 ## Project guides
 
