@@ -3,7 +3,7 @@ language:
     prover_tools:
       exceptions:
         - clauses: [PT-001, PT-002]
-          pin: 9c4a27a86c678ceac1155404f45d95ee4a14a172
+          pin: 9c4a27a8
           record: docs/adrs/adr-0011-keep-rust-prover-tools-at-9c4a27a8-until-the-kani-evidence-is-recaptured.md
           rationale: >-
             The Kani provenance records name 9c4a27a8 as the rust-prover-tools
