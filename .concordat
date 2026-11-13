@@ -1,0 +1,16 @@
+language:
+  rust:
+    prover_tools:
+      exceptions:
+        - clauses: [PT-001, PT-002]
+          pin: 9c4a27a8
+          record: docs/adrs/adr-0011-keep-rust-prover-tools-at-9c4a27a8-until-the-kani-evidence-is-recaptured.md
+          rationale: >-
+            The Kani provenance records name 9c4a27a8 as the rust-prover-tools
+            revision that captured their observations, so moving the pin, or
+            moving the workflows that install Kani by that revision onto the
+            shared install-prover-tools action, would orphan the recorded
+            evidence.
+          review_trigger: >-
+            Revisit when the Kani evidence is recaptured under a newer
+            rust-prover-tools revision.
