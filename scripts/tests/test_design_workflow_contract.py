@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -15,6 +16,38 @@ from typing import cast
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
+
+SETUP_UV_PIN = re.compile(r'astral-sh/setup-uv@[0-9a-f]{40}')
+
+
+def _load_workflow(name: str) -> dict:
+    """Load one workflow with every scalar kept as written text."""
+    document = yaml.load(
+        (ROOT / f'.github/workflows/{name}').read_text(encoding='utf-8'),
+        Loader=yaml.BaseLoader,
+    )
+    return cast('dict', document)
+
+
+def _setup_uv_uses(workflow: dict, name: str, job: str) -> str:
+    """Return the sole ``setup-uv`` reference declared by one job.
+
+    Raises
+    ------
+    AssertionError
+        When the job declares no ``setup-uv`` step or more than one.
+    """
+    steps = workflow['jobs'][job]['steps']
+    uses = [
+        step['uses'] for step in steps
+        if step.get('uses', '').startswith('astral-sh/setup-uv@')
+    ]
+    if len(uses) != 1:
+        raise AssertionError(
+            f'{name} job {job!r} must declare exactly one setup-uv step, '
+            f'found {len(uses)}'
+        )
+    return cast('str', uses[0])
 
 
 @dataclass(frozen=True)
@@ -170,10 +203,7 @@ class DesignWorkflowContract(unittest.TestCase):
 
     def test_workflow_installs_uv_before_running_design_check(self) -> None:
         """Verify CI installs and caches the design-check dependencies."""
-        workflow = yaml.load(
-            (ROOT / '.github/workflows/design.yml').read_text(encoding='utf-8'),
-            Loader=yaml.BaseLoader,
-        )
+        workflow = _load_workflow('design.yml')
         steps = workflow['jobs']['design-check']['steps']
         python_step_index = next(
             index for index, step in enumerate(steps)
@@ -192,7 +222,6 @@ class DesignWorkflowContract(unittest.TestCase):
             if step.get('name') == 'Validate documentation contracts'
         )
         python_step = steps[python_step_index]
-        uv_step = steps[uv_step_index]
         dependencies_step = steps[dependencies_step_index]
         self.assertEqual(
             python_step['with']['cache-dependency-path'],
@@ -204,10 +233,16 @@ class DesignWorkflowContract(unittest.TestCase):
             'python3 -m pip install -r scripts/requirements.txt',
             'CI must install the relocated documentation requirements file',
         )
+        uv_uses = _setup_uv_uses(workflow, 'design.yml', 'design-check')
+        self.assertIsNotNone(
+            SETUP_UV_PIN.fullmatch(uv_uses),
+            f'the design workflow must pin uv to a full commit SHA, got {uv_uses!r}',
+        )
+        ci_uses = _setup_uv_uses(_load_workflow('ci.yml'), 'ci.yml', 'build-test')
         self.assertEqual(
-            uv_step['uses'],
-            'astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91',
-            'the workflow must use the repository-pinned uv setup action',
+            uv_uses, ci_uses,
+            'design.yml and ci.yml must select one pinned uv setup action: '
+            f'{uv_uses!r} != {ci_uses!r}',
         )
         self.assertLess(
             python_step_index, dependencies_step_index,

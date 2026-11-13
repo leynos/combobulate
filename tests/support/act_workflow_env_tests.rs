@@ -191,8 +191,13 @@ fn act_route_mutations_break_the_contract() {
         !contracts_hold(CI_WORKFLOW, &enabled_pr_act),
         "Act must not repeat full validation on pull requests"
     );
-    let wrong_manual_pin =
-        ACT_VALIDATION_WORKFLOW.replace("47b337e4f230b591891656534d4ffad868131740", "main");
+    let Some(wrong_manual_pin) = super::super::action_ref::repoint_action(
+        ACT_VALIDATION_WORKFLOW,
+        super::super::action_ref::SETUP_RUST_PATH,
+        "main",
+    ) else {
+        panic!("the manual workflow must contain the setup-rust action")
+    };
     assert_ne!(
         wrong_manual_pin, ACT_VALIDATION_WORKFLOW,
         "manual pin mutation must change source"

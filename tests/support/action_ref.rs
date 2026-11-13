@@ -1,5 +1,13 @@
 //! Shared action-path and immutable-reference checks for workflow contracts.
 
+/// The shared action that provisions Rust in every workflow.
+pub(crate) const SETUP_RUST_PATH: &str = "leynos/shared-actions/.github/actions/setup-rust";
+
+/// Returns the action path before its trailing `@` reference, if any.
+pub(crate) fn action_path(uses: &str) -> &str {
+    uses.rsplit_once('@').map_or(uses, |(path, _)| path)
+}
+
 /// Requires a full lowercase hexadecimal commit reference, independently of its value.
 pub(crate) fn is_sha_pinned(uses: &str) -> bool {
     uses.rsplit_once('@').is_some_and(|(_, reference)| {
@@ -12,9 +20,7 @@ pub(crate) fn is_sha_pinned(uses: &str) -> bool {
 
 /// Checks the expected action identity and an immutable commit-shaped reference.
 pub(crate) fn matches_pinned_action(uses: &str, expected_path: &str) -> bool {
-    uses.rsplit_once('@')
-        .is_some_and(|(path, _)| path == expected_path)
-        && is_sha_pinned(uses)
+    action_path(uses) == expected_path && is_sha_pinned(uses)
 }
 
 /// Replaces the action's current source reference without coupling fixtures to its SHA.
@@ -35,7 +41,21 @@ mod tests {
 
     use rstest::rstest;
 
-    use super::{is_sha_pinned, matches_pinned_action, repoint_action};
+    use super::{SETUP_RUST_PATH, is_sha_pinned, matches_pinned_action, repoint_action};
+
+    /// The shared setup-rust path matches itself only when it stays pinned.
+    #[test]
+    fn setup_rust_path_names_a_pinned_action() {
+        let pinned = format!("{SETUP_RUST_PATH}@{}", "a".repeat(40));
+        assert!(
+            matches_pinned_action(&pinned, SETUP_RUST_PATH),
+            "the shared setup-rust reference must match its own path"
+        );
+        assert!(
+            !matches_pinned_action(&format!("{SETUP_RUST_PATH}@main"), SETUP_RUST_PATH),
+            "a floating setup-rust reference must not match"
+        );
+    }
 
     /// Only immutable lowercase hexadecimal references satisfy the pin policy.
     #[rstest]

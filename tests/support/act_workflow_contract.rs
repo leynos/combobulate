@@ -23,7 +23,6 @@ pub(super) use jobs::{
     action_input,
     action_inputs_match,
     job_steps,
-    matches_action_revision,
     smoke_action_contracts,
     smoke_job_name,
     valid_actions,
@@ -324,7 +323,25 @@ pub(super) fn contracts_hold(ci_source: &str, act_source: &str) -> bool {
         && valid_actions(&ci)
         && valid_ci_route(&ci)
         && valid_manual_act_route(&act)
+        && setup_rust_revisions_agree(&ci, &act)
         && mdtablefix::versions_agree(&ci, &act)
+}
+
+/// Requires the hosted and manual routes to select one pinned Rust setup.
+///
+/// Dependabot may bump the shared revision, so the value is not restated. The
+/// two routes must still agree: a manual run that provisions a different
+/// action from the hosted gate is no longer validating the hosted route.
+fn setup_rust_revisions_agree(ci: &Value, act: &Value) -> bool {
+    let hosted = step(ci, "build-test", "Setup Rust").and_then(|(_, item)| text(item, &["uses"]));
+    let manual =
+        step(act, "act-validation", "Setup Rust").and_then(|(_, item)| text(item, &["uses"]));
+    matches!(
+        (hosted, manual),
+        (Some(hosted_pin), Some(manual_pin))
+            if hosted_pin == manual_pin
+                && action_ref::matches_pinned_action(manual_pin, action_ref::SETUP_RUST_PATH)
+    )
 }
 
 /// Pins the three provisioning actions before the manual full Act command.
@@ -336,19 +353,14 @@ fn valid_manual_action_prefix(steps: &[Value]) -> bool {
             "version",
             ANY_VALUE,
         ),
-        (
-            "leynos/shared-actions/.github/actions/setup-rust@\
-             47b337e4f230b591891656534d4ffad868131740",
-            "rustflags",
-            "",
-        ),
+        (action_ref::SETUP_RUST_PATH, "rustflags", ""),
     ];
     steps
         .iter()
         .take(3)
         .zip(expected_actions)
-        .all(|(item, (revision, key, value))| {
-            text(item, &["uses"]).is_some_and(|uses| matches_action_revision(uses, revision))
+        .all(|(item, (path, key, value))| {
+            text(item, &["uses"]).is_some_and(|uses| action_ref::matches_pinned_action(uses, path))
                 && action_inputs_match(item, &[(key, value)])
         })
 }

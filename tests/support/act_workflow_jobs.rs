@@ -14,7 +14,11 @@ use super::{action_ref, at, text};
 /// Marks an input whose value is checked elsewhere rather than restated here.
 pub(crate) const ANY_VALUE: &str = "<any>";
 
-/// One action path (or capability-bound revision), name, and required inputs.
+/// One action path, name, and required inputs.
+///
+/// Every entry is path-only: its revision is checked for shape by
+/// `action_ref::matches_pinned_action`, so a Dependabot bump does not need a
+/// matching edit here.
 pub(crate) type ActionContract = (
     &'static str,
     &'static str,
@@ -31,7 +35,7 @@ pub(crate) struct JobContract {
     pub(super) name: &'static str,
     /// Ordered step names; `None` for the unnamed checkout step.
     pub(super) steps: &'static [Option<&'static str>],
-    /// Ordered action revisions, matched by [`matches_action_revision`].
+    /// Ordered action paths, matched by `action_ref::matches_pinned_action`.
     pub(super) actions: &'static [&'static str],
     /// The complete job environment; `GATE_PROFILE` selects the profile.
     ///
@@ -89,8 +93,7 @@ pub(crate) const JOBS: &[JobContract] = &[
         ],
         actions: &[
             "actions/checkout",
-            "leynos/shared-actions/.github/actions/setup-rust@\
-             47b337e4f230b591891656534d4ffad868131740",
+            action_ref::SETUP_RUST_PATH,
             "leynos/shared-actions/.github/actions/install-mdtablefix",
             "DavidAnson/markdownlint-cli2-action",
             "astral-sh/setup-uv",
@@ -126,8 +129,7 @@ pub(crate) const JOBS: &[JobContract] = &[
         ],
         actions: &[
             "actions/checkout",
-            "leynos/shared-actions/.github/actions/setup-rust@\
-             47b337e4f230b591891656534d4ffad868131740",
+            action_ref::SETUP_RUST_PATH,
             "astral-sh/setup-uv",
             "leynos/shared-actions/.github/actions/install-whitaker",
         ],
@@ -156,11 +158,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Test"),
             Some("Test the single-feature isolation profiles"),
         ],
-        actions: &[
-            "actions/checkout",
-            "leynos/shared-actions/.github/actions/setup-rust@\
-             47b337e4f230b591891656534d4ffad868131740",
-        ],
+        actions: &["actions/checkout", action_ref::SETUP_RUST_PATH],
         env: &[
             ("CARGO_TERM_COLOR", "always"),
             ("BUILD_PROFILE", "debug"),
@@ -177,10 +175,10 @@ pub(crate) const JOBS: &[JobContract] = &[
 
 /// Every action any job names, with the inputs that action must receive.
 ///
-/// The setup-rust revision is capability-bound, so its path is a commit id;
-/// the rest are ordinary action references. All three jobs resolve their
-/// inputs from this one table, so an action shared by two jobs cannot acquire
-/// two different contracts, and a job's own `actions` list pins order only.
+/// Entries are path-only so a Dependabot bump needs no edit here. All three
+/// jobs resolve their inputs from this one table, so an action shared by two
+/// jobs cannot acquire two different contracts, and a job's own `actions` list
+/// pins order only.
 pub(crate) const ACTIONS: &[ActionContract] = &[
     (
         "actions/checkout",
@@ -188,7 +186,7 @@ pub(crate) const ACTIONS: &[ActionContract] = &[
         &[("persist-credentials", "false")],
     ),
     (
-        "leynos/shared-actions/.github/actions/setup-rust@47b337e4f230b591891656534d4ffad868131740",
+        action_ref::SETUP_RUST_PATH,
         "Setup Rust",
         &[("rustflags", ""), ("use-sccache", "true")],
     ),
@@ -290,10 +288,10 @@ fn valid_job_actions(ci: &Value, job: &JobContract) -> bool {
             .all(|(item, expected)| matches_hosted_action(item, expected))
 }
 
-/// Matches one hosted action revision, its name exception, and consumed inputs.
+/// Matches one hosted action path, its pin shape, name, and consumed inputs.
 fn matches_hosted_action(item: &Value, expected: &ActionContract) -> bool {
-    let (revision, name, inputs) = expected;
-    text(item, &["uses"]).is_some_and(|uses| matches_action_revision(uses, revision))
+    let (path, name, inputs) = expected;
+    text(item, &["uses"]).is_some_and(|uses| action_ref::matches_pinned_action(uses, path))
         && (*name == "checkout" || text(item, &["name"]) == Some(*name))
         && action_inputs_match(item, inputs)
 }
@@ -311,13 +309,4 @@ pub(crate) fn action_inputs_match(item: &Value, expected: &[(&str, &str)]) -> bo
         .and_then(Value::as_mapping)
         .map_or(0, serde_yaml::Mapping::len)
         == expected.len()
-}
-
-/// Preserves only the documented setup-rust capability pin as an exact revision.
-pub(crate) fn matches_action_revision(uses: &str, expected: &str) -> bool {
-    if expected.contains('@') {
-        uses == expected
-    } else {
-        action_ref::matches_pinned_action(uses, expected)
-    }
 }

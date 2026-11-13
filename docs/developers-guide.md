@@ -616,27 +616,34 @@ runtime path.
 ## Workflow pins and Dependabot
 
 Dependabot owns the upgrade of GitHub Actions and reusable workflows, including
-calls into `leynos/shared-actions`. Contract tests that assert a caller's exact
-commit SHA create a lockstep dependency: every time Dependabot opens a bump PR,
-the test fails until a human edits the pinned constant to match. That defeats
-the purpose of automated dependency updates and turns a routine bump into a
-manual chore.
+calls into `leynos/shared-actions`. A contract must therefore check the *shape*
+of each pin and, where a relationship matters, that the related pins agree. It
+must not restate one current commit SHA as an expected value: every Dependabot
+bump would then fail the test until a human copied the new SHA into it, turning
+an automated update into a manual chore.
 
-The narrow `RUSTFLAGS_PASSTHROUGH_REVISION` exception applies only while no
-independent capability probe can establish that the shared `setup-rust` action
-accepts the required `rustflags` input. In that case, assert the first revision
-that provides the capability and document this boundary beside the test. Remove
-the literal revision assertion once an independent capability probe is
-available.
+`tests/workflow_action_pins.rs` enforces the repository-wide rule. Every
+non-local `uses:` reference, at job or step level, must be a full lowercase
+40-character commit SHA, and one action path must resolve to one SHA across all
+workflows. A deliberate difference is declared as a named exception giving its
+workflow, its action path, and a reason; an exception whose action no longer
+appears in that workflow fails as stale. The current exception covers
+`setup-rust` in `audit.yml`: the scheduled audit neither passes the `rustflags`
+input nor reuses the pull-request build route, so it does not move in lockstep
+with the shared revision. The suite reads each workflow as data, rejects
+duplicate YAML mapping keys, and names the workflow file in every read or parse
+failure.
 
-Contract tests may still verify the *shape* of a reusable-workflow caller. They
-must not verify the specific SHA value.
+Contract tests may still verify other caller properties:
 
 - Do assert the workflow references the correct reusable workflow path.
 - Do assert the ref is pinned to a full 40-character commit SHA, not a
   mutable branch such as `main` or `rolling`.
 - Do assert the expected `on:` triggers, least-privilege `permissions:`, and
   the inputs the caller relies on.
+- Do assert that pins whose relationship matters agree: CI, Act, and the
+  coverage baseline select the same `setup-rust` revision, and the Design and
+  CI lanes select the same `setup-uv` revision.
 - Do not hard-code the current SHA value as an expected string. Match it with
   a pattern instead.
 - Do not fail a test purely because Dependabot bumped the pinned SHA.
@@ -651,14 +658,18 @@ def test_uses_pinned_full_sha(caller_step):
     assert SHA_RE.match(ref), f"expected a 40-hex commit SHA, got {ref!r}"
 ```
 
+Equality checks accept any shared revision, so a coordinated bump passes. They
+cannot distinguish a coordinated downgrade from an upgrade: if every caller
+moved back to an older revision together, the pins would still agree. That is
+accepted because Dependabot only moves pins forward; a deliberate downgrade is
+a reviewed change, not an automated one. Behavioural assertions remain, so a
+shared pin that lost a required capability still fails: CI and Act must keep
+`rustflags: ""`, which leaves Cargo's development defaults active.
+
 If a workflow depends on a particular capability, verify that capability before
 executing the dependency. A comment records provenance; it does not enforce a
 behavioural boundary. Keep the capability check separate from the caller's
 immutable-ref check so equivalent implementations at another commit can pass.
-The sole exception for a literal revision assertion is the
-`RUSTFLAGS_PASSTHROUGH_REVISION` boundary above: until an independent probe can
-confirm that `setup-rust` supports `rustflags`, document and assert the first
-capable revision. Remove that literal revision assertion once the probe exists.
 
 Before installing Whitaker, CI runs:
 
