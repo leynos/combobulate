@@ -1,4 +1,14 @@
 //! Shared action-path and immutable-reference checks for workflow contracts.
+//!
+//! Fixture mutation resolves call sites through the parsed workflow document
+//! rather than by scanning its text. A `uses` value is a call site only when it
+//! is a job-level `jobs.*.uses` or a step-level `jobs.*.steps[*].uses`, so a
+//! comment, a folded scalar, or a `with:` input that names an action is never
+//! repointed. A mutated document is serialized again, which keeps its structure
+//! but not its comments or original quoting; every caller parses the result as
+//! YAML.
+
+use serde_yaml::Value;
 
 /// The shared action that provisions Rust in every workflow.
 pub(crate) const SETUP_RUST_PATH: &str = "leynos/shared-actions/.github/actions/setup-rust";
@@ -23,161 +33,97 @@ pub(crate) fn matches_pinned_action(uses: &str, expected_path: &str) -> bool {
     action_path(uses) == expected_path && is_sha_pinned(uses)
 }
 
-/// Extracts the reference that immediately follows an action's `@`.
-///
-/// Quoting and YAML flow delimiters end the reference as surely as whitespace
-/// does. `uses: "path@SHA"` must yield `SHA`, not `SHA"`, and
-/// `{uses: path@SHA}` must yield `SHA`, not `SHA}`; otherwise the replacement
-/// consumes the closing character and leaves unparsable YAML behind.
-fn current_reference(suffix: &str) -> Option<&str> {
-    let ends_reference = |character: char| {
-        character.is_whitespace() || matches!(character, '"' | '\'' | '{' | '}' | '[' | ']' | ',')
-    };
-    suffix
-        .split(ends_reference)
-        .next()
-        .filter(|reference| !reference.is_empty())
+/// Replaces the reference in a `uses` value that names the expected action.
+fn repointed_reference(uses: &str, path: &str, replacement: &str) -> Option<String> {
+    let (action, _reference) = uses.rsplit_once('@')?;
+    (action == path).then(|| format!("{path}@{replacement}"))
 }
 
-/// Returns the byte offset where a YAML comment starts, if the line has one.
-///
-/// A `#` opens a comment only at the start of a line or after whitespace, so a
-/// scalar fragment such as `path@ref#suffix` is not truncated.
-fn comment_start(line: &str) -> Option<usize> {
-    line.char_indices()
-        .find(|(index, character)| {
-            *character == '#'
-                && (*index == 0
-                    || line
-                        .get(..*index)
-                        .is_some_and(|prefix| prefix.ends_with(char::is_whitespace)))
-        })
-        .map(|(index, _)| index)
-}
-
-/// Returns the part of a line that YAML treats as code rather than prose.
-fn code_before_comment(line: &str) -> &str {
-    comment_start(line).map_or(line, |index| line.split_at(index).0)
-}
-
-/// Byte offsets of the scalar values that follow each `uses:` key on a line.
-///
-/// A flow sequence can hold more than one step, so every key on the line is
-/// visited rather than only the first.
-fn uses_value_starts(line: &str) -> Vec<usize> {
-    let key = "uses:";
-    let mut starts = Vec::new();
-    let mut search = 0;
-    while let Some(rest) = line.get(search..) {
-        let Some(found) = rest.find(key) else {
-            break;
-        };
-        let key_start = search + found;
-        let is_key = key_start == 0
-            || line.get(..key_start).is_some_and(|prefix| {
-                prefix.ends_with(|character: char| {
-                    character.is_whitespace() || matches!(character, '{' | ',')
-                })
-            });
-        if is_key {
-            starts.push(key_start + key.len());
-        }
-        search = key_start + key.len();
-    }
-    starts
-}
-
-/// Whether the scalar after `uses:` introduces a block value on the next line.
-fn is_block_indicator(value: &str) -> bool {
-    matches!(value.trim_start().chars().next(), Some('>' | '|'))
-}
-
-/// Resolves the scalar text that follows a `uses:` value position.
-///
-/// A block indicator (`>-`, `|`) places the scalar on the following line; any
-/// other form keeps it on the same line. The returned offset is absolute.
-fn uses_scalar<'a>(
-    lines: &[(usize, &'a str)],
-    index: usize,
-    value_start: usize,
-) -> Option<(usize, &'a str)> {
-    let (line_start, line) = *lines.get(index)?;
-    let value = code_before_comment(line).split_at(value_start).1;
-    if !is_block_indicator(value) {
-        let indent = value.len() - value.trim_start().len();
-        return Some((line_start + value_start + indent, value.split_at(indent).1));
-    }
-    let (next_start, next_line) = *lines.get(index + 1)?;
-    let next_code = code_before_comment(next_line);
-    let indent = next_code.len() - next_code.trim_start().len();
-    Some((next_start + indent, next_code.split_at(indent).1))
-}
-
-/// Byte ranges of action references that appear in job- or step-level `uses`.
-///
-/// Comments and every other key are excluded: prose that mentions an action, or
-/// a `with:` input that restates one, is not a call site to repoint. Block
-/// scalar `uses:` values are read from the following line.
-fn reference_spans(source: &str, prefix: &str) -> Vec<(usize, usize)> {
-    let lines = source
-        .split_inclusive('\n')
-        .scan(0usize, |offset, line| {
-            let start = *offset;
-            *offset += line.len();
-            Some((start, line))
-        })
-        .collect::<Vec<_>>();
-    let mut spans = Vec::new();
-    for (index, (_, line)) in lines.iter().enumerate() {
-        let code = code_before_comment(line);
-        for value_start in uses_value_starts(code) {
-            let Some((absolute, scalar)) = uses_scalar(&lines, index, value_start) else {
-                continue;
-            };
-            let Some(found) = scalar.find(prefix) else {
-                continue;
-            };
-            let start = absolute + found;
-            let Some(reference) = current_reference(source.split_at(start + prefix.len()).1) else {
-                continue;
-            };
-            spans.push((start, start + prefix.len() + reference.len()));
-        }
-    }
-    spans
-}
-
-/// Replaces the first, or every, `uses` reference to an action path.
-fn replace_references(
-    source: &str,
-    path: &str,
-    replacement: &str,
+/// One coordinated, or deliberately partial, fixture mutation.
+struct Repoint<'a> {
+    path: &'a str,
+    replacement: &'a str,
     first_only: bool,
-) -> Option<String> {
-    let prefix = format!("{path}@");
-    let mut changed = String::with_capacity(source.len());
-    let mut cursor = 0;
-    let mut replaced = false;
-    for (start, end) in reference_spans(source, &prefix) {
-        changed.push_str(source.get(cursor..start).unwrap_or_default());
-        changed.push_str(&prefix);
-        changed.push_str(replacement);
-        cursor = end;
-        replaced = true;
-        if first_only {
+    replaced: bool,
+}
+
+impl Repoint<'_> {
+    /// Repoints one call-site value in place, once its turn has come.
+    fn visit(&mut self, uses: &mut Value) {
+        if self.is_done() {
+            return;
+        }
+        let Some(text) = uses.as_str() else {
+            return;
+        };
+        let Some(updated) = repointed_reference(text, self.path, self.replacement) else {
+            return;
+        };
+        *uses = Value::String(updated);
+        self.replaced = true;
+    }
+
+    /// Whether a partial mutation has already moved its only call site.
+    fn is_done(&self) -> bool { self.replaced && self.first_only }
+}
+
+/// Repoints job-level and step-level `uses` values inside a parsed workflow.
+///
+/// Only the two documented call-site shapes are visited, so a `with:` input
+/// named `uses` is left alone even when it names the same action.
+fn repoint_document(document: &mut Value, path: &str, replacement: &str, first_only: bool) -> bool {
+    let mut repoint = Repoint {
+        path,
+        replacement,
+        first_only,
+        replaced: false,
+    };
+    let Some(jobs) = document.get_mut("jobs").and_then(Value::as_mapping_mut) else {
+        return false;
+    };
+    for job in jobs.values_mut() {
+        let Some(entry) = job.as_mapping_mut() else {
+            continue;
+        };
+        if let Some(uses) = entry.get_mut("uses") {
+            repoint.visit(uses);
+        }
+        for step in entry
+            .get_mut("steps")
+            .and_then(Value::as_sequence_mut)
+            .into_iter()
+            .flatten()
+        {
+            if repoint.is_done() {
+                break;
+            }
+            if let Some(uses) = step.get_mut("uses") {
+                repoint.visit(uses);
+            }
+        }
+        if repoint.is_done() {
             break;
         }
     }
-    if !replaced {
+    repoint.replaced
+}
+
+/// Repoints the first matching call site, or every call site.
+///
+/// Returns `None` when the source has no matching call site, or when it cannot
+/// be parsed and serialized again. Every caller treats that as a fixture that
+/// does not contain the action.
+fn repointed(source: &str, path: &str, replacement: &str, first_only: bool) -> Option<String> {
+    let mut document: Value = serde_yaml::from_str(source).ok()?;
+    if !repoint_document(&mut document, path, replacement, first_only) {
         return None;
     }
-    changed.push_str(source.get(cursor..).unwrap_or_default());
-    Some(changed)
+    serde_yaml::to_string(&document).ok()
 }
 
 /// Replaces the first `uses` reference without coupling fixtures to its SHA.
 pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Option<String> {
-    replace_references(source, path, replacement, true)
+    repointed(source, path, replacement, true)
 }
 
 /// Replaces every `uses` reference to the action.
@@ -185,7 +131,7 @@ pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Opt
 /// A coordinated bump must move all of an action's call sites: leaving one
 /// behind would make the fixture test an inconsistency rather than a bump.
 pub(crate) fn repoint_all_actions(source: &str, path: &str, replacement: &str) -> Option<String> {
-    replace_references(source, path, replacement, false)
+    repointed(source, path, replacement, false)
 }
 
 /// Shape and bump regressions shared by all action-reference consumers.

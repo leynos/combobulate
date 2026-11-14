@@ -11,6 +11,60 @@ use super::{
     repoint_all_actions,
 };
 
+/// Parses a workflow fixture, naming the fixture in every failure.
+fn parsed(source: &str) -> Value {
+    match serde_yaml::from_str(source) {
+        Ok(document) => document,
+        Err(error) => panic!("the workflow fixture must parse: {error}"),
+    }
+}
+
+/// Reads one step's `uses` value.
+fn step_uses<'a>(document: &'a Value, job: &str, index: usize) -> &'a str {
+    let located = document
+        .get("jobs")
+        .and_then(|jobs| jobs.get(job))
+        .and_then(|entry| entry.get("steps"))
+        .and_then(Value::as_sequence)
+        .and_then(|steps| steps.get(index))
+        .and_then(|step| step.get("uses"))
+        .and_then(Value::as_str);
+    let Some(uses) = located else {
+        panic!("{job} step {index} must declare a uses value");
+    };
+    uses
+}
+
+/// Reads one job's `with:` input that is itself named `uses`.
+fn with_uses<'a>(document: &'a Value, job: &str, index: usize) -> &'a str {
+    let located = document
+        .get("jobs")
+        .and_then(|jobs| jobs.get(job))
+        .and_then(|entry| entry.get("steps"))
+        .and_then(Value::as_sequence)
+        .and_then(|steps| steps.get(index))
+        .and_then(|step| step.get("with"))
+        .and_then(|inputs| inputs.get("uses"))
+        .and_then(Value::as_str);
+    let Some(input) = located else {
+        panic!("{job} step {index} must declare a uses input");
+    };
+    input
+}
+
+/// Reads a job-level `uses` value.
+fn job_uses<'a>(document: &'a Value, job: &str) -> &'a str {
+    let located = document
+        .get("jobs")
+        .and_then(|jobs| jobs.get(job))
+        .and_then(|entry| entry.get("uses"))
+        .and_then(Value::as_str);
+    let Some(uses) = located else {
+        panic!("{job} must declare a job-level uses value");
+    };
+    uses
+}
+
 /// The shared setup-rust path matches itself only when it stays pinned.
 #[test]
 fn setup_rust_path_names_a_pinned_action() {
@@ -57,130 +111,117 @@ fn action_pin_requires_full_lowercase_sha(#[case] reference: String, #[case] exp
 #[case("0".repeat(40))]
 #[case("a".repeat(40))]
 fn action_mutation_is_independent_of_current_pin(#[case] reference: String) {
-    let source = format!("uses: owner/action@{reference}\n");
+    let source = format!("jobs:\n  one:\n    steps:\n      - uses: owner/action@{reference}\n");
     let changed =
         repoint_action(&source, "owner/action", "main").expect("the action fixture must exist");
     assert_eq!(
-        changed, "uses: owner/action@main\n",
+        step_uses(&parsed(&changed), "one", 0),
+        "owner/action@main",
         "mutation must replace the current pin"
     );
-    assert_ne!(
-        changed, source,
-        "each current-pin fixture must actually change"
-    );
 }
 
-/// A coordinated bump must move every call site of the same action.
+/// Every call-site form a workflow can use takes the coordinated bump.
 ///
-/// The quoted cases place the quoted value first, which is where an
-/// over-greedy reference extraction would silently leave later unquoted sites
-/// behind and consume the closing quote.
-#[rstest]
-#[case("", "")]
-#[case("\"", "\"")]
-#[case("'", "'")]
-fn every_call_site_is_repointed(#[case] open: &str, #[case] close: &str) {
-    let current = "a".repeat(40);
-    let source = format!(
-        "jobs:\n  one:\n    steps:\n      - uses: {open}owner/action@{current}{close}\n  \
-         two:\n    steps:\n      - uses: owner/action@{current}\n"
-    );
-    let replacement = "b".repeat(40);
-    let changed = repoint_all_actions(&source, "owner/action", &replacement)
-        .expect("the action fixture must exist");
-    assert!(
-        !changed.contains(&current),
-        "no call site may keep the previous reference: {changed}"
-    );
-    assert_eq!(
-        changed
-            .matches(&format!("owner/action@{replacement}"))
-            .count(),
-        2,
-        "every call site must take the new reference: {changed}"
-    );
-    assert!(
-        changed.contains(&format!("{open}owner/action@{replacement}{close}")),
-        "the bump must preserve call-site quoting: {changed}"
-    );
-}
-
-/// Flow mappings end a value at `}` or `,` with no intervening space.
-///
-/// Treating either delimiter as part of the reference consumes it and leaves
-/// invalid YAML, so the bumped document must still parse.
+/// The fixture mixes block, quoted, folded, and flow values, including a flow
+/// sequence that names two actions on one line. Only the references to the
+/// bumped action may change.
 #[test]
-fn flow_mapping_call_sites_keep_their_delimiters() {
+fn every_call_site_is_repointed() {
     let current = "a".repeat(40);
     let replacement = "b".repeat(40);
     let source = format!(
-        "jobs:\n  one:\n    steps:\n      - {{uses: owner/action@{current}}}\n  two:\n    \
-         steps:\n      - {{uses: owner/action@{current}, name: two}}\n"
-    );
+            "jobs:\n  block:\n    steps:\n      - uses: owner/action@{current}\n      - uses: \
+             \"owner/action@{current}\"\n      - uses: 'owner/action@{current}'\n      - uses: \
+             >-\n          owner/action@{current}\n  flow:\n    steps:\n      - {{uses: \
+             owner/action@{current}}}\n      - {{uses: other/action@{current}, name: two}}\n      \
+             - {{uses: owner/action@{current}, name: three}}\n  sequence:\n    steps: [{{uses: \
+             owner/action@{current}}}, {{uses: other/action@{current}}}]\n"
+        );
     let changed = repoint_all_actions(&source, "owner/action", &replacement)
         .expect("the action fixture must exist");
-    assert!(
-        !changed.contains(&current),
-        "no call site may keep the previous reference: {changed}"
-    );
-    let document: Value =
-        serde_yaml::from_str(&changed).expect("a bumped flow mapping must remain valid YAML");
-    for job in ["one", "two"] {
-        let uses = document
-            .get("jobs")
-            .and_then(|jobs| jobs.get(job))
-            .and_then(|entry| entry.get("steps"))
-            .and_then(Value::as_sequence)
-            .and_then(|steps| steps.first())
-            .and_then(|step| step.get("uses"))
-            .and_then(Value::as_str)
-            .expect("each flow-mapping step must keep its action reference");
+    let document = parsed(&changed);
+    for index in 0..4 {
         assert_eq!(
-            uses,
+            step_uses(&document, "block", index),
             format!("owner/action@{replacement}"),
-            "the bumped reference must stay intact in job {job}"
+            "block step {index} must take the new reference"
         );
     }
-    assert!(
-        changed.contains(&format!("owner/action@{replacement}}}")),
-        "the closing brace must survive the bump: {changed}"
+    assert_eq!(
+        step_uses(&document, "flow", 0),
+        format!("owner/action@{replacement}"),
+        "a flow-mapping value must take the new reference"
     );
-    assert!(
-        changed.contains(&format!("owner/action@{replacement},")),
-        "the flow separator must survive the bump: {changed}"
+    assert_eq!(
+        step_uses(&document, "flow", 1),
+        format!("other/action@{current}"),
+        "a different action on the same line must keep its reference"
+    );
+    assert_eq!(
+        step_uses(&document, "flow", 2),
+        format!("owner/action@{replacement}"),
+        "a following value on the same line must take the new reference"
+    );
+    assert_eq!(
+        step_uses(&document, "sequence", 0),
+        format!("owner/action@{replacement}"),
+        "a flow-sequence step must take the new reference"
+    );
+    assert_eq!(
+        step_uses(&document, "sequence", 1),
+        format!("other/action@{current}"),
+        "a neighbouring flow-sequence step must keep its reference"
     );
 }
 
-/// Comments and other scalars are not call sites.
-///
-/// A workflow that mentions the action in prose, or restates it in a `with:`
-/// input, must keep those mentions when a fixture repoints the real steps.
+/// A job-level reusable-workflow reference is a call site.
 #[test]
-fn only_uses_values_are_repointed() {
+fn job_level_uses_is_a_call_site() {
     let current = "a".repeat(40);
-    let comment_ref = "c".repeat(40);
+    let replacement = "b".repeat(40);
+    let source = format!("jobs:\n  call:\n    uses: owner/action@{current}\n");
+    let changed = repoint_action(&source, "owner/action", &replacement)
+        .expect("the action fixture must exist");
+    assert_eq!(
+        job_uses(&parsed(&changed), "call"),
+        format!("owner/action@{replacement}"),
+        "a job-level uses value must be repointed"
+    );
+}
+
+/// A `with:` input named `uses` is not a call site.
+///
+/// The input names the same action and an earlier reference than the real call
+/// site, so a text scan that looked for the action path would move the input
+/// and leave the step unchanged.
+#[test]
+fn with_inputs_are_not_call_sites() {
+    let current = "a".repeat(40);
+    let input = "c".repeat(40);
     let replacement = "b".repeat(40);
     let source = format!(
-        "# pinned at owner/action@{comment_ref}\njobs:\n  one:\n    steps:\n      - uses: \
-         owner/action@{current}\n        with:\n          pinned: owner/action@{current}\n      - \
+        "jobs:\n  one:\n    steps:\n      - name: input first\n        uses: \
+         other/action@{input}\n        with:\n          uses: owner/action@{current}\n      - \
          uses: owner/action@{current}\n"
     );
-    let changed = repoint_all_actions(&source, "owner/action", &replacement)
+    let changed = repoint_action(&source, "owner/action", &replacement)
         .expect("the action fixture must exist");
-    assert!(
-        changed.contains(&comment_ref),
-        "a comment reference must survive: {changed}"
-    );
-    assert!(
-        changed.contains(&format!("pinned: owner/action@{current}")),
-        "a non-uses scalar must survive: {changed}"
+    let document = parsed(&changed);
+    assert_eq!(
+        with_uses(&document, "one", 0),
+        format!("owner/action@{current}"),
+        "a with input must keep its value"
     );
     assert_eq!(
-        changed
-            .matches(&format!("uses: owner/action@{replacement}"))
-            .count(),
-        2,
-        "both call sites must be repointed: {changed}"
+        step_uses(&document, "one", 0),
+        format!("other/action@{input}"),
+        "an unrelated action must keep its reference"
+    );
+    assert_eq!(
+        step_uses(&document, "one", 1),
+        format!("owner/action@{replacement}"),
+        "the single repoint must move the later call site"
     );
 }
 
@@ -190,23 +231,37 @@ fn single_repoint_moves_one_call_site() {
     let current = "a".repeat(40);
     let replacement = "b".repeat(40);
     let source = format!(
-        "jobs:\n  one:\n    steps:\n      - uses: owner/action@{current}\n  two:\n    \
-         steps:\n      - uses: owner/action@{current}\n"
-    );
+            "jobs:\n  one:\n    steps:\n      - uses: owner/action@{current}\n  two:\n    \
+             steps:\n      - uses: owner/action@{current}\n"
+        );
     let changed = repoint_action(&source, "owner/action", &replacement)
         .expect("the action fixture must exist");
+    let document = parsed(&changed);
     assert_eq!(
-        changed
-            .matches(&format!("uses: owner/action@{replacement}"))
-            .count(),
-        1,
-        "only the first call site must change: {changed}"
+        step_uses(&document, "one", 0),
+        format!("owner/action@{replacement}"),
+        "the first call site must change"
     );
     assert_eq!(
-        changed
-            .matches(&format!("uses: owner/action@{current}"))
-            .count(),
-        1,
-        "the remaining call site must keep its reference: {changed}"
+        step_uses(&document, "two", 0),
+        format!("owner/action@{current}"),
+        "the remaining call site must keep its reference"
+    );
+}
+
+/// A fixture without the action reports no mutation.
+#[test]
+fn missing_action_reports_no_mutation() {
+    let source = format!(
+        "jobs:\n  one:\n    steps:\n      - uses: other/action@{}\n",
+        "a".repeat(40)
+    );
+    assert!(
+        repoint_action(&source, "owner/action", "main").is_none(),
+        "a workflow that never names the action must report no mutation"
+    );
+    assert!(
+        repoint_all_actions("jobs: [", "owner/action", "main").is_none(),
+        "an unparsable workflow must report no mutation"
     );
 }
