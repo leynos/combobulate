@@ -2,15 +2,18 @@
 
 use rstest::rstest;
 
-use crate::pins::{
-    PinError,
-    PinSource,
-    is_calendar_date,
-    kani_version,
-    pinned_ref,
-    pinned_repository,
-    verus_checksum_row,
-    verus_version,
+use crate::{
+    gregorian_oracle::is_real_date,
+    pins::{
+        PinError,
+        PinSource,
+        is_calendar_date,
+        kani_version,
+        pinned_ref,
+        pinned_repository,
+        verus_checksum_row,
+        verus_version,
+    },
 };
 
 /// One repository-relative path used by every diagnostic in these cases.
@@ -239,4 +242,23 @@ fn calendar_cycle_matches_the_gregorian_constants() {
         leap_years, 97,
         "a 400-year Gregorian cycle must contain 97 leap years"
     );
+}
+
+/// Every candidate date in a 400-year cycle agrees with an independent oracle.
+///
+/// Aggregate totals alone could hide compensating month-length errors, and
+/// day 0 or 32 must be rejected rather than normalized, so each of the
+/// 158 400 candidates is compared individually with the day-number round trip.
+#[test]
+fn calendar_dates_agree_with_the_gregorian_oracle() {
+    let candidates = (1600..2000).flat_map(|year| {
+        (1..=12).flat_map(move |month| (0..=32).map(move |day| (year, month, day)))
+    });
+    for (year, month, day) in candidates {
+        assert_eq!(
+            is_calendar_date(year, month, day),
+            is_real_date(i32::from(year), i32::from(month), i32::from(day)),
+            "date {year}-{month}-{day} must match the Gregorian oracle"
+        );
+    }
 }

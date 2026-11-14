@@ -16,6 +16,10 @@ mod pins;
 #[path = "support/prover_script_pin.rs"]
 mod script_pin;
 
+/// An independent Gregorian oracle for the release-pin date tests.
+#[path = "support/gregorian_oracle.rs"]
+mod gregorian_oracle;
+
 /// Shape and relationship regressions for the release-pin readers.
 #[path = "support/prover_pins_tests.rs"]
 mod pin_tests;
