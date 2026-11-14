@@ -44,7 +44,7 @@ impl OperationId {
     };
 
     /// The operation that sums two arrays elementwise.
-    const ADD: Self = Self {
+    pub(crate) const ADD: Self = Self {
         name: "add",
         catalogue_id: "V001",
     };
@@ -71,7 +71,7 @@ impl fmt::Display for OperationId {
 /// destructured when it is dropped. A type carrying a `Drop` implementation
 /// cannot be moved out of field by field, and the iterative drop depends on
 /// exactly that.
-enum NodeKind {
+pub(crate) enum NodeKind {
     /// A materialized input, sharing its array's buffer.
     Input(Arc<Vec<i64>>),
     /// The elementwise sum of two operands.
@@ -84,14 +84,14 @@ enum NodeKind {
 }
 
 /// One node of an expression graph, shared by its handles.
-struct Node {
+pub(crate) struct Node {
     /// What this node computes.
-    kind: NodeKind,
+    pub(crate) kind: NodeKind,
     /// The length under the partial model, when it is known.
-    length: Option<usize>,
+    pub(crate) length: Option<usize>,
     /// Whether some node at or beneath this one has contradicting operand
     /// lengths, so preparation must report a shape failure here.
-    mismatch_below: bool,
+    pub(crate) mismatch_below: bool,
 }
 
 impl Drop for Node {
@@ -157,7 +157,7 @@ fn collect_children(kind: NodeKind, work: &mut Vec<Arc<Node>>) {
 #[derive(Clone)]
 pub struct AExpr {
     /// The shared node this handle refers to.
-    node: Arc<Node>,
+    pub(crate) node: Arc<Node>,
 }
 
 impl AExpr {
