@@ -7,6 +7,8 @@
 #![no_std]
 #![deny(clippy::std_instead_of_core, clippy::alloc_instead_of_core)]
 
+pub mod elementwise_add;
+
 /// Bind Kani's vocabulary when the verifier compiles this crate.
 ///
 /// Kani refuses a `#![no_std]` input that never names it, and this kernel has

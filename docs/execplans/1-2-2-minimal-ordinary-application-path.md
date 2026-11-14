@@ -270,11 +270,26 @@ The thresholds are:
   workflow, the control register, the calibration report, ADR-0008, this plan
   and the tests that read those figures changed together, so no test now
   hard-codes the old number.
-- [ ] EP-M1: specify. SC-12, the `ShapeAgreement` registration, examples and
-  the Python model, the ADR-0006 amendment, and the denotation in technical
-  design §8.
-- [ ] EP-M2 (prototype): kernel `elementwise_add::add_i64_into`, Verus roots,
-  mutants, `scripts/verus_kernel.py` and `make verus-kernel`.
+- [x] (2026-11-14) EP-M1: specify. SC-12, the `ShapeAgreement` registration,
+  examples and the Python model, the ADR-0006 amendment, and the denotation in
+  technical design §8. Committed as `ff5a567`.
+- [x] (2026-11-14) EP-M2 (prototype): kernel
+  `elementwise_add::add_i64_into`, the three Verus roots, the five wrapper
+  mutants and the body-tier `wrap` mutant, `scripts/verus_kernel.py` with
+  `scripts/verus_kernel_verdicts.py` and `scripts/tests/test_verus_kernel.py`,
+  `make verus-kernel`, the trust-audit subjects, the const evaluation and
+  `tests/kernel_elementwise_add.rs`. Every gate passes: `make verus-kernel`,
+  `check-fmt`, `lint`, `test`, `markdownlint`, `nixie`, `spelling` and
+  `design-check` under Python 3.14. The run verified 19 obligations, rejected
+  five mutants and `wrap`, and ran 449 and 455 Rust tests across the two
+  profiles, with 1272 Python tests and 2650 subtests.
+
+  The milestone first also added `tests/prover_tools_contract.rs` cases and a
+  `kernel` submodule that drove the Makefile against a recording fake helper.
+  Main deleted that whole probe-provenance subsystem in `b7bd51c`, so the
+  rebase onto `7e634a4` drops them rather than resurrecting a contract for a
+  seam that no longer exists. `make verus-kernel` remains covered by the
+  driver's own tests; its hosted run is `formal.yml`'s job.
 - [ ] EP-M3: facade values and expression handles.
 - [ ] EP-M4: preparation, execution and errors.
 - [ ] EP-M5: the public consumer fixture, boundary and workflow wiring.
@@ -319,6 +334,95 @@ The thresholds are:
 - Observation: `clippy::error_impl_error` is denied, so a public type named
   `Error` that implements the error trait fails `make lint`. Evidence:
   `Cargo.toml:125`; the existing `BackendProbeError`. Impact: DL-11.
+- Observation: a `verus_spec(invariant …)` attribute on a `while` statement
+  is a custom attribute on an expression, so rustc rejects it with E0658 unless
+  the root crate enables `#![feature(proc_macro_hygiene)]`. Evidence: the first
+  run of `crates/combobulate-kernel/verus/elementwise_add.rs` before that
+  feature gate was added. Impact: both proof roots carry the feature line; the
+  production file does not, because rustc never sees the attribute there.
+- Observation: `crate::` does not resolve inside a `#[path]`-included module
+  under `--edition=2024` in Verus, so an included production file cannot name
+  the contract by `crate::contract::…`. Evidence: the first compile of
+  `crates/combobulate-kernel/src/elementwise_add.rs` as an included module.
+  Impact: it imports through `super::contract::…`, which works because the
+  production file is a direct child module of the root.
+- Observation: Verus does not translate `r is Ok` into an equality with
+  `Ok(())`; a lemma that concludes `r1 == r2` from two `is Ok` premises does
+  not verify. Evidence: `lemma_contract_determinate`'s success branch before
+  the proof was split. Impact: `lemma_ok_results_agree` and
+  `lemma_length_results_agree` derive result equality by matching, and the
+  determinacy lemma calls them rather than unfolding the result type itself.
+- Observation: a quantifier whose body is arithmetic has no usable trigger, so
+  `forall|i: int| 0 <= i < n ==> out@[i] == lhs@[i] + rhs@[i]` fails with
+  "Could not automatically infer triggers". Evidence: the first pass-2 loop
+  invariant. Impact: the predicates `in_range_at`, `all_in_range` and
+  `same_len` exist as named `open spec fn`s, and the quantifiers trigger on
+  those calls instead of on the arithmetic. One loop invariant still tripped
+  the low-confidence note; annotating it with `#[trigger] out@[j]` removed the
+  note without moving the verified count.
+- Observation: a diagnostic's clause must be read from the source line it
+  names, not assumed. `_qualify_mutant` maps each located line to whatever `k1`
+  to `k5` call that line holds, so a reordered or wrong clause list cannot
+  produce a false pass. Evidence: the negative control in
+  `scripts/tests/test_verus_kernel.py` that offers a neighbouring clause and
+  requires the rejection message. Impact: the record's `verdict.lines` is a map
+  from line to clause, and the mutant table in `MUTANTS` names only the
+  intended clause.
+- Observation: the record irreversibly binds its own driver. `provenance.json`
+  carries a structural digest of `scripts/verus_kernel.py` and
+  `scripts/verus_kernel_verdicts.py`, so any edit to either fails
+  `test_verifier_record_digests` until `make verus-kernel` is re-run. Evidence:
+  the design-check failure that reported "`scripts/verus_kernel.py` changed
+  after provenance.json recorded it". Impact: the driver is edited before the
+  record is generated, and re-running `make verus-kernel` is part of finishing
+  any driver change.
+- Observation: a local digest comparison must use the same interpreter the
+  record was made under. Checking the four Rust sources and the driver with the
+  host `python3` (3.12.15) reported `DRIFT scripts/verus_kernel.py` while all
+  four Rust sources matched; re-checking under Python 3.14 with
+  `tree-sitter==0.25.2` and `tree-sitter-rust==0.24.2` reported all five as
+  `OK`, because a `.py` structural digest hashes `ast.dump`. Evidence: the two
+  comparison runs. Impact: a reported `DRIFT` on a `.py` file is a version
+  artefact until it is reproduced under Python 3.14; only then is regeneration
+  warranted.
+- Observation: a doctest's examples share one scope, so a second example that
+  reuses the first's destination buffer must keep the operands the same width.
+  The `add_i64_into` example ran a length-2 overflow case into the length-3
+  buffer its first example had built, and the kernel correctly reported
+  `LengthMismatch`. Evidence: the doctest failure naming "position 0 fits, so
+  the later overflow is the one named" with `left: Err(LengthMismatch)`.
+  Impact: the example gives the short case its own buffer, and its assertion on
+  `narrow` also documents that a failed call writes nothing.
+- Observation: the pin sweep requires every tracked file that names the
+  prover-tools ref to be a registered site. `scripts/verus_kernel.py` names the
+  ref in its PEP 723 header, so `make design-check` failed until that file was
+  added to `spec/toolchain-profiles.json`'s `prover_tools_ref` sites. Evidence:
+  the first design-check run after the driver was added. Impact: the same
+  record edit that adds the `verus-kernel` subjects also registers the new
+  site; both are pre-approved governance edits. Superseded on rebase: main's
+  `b7bd51c` moved the helper invocation to `$(PROVER_TOOLS)`, so the driver's
+  PEP 723 block names `cyclopts` and `cuprum` rather than the ref, and
+  `tools/rust-prover-tools/REF` is the pin's only site again.
+- Observation: a shared test probe does not survive being compiled into two
+  test binaries. Splitting the kernel cases out of
+  `tests/prover_tools_contract.rs` was attempted first as a second binary, and
+  `dead_code` then fired on both sides: the kernel binary used only three of
+  the recorder's methods and the prover-tools binary only the rest. Evidence:
+  `warning: methods run, set_count_inflation, invalidate_pin, and
+  environment_only are never used`
+  when building `tests/prover_kernel_contract`. Impact: the kernel cases
+  became a `#[path]` submodule, `tests/prover_tools_contract/kernel.rs`, so one
+  binary instantiates the recorder once. The 400-line ceiling is met by both
+  files (365 and 133) and no warning is silenced. Superseded on rebase: main
+  deleted `tests/prover_tools_contract.rs` and its support modules in
+  `b7bd51c`, so neither file survives the rebase and the constraint is moot.
+- Observation: the driver's 400-line ceiling forced the verdict rules out of
+  `scripts/verus_kernel.py`. They now live in
+  `scripts/verus_kernel_verdicts.py`, which reads a log and nothing else, and
+  the driver remains the pipeline. Evidence: the driver was 462 lines before
+  the split and 346 after. Impact: `provenance.json` binds both scripts'
+  digests, and a test asserts the record names the verdict module, so the
+  deciding rules cannot fall outside the record.
 
 ## Decision log
 
@@ -492,7 +596,8 @@ otherwise.
     files. Each mutant runs with
     `--verify-root --verify-function=<exact name>`, and mutant names share no
     substrings.
-  - The new `scripts/verus_kernel.py` runs both passes and imports
+  - The new `scripts/verus_kernel.py` runs both passes and delegates every
+    verdict to `scripts/verus_kernel_verdicts.py`, and imports
     `verus_probe` helpers without editing them. It passes `--edition=2024`.
     Its tests live in `scripts/tests/test_verus_kernel.py`.
   Rationale: a positive run limited to the root module never checks the shipped
@@ -594,8 +699,8 @@ Test patterns to copy:
 - `tests/native_consumer_e2e.rs` with `tools/fixtures/native-consumer/`: a
   standalone consumer built with `--locked --offline`.
 - `tests/workspace_kernel_boundary.rs`: `googletest` matchers.
-- `tests/prover_tools_contract.rs`: the contract for verifier Make targets,
-  using fake helpers.
+- `scripts/tests/test_verus_kernel.py`: the verdict rules, exercised on log
+  text with every solver-facing import stubbed.
 
 Documentation and skills:
 
@@ -1010,12 +1115,15 @@ Outcome:
   loop invariants through `cfg_attr`.
 - The kernel root declares `pub mod elementwise_add;`.
 - The three Verus files from DL-13.
-- `scripts/verus_kernel.py` with `scripts/tests/test_verus_kernel.py`.
-- A `verus-kernel` Make target beside `verus-probe`, recorded in
-  `tests/prover_tools_contract.rs`'s target list. Fake-helper cases there cover:
-  - the positive argv and each mutant's argv;
+- `scripts/verus_kernel.py` (the pipeline) with
+  `scripts/verus_kernel_verdicts.py` (the log-reading rules) and
+  `scripts/tests/test_verus_kernel.py`.
+- A `make verus-kernel` target beside `verus`, running the driver under
+  `$(PROVER_TOOLS)` and `$(VERUS_Z3_PATH)`. The driver's own tests cover the
+  rules it relies on:
   - an inflated verified count, which must fail;
-  - an unlocated mutant diagnostic, which must fail.
+  - an unlocated mutant diagnostic, which must fail;
+  - a neighbouring clause, which must not qualify.
 - `trust_audit_check.py` lists the product proof roots as zero-trust subjects.
 - `spec/toolchain-profiles.json`'s `proof-verus` record gains the new
   subjects.
@@ -1400,6 +1508,38 @@ uv run --no-project --python 3.14 --with-requirements scripts/requirements.txt \
 # 7 passed, 1 warning, 43 subtests passed
 ```
 
+The kernel proof, as observed on 2026-11-14:
+
+```plaintext
+positive: verification results:: 19 verified, 0 errors
+mutant mutant_err: rejected at k2 (elementwise_add_mutants.rs:40), k3 (elementwise_add_mutants.rs:41)
+mutant mutant_late: rejected at k4 (elementwise_add_mutants.rs:58)
+mutant mutant_ok_on_overflow: rejected at k1 (elementwise_add_mutants.rs:82)
+mutant mutant_mismatch_write: rejected at k5 (elementwise_add_mutants.rs:107)
+mutant mutant_early_write: rejected at k5 (elementwise_add_mutants.rs:133)
+body mutant wrap: rejected at loop invariant
+```
+
+`N` is pinned at **19**. It is the positive root's whole-crate count with no
+`--verify-*` flag, so the shipped body is verified as well as its wrappers. A
+change to the body or the specification moves it, and the run then fails until
+the new figure has been reviewed.
+
+Proof-cost measurement, against AC-01's frozen trigger (10 s wall, 320 MiB
+resident, rlimit 300,000, 30 s hard timeout). Measured through the pinned
+helper, with `VERUS_Z3_PATH` bound to the calibrated solver:
+
+| Subject                                 | Wall   | Peak child RSS | rlimit  | Exit |
+| --------------------------------------- | ------ | -------------- | ------- | ---- |
+| Positive root alone                     | 1.68 s | 314.4 MiB      | 300,000 | 0    |
+| All seven runs, one `make verus-kernel` | 8.96 s | 317.4 MiB      | 300,000 | 0    |
+
+The positive root verifies at `--rlimit 300000` directly, so the figure is a
+real per-function limit rather than the tool's default of 10. Peak RSS is
+within 8 MiB of the 320 MiB trigger: it is inside the threshold, but not with
+much room. A body that adds another quantified invariant should be measured
+again before it is trusted.
+
 Negative-control transcripts are added here as each is observed:
 
 - FACADE-1 with `wrapping_add`;
@@ -1512,10 +1652,12 @@ Dependencies:
 - No kernel dependency of any kind.
 - Verus and vstd stay outside every Cargo manifest (ADR-0010).
 
-Make: a new `verus-kernel` target beside `verus-probe` in `.PHONY`. It runs
-`uv run --script scripts/verus_kernel.py --prover-tools '$(PROVER_TOOLS)'`. It
-builds no Cargo target, so it stays outside the gate-order and build-standard
-contracts. Its own contract lives in `tests/prover_tools_contract.rs`.
+Make: a new `verus-kernel` target beside `verus` in `.PHONY`. It runs
+`uv run --script scripts/verus_kernel.py` with `PROVER_TOOLS` and
+`VERUS_Z3_PATH` exported, which is how main's `verus` target hands both to
+`scripts/verus_probe.py`. It builds no Cargo target, so it stays outside the
+gate-order and build-standard contracts; its rules are tested by
+`scripts/tests/test_verus_kernel.py`.
 
 ## Revision note
 
@@ -1538,7 +1680,7 @@ contracts. Its own contract lives in `tests/prover_tools_contract.rs`.
     - a new `scripts/verus_kernel.py` instead of editing digest-bound scripts;
     - observations under `tools/verifier-fixtures/verus-kernel/`;
     - `ShapeAgreement` instead of a new alias;
-    - `prover_tools_contract.rs` as the Make contract;
+    - `scripts/tests/test_verus_kernel.py` as the verdict-rule tests;
     - FACADE-1 generator and classification redesign; BDD binding details;
     - realistic size tolerances.
   - Design conformance: SC-12 makes the denotation durable (EP-M1 is now the

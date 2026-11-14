@@ -44,7 +44,7 @@ VERUS_Z3_PATH ?= $(VERUS_Z3_DIR)/z3
 export VERUS_Z3_PATH
 VERUS_PROOF_FILES ?= tools/calibration/cardinality-probe/verus/cardinality.rs
 
-.PHONY: install-kani install-verus kani kani-corpus kani-full verus
+.PHONY: install-kani install-verus kani kani-corpus kani-full verus verus-kernel
 
 install-kani: ## Install the pinned Kani release
 	$(PROVER_TOOLS) kani install --repo-root .
@@ -69,6 +69,13 @@ kani-full: kani kani-corpus ## Run every Kani proof route
 verus: ## Run the Verus proofs and the wiring candidates on an installed Verus
 	$(PROVER_TOOLS) verus run --repo-root . $(foreach file,$(VERUS_PROOF_FILES),--proof-file $(file)) --extra-arg=--crate-type=lib
 	PROVER_TOOLS='$(PROVER_TOOLS)' $(UV) run --script scripts/verus_probe.py
+
+# The kernel's own proof root and its seeded mutants. `verus` above keeps the
+# wiring candidates warm; this target is the one that decides whether the
+# shipped `add_i64_into` still satisfies SC-12, so formal.yml runs it too.
+verus-kernel: ## Verify the shipped kernel against SC-12 and reject its mutants
+	@PROVER_TOOLS='$(PROVER_TOOLS)' VERUS_Z3_PATH='$(VERUS_Z3_PATH)' \
+		$(UV) run --script scripts/verus_kernel.py
 
 TARGET ?= libcombobulate.rlib
 
@@ -212,8 +219,7 @@ test: prepare-ui-gate ## Run tests with warnings treated as errors
 # It runs one integration-test target rather than the whole suite. Running
 # `make test` per isolation profile costs two further compilations of the
 # workspace and the cardinality gate's nested `trybuild` build, which a hosted
-# job under AC-07's 20-minute budget cannot absorb alongside its own lint and
-# measured coverage. The isolation claim is
+# job under AC-07's eight-minute budget cannot absorb. The isolation claim is
 # about `BuildProfile::current()`, and `build_profiles` is the only target that
 # asserts it.
 #

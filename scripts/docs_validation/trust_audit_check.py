@@ -25,6 +25,17 @@ from .trust_audit import audit_tree, items_of
 from .trust_audit.command import RUST_SUFFIX
 
 FIXTURE_ROOT = 'tools/verifier-fixtures'
+# Proof roots that no Cargo target compiles, so ``cargo metadata`` cannot reach
+# them. Verus builds them from their own files, outside the workspace, which is
+# exactly why they need naming: a trust item here would enter the shipped proof
+# without any crate gate noticing. Every file is listed rather than globbed, so
+# adding a proof root is a deliberate edit to this control.
+PRODUCT_PROOF_ROOTS = (
+    'crates/combobulate-kernel/src/elementwise_add.rs',
+    'crates/combobulate-kernel/verus/elementwise_add.rs',
+    'crates/combobulate-kernel/verus/elementwise_add_contract.rs',
+    'crates/combobulate-kernel/verus/elementwise_add_mutants.rs',
+)
 # The corpus files that must report items, and one item each must contain.
 # Naming a file per item keeps the control from passing on a single stray hit.
 SEEDED_ITEMS = {
@@ -66,10 +77,15 @@ def check_trust_audit(context: ValidationContext) -> None:
     require(not shipped,
             'shipped crates must contain no trust items; found '
             + ', '.join(f'{location} ({item})' for item, location in shipped))
+    proofs = _proof_items(context.root)
+    require(not proofs,
+            'product proof roots must contain no trust items; found '
+            + ', '.join(f'{location} ({item})' for item, location in proofs))
     _require_seeded_fixtures(context.root)
     context.record('trust-audit',
-                   'No trust item appears in any workspace member; the fixture corpus still '
-                   'reports its seeded items.', len(_workspace_roots(context.root)))
+                   'No trust item appears in any workspace member or product proof root; '
+                   'the fixture corpus still reports its seeded items.',
+                   len(_workspace_roots(context.root)) + len(PRODUCT_PROOF_ROOTS))
 
 
 def _shipped_items(root: Path) -> list[tuple[str, str]]:
@@ -85,6 +101,21 @@ def _shipped_items(root: Path) -> list[tuple[str, str]]:
             relative = driver.relative_to(root).as_posix()
             items.extend((entry['item'], str(entry['location']))
                          for entry in items_of(audit_tree(root, [relative])))
+    return items
+
+
+def _proof_items(root: Path) -> list[tuple[str, str]]:
+    """Return every trust item in the product proof roots.
+
+    A proof root that has gone missing is reported as a failure rather than
+    skipped: an enumerated control whose subject vanished would otherwise pass
+    on nothing, which is the vacuity this check exists to prevent.
+    """
+    items = []
+    for relative in PRODUCT_PROOF_ROOTS:
+        require((root / relative).is_file(), f'{relative} must exist to be audited')
+        items.extend((entry['item'], str(entry['location']))
+                     for entry in items_of(audit_tree(root, [relative])))
     return items
 
 
