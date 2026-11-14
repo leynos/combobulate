@@ -85,7 +85,7 @@ class CiMeasurement(unittest.TestCase):
     """Check AC-07 attempt accounting, incomplete windows, and nearest-rank p90."""
 
     def test_twenty_successes_pass_at_the_p90_budget_boundary(self) -> None:
-        """Use rank 18 of 20 and accept an exact eight-minute p90."""
+        """Use rank 18 of 20 and accept a p90 exactly at the registered budget."""
         record = measurement('pass', [420.0] * 17 + [P90_BUDGET_SECONDS] * 3)
         check_ci_measurement(CI_CONTROL, record, REQUIRED_JOBS)
 

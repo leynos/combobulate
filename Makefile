@@ -212,7 +212,8 @@ test: prepare-ui-gate ## Run tests with warnings treated as errors
 # It runs one integration-test target rather than the whole suite. Running
 # `make test` per isolation profile costs two further compilations of the
 # workspace and the cardinality gate's nested `trybuild` build, which a hosted
-# job under AC-07's eight-minute budget cannot absorb. The isolation claim is
+# job under AC-07's 20-minute budget cannot absorb alongside its own lint and
+# measured coverage. The isolation claim is
 # about `BuildProfile::current()`, and `build_profiles` is the only target that
 # asserts it.
 #

@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: APPROVED (2026-11-14; DL-1, DL-4 and DL-6 approved as expected).
 
 Roadmap task: 1.2.2 in `docs/roadmap.md`. Branch:
 `1-2-2-minimal-ordinary-application-path`, cut from `main` at `b873322`.
@@ -243,7 +243,7 @@ The thresholds are:
   `tools/verifier-fixtures/verus-kernel/`, which the sweep already exempts. The
   existing record tests there may assume the wiring-probe schema. Run them
   first, and treat any schema mismatch under the governance tolerance.
-- Risk: the hosted `build-test` job has an eight-minute budget, and new test
+- Risk: the hosted `build-test` job has a 20-minute budget, and new test
   binaries and `proptest` add build time. Severity: medium. Likelihood: medium.
   Mitigation:
   - Add at most two new integration-test binaries.
@@ -263,7 +263,13 @@ The thresholds are:
   `Revision note`).
 - [x] (2026-11-11) Draft PR opened for plan review:
   <https://github.com/leynos/combobulate/pull/71>.
-- [ ] User approval of the plan (status becomes `APPROVED`).
+- [x] (2026-11-14) User approval of the plan; status became `APPROVED`, with
+  DL-1, DL-4 and DL-6 approved as expected.
+- [x] (2026-11-14) AC-07's budget raised from 8 to 20 minutes, on the
+  maintainer's instruction that hosted CI needs longer than eight. The
+  workflow, the control register, the calibration report, ADR-0008, this plan
+  and the tests that read those figures changed together, so no test now
+  hard-codes the old number.
 - [ ] EP-M1: specify. SC-12, the `ShapeAgreement` registration, examples and
   the Python model, the ADR-0006 amendment, and the denotation in technical
   design §8.
@@ -1168,7 +1174,7 @@ Acceptance evidence:
   `--test workspace_kernel_boundary` and `--test formal_workflow_contract` pass.
 - The gates pass.
 - The hosted `build-test` time on the draft PR is recorded against its
-  eight-minute budget.
+  20-minute budget.
 
 Conformance check:
 
