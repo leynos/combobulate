@@ -301,7 +301,27 @@ The thresholds are:
   construction and FACADE-3 cases. Red first: the probe written before the
   modules failed to compile, with unresolved imports of `Array`, `identity` and
   `add`. Green: 41 unit cases pass, and `make lint` passes.
-- [ ] EP-M4: preparation, execution and errors.
+- [x] (2026-11-14) EP-M4: preparation, execution and errors. `src/error/mod.rs`
+  holds `Stage`, `Failure` (with `code()` and a rendered sentence) and
+  `ExpressionError`, with `failure_from_kernel` for both kernel arms.
+  `src/plan/mod.rs` holds `NativeExecutor`, `PreparedPlan`, `Slot`, `Step`, the
+  slot read, `dispatch_add` (DL-14) and the execution loop;
+  `src/plan/schedule.rs` holds the iterative, memoized schedule walk (DL-12,
+  DL-9); `src/lib.rs` re-exports the public surface. `Array::from_shared` lets
+  execution publish the buffer it filled without a copy.
+  `tests/ordinary_application.rs` is the second new binary: `copies`,
+  `deep_chain`, `diagnostics`, `failures`, `sharing`, `staging` and `surface`
+  are single files, and `refinement/` is a directory of `generator`, `model`,
+  `verdict` and `checks`. Red first: the binary did not compile while `prepare`,
+  `execute`, `collect` and the error types were absent, and the behaviour
+  assertions failed against an `execute` that returned `Err`. Green: 546 and
+  552 cases pass in the two profiles, doctests included; the three FACADE-8
+  snapshots are committed under `tests/snapshots/`. `proptest` became a
+  dev-dependency (DL-6), and the regenerated validation report records the
+  widened Polars-confinement count. Every gate passes: `check-fmt`, `lint`
+  (Clippy over both profiles, Whitaker, interrogate at 100%), `test`,
+  `markdownlint`, `nixie`, `spelling` and `design-check` under Python 3.14
+  (1272 passed, 2650 subtests).
 - [ ] EP-M5: the public consumer fixture, boundary and workflow wiring.
 - [ ] EP-M6: documentation, ADR-0011, the completion record and the roadmap
   tick.
@@ -451,6 +471,62 @@ The thresholds are:
   `warning: variant Identity is never constructed`. Impact: the mismatch tests
   assert through the non-recursive `Node` `Debug` rendering instead, and
   `has_mismatch` returns in EP-M4 where preparation consumes it.
+- Observation: Whitaker's `module-max-lines` counts a Rust module, not a file,
+  so a directory of submodules is the only split that satisfies it. The
+  refinement case reached 578 lines before it was divided into
+  `refinement/mod.rs`, `generator.rs`, `model.rs`, `verdict.rs` and
+  `checks.rs`, the largest 201 lines. Evidence: `make lint` reporting
+  `Module refinement spans 578 lines, exceeding the allowed 400`. Impact: any
+  future test module is written as a directory once it passes roughly 350
+  lines, so the lesson from EP-M3 applies to tests as well as to `src/`.
+- Observation: googletest's `elements_are!` requires both the container and its
+  element type to be `Copy`, so a `Vec<Failure>` cannot be matched directly.
+  Evidence: the `ElementsAre<'a, T: Debug + Copy>` bound in
+  `googletest-0.14.4/src/matchers/elements_are_matcher.rs`, and the
+  `Failure: Copy is not satisfied` error from the first compile. Impact:
+  `Failure` derives `Copy` (every field is), and the FACADE-2 helper returns a
+  fixed-length array, so a report of the wrong size fails with both counts
+  rather than as a matcher mismatch.
+- Observation: `#[non_exhaustive]` variants cannot be constructed outside their
+  crate, so a test or doctest that wants a failure must earn one from a real
+  run. Evidence: E0639 at every site that wrote
+  `Failure::ShapeAgreement { .. }`, including the `Failure` doctest and the
+  code-registration test. Impact: both now observe `prepare`/`execute` output,
+  which also means a code that no longer occurs cannot pass the registration
+  check by being written down.
+- Observation: FACADE-1's oracle must model the lifecycle contract, not the
+  bare denotation. The first property compared `collect` against `⟦·⟧` and
+  failed on a graph whose operands disagreed in length but which also would
+  have overflowed: the crate correctly reported the preparation failure, while
+  the model reported the value error. Evidence: the shrunk counterexample
+  `[Some(Shape { lhs_len: 3, rhs_len: 0 })]` against
+  `[Some(Overflow { position: 1 })]`. Impact: the oracle states `static(e)`
+  first and only then `⟦e⟧`, and the comparison is on the rendered stage word
+  so a stage cannot pass by comparing equal to itself.
+- Observation: a generator's coverage has to be stated and counted, then tuned.
+  At 256 draws the first generator produced one late overflow, so the companion
+  count's minimum of four failed. Evidence:
+  `got Outcomes { ok_wide: 70,
+  ok_narrow: 78, overflow_late: 1, overflow_first: 2, shape: 105, unknown: 0 }`.
+  Impact: the count runs 512 draws on a fixed seed, the element strategy
+  weights the extremes at 1 in 5, and independence (a shape pair) and sharing
+  are counted alongside the value outcomes, matching FACADE-1's non-vacuity
+  list.
+- Observation: `proptest`'s default `FileFailurePersistence::SourceParallel`
+  cannot locate a source file from a `#[path]` module tree and prints
+  `failed to find lib.rs or main.rs`. Evidence: the `--no-capture` run. Impact:
+  `failure_persistence: None` in the model checks' configuration, which is also
+  the plan's stated method; a shrunk case becomes a named `rstest` case
+  instead. Setting `Config::default()`'s fields by assignment also trips
+  `clippy::field_reassign_with_default`, so the configuration is a
+  struct-update expression.
+- Observation: `insta` prefixes a snapshot's file name with the module path, so
+  a snapshot inside `tests/ordinary_application/` would be filed under a
+  doubled name. Evidence: the first run wrote
+  `ordinary_application__diagnostics__ordinary_application__shape_agreement.snap`.
+  Impact: the FACADE-8 snapshots set `snapshot_path => "../snapshots"` and
+  shorten the name, giving the plan's
+  `tests/snapshots/ordinary_application__*.snap`.
 
 ## Decision log
 
@@ -1234,10 +1310,10 @@ Compatibility decision: none.
 
 Outcome:
 
-- `src/error.rs` defines `ExpressionError`, `Failure` and `Stage`, and a
+- `src/error/` defines `ExpressionError`, `Failure` and `Stage`, and a
   `const fn failure_from_kernel(AddFailure, lhs_len, rhs_len) -> Failure`
   unit-tested for both arms.
-- `src/plan.rs` defines `NativeExecutor`, `PreparedPlan`, `Step`, `Slot`, the
+- `src/plan/` defines `NativeExecutor`, `PreparedPlan`, `Step`, `Slot`, the
   iterative schedule builder (DL-12), and the execution loop calling
   `add_i64_into` through the dispatch function (DL-14).
 - `AExpr::prepare`, `AExpr::collect` and `PreparedPlan::execute`.

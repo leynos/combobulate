@@ -11,11 +11,15 @@
 #![forbid(unsafe_code)]
 
 mod array;
+mod error;
 mod expr;
+mod plan;
 mod profile;
 
 pub use array::{Array, Dtype};
+pub use error::{ExpressionError, Failure, Stage};
 pub use expr::{AExpr, Binary, OperationId, Unary, add, identity};
+pub use plan::{NativeExecutor, PreparedPlan};
 
 #[cfg(feature = "polars")]
 pub(crate) mod polars_backend;

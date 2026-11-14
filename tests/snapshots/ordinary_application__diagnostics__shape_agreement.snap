@@ -1,0 +1,6 @@
+---
+source: tests/ordinary_application/diagnostics.rs
+expression: error.to_string()
+---
+expression failed during preparation
+- add (V001) operands disagree about length: left is 3, right is 2

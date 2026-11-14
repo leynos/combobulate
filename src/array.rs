@@ -105,6 +105,18 @@ impl Array {
         }
     }
 
+    /// Wrap a buffer the expression graph already shares.
+    ///
+    /// Execution produces its results as shared buffers, so wrapping one adds
+    /// a handle rather than copying elements. That is why collecting an
+    /// expression that is only an input returns the very buffer it was given
+    /// (FACADE-3).
+    pub(crate) const fn from_shared(values: Arc<Vec<i64>>) -> Self {
+        Self {
+            storage: Storage::I64(values),
+        }
+    }
+
     /// The dtype of the elements this array holds.
     #[must_use]
     pub const fn dtype(&self) -> Dtype { self.storage.dtype() }
