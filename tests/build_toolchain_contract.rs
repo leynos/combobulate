@@ -65,7 +65,11 @@ fn mold_pin_covers_only_the_supported_native_archive() {
 /// Cargo's effective profile setting changes for the measured route.
 #[test]
 fn coverage_overrides_the_effective_dev_backend_to_llvm() {
-    for (override_backend, expected) in [(None, "cranelift"), (Some("llvm"), "llvm")] {
+    // The Cranelift selection in `.cargo/config.toml` is commented out, so with
+    // no override no backend is configured and Cargo defaults to LLVM; Cargo
+    // reports that as an unset value. Uncommenting the selection is a
+    // persistent opt-in that needs this contract updated.
+    for (override_backend, expected_backend) in [(None, None), (Some("llvm"), Some("llvm"))] {
         let mut command = Command::new("cargo");
         command
             .args([
@@ -89,6 +93,14 @@ fn coverage_overrides_the_effective_dev_backend_to_llvm() {
             .env("CARGO_NET_OFFLINE", "true")
             .output()
             .expect("read Cargo's selected development backend");
+        let Some(expected) = expected_backend else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                !output.status.success() && stderr.contains("is not set"),
+                "Cargo must report the development backend as unset, not fail otherwise: {stderr}"
+            );
+            continue;
+        };
         assert!(
             output.status.success(),
             "Cargo must expose its profile backend: {}",

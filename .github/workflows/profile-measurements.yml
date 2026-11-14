@@ -151,10 +151,11 @@ jobs:
   #
   # The proof profile's timed region is Kani codegen of the kernel, not
   # `cargo build`. It runs through the installed driver directly rather than
-  # through the helper's `kani exec` route, because that route refuses this
-  # repository's `[profile.dev] codegen-backend = "cranelift"`: it cannot prove
-  # isolation of a backend it does not control, and the accepted route for the
-  # repository is the direct driver (DL-24). The driver is selected by the
+  # through the helper's `kani exec` route, because that route refuses a
+  # `[profile.dev] codegen-backend` selection (the repository's Cranelift opt-in
+  # is commented out): it cannot prove isolation of a backend it does not
+  # control, and the accepted route for the repository is the direct driver
+  # (DL-24). The driver is selected by the
   # environment `kani-driver` needs — the release's bundled SDK toolchain,
   # warnings-as-errors through both rustflags spellings, LLVM for the verifier,
   # and the release's own `bin` and `toolchain/bin` ahead of `PATH`.
@@ -238,8 +239,8 @@ jobs:
           # policy, and `CARGO_ENCODED_RUSTFLAGS` carries it too because Cargo
           # prefers the encoded form when both are set: an inherited value would
           # otherwise replace the policy silently rather than being overridden
-          # by it. The LLVM backend is the verifier's own and must displace the
-          # Cranelift the repository selects for dev builds; and the release's
+          # by it. The LLVM backend is the verifier's own and must displace any
+          # dev-profile backend an opt-in selects; and the release's
           # `toolchain/bin` and `bin` come first on `PATH` so the driver finds
           # its bundled rustc and CBMC. The version is not named here: the
           # release root comes from `tools/kani/VERSION`, so the pin has one
@@ -294,10 +295,14 @@ jobs:
           "$Z3_PATH" --version > build-budget/z3
 
           mold --version > build-budget/mold
-          # The dev profile's backend is Cranelift and the proof profile's is
-          # LLVM; both are asserted from the files that select them, so the
-          # record describes the configuration that ran.
-          grep -qF 'codegen-backend = "cranelift"' .cargo/config.toml
+          # Cranelift is disabled estate-wide (14 November 2026), so the dev
+          # profile selects no backend and Cargo uses LLVM, as the proof
+          # profile does. Assert that nothing in the repository selects another
+          # backend, so the record describes the configuration that ran.
+          if grep -E '^[[:space:]]*codegen-backend[[:space:]]*=' .cargo/config.toml; then
+            echo 'the repository selects a dev-profile backend; this record assumes LLVM' >&2
+            exit 1
+          fi
           grep -qF 'CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm"' "$PWD/build-budget/kani-codegen"
           date +%s > build-budget/setup-end
       - name: Fetch dependencies once, untimed
