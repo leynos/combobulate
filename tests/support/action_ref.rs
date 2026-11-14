@@ -25,12 +25,16 @@ pub(crate) fn matches_pinned_action(uses: &str, expected_path: &str) -> bool {
 
 /// Extracts the reference that immediately follows an action's `@`.
 ///
-/// Quoting ends the reference as surely as whitespace does: `uses: "path@SHA"`
-/// must yield `SHA`, not `SHA"`, or the replacement would consume the closing
-/// quote and leave the scalar unterminated.
+/// Quoting and YAML flow delimiters end the reference as surely as whitespace
+/// does. `uses: "path@SHA"` must yield `SHA`, not `SHA"`, and
+/// `{uses: path@SHA}` must yield `SHA`, not `SHA}`; otherwise the replacement
+/// consumes the closing character and leaves unparsable YAML behind.
 fn current_reference(suffix: &str) -> Option<&str> {
+    let ends_reference = |character: char| {
+        character.is_whitespace() || matches!(character, '"' | '\'' | '{' | '}' | '[' | ']' | ',')
+    };
     suffix
-        .split(|character: char| character.is_whitespace() || matches!(character, '"' | '\''))
+        .split(ends_reference)
         .next()
         .filter(|reference| !reference.is_empty())
 }
@@ -64,6 +68,7 @@ mod tests {
     //! Shape and bump regressions shared by all action-reference consumers.
 
     use rstest::rstest;
+    use serde_yaml::Value;
 
     use super::{
         SETUP_RUST_PATH,
@@ -164,6 +169,52 @@ mod tests {
         assert!(
             changed.contains(&format!("{open}owner/action@{replacement}{close}")),
             "the bump must preserve call-site quoting: {changed}"
+        );
+    }
+
+    /// Flow mappings end a value at `}` or `,` with no intervening space.
+    ///
+    /// Treating either delimiter as part of the reference consumes it and
+    /// leaves invalid YAML, so the bumped document must still parse.
+    #[test]
+    fn flow_mapping_call_sites_keep_their_delimiters() {
+        let current = "a".repeat(40);
+        let replacement = "b".repeat(40);
+        let source = format!(
+            "jobs:\n  one:\n    steps:\n      - {{uses: owner/action@{current}}}\n  two:\n    \
+             steps:\n      - {{uses: owner/action@{current}, name: two}}\n"
+        );
+        let changed = repoint_all_actions(&source, "owner/action", &replacement)
+            .expect("the action fixture must exist");
+        assert!(
+            !changed.contains(&current),
+            "no call site may keep the previous reference: {changed}"
+        );
+        let document: Value =
+            serde_yaml::from_str(&changed).expect("a bumped flow mapping must remain valid YAML");
+        for job in ["one", "two"] {
+            let uses = document
+                .get("jobs")
+                .and_then(|jobs| jobs.get(job))
+                .and_then(|entry| entry.get("steps"))
+                .and_then(Value::as_sequence)
+                .and_then(|steps| steps.first())
+                .and_then(|step| step.get("uses"))
+                .and_then(Value::as_str)
+                .expect("each flow-mapping step must keep its action reference");
+            assert_eq!(
+                uses,
+                format!("owner/action@{replacement}"),
+                "the bumped reference must stay intact in job {job}"
+            );
+        }
+        assert!(
+            changed.contains(&format!("owner/action@{replacement}}}")),
+            "the closing brace must survive the bump: {changed}"
+        );
+        assert!(
+            changed.contains(&format!("owner/action@{replacement},")),
+            "the flow separator must survive the bump: {changed}"
         );
     }
 }
