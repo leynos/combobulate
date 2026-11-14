@@ -17,6 +17,11 @@ from pathlib import Path
 from rust_prover_tools.commands import CommandSpec, run_command
 
 from structural_digest import structural_digest
+from verifier_free_staging import (
+    recreate_workspace as _recreate_workspace,
+    verify_source_links as _verify_source_links,
+    verify_staged_workspace as _verify_staged_workspace,
+)
 from verifier_probe_support import FIXTURES, ROOT, _capture
 
 BASE_IMAGE = "quay.io/rockylinux/rockylinux@sha256:827d37bc128288ccf160ee318bb3cb92d591164cb217e92f8bc61e3982ae1834"
@@ -94,6 +99,28 @@ def _write_inconclusive_record(record: Path) -> None:
     )
 
 
+def staged_fixture_entries() -> list[Path]:
+    """Return every fixture entry the staging copy visits, directories included.
+
+    ``staged_sources`` keeps regular files because only those carry digests,
+    but ``copytree`` also descends directories. The staging step checks these
+    entries for links, so a linked directory cannot carry in outside content
+    that the file-only source list would never name.
+    """
+    fixture = FIXTURES / "verus-wiring-probe"
+    return [
+        fixture,
+        *sorted(
+            path
+            for path in fixture.rglob("*")
+            if not any(
+                part in STAGING_IGNORES
+                for part in path.relative_to(fixture).parts
+            )
+        ),
+    ]
+
+
 def staged_sources() -> list[Path]:
     """Return every repository file the verifier-free build stages.
 
@@ -108,35 +135,48 @@ def staged_sources() -> list[Path]:
         staged_sources()
         # [PosixPath('.../verus-wiring-probe/Cargo.toml'), ..., PosixPath('.../rust-toolchain.toml')]
     """
-    fixture = FIXTURES / "verus-wiring-probe"
-    copied = [
-        path
-        for path in sorted(fixture.rglob("*"))
-        if path.is_file()
-        and not any(part in STAGING_IGNORES for part in path.relative_to(fixture).parts)
-    ]
+    copied = [path for path in staged_fixture_entries() if path.is_file()]
     return copied + [ROOT / name for name in STAGING_FILES]
 
 
-def _stage_verifier_free_workspace(directory: Path) -> None:
+def _stage_verifier_free_workspace(
+    directory: Path, *, boundary: Path | None = None
+) -> None:
     """Copy the probe fixture and pinned toolchain files into ``directory``.
+
+    The workspace is recreated first, so files deleted from the repository or
+    left behind by an earlier build cannot reach Cargo. ``boundary`` defaults
+    to ``ROOT / "target"`` at call time rather than definition time, so a
+    test or a relocated composition root supplies the right owned directory.
+    A symbolic link among the sources is refused before the workspace is
+    touched, because copying would dereference it into a regular staged file.
 
     Parameters
     ----------
     directory
         Scratch workspace the container mounts and builds.
+    boundary
+        Directory that must strictly contain ``directory``; defaults to
+        ``ROOT / "target"``.
 
     Examples
     --------
-    Staging is idempotent, so a rerun refreshes the copied files::
+    A rerun starts from a fresh workspace rather than layering over it::
 
-        _stage_verifier_free_workspace(ROOT / 'target/epm1-verifier-free-workspace')
+        _stage_verifier_free_workspace(
+            ROOT / 'target/epm1-verifier-free-workspace'
+        )
     """
-    directory.mkdir(parents=True, exist_ok=True)
+    fixture = FIXTURES / "verus-wiring-probe"
+    _verify_source_links(
+        [*staged_fixture_entries(), *staged_sources()], ROOT
+    )
+    _recreate_workspace(
+        directory, ROOT / "target" if boundary is None else boundary
+    )
     shutil.copytree(
-        FIXTURES / "verus-wiring-probe",
+        fixture,
         directory / "probe",
-        dirs_exist_ok=True,
         ignore=shutil.ignore_patterns(*STAGING_IGNORES),
     )
     for name in STAGING_FILES:
@@ -144,6 +184,51 @@ def _stage_verifier_free_workspace(directory: Path) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, target)
     (directory / "Containerfile").write_text(_verifier_free_containerfile())
+
+
+def staged_inputs(workspace: Path) -> dict[str, Path]:
+    """Return the staged copy of every recorded input, keyed as in the repository.
+
+    The keys stay repository-relative so a reviewer can compare a digest with
+    the file it names. The values are the copies the container actually
+    builds. Digesting the repository path after staging would bind a file the
+    build never saw if the source changed in between.
+
+    Fixture files are staged under ``probe/`` and keep their fixture-relative
+    key; the pinned toolchain and linker files keep their repository-relative
+    key. Both come from :func:`staged_sources`, so this mapping cannot drift
+    from the files the staging step copies.
+
+    Parameters
+    ----------
+    workspace
+        Workspace produced by :func:`_stage_verifier_free_workspace`.
+
+    Returns
+    -------
+    dict[str, Path]
+        Repository-relative key mapped to its staged copy.
+
+    Examples
+    --------
+    A fixture input keeps the key the hosted record already uses::
+
+        staged_inputs(workspace)[
+            'tools/verifier-fixtures/verus-wiring-probe/Cargo.toml'
+        ]
+        # PosixPath('.../probe/Cargo.toml')
+    """
+    fixture = FIXTURES / "verus-wiring-probe"
+    staged: dict[str, Path] = {}
+    for source in staged_sources():
+        relative = source.relative_to(ROOT)
+        if source.is_relative_to(fixture):
+            staged[str(relative)] = (
+                workspace / "probe" / source.relative_to(fixture)
+            )
+        else:
+            staged[str(relative)] = workspace / relative
+    return staged
 
 
 def ensure_base_image(output: Path, environment: dict[str, str]) -> None:
@@ -264,8 +349,14 @@ def run_verifier_free() -> None:
 
         run_verifier_free()
     """
-    environment = dict(os.environ)
     record = FIXTURES / "verus-wiring-probe/verifier-free.json"
+    # Unlinking and the inconclusive write both follow the path, so a linked
+    # fixture directory must be refused before either can leave the repository.
+    _verify_source_links([record], ROOT)
+    environment = dict(os.environ)
+    # A record describes one run. An earlier pass must not survive a failure
+    # below, because nothing would distinguish it from a record of this run.
+    record.unlink(missing_ok=True)
     if environment.get("RUSTC_WRAPPER"):
         _write_inconclusive_record(record)
         raise RuntimeError(
@@ -274,9 +365,10 @@ def run_verifier_free() -> None:
         )
     directory = ROOT / "target/epm1-verifier-free-workspace"
     _stage_verifier_free_workspace(directory)
+    inputs = staged_inputs(directory)
+    _verify_staged_workspace(directory, inputs)
     source_digests = {
-        str(path.relative_to(ROOT)): structural_digest(path)
-        for path in staged_sources()
+        key: structural_digest(path) for key, path in inputs.items()
     }
     output = FIXTURES / "verus-wiring-probe/observations"
     image = "localhost/combobulate-epm1-verifier-free:20261028"
@@ -290,9 +382,9 @@ def run_verifier_free() -> None:
     if built["exit_code"] != 0:
         raise RuntimeError("the verifier-free build environment could not be prepared")
     home = Path.home()
-    channel = tomllib.loads((ROOT / "rust-toolchain.toml").read_text())["toolchain"][
-        "channel"
-    ]
+    channel = tomllib.loads(
+        (directory / "rust-toolchain.toml").read_text()
+    )["toolchain"]["channel"]
     command = container_run_command(directory, image, home, channel)
     observation = _capture(command, ROOT, output / "verifier-free.log", environment)
     if observation["exit_code"] != 0:
