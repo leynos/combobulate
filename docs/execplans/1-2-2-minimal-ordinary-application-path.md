@@ -624,6 +624,27 @@ The thresholds are:
   predicate `substitutes_a_function`. Evidence: `make lint`'s Whitaker pass on
   `tests/support/workspace_source.rs`.
 
+- Observation: the ADR number in this plan is not stable, and a later landing
+  can take it. `main` published ADR-0011 while this branch was in flight, so
+  the record this plan describes was renumbered to ADR-0012 before the rebase.
+  Evidence: `git log --oneline b873322..9dd6e3c` includes
+  `094d6c2 Record the rust-prover-tools 9c4a27a8 pin as a prover-tooling
+  exception (#83)`,
+  which created `docs/adrs/adr-0011-keep-rust-prover-tools-at-9c4a27a8-…md`,
+  and the rebase conflicted only on `docs/contents.md`, where both sides
+  appended an entry. Impact: an unreleased ADR number belongs to whoever lands
+  it first. Both entries are kept, in number order, and every reference in this
+  plan, the technical design and `spec/task-completion.json` names 0012.
+- Observation: the validation report is derived, so its counts cannot be
+  merged. The `markdown-structure` count conflicted silently: both sides edited
+  neighbouring lines and Git took both, leaving a total that matched neither
+  branch. Evidence: the auto-merged `docs/validation-results.json` carried
+  `24`, while regenerating it produced `25` after main's five new documents and
+  this branch's ADR. Impact: after any rebase, regenerate the report with
+  `scripts/check_docs.py --as-of <date> --write` rather than resolving its
+  hunks, and treat a clean `git merge` of a generated file as no evidence that
+  the value is right.
+
 ## Decision log
 
 Each entry below is proposed. It takes effect on plan approval unless it says
