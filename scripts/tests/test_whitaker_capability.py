@@ -5,18 +5,37 @@ import copy
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from whitaker_capability import probe_manifest
+from whitaker_capability import Scenario, fragments, probe_manifest, run_scenario
 
-MANIFEST = yaml.safe_load((Path(__file__).parent / 'fixtures' / 'whitaker' / 'current.yml').read_text())
+FIXTURES = Path(__file__).parent / 'fixtures' / 'whitaker'
+MANIFEST = yaml.safe_load((FIXTURES / 'current.yml').read_text())
 
 
 def fragment(manifest: dict, name: str) -> dict:
     """Find one fixture boundary; mutation assertions prove the selected source changes."""
     return next(step for step in manifest['runs']['steps'] if step['name'] == name)
+
+
+def legacy_with_declared_cranelift_input() -> dict:
+    """Declare the missing input so the probe's behavioural boundaries can run.
+
+    The declaration is the only change: it neither adds Cranelift support nor
+    touches either shell fragment, so the result still exposes what the legacy
+    installer does rather than what the fixture claims about itself.
+    """
+    legacy = yaml.safe_load((FIXTURES / 'legacy.yml').read_text())
+    adapted = copy.deepcopy(legacy)
+    adapted['inputs']['cranelift'] = {
+        'description': 'Declared only so the probe reaches the shell boundaries.',
+        'required': False,
+        'default': 'false',
+    }
+    return adapted
 
 
 class CapabilityMutationTests(unittest.TestCase):
@@ -58,10 +77,33 @@ class CapabilityMutationTests(unittest.TestCase):
                                             '--clippy-snapshot-bundle ""'))
 
     def test_upstream_legacy_fragments_fail_capability_directly(self):
-        """Pre-#522 source is unsuitable even without the content-approval guard."""
-        source = (Path(__file__).parent / 'fixtures' / 'whitaker' / 'legacy.yml').read_text()
-        with self.assertRaisesRegex(ValueError, 'Cranelift'):
-            probe_manifest(yaml.safe_load(source))
+        """Pre-#522 source is unsuitable without any content-approval guard.
+
+        The fixture never declares the Cranelift input, so the probe stops at
+        that prerequisite before any shell fragment runs. This is the boundary
+        that rejects the legacy manifest once the content-hash gate is gone.
+        """
+        source = (FIXTURES / 'legacy.yml').read_text()
+        with patch('whitaker_capability.run_scenario') as runner:
+            with self.assertRaisesRegex(ValueError, 'the action must support the Cranelift input'):
+                probe_manifest(yaml.safe_load(source))
+            runner.assert_not_called()
+
+    def test_legacy_binary_only_and_missing_asset_boundaries_fail_behaviourally(self):
+        """Legacy source fails on what it does, not on a stale content digest.
+
+        Declaring the Cranelift input lets the probe reach the shell
+        boundaries. The first scenario then observes that the legacy installer
+        receives no binary-only arguments, and a direct missing-asset run
+        observes that it builds from source instead of failing. Both results
+        are simulated markers from the probe's fake installer, not a real
+        build.
+        """
+        adapted = legacy_with_declared_cranelift_input()
+        with self.assertRaisesRegex(ValueError, 'installer arguments violate binary-only policy'):
+            probe_manifest(adapted)
+        with self.assertRaisesRegex(ValueError, 'missing assets permitted a source build'):
+            run_scenario(fragments(adapted), Scenario(missing_asset=True), 'cold-missing-artifact')
 
     def test_ignored_installer_failure_is_rejected(self):
         """A command failure must survive the tee pipeline and action backstop."""

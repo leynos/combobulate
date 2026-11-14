@@ -667,17 +667,15 @@ uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py \
   --workflow .github/workflows/ci.yml
 ```
 
-The gate resolves the caller's current full SHA and fetches every file in
-`tools/whitaker-approved.json` at that exact commit: `action.yml`, the
-installer digest manifest, the release, archive and rolling-asset helpers, and
-the files installer 0.2.11 adds for the verified Clippy snapshot bootstrap
-(`scripts/bootstrap-paths.sh`, `scripts/resolve-snapshot.sh`,
-`clippy-snapshots.tsv` and `snapshot-digests.sha256`). The manifest records the
-reviewed content digests and source provenance. The complete manifest digest
-also covers nested action references. Unavailable or changed content fails
-before the action runs. A commit bump with identical approved content passes.
-Execution-content changes require review and an explicit evidence-map update,
-including raw source provenance and passing hermetic capability mutations.
+The gate resolves the caller's current full 40-hex commit SHA and fetches
+`action.yml` at that exact commit. The pin fixes the content, so the recorded
+manifest SHA-256 is provenance for a reviewer rather than a value compared with
+an expected digest. Fourteen behavioural scenarios then drive the pinned
+manifest's validation and installation fragments, so a Dependabot bump passes
+whenever that behaviour still holds, even when the manifest's bytes changed.
+The action checks its own installer archive and Clippy snapshot digests against
+the manifests committed at the same pinned commit; the probe does not
+authenticate those digests.
 
 Installer 0.2.11 builds the Dylint driver from a verified Clippy snapshot
 instead of cloning Clippy's `master` branch, which upstream Dylint 6.0.1 still
@@ -692,12 +690,15 @@ The upstream action's own tests own those paths.
 
 The probes exercise source-derived validation and installation fragments with a
 fake installer, denied download and build executors, and private environment
-paths. They check the approved feature boundary, including source-build
+paths. They check the required feature boundary, including source-build
 refusal, installer failures, and both output streams. They do not provide an
 operating system sandbox, simulate every composite step, or prove the behaviour
-of nested actions or the real installer binary. Installer archive integrity
-remains anchored by the approved upstream digest manifest. Acquisition has
-per-file size and time limits; the CI gate has a three-minute timeout.
+of nested actions or the real installer binary. They cannot observe whether a
+helper script is present at the pinned commit, because only the manifest is
+fetched. They cannot observe how the action treats a malformed installer or
+snapshot SHA-256 input beyond the fragments they run, and installer archive
+integrity remains the upstream action's own digest-manifest check. Acquisition
+has a size and time limit; the CI gate has a three-minute timeout.
 
 ## Profile measurements
 

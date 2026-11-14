@@ -2,14 +2,18 @@
 """Resolve and behaviourally check the actual pinned Whitaker action before use.
 
 Example: ``python scripts/whitaker_probe.py --workflow .github/workflows/ci.yml``.
-Only approved-source acquisition uses the network; capability probes use private
-fake executors. Complete content approval precedes the selected boundary probes.
+The caller must pin the action to a full commit, which fixes the content the
+probe fetches. Manifest acquisition is the only deliberate network access, but
+the capability probes are not an operating-system sandbox: they supply private
+fake executors that intercept bare command names, so a fragment naming an
+absolute executable path could still reach the network. The probes ask what the
+pinned action does, not whether its files match a recorded digest, so a
+Dependabot bump passes whenever the behaviour holds.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import re
 import time
 import urllib.error
@@ -22,10 +26,10 @@ import yaml
 from whitaker_capability import probe_manifest
 
 ACTION_PATH = 'leynos/shared-actions/.github/actions/install-whitaker'
+MANIFEST_PATH = 'action.yml'
 MAX_MANIFEST_BYTES = 128 * 1024
 NETWORK_TIMEOUT_SECONDS = 10
 NETWORK_DEADLINE_SECONDS = 30
-APPROVAL = Path(__file__).resolve().parents[1] / 'tools' / 'whitaker-approved.json'
 
 
 class UniqueSafeLoader(yaml.SafeLoader):
@@ -96,11 +100,11 @@ class NoRedirects(urllib.request.HTTPRedirectHandler):
 
 
 def fetch_source(reference: str, path: str) -> str:
-    """Fetch an approved relative path at the caller's exact immutable source ref."""
+    """Fetch the composite manifest at the caller's exact immutable source ref."""
     if not re.fullmatch('[0-9a-f]{40}', reference):
         raise ValueError('invalid source reference')
-    if path not in json.loads(APPROVAL.read_text())['files']:
-        raise ValueError('source path is outside the approved execution set')
+    if path != MANIFEST_PATH:
+        raise ValueError('unsupported Whitaker source path')
     url = ('https://raw.githubusercontent.com/leynos/shared-actions/'
            f'{reference}/.github/actions/install-whitaker/{path}')
     opener = urllib.request.build_opener(NoRedirects())
@@ -120,32 +124,18 @@ def fetch_source(reference: str, path: str) -> str:
 
 def fetch_manifest(reference: str) -> str:
     """Acquire the full composite manifest, e.g. for a diagnostic source read."""
-    return fetch_source(reference, 'action.yml')
-
-
-def approved_manifest(reference: str, fetcher: Callable[[str, str], str]) -> str:
-    """Authenticate the complete execution set before any source-derived code runs.
-
-    Identical reviewed content at a new commit is valid. Changed helpers, nested
-    action refs, digests or shell steps require an explicit evidence-map update.
-    """
-    approval = json.loads(APPROVAL.read_text(encoding='utf-8'))
-    sources = {}
-    for path, expected in approval['files'].items():
-        content = fetcher(reference, path)
-        if len(content.encode('utf-8')) > MAX_MANIFEST_BYTES:
-            raise ValueError('approved source exceeds the source size limit')
-        digest = hashlib.sha256(content.encode('utf-8')).hexdigest()
-        if digest != expected:
-            raise ValueError(f'unapproved execution content: {path}')
-        sources[path] = content
-    return sources['action.yml']
+    return fetch_source(reference, MANIFEST_PATH)
 
 
 def verify_workflow(source: str, fetcher: Callable[[str, str], str] = fetch_source) -> dict:
-    """Bind content approval and behavioural evidence to the actual caller ref."""
+    """Bind behavioural evidence to the caller's full-commit pin of the action.
+
+    The pin fixes the manifest content, so the digest below is provenance for a
+    reviewer rather than a value compared against an expected one. Rejection
+    comes from the probes observing behaviour the caller requires.
+    """
     reference = caller_reference(document(source))
-    manifest_source = approved_manifest(reference, fetcher)
+    manifest_source = fetcher(reference, MANIFEST_PATH)
     manifest = document(manifest_source)
     scenarios = probe_manifest(manifest)
     return {'reference': reference, 'manifest_sha256': hashlib.sha256(
