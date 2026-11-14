@@ -32,7 +32,7 @@ the truth of its contents.
 Governance checks cover the records that control acceptance. The decision
 register validates D01 to D16 and keeps the five governing documents linked to
 it and free of retired or open-status wording for accepted questions. The
-semantic contract register (`SC-01` to `SC-11`) evaluates 68 tagged-scalar
+semantic contract register (`SC-01` to `SC-12`) evaluates 75 tagged-scalar
 examples and a 29-entry `comb!` corpus in documentation models, and proves each
 seeded mutation changes an outcome. The acceptance controls (`AC-01` to
 `AC-07`) define every registered field, and host-free calibration records bind

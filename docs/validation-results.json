@@ -6,13 +6,13 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 23
+      "count": 24
     },
     {
       "check": "local-links",
       "status": "pass",
       "detail": "All explicit local Markdown links resolve, including anchors where used.",
-      "count": 118
+      "count": 119
     },
     {
       "check": "catalogue",
@@ -90,19 +90,19 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 150
+      "count": 166
     },
     {
       "check": "contract-examples",
       "status": "pass",
       "detail": "Tagged-scalar examples of the accepted numeric, validity, reduction, cell, and commit contracts evaluate as recorded in the documentation model.",
-      "count": 68
+      "count": 75
     },
     {
       "check": "semantic-contracts",
       "status": "pass",
       "detail": "Contract records are complete, cite accepted decisions, registered errors, owned examples, and real discharge targets; every seeded mutation changes an outcome; superseded names stay out of the catalogue.",
-      "count": 11
+      "count": 12
     },
     {
       "check": "macro-grammar",
@@ -150,7 +150,7 @@
       "check": "toolchain-profiles",
       "status": "pass",
       "detail": "Pins agree with every site the record names, no unlisted site repeats a pin, and every capability status that claims an observation cites its log.",
-      "count": 20
+      "count": 21
     },
     {
       "check": "trust-audit",

@@ -336,7 +336,7 @@ Both routes implement the same ordered neighbourhood and numeric contract.
 ### 6.1. Dtypes and exceptional values
 
 [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md) records
-the contracts of this section as `SC-01` to `SC-09` and `SC-11` in
+the contracts of this section as `SC-01` to `SC-09`, `SC-11` and `SC-12` in
 `spec/semantic-contracts.json`, each with executable examples, seeded
 mutations, and a proof sketch.
 
@@ -345,9 +345,11 @@ subtype. Mixed I64/F64 arithmetic requires an explicit cast except for `div`,
 which converts each operand to F64 (round to nearest, ties to even) and then
 applies IEEE division ([D14](decision-register.md#d14)). `idiv` truncates
 towards zero; `rem` follows the truncating quotient. Checked integer operations
-reject overflow, including the specified MIN/-1 division/remainder case. The
-conversion of large I64 values to F64 can round and remains explicit except
-within documented true division and aggregate definitions.
+reject overflow, including the specified MIN/-1 division/remainder case.
+Elementwise I64 `add` is fixed by `SC-12`: equal operand lengths are required,
+and of the positions that overflow it reports the least. The conversion of
+large I64 values to F64 can round and remains explicit except within documented
+true division and aggregate definitions.
 
 F64 arithmetic follows the selected floating implementation's operation
 semantics. Ordinary division, square root, logarithm, and power can produce
@@ -565,6 +567,29 @@ or refuses the transformation. Explain output shows rejected high-value fast
 paths when a semantic mismatch would otherwise confuse the user, such as
 null-skipping or scan association. A performance preference never overrides a
 requirement to execute faithfully.
+
+### 8.1. Denotation of values and graphs
+
+Contract `SC-12` fixes the meaning that preparation and execution must preserve
+for the minimal I64 path, and later denotations extend it rather than replace
+it. A materialized value is an I64 vector with visible shape `[|s|]`, and
+expression handles denote deferred vectors rather than holding one.
+
+- Length is a partial static model. An input has its own length; `identity`
+  preserves its operand's; an `add` has a length only when both operands do and
+  the two agree. A length disagreement is therefore a root-cause node, and the
+  nodes above it have no length rather than a second copy of the same failure.
+- Preparation reports every such root-cause disagreement once, in
+  first-completion, left-first post-order, which is deterministic for a given
+  graph and independent of how often a node is referenced. It never evaluates
+  an element to do so.
+- Execution is the pointwise sum, failing at the least overflowing position.
+  A shared node has one denotation however many times it is referenced, which
+  is what makes evaluating each distinct node once (rather than once per
+  reference) an implementation choice and not a change of meaning.
+- A failed execution publishes nothing: the frame is that no input is modified
+  and no output escapes from a failure, including one that follows positions
+  that summed successfully.
 
 ## 9. Extension and kernel contracts
 
