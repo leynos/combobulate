@@ -223,6 +223,7 @@ fn setup_rust_mutations_break_the_three_way_contract() {
     let coverage = setup_rust::repoint(MAIN, &reference);
     let manual = setup_rust::repoint(ACT, &reference);
     let floating = setup_rust::repoint(ACT, "main");
+    let overridden = ACT.replace("rustflags: ''", "rustflags: '-C target-cpu=native'");
     assert_eq!(
         setup_rust::holds(&hosted, &coverage, &manual),
         Ok(()),
@@ -238,6 +239,12 @@ fn setup_rust_mutations_break_the_three_way_contract() {
         ),
         ("manual setup-rust moved alone", CI, MAIN, manual.as_str()),
         ("manual setup-rust is floating", CI, MAIN, floating.as_str()),
+        (
+            "manual rustflags input overridden",
+            CI,
+            MAIN,
+            overridden.as_str(),
+        ),
     ] {
         assert!(
             setup_rust::holds(changed_ci, changed_main, changed_act).is_err(),
@@ -248,6 +255,10 @@ fn setup_rust_mutations_break_the_three_way_contract() {
     assert_ne!(coverage, MAIN, "coverage mutation must change source");
     assert_ne!(manual, ACT, "manual mutation must change source");
     assert_ne!(floating, ACT, "floating mutation must change source");
+    assert_ne!(
+        overridden, ACT,
+        "rustflags mutation must change the manual workflow"
+    );
 }
 
 /// The cache write mode that permits a save, and the one that forbids it.
