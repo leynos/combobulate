@@ -102,9 +102,11 @@ asserts that against live `cargo metadata` and `cargo tree` output.
 The default facade features enable macros and Polars, spelled
 `default = ["macros", "polars"]`. Native-only execution and the proof SDK
 profiles remain available without Polars; ordinary consumers need no verifier
-installation. The facade's only public item in this task is `BuildProfile`,
-which reports the compiled features and the target's `usize` width. Glam is
-opt-in. A companion proof package can organize exported metadata/lemmas, but
+installation. Task 1.2.1's facade item is `BuildProfile`, which reports the
+compiled features and the target's `usize` width; task 1.2.2 adds the minimal
+value and expression path described in §4.1 and
+[ADR-0012](adrs/adr-0012-minimal-value-and-expression-representation.md). Glam
+is opt-in. A companion proof package can organize exported metadata/lemmas, but
 must bind to production bodies rather than replace them. The early
 shared-kernel and downstream probes must validate this arrangement before
 feature or proof-API stabilization.
@@ -160,6 +162,22 @@ graph fragments. A `PreparedPlan` records validated requirements, eligible
 stages, dynamic obligations, resource bindings, and the chosen execution
 policy. N-ary operations use the same internal argument-vector model without
 adding large public generic types.
+
+Task 1.2.2 implements the first slice of that model, recorded in
+[ADR-0012](adrs/adr-0012-minimal-value-and-expression-representation.md). The
+facade exports `Array`, `Dtype`, `AExpr`, `Unary`, `Binary`, `OperationId`,
+`identity`, `add`, `NativeExecutor`, `PreparedPlan`, `Stage`, `Failure` and
+`ExpressionError`. `Array::from_i64` moves a `Vec<i64>` into shared storage
+without copying it, `AExpr::then` applies a `Unary` and `AExpr::prepare` builds
+a plan, and the plan's `execute` or the expression's `collect` produces the
+value. Values hold their elements in one `Arc<Vec<i64>>`: identity returns its
+operand's handle rather than a node, and an addition allocates one output
+buffer. Applying `identity` or `add` to an expression runs no kernel; the
+`elementwise_add` kernel module in `combobulate-kernel` is reached only from
+execution, through the facade's single crate-private dispatch function. The
+static length model and its failure ordering, the linear schedule preparation
+emits, and the identity tuple that binds the verified body to `SC-12` are all
+stated in ADR-0012.
 
 Array dtypes are dynamic metadata. Typed batches retain a coarse element type
 in Rust. Optional rank markers can improve a small set of APIs, but arbitrary
@@ -590,6 +608,11 @@ expression handles denote deferred vectors rather than holding one.
 - A failed execution publishes nothing: the frame is that no input is modified
   and no output escapes from a failure, including one that follows positions
   that summed successfully.
+
+[ADR-0012](adrs/adr-0012-minimal-value-and-expression-representation.md)
+records the representation this denotation is carried by in task 1.2.2: how
+values hold storage, what identity folding returns, which schedule preparation
+emits, and the identity tuple that binds the verified `add_i64_into` to `SC-12`.
 
 ## 9. Extension and kernel contracts
 

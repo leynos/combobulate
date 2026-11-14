@@ -354,8 +354,41 @@ The thresholds are:
   `tests/support/native_consumer_build.rs`, which is where the lookup lives, so
   the per-profile counts fell by one. The hosted `build-test` time is recorded
   under EP-M6, once the branch is published.
-- [ ] EP-M6: documentation, ADR-0011, the completion record and the roadmap
-  tick.
+- [x] (2026-11-14) EP-M6: documentation, ADR-0012, the completion record and
+  the roadmap tick.
+  `docs/adrs/adr-0012-minimal-value-and-expression-representation.md` records
+  DL-2, DL-3, DL-7, DL-9, DL-12 and DL-14, including the five rejected
+  alternatives and the DL-14 identity tuple. The tuple is implemented rather
+  than only described: the new `scripts/verus_kernel_identity.py` composes it,
+  `scripts/verus_kernel.py` emits it as `"identity"` between `"admission"` and
+  `"source_digests"` and binds its own source, and `make verus-kernel`
+  regenerated `tools/verifier-fixtures/verus-kernel/provenance.json` with 19
+  verified and all six mutants rejected. Three new cases in
+  `scripts/tests/test_verus_kernel.py` pin each component, the source binding,
+  and — reading the Rust files rather than the constants — that the tuple names
+  what the code declares; they failed first with `KeyError: 'identity'` and a
+  missing `source_digests` entry, then passed at 27 cases and 12 subtests. A
+  fourth case came out of verification: editing a constant in
+  `verus_kernel_identity.py` without re-running the pipeline failed nothing,
+  because every case read the committed record and none re-derived the tuple,
+  so a record could name one operation while the module that generates it said
+  another. `test_the_committed_tuple_is_what_the_module_composes` recomputes
+  the tuple from the digests the record binds and compares; it fails on a
+  `CATALOGUE_ID` drift and passes on the committed record, for 28 cases.
+  `docs/users-guide.md` gains "Build and run an array expression" with both
+  examples compiled and run from an external scratch crate, the error-stage
+  table, copying and sharing, current limits, and the DL-1 wording. The first
+  draft of the error example did not compile — `?` after `prepare` binds the
+  plan, not the error, so `error.failures()` was called on a `PreparedPlan` —
+  which is why the examples were run rather than reviewed. Technical design §3,
+  §4.1 and §8.1, `docs/developers-guide.md` (three table rows, the
+  `elementwise_add` re-use policy, and a new "Product Verus proofs" section),
+  `docs/repository-layout.md` and `docs/contents.md` cover the new surface.
+  `spec/task-completion.json` gains a 1.2.2 entry citing D06, D07 and D16 with
+  file artefacts only; `docs/roadmap.md` ticks 1.2.2 and
+  `scripts/export_roadmap.py` refreshes `spec/roadmap.json`. The Step 1.2
+  finding is recorded under `Outcomes & retrospective`, with the two
+  predictions that did not hold stated as they measured.
 
 ## Surprises & discoveries
 
@@ -723,7 +756,7 @@ otherwise.
   2026-11-11, planning agent.
 - DL-10. Records.
   Decision:
-  - `docs/adrs/adr-0011-minimal-value-and-expression-representation.md`
+  - `docs/adrs/adr-0012-minimal-value-and-expression-representation.md`
     records DL-2, DL-3, DL-7, DL-9, DL-12 and DL-14. Its initial status is
     `Accepted`, citing this plan's approval and the PR as the approval
     reference.
@@ -791,15 +824,72 @@ otherwise.
 
 ## Outcomes & retrospective
 
-Not started. Record at each milestone boundary and at completion. At
-completion, add a "Step 1.2 finding" that the completion record cites, stating:
+Delivered on 2026-11-14 in six milestones, EP-M1 to EP-M6, as one pull request.
+The milestones are recorded in `Progress` above; this section records what the
+delivered work establishes about roadmap step 1.2 and where it departed from
+what the plan predicted.
 
-- the fixture's `cargo tree` closure (expected: `combobulate` and
-  `combobulate-kernel` only);
-- that the ordinary path needs neither the `macros` nor the `polars` feature;
-- that no `Fn` trait is implemented and the fixture uses no closures;
-- the `Cargo.lock` change (`proptest`, dev-only);
-- that AC-04 needs no re-measurement, because no shipped dependency changed.
+### Step 1.2 finding
+
+Measured 2026-11-14 on the final candidate, by running each command below in
+the worktree.
+
+- The fixture's `cargo tree --locked --offline` closure is exactly
+  `native-consumer`, `combobulate`, and `combobulate-kernel`. The prediction
+  held: no Polars, no glam, no macro crate, and no verifier appears.
+- The ordinary path needs neither the `macros` nor the `polars` feature.
+  `tools/fixtures/native-consumer/Cargo.toml` takes the facade by path with
+  `default-features = false` and depends on nothing else, so its closure could
+  not contain either even if the features were unified in.
+- The `Cargo.lock` change is `proptest` and its twelve transitive crates, 124
+  lines in total, and it is dev-only: `proptest` is declared under
+  `[dev-dependencies]` and is used by `tests/ordinary_application/refinement/`
+  alone. `cargo tree -e normal` contains no `proptest`, so the shipped closure
+  is unchanged. No shipped dependency was added, removed, or re-pinned.
+- AC-04 needs no re-measurement, and none was taken. The profiles, the
+  compiler flags, and the shipped dependency set are the ones the 2026-11-11
+  measurement covered; the only manifest edit in this range is the dev-only
+  `proptest` line, which no shipped crate can reach.
+
+Two predictions did not hold literally, and the record is more useful for
+saying so:
+
+- "No `Fn` trait is implemented" is true of the public surface — no `pub fn`,
+  `pub struct`, `pub enum` or `pub trait` takes a type parameter, and no
+  shipped item accepts a callback — but the crate does have one internal
+  `impl FnOnce` parameter: `on_small_stack` in `src/expr/small_stack.rs` takes
+  the body it runs on a 2 MiB thread. It is `#[cfg(test)]`, so it is not in the
+  shipped API and not in the fixture's closure. A reader checking the
+  prediction would find it and conclude the finding was wrong; the accurate
+  form is that no shipped or public item implements or accepts an `Fn` trait.
+- "The fixture uses no closures" is false. The
+  `ordinary_application` binary uses `is_ok_and` and `and_then` closures, as
+  any idiomatic Rust caller would. What the fixture establishes is narrower and
+  still what DL-2 was about: it names every public item in a signature and runs
+  the three phases without a closure being part of the facade's API — there is
+  no callback, visitor, or trait-object parameter to thread. The prediction was
+  written as a proxy for "no closures are needed to use the facade", and that
+  proxy is what turned out not to be testable.
+
+### Retrospective
+
+The milestones that took the most rework were the ones whose acceptance
+evidence had to be produced twice: EP-M1's SC-12 wording survived an expert
+review round, and the hosted CI budget in AC-07 was raised from 8 to 20 minutes
+only after a real `build-test` run showed the 8-minute allowance could not hold
+the two gate profiles. Both corrections cost a commit each and neither was
+avoidable from inside the plan, which is the case for keeping a plan's
+measurements honest rather than aspirational.
+
+The DL-14 identity tuple is the piece most likely to be read later without its
+context, so it is worth restating here why it exists: `provenance.json` already
+bound the executable and specification by digest, but nothing in the record
+said *which operation* those digests were evidence about. A digest map is not a
+claim. Composing the tuple and checking it against the shipped Rust
+declarations is what turns the record from "these files were hashed" into "the
+checked addition of two I64 vectors, under the checked-i64 policy, was
+verified" — and keeps that statement true when the source is renamed, because
+the test reads the declarations rather than the constants.
 
 ## Context and orientation
 
@@ -1468,10 +1558,10 @@ Compatibility decision: none.
 
 Outcome:
 
-- `docs/adrs/adr-0011-minimal-value-and-expression-representation.md`
+- `docs/adrs/adr-0012-minimal-value-and-expression-representation.md`
   (DL-10).
 - Technical design §3 and §4.1 name the facade's public items and the
-  `elementwise_add` kernel module, and reference ADR-0011.
+  `elementwise_add` kernel module, and reference ADR-0012.
 - `docs/users-guide.md` gains a "Build and run an array expression" section.
   It covers:
   - the `Purpose` example;
@@ -1488,7 +1578,7 @@ Outcome:
   - a "Product Verus proofs" subsection on `make verus-kernel`, the proof
     roots, the rejection rule and observations.
 - `docs/repository-layout.md` gains rows for the new paths.
-- `docs/contents.md` lists this plan and ADR-0011.
+- `docs/contents.md` lists this plan and ADR-0012.
 - The captured observations and `provenance.json` under
   `tools/verifier-fixtures/verus-kernel/` hold the DL-14 identity tuple.
 - `spec/task-completion.json` gains a 1.2.2 entry. It cites D06, D07 and D16,
@@ -1504,7 +1594,7 @@ Acceptance evidence: `make design-check`, `make markdownlint`, `make nixie`,
 
 Conformance check:
 
-- Every DL item appears in ADR-0011, the ADR-0006 amendment or the design.
+- Every DL item appears in ADR-0012, the ADR-0006 amendment or the design.
 - No upstream assumption is silently changed.
 - Trace links resolve to real tests and files.
 

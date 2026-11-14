@@ -38,6 +38,9 @@ def _load_driver() -> ModuleType:
         stubs['kernel_record'] = record
         verdicts = _load('verus_kernel_verdicts', SCRIPTS / 'verus_kernel_verdicts.py')
         stubs['verus_kernel_verdicts'] = verdicts
+        stubs['verus_kernel_identity'] = _load(
+            'verus_kernel_identity', SCRIPTS / 'verus_kernel_identity.py'
+        )
         spec = importlib.util.spec_from_file_location(
             'verus_kernel', SCRIPTS / 'verus_kernel.py'
         )
@@ -232,9 +235,12 @@ class RecordTests(unittest.TestCase):
     """Keep the committed record reproducible and free of host paths."""
 
     def setUp(self) -> None:
-        """Load the driver and its record module once per test."""
+        """Load the driver, its record module and the identity module per test."""
         self.driver = _load_driver()
         self.record = _load('kernel_record', SCRIPTS / 'kernel_record.py')
+        self.identity = _load(
+            'verus_kernel_identity', SCRIPTS / 'verus_kernel_identity.py'
+        )
 
     def _record(self) -> dict:
         """Read the committed record, which every assertion here inspects."""
@@ -284,6 +290,76 @@ class RecordTests(unittest.TestCase):
         admission = self._record()['admission']
 
         self.assertIn('PF05.proof@2.3.5', admission)
+
+    def test_the_record_states_the_identity_it_is_about(self) -> None:
+        """DL-14's tuple must name the operation, not just carry its digests.
+
+        The digests are already in the record unlabelled, so a reader could
+        not tell which catalogue entry, dtype or policy they verify. Each
+        component is checked against the committed value, and the executable
+        and specification entries must carry the same digests the record
+        holds for those files, or the tuple would name files it does not bind.
+        """
+        record = self._record()
+        tuple_ = record['identity']
+        digests = record['source_digests']
+
+        self.assertEqual(tuple_['catalogue_id'], 'V001')
+        self.assertEqual(tuple_['operation'], {'name': 'add', 'catalogue_id': 'V001'})
+        self.assertEqual(tuple_['dtype'], 'I64')
+        self.assertEqual(
+            tuple_['symbol'], 'combobulate_kernel::elementwise_add::add_i64_into'
+        )
+        self.assertEqual(tuple_['semantic_policy'], 'checked-i64')
+        self.assertEqual(tuple_['executable']['digest'], digests[tuple_['executable']['path']])
+        self.assertEqual(
+            tuple_['specification']['digest'], digests[tuple_['specification']['path']]
+        )
+
+    def test_the_record_binds_the_identity_module(self) -> None:
+        """The tuple's own source must be in the digests, as the rules' is."""
+        self.assertIn(
+            'scripts/verus_kernel_identity.py', self._record()['source_digests']
+        )
+
+    def test_the_committed_tuple_is_what_the_module_composes(self) -> None:
+        """The record must be the module's output, not a stale copy of it.
+
+        Every other assertion here reads the committed record, so a constant
+        edited in ``verus_kernel_identity.py`` without a re-run would leave
+        the record naming the operation the source no longer describes, and
+        nothing would fail. Composing the tuple again from the digests the
+        record already binds is what makes the record reproducible rather
+        than merely well-formed. The digests are passed in so this case does
+        not depend on an unrelated source edit invalidating the record.
+        """
+        record = self._record()
+        tuple_ = record['identity']
+
+        self.assertEqual(
+            self.identity.identity(
+                tuple_['executable']['digest'], tuple_['specification']['digest']
+            ),
+            tuple_,
+        )
+
+    def test_the_identity_names_what_the_rust_source_declares(self) -> None:
+        """The tuple is a claim about the code, so it must match it.
+
+        A catalogue id or a symbol that drifts from the shipped source would
+        make the record a statement about an operation that no longer exists.
+        The check reads the two declarations rather than trusting the
+        constants, so renaming one without the other fails here.
+        """
+        source = (ROOT / 'crates/combobulate-kernel/src/elementwise_add.rs').read_text(
+            encoding='utf-8'
+        )
+        facade = (ROOT / 'src/expr/mod.rs').read_text(encoding='utf-8')
+        tuple_ = self._record()['identity']
+
+        self.assertIn(f'fn {tuple_["operation"]["name"]}_i64_into(', source)
+        self.assertIn(f'name: "{tuple_["operation"]["name"]}"', facade)
+        self.assertIn(f'catalogue_id: "{tuple_["catalogue_id"]}"', facade)
 
     def test_every_mutant_is_recorded_once(self) -> None:
         """One observation per mutant, plus the positive root and the wrap copy."""
@@ -362,3 +438,4 @@ class SummaryPatternTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+# weave: run 'weave explain scripts/tests/test_verus_kernel.py' for per-hunk detail, 'weave check' to verify your resolution

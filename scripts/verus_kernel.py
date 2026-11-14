@@ -54,6 +54,7 @@ from kernel_record import (
     portable_argument,
     structural_digest,
 )
+from verus_kernel_identity import identity
 from verus_kernel_verdicts import (
     _qualify_body,
     _qualify_mutant,
@@ -67,6 +68,7 @@ CONTRACT = KERNEL / "verus/elementwise_add_contract.rs"
 PRODUCTION = KERNEL / "src/elementwise_add.rs"
 VERDICTS = ROOT / "scripts/verus_kernel_verdicts.py"
 DRIVER = ROOT / "scripts/verus_kernel.py"
+IDENTITY = ROOT / "scripts/verus_kernel_identity.py"
 OBSERVATIONS = ROOT / "tools/verifier-fixtures/verus-kernel"
 KERNEL_WRAP = ROOT / "target/verus-kernel-wrap"
 
@@ -336,7 +338,7 @@ def _write_record(version: str, z3_path: Path, observations: list[dict]) -> None
     the identity statement outside the record.
     """
     OBSERVATIONS.mkdir(parents=True, exist_ok=True)
-    sources = [CONTRACT, PRODUCTION, POSITIVE_ROOT, MUTANT_ROOT, DRIVER, VERDICTS]
+    sources = [CONTRACT, PRODUCTION, POSITIVE_ROOT, MUTANT_ROOT, DRIVER, VERDICTS, IDENTITY]
     digests = {
         str(source.relative_to(ROOT)): structural_digest(source) for source in sources
     }
@@ -349,6 +351,13 @@ def _write_record(version: str, z3_path: Path, observations: list[dict]) -> None
                 "z3": portable_argument(str(z3_path)),
                 "z3_sha256": exact_digest(z3_path),
                 "admission": "PF05.proof@2.3.5 re-runs these; they are not admitted evidence",
+                # DL-14: the tuple says which operation these observations are
+                # about, so a later release cannot read them as evidence for a
+                # different body.
+                "identity": identity(
+                    structural_digest(PRODUCTION),
+                    structural_digest(CONTRACT),
+                ),
                 "source_digests": digests,
                 "observations": observations,
             },
