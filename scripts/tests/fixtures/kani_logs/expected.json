@@ -1,6 +1,6 @@
 {
   "revision": "0.1",
-  "description": "The facts every committed Kani log must yield, and the decision each must reach. Read with provenance.json, which records how each log was produced: the two together make a log's meaning a committed claim rather than this suite's opinion.",
+  "description": "The facts every committed Kani log must yield, and the decision each must reach. Read with runs.json, which records the command that produced each log: the two together make a log's meaning a committed claim rather than this suite's opinion.",
   "logs": {
     "counterexample": {
       "format": "regular",

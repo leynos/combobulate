@@ -1,25 +1,29 @@
-"""Build and qualify the pinned Verus wiring observations.
+"""Run and qualify the pinned Verus wiring candidates.
 
-Only the verifier probe CLI imports this module. It keeps solver resolution,
-command construction, and mutant qualification together so the CLI stays
-within the repository's module-size limit, and it is not an evidence parser.
+The four candidates (macro, attributes, companion and single-root) each hold a
+capability proof that must verify and a seeded mutant that must fail at its own
+declaration. This module runs them on an installed Verus and applies one rule:
+a candidate qualifies only when its log reports the exact counts and the mutant
+failure names the seeded region. It reads proof output and nothing else, so it
+is analysis that belongs beside the shared prover tools, not a record of how or
+when a run happened. Verus and Z3 come from the shared install-prover-tools
+action (or `make install-verus` locally); nothing here installs them.
+
+Run it with `python3 scripts/verus_probe.py`; `make verus` does.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import os
 from pathlib import Path
 import re
 import shlex
-import shutil
+import subprocess
+import sys
+import tempfile
 
-from rust_prover_tools.commands import CommandSpec, run_command
-
-from probe_provenance import Z3_DISTRIBUTION
-from verifier_probe_support import ROOT
-
-Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURES = ROOT / "tools/verifier-fixtures/verus-wiring-probe"
 VERUS_CANDIDATES = ("macro", "attributes", "companion", "single-root")
 VERUS_FUNCTIONS = {
     "macro": ("capability", "mutant"),
@@ -27,166 +31,21 @@ VERUS_FUNCTIONS = {
     "companion": ("capability", "mutant"),
     "single-root": ("capability", "helper", "mutant"),
 }
-
-
-def _pinned_solver_executable() -> str | None:
-    """Ask the pinned distribution where it installed the solver.
-
-    ``uv tool run`` may consult a package index and unpack ``z3-solver`` into
-    uv's cache, so this is a command-side effect rather than a lookup. It is
-    therefore never a default: the probe CLI passes it as the resolver seam,
-    and a caller that only needs the selection policy supplies its own.
-
-    Returns
-    -------
-    str | None
-        The executable ``uv`` reported, or ``None`` when it reported nothing.
-
-    Raises
-    ------
-    RuntimeError
-        When the pinned distribution could not be resolved. The record names
-        the calibrated distribution, so a failed resolver must not fall back to
-        whichever ``z3`` sits on ``PATH``: that binary would be recorded as the
-        pin's own.
-    """
-    selected = run_command(
-        CommandSpec(
-            (
-                "uv",
-                "tool",
-                "run",
-                "--from",
-                Z3_DISTRIBUTION,
-                "python",
-                "-c",
-                "import shutil; print(shutil.which('z3') or '')",
-            )
-        )
-    )
-    if selected.exit_code != 0:
-        raise RuntimeError(
-            "the pinned z3-solver distribution could not be resolved: "
-            f"{selected.stderr.strip() or 'uv exited with an error'}"
-        )
-    return selected.stdout.strip() or None
-
-
-def select_solver(
-    selection: str,
-    *,
-    pinned: Callable[[], str | None],
-    discovery: Callable[[str], str | None] = shutil.which,
-) -> tuple[Path, str | None]:
-    """Choose the solver a selection names, without running anything.
-
-    The selection policy and its side effects are separate steps: this
-    function decides which executable a selection refers to, and the caller
-    observes its version. ``pinned`` is a required parameter rather than a
-    default because it is the one resolver that may consult a package index and
-    write to uv's cache; a caller that only needs the policy still has to name
-    the resolver it wants, so no innocuous-looking default can reach the
-    network.
-
-    Parameters
-    ----------
-    selection : str
-        A solver name or path. The default ``z3`` name resolves the pinned
-        ``z3-solver`` distribution, while any explicit selection is looked up
-        as given. ``PATH`` is never consulted for the default: doing so would
-        silently substitute an uncalibrated solver.
-    pinned : Callable[[], str | None]
-        Resolver for the pinned distribution. Supplied by the command boundary.
-    discovery : Callable[[str], str | None]
-        Lookup used for an explicit selection; a pure ``PATH``-style lookup by
-        default.
-
-    Returns
-    -------
-    tuple[Path, str | None]
-        The selected executable and the pinned distribution when the resolver
-        supplied it. An explicit selection records ``None``: its path and
-        digest identify it, and attributing it to the pin would claim a source
-        the probe never consulted.
-
-    Raises
-    ------
-    RuntimeError
-        When the selection resolves to no executable.
-
-    Examples
-    --------
-    The default route names the pin, and an explicit path does not::
-
-        select_solver('z3', pinned=lambda: '/pinned/z3')
-        # (PosixPath('/pinned/z3'), 'z3-solver==4.16.0.0')
-        select_solver('/opt/z3', pinned=lambda: '/pinned/z3')
-        # (PosixPath('/opt/z3'), None)
-    """
-    solver = pinned() if selection == "z3" else discovery(selection)
-    if solver is None:
-        raise RuntimeError("the pinned Z3 executable is unavailable")
-    distribution = Z3_DISTRIBUTION if selection == "z3" else None
-    return Path(solver).resolve(), distribution
-
-
-def qualify_solver(
-    z3_path: Path,
-    *,
-    exit_code: int,
-    reported: str,
-    distribution: str | None,
-) -> tuple[Path, str, str | None]:
-    """Validate an observed solver invocation and name the recorded solver.
-
-    The version command runs at the command boundary because it launches the
-    resolved executable. This function receives its status and output, so
-    qualification itself starts no process and a caller cannot mistake it for a
-    step that does.
-
-    Parameters
-    ----------
-    z3_path : Path
-        Executable the selection resolved to.
-    exit_code : int
-        Exit status reported by ``z3_path --version``.
-    reported : str
-        Standard output of that invocation, already stripped.
-    distribution : str | None
-        Pinned distribution when its resolver supplied the executable.
-
-    Returns
-    -------
-    tuple[Path, str, str | None]
-        The validated executable, the exact banner it reported, and the
-        distribution attribution. An explicit selection keeps ``None``: its
-        path and digest identify it, and only the default resolver consults the
-        pin.
-
-    Raises
-    ------
-    RuntimeError
-        When the run failed or its banner is not the calibrated one.
-
-    Examples
-    --------
-    A calibrated banner is returned unchanged::
-
-        qualify_solver(Path('/pinned/z3'), exit_code=0,
-                       reported=Z3_VERSION_BANNER,
-                       distribution=Z3_DISTRIBUTION)
-        # (PosixPath('/pinned/z3'), 'Z3 version 4.16.0 - 64 bit', 'z3-solver==4.16.0.0')
-    """
-    if exit_code != 0 or reported != Z3_VERSION_BANNER:
-        raise RuntimeError("the solver must report the calibrated Z3 4.16.0 release")
-    return z3_path, reported, distribution
-
+# The companion crate is a negative control: Verus rejects its wrapper because
+# the production crate carries no specification, which is the finding that
+# chose the other wirings. It must keep failing; a pass would mean it verified
+# an executable body it has no contract for.
+EXPECTED_QUALIFIED = frozenset({"macro", "attributes", "single-root"})
 
 
 def _verus_environment(z3_path: Path) -> dict[str, str]:
     """Return the child environment that binds the calibrated solver."""
     environment = dict(os.environ)
     environment.pop("RUSTUP_TOOLCHAIN", None)
+    # cargo-verus makes `verus` the compiler driver. A compiler wrapper such as
+    # sccache would sit in front of it and Verus refuses to start behind one.
+    environment.pop("RUSTC_WRAPPER", None)
+    environment.pop("RUSTC_WORKSPACE_WRAPPER", None)
     environment["VERUS_Z3_PATH"] = str(z3_path)
     environment.update(
         RUSTFLAGS="-D warnings",
@@ -367,3 +226,79 @@ def _qualified_candidates(
             continue
         qualified.append(candidate)
     return qualified
+
+
+def _capture(argv: list[str], log: Path, environment: dict[str, str]) -> dict:
+    """Run one verifier command, keep its output as a log, and return its status."""
+    result = subprocess.run(
+        argv, cwd=FIXTURES, env=environment, capture_output=True, text=True, check=False
+    )
+    log.write_text(result.stdout + result.stderr)
+    print(f"{log.name}: exit {result.returncode}", flush=True)
+    return {"exit_code": result.returncode}
+
+
+def run_candidates(
+    binaries: Path, z3_path: Path, prover_tools: str, output: Path
+) -> list[str]:
+    """Run every candidate's functions and return the candidates that qualify.
+
+    Parameters
+    ----------
+    binaries : Path
+        Installed Verus release directory that holds ``cargo-verus``.
+    z3_path : Path
+        The Z3 binary Verus is told to use.
+    prover_tools : str
+        Command prefix that invokes the shared ``prover-tools`` helper, which
+        the single-root candidate runs through.
+    output : Path
+        Directory receiving one log per candidate and function.
+    """
+    environment = _verus_environment(z3_path)
+    observations = []
+    for candidate in VERUS_CANDIDATES:
+        for function in VERUS_FUNCTIONS[candidate]:
+            _refresh_candidate_fingerprint(FIXTURES, candidate)
+            command = _verus_command(binaries, candidate, FIXTURES, function, prover_tools)
+            observations.append(
+                {
+                    "candidate": candidate,
+                    "function": function,
+                    **_capture(command, output / f"{candidate}-{function}.log", environment),
+                }
+            )
+    return _qualified_candidates(output, observations, FIXTURES)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the wiring candidates on the installed Verus and compare the outcome.
+
+    Exits non-zero unless exactly the macro, attributes and single-root
+    candidates qualify, so a regression and an unexpected pass both fail.
+
+    Reads ``VERUS_Z3_PATH`` (set by the shared install action) and takes the
+    Verus release from ``tools/verus/VERSION`` unless ``--verus-dir`` says
+    otherwise. Logs go to a temporary directory unless ``--output`` names one.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description=main.__doc__)
+    version = (ROOT / "tools/verus/VERSION").read_text().strip()
+    parser.add_argument("--verus-dir", type=Path, default=ROOT / ".verus" / version / "verus")
+    parser.add_argument("--z3", type=Path, default=os.environ.get("VERUS_Z3_PATH"))
+    parser.add_argument("--prover-tools", default=os.environ.get("PROVER_TOOLS", "prover-tools"))
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args(argv)
+    if args.z3 is None:
+        parser.error("set VERUS_Z3_PATH or pass --z3")
+    with tempfile.TemporaryDirectory() as scratch:
+        output = args.output or Path(scratch)
+        output.mkdir(parents=True, exist_ok=True)
+        qualified = run_candidates(args.verus_dir, args.z3, args.prover_tools, output)
+    print("Qualified wiring candidates: " + ", ".join(qualified))
+    return 0 if set(qualified) == EXPECTED_QUALIFIED else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

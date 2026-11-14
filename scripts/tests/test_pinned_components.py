@@ -1,8 +1,8 @@
 """Check that the build tools read the toolchain pin as parsed TOML.
 
-The verifier-record digest parses ``rust-toolchain.toml``; the shell helper
-that lists its components must agree, or a comment could hide a component from
-the installer while the digest still matched.
+The build-tools installer reads ``rust-toolchain.toml`` through a shell helper;
+it must parse the file as TOML, or a comment could hide a component from the
+installer.
 
 For example::
 
@@ -17,7 +17,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from verifier_probe_loader import SCRIPTS
+SCRIPTS = Path(__file__).resolve().parents[1]
 
 
 def components(toolchain: str, function: str = 'pinned_components') -> subprocess.CompletedProcess:

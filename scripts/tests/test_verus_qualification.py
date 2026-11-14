@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from verifier_probe_loader import load_verifier_probes
+import verus_probe
 
 # Line 8 holds the mutant's contract clause and line 10 its body. The region
 # also reaches the doc comment on line 6, because Verus may name either.
@@ -58,7 +58,7 @@ class MutantLocationTests(unittest.TestCase):
 
     def test_diagnostic_inside_the_mutant_qualifies(self) -> None:
         """A contract clause inside the declaration must be accepted."""
-        module = load_verifier_probes().verus_probe
+        module = verus_probe
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             source = self._write(directory, MUTANT_SOURCE)
@@ -71,7 +71,7 @@ class MutantLocationTests(unittest.TestCase):
 
     def test_diagnostic_in_the_preceding_function_is_rejected(self) -> None:
         """A neighbouring function's failure must not qualify as the mutant."""
-        module = load_verifier_probes().verus_probe
+        module = verus_probe
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             source = self._write(directory, MUTANT_SOURCE)
@@ -84,7 +84,7 @@ class MutantLocationTests(unittest.TestCase):
 
     def test_diagnostic_in_another_source_file_is_rejected(self) -> None:
         """A failure in a different candidate file must not qualify."""
-        module = load_verifier_probes().verus_probe
+        module = verus_probe
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             source = self._write(directory, MUTANT_SOURCE)
@@ -99,7 +99,7 @@ class MutantLocationTests(unittest.TestCase):
 
     def test_relative_location_resolves_against_the_probe_directory(self) -> None:
         """A relative diagnostic path must name the candidate it resolves to."""
-        module = load_verifier_probes().verus_probe
+        module = verus_probe
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             source = self._write(directory, MUTANT_SOURCE)
@@ -112,7 +112,7 @@ class MutantLocationTests(unittest.TestCase):
 
     def test_two_postcondition_failures_are_rejected(self) -> None:
         """Exactly one failure may be attributed to the seeded mutant."""
-        module = load_verifier_probes().verus_probe
+        module = verus_probe
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             source = self._write(directory, MUTANT_SOURCE)
@@ -124,7 +124,7 @@ class MutantLocationTests(unittest.TestCase):
 
     def test_source_without_a_mutant_raises(self) -> None:
         """A candidate that lost its mutant declaration must fail loudly."""
-        module = load_verifier_probes().verus_probe
+        module = verus_probe
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             source = self._write(directory, HELPER_ONLY_SOURCE)

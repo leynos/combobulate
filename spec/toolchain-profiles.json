@@ -53,11 +53,8 @@
         "rust-toolchain.toml",
         "scripts/tests/test_pinned_components.py",
         "scripts/tests/test_preregistration.py",
-        "scripts/tests/test_structural_digest.py",
         "scripts/tests/test_toolchain_profiles.py",
         "scripts/tests/test_validation_report.py",
-        "scripts/tests/test_verifier_free_container.py",
-        "scripts/tests/test_verifier_free_orchestration.py",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json"
       ]
     },
@@ -72,12 +69,10 @@
       "sites": [
         "scripts/docs_validation/kani_log/syntax.py",
         "scripts/tests/fixtures/evidence/bounded-kani.json",
-        "scripts/tests/fixtures/kani_logs/provenance.json",
         "scripts/tests/test_preregistration.py",
         "scripts/tests/test_preregistration_measurements.py",
         "scripts/tests/test_toolchain_profiles.py",
         "scripts/tests/test_validation_report.py",
-        "scripts/verifier_probe_support.py",
         "spec/acceptance-controls.json",
         "spec/calibration/builds.json",
         "spec/calibration/shared-workloads-local.json",
@@ -85,18 +80,8 @@
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json",
-        "tests/support/prover_tools_probe.rs",
         "tools/kani/VERSION",
         "tools/verifier-fixtures/kani-corpus/kani-list.json"
-      ]
-    },
-    "kani_toolchain": {
-      "value": "nightly-2025-11-21-x86_64-unknown-linux-gnu",
-      "sites": [
-        "scripts/tests/fixtures/kani_logs/provenance.json",
-        "scripts/verifier_probe_support.py",
-        "scripts/tests/test_kani_route_builders.py",
-        "tests/support/prover_tools_probe.rs"
       ]
     },
     "kani_cbmc": {
@@ -128,11 +113,9 @@
         "spec/measurements/ac-04-profile-build-budgets-2026-11-08.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-09.json",
         "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json",
-        "tools/verifier-fixtures/verus-wiring-probe/provenance.json",
         "scripts/tests/test_preregistration.py",
         "scripts/tests/test_preregistration_measurements.py",
-        "scripts/tests/test_validation_report.py",
-        "scripts/tests/test_verifier_probe_provenance.py"
+        "scripts/tests/test_validation_report.py"
       ]
     },
     "verus_rust": {
@@ -146,9 +129,6 @@
     "verus_z3": {
       "value": "4.16.0",
       "sites": [
-        "tools/verifier-fixtures/verus-wiring-probe/provenance.json",
-        "scripts/probe_provenance.py",
-        "scripts/verus_probe.py",
         "spec/acceptance-controls.json",
         "spec/calibration/builds.json",
         "spec/calibration/shared-workloads-local.json",
@@ -158,9 +138,7 @@
         "spec/measurements/ac-04-profile-build-budgets-2026-11-11.json",
         "scripts/tests/test_preregistration.py",
         "scripts/tests/test_preregistration_measurements.py",
-        "scripts/tests/test_validation_report.py",
-        "scripts/tests/test_verifier_probe_provenance.py",
-        "tests/support/prover_tools_probe.rs"
+        "scripts/tests/test_validation_report.py"
       ]
     },
     "verus_vstd": {
@@ -195,10 +173,7 @@
     "prover_tools_ref": {
       "value": "9c4a27a86c678ceac1155404f45d95ee4a14a172",
       "sites": [
-        "tools/rust-prover-tools/REF",
-        "scripts/run_verifier_probes.py",
-        "scripts/tests/fixtures/kani_logs/provenance.json",
-        "tools/probes/observations/prover-tools-ref.log"
+        "tools/rust-prover-tools/REF"
       ]
     }
   },
