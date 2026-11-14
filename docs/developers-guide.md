@@ -618,21 +618,29 @@ kernel. `tests/workspace_boundaries.rs` asserts that shape against live
 `cargo metadata` and `cargo tree` output, so a new edge fails a test rather
 than being noticed at review.
 
-| Path                                            | Role                                                   | Re-use boundary                                               |
-| ----------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| `crates/combobulate-kernel/`                    | `#![no_std]` without `alloc`; owns `TargetFacts`       | Target facts only; see the first policy below                 |
-| `crates/combobulate-macros/`                    | `proc-macro` crate; exports nothing until task 2.3.1   | Expansion boundary only; must not build `TargetFacts`         |
-| `src/lib.rs`                                    | Facade crate root                                      | Re-exports behind features; owns nothing below the facade     |
-| `src/profile.rs`                                | `BuildProfile`                                         | Reports features and target facts only                        |
-| `src/polars_backend.rs`                         | Crate-private Polars module, `cfg(feature = "polars")` | Wiring target for the pinned release; claims no capability    |
-| `scripts/docs_validation/trust_audit/`          | Trusted-item scanner behind the evidence gate          | The gate and the design check only                            |
-| `scripts/docs_validation/kani_log/`             | Kani log parser behind the evidence gate               | The gate's I/O shell only; the decision function is pure      |
-| `scripts/docs_validation/toolchain_profiles.py` | Pin checker for `spec/toolchain-profiles.json`         | Derives pins; other checks read the record instead of the pin |
-| `scripts/docs_validation/candidate_deferral.py` | Guard against a tick outrunning a deferred candidate   | Reads the roadmap export and D07's dispositions only          |
+| Path                                               | Role                                                         | Re-use boundary                                               |
+| -------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `crates/combobulate-kernel/`                       | `#![no_std]` without `alloc`; owns `TargetFacts`             | Target facts only; see the first policy below                 |
+| `crates/combobulate-macros/`                       | `proc-macro` crate; exports nothing until task 2.3.1         | Expansion boundary only; must not build `TargetFacts`         |
+| `src/lib.rs`                                       | Facade crate root                                            | Re-exports behind features; owns nothing below the facade     |
+| `src/profile.rs`                                   | `BuildProfile`                                               | Reports features and target facts only                        |
+| `src/array.rs`                                     | `Array`, `Dtype`, and shared I64 storage                     | Values and their construction; no operation knowledge         |
+| `src/expr/`                                        | `AExpr`, `Unary`, `Binary`, `OperationId`, `identity`, `add` | Graphs and their static facts; runs no kernel                 |
+| `src/plan/`                                        | `NativeExecutor`, `PreparedPlan`, the schedule walk          | Prepared execution; the only caller of the kernel dispatch    |
+| `src/error/`                                       | `Stage`, `Failure`, `ExpressionError`                        | Reporting a rejected expression; no recovery policy           |
+| `src/polars_backend.rs`                            | Crate-private Polars module, `cfg(feature = "polars")`       | Wiring target for the pinned release; claims no capability    |
+| `crates/combobulate-kernel/src/elementwise_add.rs` | Verified I64 addition; one kernel per file                   | Called only through the facade's crate-private dispatch       |
+| `scripts/verus_kernel.py`                          | Pipeline that runs the kernel proof and its mutants          | Runs Verus; verdict rules live in its sibling module          |
+| `scripts/verus_kernel_verdicts.py`                 | Decides a proof verdict from one log                         | Reads a log and nothing else                                  |
+| `scripts/verus_kernel_identity.py`                 | The DL-14 executable identity tuple                          | States what a proof record is about; reads no file            |
+| `scripts/docs_validation/trust_audit/`             | Trusted-item scanner behind the evidence gate                | The gate and the design check only                            |
+| `scripts/docs_validation/kani_log/`                | Kani log parser behind the evidence gate                     | The gate's I/O shell only; the decision function is pure      |
+| `scripts/docs_validation/toolchain_profiles.py`    | Pin checker for `spec/toolchain-profiles.json`               | Derives pins; other checks read the record instead of the pin |
+| `scripts/docs_validation/candidate_deferral.py`    | Guard against a tick outrunning a deferred candidate         | Reads the roadmap export and D07's dispositions only          |
 
 *Table 1: Workspace modules, roles, and re-use boundaries.*
 
-Five re-use policies follow from that table. They are stated here because each
+Six re-use policies follow from that table. They are stated here because each
 one has already been tempting to break in a different file, and a boundary that
 lives only in a review comment is not a boundary.
 
@@ -669,6 +677,16 @@ lives only in a review comment is not a boundary.
 - `toolchain_profiles` validates pins. Other checks read pins from
   `spec/toolchain-profiles.json` rather than duplicating them, so a pin bump
   edits one record and the sites it names, not every consumer.
+- `elementwise_add` is reached only through the facade's single crate-private
+  dispatch function. No other module calls the kernel, and the kernel does not
+  reach back: its only input is the borrowed slices the dispatch supplies, so
+  the facade's storage, error and plan types never appear in a kernel
+  signature. Each new kernel gets its own file, its own `verus_spec`, its own
+  contract file, its own mutant root and its own `verus_kernel.py` entry rather
+  than joining a shared multi-operation proof, because a proof root that
+  verified two bodies at once would leave a reader unable to tell which body a
+  rejection belonged to. Reusing `elementwise_add` for a second operation is
+  therefore not a re-use of the kernel but a second kernel.
 
 ## Spelling policy
 
@@ -1357,17 +1375,18 @@ cooldown would delay nothing.
 
 ## Formal verification
 
-The proofs that exist today are the calibration probes', not the kernel's; the
-kernel's own harnesses arrive with task 1.2.4 and join `make kani` and
-`make verus` then. What runs, and where:
+The proofs fall in two groups. The calibration probes and fixtures came first;
+the kernel's own proof is `make verus-kernel`, and its Kani harnesses arrive
+with task 1.2.4 and join `make kani` then. What runs, and where:
 
-| Proof                                                          | Target             | What it must show                                               |
-| -------------------------------------------------------------- | ------------------ | --------------------------------------------------------------- |
-| `tools/calibration/cardinality-probe` (2 Kani harnesses)       | `make kani`        | Both verify                                                     |
-| `tools/verifier-fixtures/kani-native-workspace` (1 harness)    | `make kani`        | The facade's target-facts harness verifies, cover satisfied     |
-| `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus` | Each run decides as `kani_logs/expected.json` records           |
-| `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`       | 8 functions verified, 0 errors                                  |
-| `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`       | Macro, attributes and single-root qualify; companion is refused |
+| Proof                                                          | Target              | What it must show                                               |
+| -------------------------------------------------------------- | ------------------- | --------------------------------------------------------------- |
+| `tools/calibration/cardinality-probe` (2 Kani harnesses)       | `make kani`         | Both verify                                                     |
+| `tools/verifier-fixtures/kani-native-workspace` (1 harness)    | `make kani`         | The facade's target-facts harness verifies, cover satisfied     |
+| `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus`  | Each run decides as `kani_logs/expected.json` records           |
+| `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`        | 8 functions verified, 0 errors                                  |
+| `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`        | Macro, attributes and single-root qualify; companion is refused |
+| `crates/combobulate-kernel/verus/elementwise_add.rs`           | `make verus-kernel` | 19 verified, 0 errors; five mutants and `wrap` rejected         |
 
 `.github/workflows/formal.yml` runs all of them on a pull request that touches
 them and weekly. The ordinary commit gates do not install or execute a
@@ -1468,3 +1487,60 @@ The Kani log parser (`scripts/docs_validation/kani_log/`), the trust-audit
 scanner (`scripts/docs_validation/trust_audit/`) and `scripts/verus_probe.py`
 are prover-output tooling that the shared `rust-prover-tools` is expected to
 adopt; the request is <https://github.com/leynos/rust-prover-tools/issues/250>.
+
+## Product Verus proofs
+
+`make verus-kernel` is the first proof about shipped product code rather than
+about a probe fixture. It verifies `add_i64_into` in
+`crates/combobulate-kernel/src/elementwise_add.rs` against SC-12 and rejects
+the seeded mutants that would otherwise pass for a proof. The proofs are ADR
+evidence for a claim this repository makes about its own kernel, and they are
+committed as observations rather than admitted as evidence: DL-1 hands
+admission to `PF05.proof@2.3.5`, which re-runs the roots instead of adopting
+these logs.
+
+Two roots run. `verus/elementwise_add.rs` includes the production file by
+`#[path]`, so the proof is about the bytes Cargo compiles, and it must report
+exactly the pinned `19 verified, 0 errors` with no partial-verification suffix;
+a selection-sized run is not the crate. `verus/elementwise_add_mutants.rs`
+states the same clauses for five deliberately wrong bodies, and each runs alone
+with `--verify-root --verify-function=<name>`. A sixth, body-tier `wrap` mutant
+copies the production file under `target/`, replaces the checked addition with
+a wrapping one, and must fail a loop invariant. That sixth run is what shows
+the shipped body's own annotation catches a wrong body rather than only a wrong
+wrapper: without it, a mutant suite could be satisfied entirely by the
+wrapper's postcondition.
+
+A mutant counts as rejected only when its diagnostic is a postcondition failure
+located inside its own declaration, at a clause it owes — the clause line is
+resolved from the file rather than hard-coded, so moving a clause keeps the
+record honest instead of stale. A diagnostic that names no location, another
+source, or a neighbouring clause does not qualify, and neither does an exit
+code by itself: a type, syntax or unsupported-feature error fails the run.
+`scripts/verus_kernel_verdicts.py` owns those rules and reads a log and nothing
+else; `scripts/verus_kernel.py` owns the pipeline, the log capture and the
+record. Keeping the split means the deciding rules can be unit-tested against
+synthetic logs without a solver, which is what
+`scripts/tests/test_verus_kernel.py` does.
+
+The record lives at `tools/verifier-fixtures/verus-kernel/provenance.json`
+beside one log per candidate. It binds the tool identities, a structural digest
+of every input, and the DL-14 identity tuple — catalogue id `V001`, the
+operation `add`, dtype `I64`, the symbol, and the executable and specification
+digests — so a later release cannot read these observations as evidence for a
+different body. The tuple is composed by `scripts/verus_kernel_identity.py` and
+checked against the shipped Rust declarations, so a catalogue id or symbol that
+drifts from the code fails a test rather than leaving a record about an
+operation that no longer exists. Re-run `make verus-kernel` after any edit to
+the kernel, the contract, the mutants, or either script: the record is fully
+regenerated, and `make design-check` fails while the committed digests disagree
+with the sources.
+
+`.github/workflows/formal.yml` runs `make verus-kernel` in its Verus job after
+the shared install-prover-tools action has installed Verus and Z3, and uploads
+the log unconditionally so a failed proof still names the clause or mutant that
+failed. The target is not part of `make test`, `make lint` or `make all`,
+because it needs an installed Verus release that most checkouts do not have. It
+is the only Make target that verifies product code; `make kani` runs the
+cardinality probe's and the native-workspace fixture's harnesses, and the
+kernel's own Kani harnesses arrive with task 1.2.4.

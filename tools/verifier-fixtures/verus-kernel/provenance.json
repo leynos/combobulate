@@ -3,13 +3,32 @@
   "z3": "~/.cache/uv/archive-v0/hPnTuCdDC4hFXVHn/bin/z3",
   "z3_sha256": "a06c2a851d58c5f5a7c1e5de188fd0e1b1135e778112aee83ffd1a433685516b",
   "admission": "PF05.proof@2.3.5 re-runs these; they are not admitted evidence",
+  "identity": {
+    "catalogue_id": "V001",
+    "operation": {
+      "name": "add",
+      "catalogue_id": "V001"
+    },
+    "dtype": "I64",
+    "symbol": "combobulate_kernel::elementwise_add::add_i64_into",
+    "executable": {
+      "path": "crates/combobulate-kernel/src/elementwise_add.rs",
+      "digest": "ast-sha256:13f2a4f28333824f43ece4f4001bd031cd812efe486c38f125e83ec1a2b145dd"
+    },
+    "specification": {
+      "path": "crates/combobulate-kernel/verus/elementwise_add_contract.rs",
+      "digest": "ast-sha256:a170f3ef3104e330c4663b8f971b46b54ad05e28512643fb0805394f84399b0f"
+    },
+    "semantic_policy": "checked-i64"
+  },
   "source_digests": {
     "crates/combobulate-kernel/src/elementwise_add.rs": "ast-sha256:13f2a4f28333824f43ece4f4001bd031cd812efe486c38f125e83ec1a2b145dd",
     "crates/combobulate-kernel/verus/elementwise_add.rs": "ast-sha256:955a1a2983f467c373ec05b0a0079cea80687687cf79b0aa1a258ddd975fb253",
     "crates/combobulate-kernel/verus/elementwise_add_contract.rs": "ast-sha256:a170f3ef3104e330c4663b8f971b46b54ad05e28512643fb0805394f84399b0f",
     "crates/combobulate-kernel/verus/elementwise_add_mutants.rs": "ast-sha256:1d07bb6b817f5e9791196484a6027fe22d6517a583e729fa56b74788ef29aa3c",
     "scripts/kernel_record.py": "ast-sha256:b168c52da8527afb12722cdcfa2e494e9819741339c9a1ff65895003ae776fce",
-    "scripts/verus_kernel.py": "ast-sha256:95ec3a980af7b5736fbb90d82aa3238c28473801f5f6716a519b7e685e6c05d9",
+    "scripts/verus_kernel.py": "ast-sha256:55031b41f2ce0fe8d6fd143784621412808783e2bc64596f1ce54d986bf7580c",
+    "scripts/verus_kernel_identity.py": "ast-sha256:7b378dcdc8812c7d7ba7b255e856ddae692a61cfeb2844a957ed0a48ee207d0f",
     "scripts/verus_kernel_verdicts.py": "ast-sha256:d7413f0ddc298a546a8cc057d41bc8c687b427f12766eea48b75cf37bd7ddd65"
   },
   "observations": [

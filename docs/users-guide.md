@@ -1,11 +1,17 @@
 # User guide
 
-Combobulate's array algebra is not yet implemented. The `combobulate` facade
-crate exports one public item, [`BuildProfile`](#build-profile), which reports
-the features and target facts compiled into the running binary. The unpublished
-`combobulate-kernel` crate exposes only `TargetFacts`. Nothing in the workspace
-carries a stability promise. Do not use the proposed design examples as working
-Rust examples.
+Combobulate's array algebra is a minimal preview. The `combobulate` facade
+crate carries an ordinary application path over I64 vectors — materialized
+[`Array`](#build-and-run-an-array-expression) values, deferred expression
+handles, and the `identity` and `add` operations — beside
+[`BuildProfile`](#build-profile), which reports the features and target facts
+compiled into the running binary. The unpublished `combobulate-kernel` crate
+exposes only `TargetFacts`. Nothing in the workspace carries a stability
+promise, and the `comb!` notation is not implemented. Use the examples in this
+guide as working Rust; the illustrative code in the
+[technical design](technical-design.md) and
+[language reference](language-reference.md) describes intended behaviour and is
+not compiled.
 
 Read the [language reference](language-reference.md) for the intended `comb!`
 pipeline notation, verbs, modifiers, and conjunctions. The
@@ -79,6 +85,105 @@ Task 1.2.6 owns the Polars capability statuses.
 Build with `default-features = false` to get a native-only build with no Polars
 dependency and no macro crate. That route is what a consumer that must avoid
 Polars entirely should select.
+
+## Build and run an array expression
+
+An array expression has three phases: apply operations to expression handles,
+prepare a plan, and collect or execute it. The facade's names carry no type
+arguments.
+
+```rust
+use combobulate::{Array, NativeExecutor, add, identity};
+
+let values = Array::from_i64(vec![1, 2, 3]);
+let shared = values.expr().then(&identity());
+assert_eq!(
+    shared.collect()?.as_i64_slice(),
+    Some(&[1_i64, 2, 3][..]),
+    "identity returns its operand unchanged"
+);
+
+let right = Array::from_i64(vec![10, 20, 30]);
+let sum = add().apply(&values.expr(), &right.expr());
+assert_eq!(
+    sum.collect()?.as_i64_slice(),
+    Some(&[11_i64, 22, 33][..]),
+    "add sums matching positions"
+);
+
+let plan = sum.prepare(&NativeExecutor::sequential())?;
+assert_eq!(
+    plan.execute()?.as_i64_slice(),
+    Some(&[11_i64, 22, 33][..]),
+    "an explicit plan and collect agree"
+);
+# Ok::<(), combobulate::ExpressionError>(())
+```
+
+`collect` is preparation followed by execution with the default engine. Call
+`prepare` and `execute` separately when you want the plan, for example to
+inspect what preparation validated or to run it more than once.
+
+### Error stages and codes
+
+A failure is reported with the stage that found it and a registered code:
+
+| Stage         | Code              | Meaning                                                    |
+| ------------- | ----------------- | ---------------------------------------------------------- |
+| `Preparation` | `ShapeAgreement`  | Two operands of an addition have different lengths.        |
+| `Execution`   | `IntegerOverflow` | A sum leaves the I64 range; the report names the position. |
+
+```rust
+use combobulate::{Array, NativeExecutor, add};
+
+let wide = Array::from_i64(vec![1, 2, 3]);
+let narrow = Array::from_i64(vec![1, 2]);
+let error = add()
+    .apply(&wide.expr(), &narrow.expr())
+    .prepare(&NativeExecutor::sequential())
+    .expect_err("operands of different lengths cannot be prepared");
+let [failure] = error.failures() else {
+    panic!("one disagreement is one failure");
+};
+assert_eq!(failure.code(), "ShapeAgreement");
+assert_eq!(error.stage(), combobulate::Stage::Preparation);
+```
+
+`prepare` reports every independent shape disagreement once, at the addition
+whose own operands disagree, and `execute` stops at the first overflowing
+addition. Formatting an `ExpressionError` gives the stage sentence and one line
+per failure.
+
+### Copying and sharing
+
+`Array::from_i64` moves your vector into the array's shared buffer, so building
+an array does not copy its elements. Cloning an `Array` clones the handle.
+`identity` returns its operand's handle rather than a new node, so collecting
+it returns an array that shares the input buffer.
+
+An addition allocates one output buffer and leaves both operands unchanged. A
+failed addition publishes nothing: the destination is not handed back holding
+the positions that succeeded before the overflow.
+
+### Current limits
+
+- I64 vectors only. There are no other dtypes, no nulls, and no scalars.
+- Rank-one only, with no broadcasting and no scalar extension.
+- `identity` and elementwise `add` only; the `comb!` notation arrives in 2.3.1.
+- `NativeExecutor::sequential()` is the only executor: a minimal preview
+  engine, not a backend choice.
+- Intermediate buffers live until the execution ends; freeing them earlier is
+  task 2.3.5.
+
+### Verification status
+
+The shipped `add` kernel is checked locally with Verus; that result is not
+admitted evidence. `make verus-kernel` runs the positive proof and rejects five
+seeded wrapper mutants plus one body mutant, but the record it writes is a
+development artefact under `tools/verifier-fixtures/verus-kernel/`. Admission
+belongs to `PF05.proof@2.3.5`, which re-runs those proofs rather than adopting
+the logs, so no proof claim in this guide is admitted evidence
+([ADR-0009](adrs/adr-0009-proof-first-policy-and-evidence-gate.md)).
 
 ## Audit a source tree for trusted items
 

@@ -3,21 +3,32 @@
 Combobulate uses the Rust development structure adapted from Peregrine Web pull
 request 11. The facade, `#![no_std]` kernel, and procedural-macro crates now
 exist, together with the `native-only` and `polars-enabled` build profiles the
-facade features select. The array algebra in the
-[technical design](technical-design.md) remains a delivery proposal.
+facade features select. The facade carries a minimal array algebra — I64
+vectors, `identity`, and elementwise `add`, with checked addition proved
+against SC-12 in Verus — while the wider algebra and the `comb!` notation
+described in the [technical design](technical-design.md) remain a delivery
+proposal.
 
 ## Paths and responsibilities
 
 | Path                                            | Responsibility                                                                                 |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `src/lib.rs`                                    | Facade crate root; re-exports `BuildProfile` and the gated Polars probe.                       |
+| `src/lib.rs`                                    | Facade crate root; re-exports the public items and the gated Polars probe.                     |
 | `src/profile.rs`                                | `BuildProfile`, reporting compiled features and target facts.                                  |
+| `src/array.rs`                                  | `Array` and `Dtype`: shared I64 storage and its constructors and accessors.                    |
+| `src/expr/`                                     | Expression handles, `OperationId`, and the `identity` and `add` operations.                    |
+| `src/plan/`                                     | `NativeExecutor`, `PreparedPlan`, and the linear schedule preparation walks.                   |
+| `src/error/`                                    | `Stage`, `Failure`, and `ExpressionError`, the closed registered error-code set.               |
 | `src/polars_backend.rs`                         | Crate-private Polars module, compiled only under `cfg(feature = "polars")`.                    |
-| `crates/combobulate-kernel/`                    | `#![no_std]` kernel crate that owns `TargetFacts`.                                             |
+| `crates/combobulate-kernel/`                    | `#![no_std]` kernel crate that owns `TargetFacts` and the verified elementwise kernels.        |
+| `crates/combobulate-kernel/verus/`              | Verus roots: the positive proof, the mutant suite, and the shared SC-12 contract.              |
 | `crates/combobulate-macros/`                    | `proc-macro` crate for the future `comb!` notation; it exports no macro yet.                   |
 | `tests/`                                        | Integration tests for build routes, workflow policy, Make commands, and shell preflights.      |
 | `tests/support/`                                | Private helpers owned by the corresponding integration test modules.                           |
 | `scripts/`                                      | Toolchain installation, build preflights, native Clang linker wrapper, and all Python scripts. |
+| `scripts/verus_kernel.py`                       | Pipeline that verifies the shipped kernel, rejects its mutants, and writes the record.         |
+| `scripts/verus_kernel_verdicts.py`              | The log-reading rules that decide a positive, mutant, or body-mutant verdict.                  |
+| `scripts/verus_kernel_identity.py`              | Composes the DL-14 identity tuple naming the operation a proof record is about.                |
 | `scripts/tests/`                                | Python unittest and pytest suites, supporting helpers, and fixtures.                           |
 | `scripts/docs_validation/`                      | Documentation-model checker package.                                                           |
 | `scripts/docs_validation/trust_audit/`          | Trusted-item scanner behind the evidence gate and the trust-audit design check.                |
@@ -57,6 +68,7 @@ facade features select. The array algebra in the
 | `tools/verus/`                                  | Pinned Verus release markers and archive checksums.                                            |
 | `tools/rust-prover-tools/`                      | Pinned `rust-prover-tools` revision that installs and runs both verifiers.                     |
 | `tools/verifier-fixtures/`                      | Non-member Kani corpus, Kani native-workspace and Verus wiring fixtures.                       |
+| `tools/verifier-fixtures/verus-kernel/`         | The kernel proof record and one captured log per candidate; development artefacts only.        |
 | `tools/probes/`                                 | Recorded toolchain and Polars capability observations, plus the Polars profile probe.          |
 | `tools/gates/`                                  | Standalone compile-fail gates; each is its own workspace with its own lockfile.                |
 | `tools/mold/`                                   | Pinned native linker version and archive digest.                                               |
@@ -77,9 +89,13 @@ implementation under `crates/`. Keep integration tests under `tests/`; support
 modules serve their named suite and must not become a generic validation
 framework. Toolchain scripts belong to the root build workflow. The kernel owns
 `TargetFacts`; the macro crate must not construct it, and the facade exposes
-only derived values through `BuildProfile`. The
+only derived values through `BuildProfile`. The kernel is reached from the
+facade through one crate-private dispatch function and never reaches back, so
+no facade type appears in a kernel signature. The
 [developer guide](developers-guide.md#workspace-layout-and-module-ownership)
-states the re-use policy for each module in the table above.
+states the re-use policy for each module in the table above, and
+[Product Verus proofs](developers-guide.md#product-verus-proofs) states what a
+kernel must carry before it may be called verified.
 
 `docs/roadmap.md` is canonical: edit it directly (preferably with `mapsplice`
 for structural changes), then run `scripts/export_roadmap.py` to refresh its
