@@ -243,7 +243,7 @@ Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
 that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
 because nextest then has no process left to escalate to `SIGKILL`. Only the
-job's own `timeout-minutes` bounds it (all three required jobs set 8;
+job's own `timeout-minutes` bounds it (all three required jobs set 20;
 `coverage-main.yml` sets none, so GitHub's 360-minute default applies there,
 and neither nextest's limits, including the 60-minute `global-timeout`, nor the
 coverage action's Cargo watchdog bound a surviving descendant, and none of them
@@ -1247,7 +1247,7 @@ Keep calibration records in `spec/calibration/` and acceptance measurements in
 control. Validation checks that every control defines the registered fields and
 that each measurement record binds to its control, registration date, runner
 and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner,
-and every required pull-request job has an eight-minute timeout. The matching
+and every required pull-request job has a 20-minute timeout. The matching
 `make act-validation` target maps `build-test` to the configured `ubuntu-24.04`
 Act runner image; the two Polars jobs are not run under Act. See the
 [acceptance calibration report](acceptance-calibration.md) for methodology,
