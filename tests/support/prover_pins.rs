@@ -11,6 +11,51 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+/// A pin file's path and complete text, the pair every reader needs.
+///
+/// Readers take one of these instead of a path and its contents as two bare
+/// strings. That keeps a caller from passing contents where the label belongs,
+/// and gives every diagnostic one place to find the file it must name.
+#[derive(Clone, Copy)]
+pub(crate) struct PinSource<'a> {
+    /// Repository-relative path used in diagnostics.
+    file: &'a str,
+    /// The file's complete text.
+    text: &'a str,
+}
+
+impl<'a> PinSource<'a> {
+    /// Groups a diagnostic label with the text read from that file.
+    pub(crate) fn new(file: &'a str, text: &'a str) -> Self { Self { file, text } }
+
+    /// Builds an error that names this source and the rule it broke.
+    pub(crate) fn error(&self, rule: impl Into<String>) -> PinError {
+        PinError::new(self.file, rule)
+    }
+
+    /// Returns the text read from this source.
+    pub(crate) fn text(self) -> &'a str { self.text }
+}
+
+/// The REF field a reader selects.
+#[derive(Clone, Copy)]
+enum Field {
+    /// The `ref:` commit.
+    Revision,
+    /// The `repository:` URL.
+    Repository,
+}
+
+impl Field {
+    /// The line prefix that introduces this field.
+    fn prefix(self) -> &'static str {
+        match self {
+            Self::Revision => "ref: ",
+            Self::Repository => "repository: ",
+        }
+    }
+}
+
 /// A pin file that does not satisfy the contract its consumer relies on.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct PinError {
@@ -44,113 +89,105 @@ impl Error for PinError {}
 /// trailing newlines. A second line or a carriage return would silently become
 /// part of the installation path, so the file must end with exactly one `\n`
 /// and contain no other line separator.
-pub(crate) fn single_line<'a>(file: &str, text: &'a str) -> Result<&'a str, PinError> {
+pub(crate) fn single_line(source: PinSource<'_>) -> Result<&str, PinError> {
+    let text = source.text;
     let Some(line) = text.strip_suffix('\n') else {
-        return Err(PinError::new(file, "must end with exactly one newline"));
+        return Err(source.error("must end with exactly one newline"));
     };
     if line.is_empty() {
-        return Err(PinError::new(file, "must not be empty"));
+        return Err(source.error("must not be empty"));
     }
     if line.bytes().any(|byte| matches!(byte, b'\n' | b'\r')) {
-        return Err(PinError::new(file, "must contain exactly one line"));
+        return Err(source.error("must contain exactly one line"));
     }
     Ok(line)
 }
 
 /// Requires a Kani release such as `1.2.3`.
-pub(crate) fn kani_version<'a>(file: &str, text: &'a str) -> Result<&'a str, PinError> {
-    let version = single_line(file, text)?;
-    if is_kani_version(version) {
-        Ok(version)
-    } else {
-        Err(PinError::new(
-            file,
-            format!("expected a Kani release such as 1.2.3, got {version:?}"),
-        ))
-    }
+pub(crate) fn kani_version(source: PinSource<'_>) -> Result<&str, PinError> {
+    checked_version(source, is_kani_version, "a Kani release such as 1.2.3")
 }
 
 /// Requires a Verus release such as `0.2027.01.15.abc1234`.
-pub(crate) fn verus_version<'a>(file: &str, text: &'a str) -> Result<&'a str, PinError> {
-    let version = single_line(file, text)?;
-    if is_verus_version(version) {
+pub(crate) fn verus_version(source: PinSource<'_>) -> Result<&str, PinError> {
+    checked_version(
+        source,
+        is_verus_version,
+        "a Verus release such as 0.2027.01.15.abc1234",
+    )
+}
+
+/// Requires one single-line release that `is_valid` accepts.
+fn checked_version<'a>(
+    source: PinSource<'a>,
+    is_valid: fn(&str) -> bool,
+    expected: &str,
+) -> Result<&'a str, PinError> {
+    let version = single_line(source)?;
+    if is_valid(version) {
         Ok(version)
     } else {
-        Err(PinError::new(
-            file,
-            format!("expected a Verus release such as 0.2027.01.15.abc1234, got {version:?}"),
-        ))
+        Err(source.error(format!("expected {expected}, got {version:?}")))
     }
 }
 
 /// Requires the single checksum row to bind the release the VERSION file selects.
-pub(crate) fn verus_checksum_row(file: &str, text: &str, version: &str) -> Result<(), PinError> {
-    let row = single_line(file, text)?;
+pub(crate) fn verus_checksum_row(source: PinSource<'_>, version: &str) -> Result<(), PinError> {
+    let row = single_line(source)?;
     let Some((digest, archive)) = row.split_once("  ") else {
-        return Err(PinError::new(
-            file,
-            "expected one '<digest>  <archive>' row",
-        ));
+        return Err(source.error("expected one '<digest>  <archive>' row"));
     };
     if !is_lowercase_hex(digest, 64) {
-        return Err(PinError::new(
-            file,
-            format!("digest must be 64 lowercase hexadecimal characters, got {digest:?}"),
-        ));
+        return Err(source.error(format!(
+            "digest must be 64 lowercase hexadecimal characters, got {digest:?}"
+        )));
     }
     let expected = format!("verus-{version}-x86-linux.zip");
     if archive == expected {
         Ok(())
     } else {
-        Err(PinError::new(
-            file,
-            format!("archive must be {expected:?}, got {archive:?}"),
-        ))
+        Err(source.error(format!("archive must be {expected:?}, got {archive:?}")))
     }
 }
 
 /// Reads the single `ref:` row and requires a full lowercase commit.
-pub(crate) fn pinned_ref<'a>(file: &str, text: &'a str) -> Result<&'a str, PinError> {
-    let reference = sole_field(file, text, "ref: ")?;
+pub(crate) fn pinned_ref(source: PinSource<'_>) -> Result<&str, PinError> {
+    let reference = sole_field(source, Field::Revision)?;
     if is_lowercase_hex(reference, 40) {
         Ok(reference)
     } else {
-        Err(PinError::new(
-            file,
-            format!("ref must be 40 lowercase hexadecimal characters, got {reference:?}"),
-        ))
+        Err(source.error(format!(
+            "ref must be 40 lowercase hexadecimal characters, got {reference:?}"
+        )))
     }
 }
 
 /// Reads the single `repository:` row and requires a whitespace-free URL.
-pub(crate) fn pinned_repository<'a>(file: &str, text: &'a str) -> Result<&'a str, PinError> {
-    let repository = sole_field(file, text, "repository: ")?;
+pub(crate) fn pinned_repository(source: PinSource<'_>) -> Result<&str, PinError> {
+    let repository = sole_field(source, Field::Repository)?;
     if repository.is_empty() || repository.bytes().any(|byte| byte.is_ascii_whitespace()) {
-        return Err(PinError::new(
-            file,
-            format!("repository must be a URL without whitespace, got {repository:?}"),
-        ));
+        return Err(source.error(format!(
+            "repository must be a URL without whitespace, got {repository:?}"
+        )));
     }
     Ok(repository)
 }
 
-/// Reads the value of the sole line that starts with `prefix`.
-fn sole_field<'a>(file: &str, text: &'a str, prefix: &str) -> Result<&'a str, PinError> {
-    if text.bytes().any(|byte| byte == b'\r') {
-        return Err(PinError::new(file, "must use newline line endings"));
+/// Reads the value of the sole line that introduces `field`.
+fn sole_field(source: PinSource<'_>, field: Field) -> Result<&str, PinError> {
+    let prefix = field.prefix();
+    if source.text.bytes().any(|byte| byte == b'\r') {
+        return Err(source.error("must use newline line endings"));
     }
-    let mut values = text.lines().filter_map(|line| line.strip_prefix(prefix));
+    let mut values = source
+        .text
+        .lines()
+        .filter_map(|line| line.strip_prefix(prefix));
     let Some(value) = values.next() else {
-        return Err(PinError::new(
-            file,
-            format!("must contain one `{prefix}` row"),
-        ));
+        return Err(source.error(format!("must contain one `{prefix}` row")));
     };
     if values.next().is_some() {
-        return Err(PinError::new(
-            file,
-            format!("must contain exactly one `{prefix}` row"),
-        ));
+        return Err(source.error(format!("must contain exactly one `{prefix}` row")));
     }
     Ok(value)
 }

@@ -2,16 +2,14 @@
 
 use rstest::rstest;
 
-use crate::{
-    pins::{
-        PinError,
-        kani_version,
-        pinned_ref,
-        pinned_repository,
-        verus_checksum_row,
-        verus_version,
-    },
-    script_pin::{ScriptDependency, script_dependency, script_matches_reference},
+use crate::pins::{
+    PinError,
+    PinSource,
+    kani_version,
+    pinned_ref,
+    pinned_repository,
+    verus_checksum_row,
+    verus_version,
 };
 
 /// One repository-relative path used by every diagnostic in these cases.
@@ -24,17 +22,15 @@ const REFERENCE: &str = "tools/rust-prover-tools/REF";
 const DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 /// Reports whether a reader failed with a diagnostic naming `fragment`.
-fn fails_with<T>(result: Result<T, PinError>, fragment: &str) -> bool {
+pub(crate) fn fails_with<T>(result: Result<T, PinError>, fragment: &str) -> bool {
     result
         .err()
         .is_some_and(|error| error.to_string().contains(fragment))
 }
 
-/// Builds a PEP 723 script whose dependency list is `dependencies`.
-fn script_with(dependencies: &str) -> String {
-    format!(
-        "# /// script\n# requires-python = \">=3.14\"\n# dependencies = [{dependencies}]\n# ///\n"
-    )
+/// Builds a pin source labelled with the file a diagnostic should name.
+pub(crate) fn pin_source<'a>(file: &'a str, text: &'a str) -> PinSource<'a> {
+    PinSource::new(file, text)
 }
 
 /// Current and future-shaped Kani releases are accepted.
@@ -44,7 +40,7 @@ fn script_with(dependencies: &str) -> String {
 #[case("1.4.0\n")]
 fn kani_versions_are_accepted(#[case] text: &str) {
     assert!(
-        kani_version("tools/kani/VERSION", text).is_ok(),
+        kani_version(pin_source("tools/kani/VERSION", text)).is_ok(),
         "Kani release {text:?} must be accepted"
     );
 }
@@ -60,7 +56,10 @@ fn kani_versions_are_accepted(#[case] text: &str) {
 #[case("1.2.3\n1.3.0\n", "one line")]
 fn kani_versions_are_rejected(#[case] text: &str, #[case] fragment: &str) {
     assert!(
-        fails_with(kani_version("tools/kani/VERSION", text), fragment),
+        fails_with(
+            kani_version(pin_source("tools/kani/VERSION", text)),
+            fragment
+        ),
         "Kani pin {text:?} must fail with {fragment:?}"
     );
 }
@@ -73,7 +72,7 @@ fn kani_versions_are_rejected(#[case] text: &str, #[case] fragment: &str) {
 #[case("0.2000.02.29.abc1234\n")]
 fn verus_versions_are_accepted(#[case] text: &str) {
     assert!(
-        verus_version("tools/verus/VERSION", text).is_ok(),
+        verus_version(pin_source("tools/verus/VERSION", text)).is_ok(),
         "Verus release {text:?} must be accepted"
     );
 }
@@ -94,7 +93,10 @@ fn verus_versions_are_accepted(#[case] text: &str) {
 #[case("0.2027.01.15.abc1234 extra\n")]
 fn verus_versions_are_rejected(#[case] text: &str) {
     assert!(
-        fails_with(verus_version("tools/verus/VERSION", text), "Verus release"),
+        fails_with(
+            verus_version(pin_source("tools/verus/VERSION", text)),
+            "Verus release"
+        ),
         "Verus pin {text:?} must be rejected"
     );
 }
@@ -105,7 +107,7 @@ fn checksum_rows_are_accepted() {
     for version in ["0.2027.01.15.abc1234", "0.2027.02.20.def5678"] {
         let text = format!("{DIGEST}  verus-{version}-x86-linux.zip\n");
         assert!(
-            verus_checksum_row("tools/verus/SHA256SUMS", &text, version).is_ok(),
+            verus_checksum_row(pin_source("tools/verus/SHA256SUMS", &text), version).is_ok(),
             "checksum row for {version} must be accepted"
         );
     }
@@ -140,7 +142,7 @@ fn checksum_rows_are_rejected() {
     for (description, text, fragment) in rows {
         assert!(
             fails_with(
-                verus_checksum_row("tools/verus/SHA256SUMS", &text, version),
+                verus_checksum_row(pin_source("tools/verus/SHA256SUMS", &text), version),
                 fragment
             ),
             "checksum row with {description} must fail with {fragment:?}"
@@ -155,12 +157,12 @@ fn reference_fields_are_accepted() {
     let text =
         format!("repository: https://example.test/tools.git\nbranch: main\nref: {revision}\n");
     assert_eq!(
-        pinned_ref(REFERENCE, &text),
+        pinned_ref(pin_source(REFERENCE, &text)),
         Ok(revision.as_str()),
         "a 40-character lowercase ref must be accepted"
     );
     assert_eq!(
-        pinned_repository(REFERENCE, &text),
+        pinned_repository(pin_source(REFERENCE, &text)),
         Ok("https://example.test/tools.git"),
         "a whitespace-free repository must be accepted"
     );
@@ -184,190 +186,19 @@ fn reference_fields_are_rejected() {
     ];
     for (description, text) in &rows {
         assert!(
-            fails_with(pinned_ref(REFERENCE, text), "ref"),
+            fails_with(pinned_ref(pin_source(REFERENCE, text)), "ref"),
             "REF row with {description} must be rejected"
         );
     }
     assert!(
         fails_with(
-            pinned_repository(REFERENCE, "repository: https://example.test/a b\n"),
+            pinned_repository(pin_source(
+                REFERENCE,
+                "repository: https://example.test/a b\n"
+            )),
             "whitespace"
         ),
         "a repository containing whitespace must be rejected"
-    );
-}
-
-/// The helper's Git source and revision are read from embedded metadata.
-#[test]
-fn script_helper_source_is_read() {
-    let revision = "a".repeat(40);
-    let source = script_with(&format!(
-        "\"tree-sitter==0.25.2\",\n#   \"rust-prover-tools @ git+https://example.test/tools.git@{revision}\""
-    ));
-    assert_eq!(
-        script_dependency("script.py", &source),
-        Ok(ScriptDependency {
-            repository: "https://example.test/tools.git".to_owned(),
-            revision,
-        }),
-        "the helper dependency must be read from the script block"
-    );
-}
-
-/// A bare `#` line is empty metadata, and helper names normalize.
-#[test]
-fn bare_comment_lines_and_normalized_names_are_accepted() {
-    let revision = "a".repeat(40);
-    let source = format!(
-        concat!(
-            "# /// script\n#\n# dependencies = [\"rust_prover_tools @ git+",
-            "https://example.test/tools.git@{revision}\"]\n# ///\n"
-        ),
-        revision = revision
-    );
-    assert_eq!(
-        script_dependency("script.py", &source),
-        Ok(ScriptDependency {
-            repository: "https://example.test/tools.git".to_owned(),
-            revision,
-        }),
-        "a bare comment line and a normalized helper name must be accepted"
-    );
-}
-
-/// A malformed PEP 723 block names the rule it broke.
-#[test]
-fn script_blocks_are_rejected() {
-    let rows = [
-        ("missing block", "print('hi')\n".to_owned(), "script block"),
-        (
-            "unclosed block",
-            "# /// script\n# dependencies = []\n".to_owned(),
-            "close",
-        ),
-        (
-            "two blocks",
-            "# /// script\n# ///\n# /// script\n# ///\n".to_owned(),
-            "exactly one",
-        ),
-        (
-            "non-comment line",
-            "# /// script\nrequires-python = \">=3.14\"\n# ///\n".to_owned(),
-            "comment",
-        ),
-        (
-            "missing metadata space",
-            "# /// script\n#dependencies = []\n# ///\n".to_owned(),
-            "comment",
-        ),
-        (
-            "no dependencies",
-            "# /// script\n# requires-python = \">=3.14\"\n# ///\n".to_owned(),
-            "dependencies",
-        ),
-    ];
-    for (description, source, fragment) in &rows {
-        assert!(
-            fails_with(script_dependency("script.py", source), fragment),
-            "script with {description} must fail with {fragment:?}"
-        );
-    }
-}
-
-/// A malformed helper requirement names the rule it broke.
-#[test]
-fn helper_requirements_are_rejected() {
-    let revision = "a".repeat(40);
-    let helper = format!("rust-prover-tools @ git+https://example.test/tools.git@{revision}");
-    let rows = [
-        (
-            "no helper",
-            script_with("\"tree-sitter==0.25.2\""),
-            "rust-prover-tools",
-        ),
-        (
-            "two helpers",
-            script_with(&format!("\"{helper}\",\n#   \"{helper}\"")),
-            "exactly once",
-        ),
-        (
-            "normalized duplicate",
-            script_with(&format!(
-                "\"{helper}\",\n#   \"rust_prover_tools @ git+https://example.test/tools.git@{revision}\""
-            )),
-            "exactly once",
-        ),
-        (
-            "pinned version",
-            script_with("\"rust-prover-tools==1.0.0\""),
-            "@ git+",
-        ),
-        (
-            "uppercase revision",
-            script_with(&format!(
-                "\"rust-prover-tools @ git+https://example.test/tools.git@{}\"",
-                "A".repeat(40)
-            )),
-            "40 lowercase",
-        ),
-        (
-            "short revision",
-            script_with(&format!(
-                "\"rust-prover-tools @ git+https://example.test/tools.git@{}\"",
-                "a".repeat(39)
-            )),
-            "40 lowercase",
-        ),
-        (
-            "trailing revision material",
-            script_with(&format!(
-                "\"rust-prover-tools @ git+https://example.test/tools.git@{revision}x\""
-            )),
-            "40 lowercase",
-        ),
-    ];
-    for (description, source, fragment) in &rows {
-        assert!(
-            fails_with(script_dependency("script.py", source), fragment),
-            "script with {description} must fail with {fragment:?}"
-        );
-    }
-}
-
-/// A well-formed script must still name the REF source exactly.
-#[rstest]
-#[case::matching(
-    "https://example.test/tools.git",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    true
-)]
-#[case::other_revision(
-    "https://example.test/tools.git",
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    false
-)]
-#[case::other_repository(
-    "https://example.test/elsewhere.git",
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    false
-)]
-fn script_must_match_the_reference(
-    #[case] repository: &str,
-    #[case] revision: &str,
-    #[case] is_expected_to_match: bool,
-) {
-    let script = script_with(&format!(
-        "\"rust-prover-tools @ git+{repository}@{revision}\""
-    ));
-    let reference = format!(
-        "repository: https://example.test/tools.git\nbranch: main\nref: {}\n",
-        "a".repeat(40)
-    );
-    let outcome = script_matches_reference(&script, &reference);
-    assert_eq!(
-        outcome.is_ok(),
-        is_expected_to_match,
-        "script {repository}@{revision} against REF must match only when identical: {outcome:?}"
     );
 }
 
@@ -375,7 +206,7 @@ fn script_must_match_the_reference(
 #[test]
 fn diagnostics_name_the_file() {
     assert!(
-        fails_with(kani_version(FILE, "0.67\n"), FILE),
+        fails_with(kani_version(pin_source(FILE, "0.67\n")), FILE),
         "a diagnostic must name the file it read"
     );
 }

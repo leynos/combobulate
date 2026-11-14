@@ -20,8 +20,12 @@ mod script_pin;
 #[path = "support/prover_pins_tests.rs"]
 mod pin_tests;
 
-use pins::{kani_version, pinned_ref, verus_checksum_row, verus_version};
-use script_pin::script_matches_reference;
+/// Shape and relationship regressions for the helper-pin reader.
+#[path = "support/prover_script_pin_tests.rs"]
+mod script_pin_tests;
+
+use pins::{PinSource, kani_version, pinned_ref, verus_checksum_row, verus_version};
+use script_pin::{reference_source, script_matches_reference, script_source};
 
 /// Reports fixture and command failures without mutating the parent environment.
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -55,15 +59,16 @@ fn prover() -> TestResult<ProverProbe> {
 #[test]
 fn prover_release_pins_are_complete() -> TestResult {
     let reference = read("tools/rust-prover-tools/REF")?;
-    pinned_ref("tools/rust-prover-tools/REF", &reference)?;
+    pinned_ref(PinSource::new("tools/rust-prover-tools/REF", &reference))?;
 
-    kani_version("tools/kani/VERSION", &read("tools/kani/VERSION")?)?;
+    let kani = read("tools/kani/VERSION")?;
+    kani_version(PinSource::new("tools/kani/VERSION", &kani))?;
 
     let verus = read("tools/verus/VERSION")?;
-    let version = verus_version("tools/verus/VERSION", &verus)?;
+    let version = verus_version(PinSource::new("tools/verus/VERSION", &verus))?;
+    let checksums = read("tools/verus/SHA256SUMS")?;
     verus_checksum_row(
-        "tools/verus/SHA256SUMS",
-        &read("tools/verus/SHA256SUMS")?,
+        PinSource::new("tools/verus/SHA256SUMS", &checksums),
         version,
     )?;
     Ok(())
@@ -72,10 +77,9 @@ fn prover_release_pins_are_complete() -> TestResult {
 /// Requires the PEP 723 probe dependency to name the same helper as REF.
 #[test]
 fn probe_script_matches_the_prover_tools_pin() -> TestResult {
-    script_matches_reference(
-        &read("scripts/run_verifier_probes.py")?,
-        &read("tools/rust-prover-tools/REF")?,
-    )?;
+    let script = read("scripts/run_verifier_probes.py")?;
+    let reference = read("tools/rust-prover-tools/REF")?;
+    script_matches_reference(script_source(&script), reference_source(&reference))?;
     Ok(())
 }
 
@@ -206,7 +210,7 @@ fn environment_cannot_unlock_the_helper(prover: TestResult<ProverProbe>) -> Test
         "the dry-run must parse successfully",
     )?;
     let reference = read("tools/rust-prover-tools/REF")?;
-    let pin = pinned_ref("tools/rust-prover-tools/REF", &reference)?;
+    let pin = pinned_ref(PinSource::new("tools/rust-prover-tools/REF", &reference))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
     check(
         stdout.contains("uv tool run --from") && stdout.contains(pin),
