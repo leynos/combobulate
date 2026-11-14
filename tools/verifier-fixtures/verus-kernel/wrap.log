@@ -1,0 +1,13 @@
+verification results:: 14 verified, 1 errors
+error: invariant not satisfied at end of loop body
+   --> <repo>/target/verus-kernel-wrap/elementwise_add.rs:129:13
+    |
+129 |             forall|j: int| 0 <= j < scan ==> #[trigger] in_range_at(lhs@, rhs@, j),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to 1 previous error
+
+Verus proofs failed (exit 1).
+Binary: <repo>/.verus/0.2026.09.06.8dea4a2/verus/verus
+Proof file: <repo>/target/verus-kernel-wrap/wrap.rs
+Toolchain: 1.98.0-x86_64-unknown-linux-gnu

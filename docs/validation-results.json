@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 166
+      "count": 169
     },
     {
       "check": "contract-examples",
@@ -155,8 +155,8 @@
     {
       "check": "trust-audit",
       "status": "pass",
-      "detail": "No trust item appears in any workspace member; the fixture corpus still reports its seeded items.",
-      "count": 3
+      "detail": "No trust item appears in any workspace member or product proof root; the fixture corpus still reports its seeded items.",
+      "count": 7
     },
     {
       "check": "log-parser-registration",
