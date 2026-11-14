@@ -1112,6 +1112,10 @@ explicitly, so they can exercise isolated repository roots without mutating
 process-wide module state. Script dependencies remain pinned in
 `scripts/requirements.txt`. Property-strategy helpers in `scripts/tests/` are
 test fixtures and must not become a production parsing or rendering path.
+`make design-check` runs the suite twice, through `unittest` discovery and
+through pytest, so every test module must be collectable both ways. Shared
+setup for `unittest.TestCase` cases therefore uses a helper or context manager
+rather than a pytest fixture.
 
 `scripts/tests/markdown_examples.py` is the shared loader for marked JSON
 fences in migration documents. It requires each fence to have a unique adjacent
