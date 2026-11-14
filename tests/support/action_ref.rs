@@ -23,11 +23,23 @@ pub(crate) fn matches_pinned_action(uses: &str, expected_path: &str) -> bool {
     action_path(uses) == expected_path && is_sha_pinned(uses)
 }
 
+/// Extracts the reference that immediately follows an action's `@`.
+///
+/// Quoting ends the reference as surely as whitespace does: `uses: "path@SHA"`
+/// must yield `SHA`, not `SHA"`, or the replacement would consume the closing
+/// quote and leave the scalar unterminated.
+fn current_reference(suffix: &str) -> Option<&str> {
+    suffix
+        .split(|character: char| character.is_whitespace() || matches!(character, '"' | '\''))
+        .next()
+        .filter(|reference| !reference.is_empty())
+}
+
 /// Replaces the action's current source reference without coupling fixtures to its SHA.
 pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Option<String> {
     let prefix = format!("{path}@");
     let (_, suffix) = source.split_once(&prefix)?;
-    let current_ref = suffix.split_whitespace().next()?;
+    let current_ref = current_reference(suffix)?;
     Some(source.replacen(
         &format!("{prefix}{current_ref}"),
         &format!("{prefix}{replacement}"),
@@ -42,7 +54,7 @@ pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Opt
 pub(crate) fn repoint_all_actions(source: &str, path: &str, replacement: &str) -> Option<String> {
     let prefix = format!("{path}@");
     let (_, suffix) = source.split_once(&prefix)?;
-    let current_ref = suffix.split_whitespace().next()?;
+    let current_ref = current_reference(suffix)?;
     let needle = format!("{prefix}{current_ref}");
     Some(source.replace(&needle, &format!("{prefix}{replacement}")))
 }
@@ -121,12 +133,19 @@ mod tests {
     }
 
     /// A coordinated bump must move every call site of the same action.
-    #[test]
-    fn every_call_site_is_repointed() {
+    ///
+    /// The quoted cases place the quoted value first, which is where an
+    /// over-greedy reference extraction would silently leave later unquoted
+    /// sites behind and consume the closing quote.
+    #[rstest]
+    #[case("", "")]
+    #[case("\"", "\"")]
+    #[case("'", "'")]
+    fn every_call_site_is_repointed(#[case] open: &str, #[case] close: &str) {
         let current = "a".repeat(40);
         let source = format!(
-            "jobs:\n  one:\n    steps:\n      - uses: owner/action@{current}\n  two:\n    \
-             steps:\n      - uses: owner/action@{current}\n"
+            "jobs:\n  one:\n    steps:\n      - uses: {open}owner/action@{current}{close}\n  \
+             two:\n    steps:\n      - uses: owner/action@{current}\n"
         );
         let replacement = "b".repeat(40);
         let changed = repoint_all_actions(&source, "owner/action", &replacement)
@@ -141,6 +160,10 @@ mod tests {
                 .count(),
             2,
             "every call site must take the new reference: {changed}"
+        );
+        assert!(
+            changed.contains(&format!("{open}owner/action@{replacement}{close}")),
+            "the bump must preserve call-site quoting: {changed}"
         );
     }
 }
