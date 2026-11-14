@@ -190,23 +190,29 @@ fn job_level_uses_is_a_call_site() {
     );
 }
 
-/// A `with:` input named `uses` is not a call site.
+/// A `with:` input named `uses` is not a call site, for either helper.
 ///
 /// The input names the same action and an earlier reference than the real call
-/// site, so a text scan that looked for the action path would move the input
-/// and leave the step unchanged.
-#[test]
-fn with_inputs_are_not_call_sites() {
+/// sites, so a text scan that looked for the action path would move the input
+/// and leave the steps unchanged.
+#[rstest]
+#[case(true)]
+#[case(false)]
+fn with_inputs_are_not_call_sites(#[case] first_only: bool) {
     let current = "a".repeat(40);
     let input = "c".repeat(40);
     let replacement = "b".repeat(40);
     let source = format!(
         "jobs:\n  one:\n    steps:\n      - name: input first\n        uses: \
          other/action@{input}\n        with:\n          uses: owner/action@{current}\n      - \
-         uses: owner/action@{current}\n"
+         uses: owner/action@{current}\n      - uses: owner/action@{current}\n"
     );
-    let changed = repoint_action(&source, "owner/action", &replacement)
-        .expect("the action fixture must exist");
+    let changed = if first_only {
+        repoint_action(&source, "owner/action", &replacement)
+    } else {
+        repoint_all_actions(&source, "owner/action", &replacement)
+    }
+    .expect("the action fixture must exist");
     let document = parsed(&changed);
     assert_eq!(
         with_uses(&document, "one", 0),
@@ -218,11 +224,18 @@ fn with_inputs_are_not_call_sites() {
         format!("other/action@{input}"),
         "an unrelated action must keep its reference"
     );
-    assert_eq!(
-        step_uses(&document, "one", 1),
-        format!("owner/action@{replacement}"),
-        "the single repoint must move the later call site"
-    );
+    for index in 1..=2 {
+        let expected = if first_only && index == 2 {
+            current.as_str()
+        } else {
+            replacement.as_str()
+        };
+        assert_eq!(
+            step_uses(&document, "one", index),
+            format!("owner/action@{expected}"),
+            "step {index} must follow the helper's replacement policy"
+        );
+    }
 }
 
 /// A single repoint moves only the first call site.
