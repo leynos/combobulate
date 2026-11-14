@@ -98,5 +98,71 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(command[-1], '--verify-function=capability')
 
 
+class EnvironmentTests(unittest.TestCase):
+    """The child neither inherits a wrapper nor loses the solver."""
+
+    def test_inherited_variables_are_unset_through_env(self) -> None:
+        """A compiler wrapper or toolchain override must not reach Verus."""
+        command = verus_probe._without_inherited_variables(['cargo-verus', 'verus'])
+        self.assertEqual(command[0], 'env')
+        for name in verus_probe.INHERITED_VARIABLES:
+            self.assertIn(name, command[1:command.index('cargo-verus')])
+        self.assertEqual(command[-2:], ['cargo-verus', 'verus'])
+
+    def test_the_overlay_binds_the_solver_and_the_warning_policy(self) -> None:
+        """The overlay names the solver and both rustflags spellings."""
+        overlay = verus_probe._verus_environment(Path('/z3'))
+        self.assertEqual(overlay['VERUS_Z3_PATH'], '/z3')
+        self.assertEqual(overlay['RUSTFLAGS'], '-D warnings')
+        self.assertEqual(overlay['CARGO_ENCODED_RUSTFLAGS'], '-D\x1fwarnings')
+
+
+class OutcomeReportingTests(unittest.TestCase):
+    """A job that fails must show why before its logs are discarded."""
+
+    def test_only_surprising_candidates_are_printed(self) -> None:
+        """An expected failure stays quiet; a missing qualifier is shown."""
+        import contextlib
+        import io
+
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            for candidate in verus_probe.VERUS_CANDIDATES:
+                (directory / f'{candidate}-capability.log').write_text(
+                    f'log of {candidate}', encoding='utf-8')
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                verus_probe._show_unexpected_logs(directory, ['attributes', 'single-root'])
+        shown = buffer.getvalue()
+        self.assertIn('log of macro', shown, 'a candidate that failed to qualify must be shown')
+        self.assertNotIn('log of companion', shown, 'the companion is expected to fail')
+        self.assertNotIn('log of attributes', shown, 'a qualified candidate needs no log')
+
+    def test_a_relative_verus_directory_is_resolved_before_the_fixtures_are_entered(self) -> None:
+        """Commands run from the fixtures, so a relative path must be made absolute."""
+        import os
+        from unittest import mock
+
+        seen = {}
+
+        def fake_run(binaries, z3_path, prover_tools, output):
+            """Record the paths the probe would hand to the commands."""
+            seen.update(binaries=binaries, z3=z3_path)
+            return sorted(verus_probe.EXPECTED_QUALIFIED)
+
+        with tempfile.TemporaryDirectory() as name, mock.patch.object(
+                verus_probe, 'run_candidates', fake_run):
+            previous = os.getcwd()
+            os.chdir(name)
+            try:
+                status = verus_probe.probe(verus_dir=Path('rel/verus'), z3=Path('rel/z3'))
+            finally:
+                os.chdir(previous)
+            expected = Path(name).resolve()
+        self.assertEqual(status, 0)
+        self.assertEqual(seen['binaries'], expected / 'rel/verus')
+        self.assertEqual(seen['z3'], expected / 'rel/z3')
+
+
 if __name__ == '__main__':
     unittest.main()

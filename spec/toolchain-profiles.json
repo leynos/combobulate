@@ -329,20 +329,14 @@
       "verified": false
     },
     {
-      "tool": "crates.io kani-verifier 0.67.0",
-      "role": "Installs the Kani driver that turns each harness into a CBMC query.",
-      "trust_basis": "Resolved from crates.io at the pinned version; the registry's own publishing controls are the only check.",
-      "verified": false
+      "tool": "Kani 0.67.0 prebuilt release archives",
+      "role": "Supply the Kani driver, and the CBMC 6.8.0 and CaDiCaL 2.0.0 binaries it turns each harness into a query for.",
+      "trust_basis": "Downloaded by the pinned rust-prover-tools, which checks each archive against a SHA-256 digest it carries before extracting it; the digests are the helper's, not this repository's.",
+      "verified": true
     },
     {
-      "tool": "Kani bundle download",
-      "role": "Supplies the Kani driver's CBMC 6.8.0 and CaDiCaL 2.0.0 binaries.",
-      "trust_basis": "Downloaded by the Kani installer rather than by this repository, and not verified against a digest here. This is recorded so no reader mistakes it for an audited input.",
-      "verified": false
-    },
-    {
-      "tool": "rust-prover-tools at 9c4a27a86c678ceac1155404f45d95ee4a14a172",
-      "role": "Installs and version-checks Kani and Verus through one pinned interface.",
+      "tool": "rust-prover-tools at 592558f7183b554fc749696246984c5d7300d029",
+      "role": "Installs and version-checks Kani, Verus and Z3 through one pinned interface, directly or through the shared install-prover-tools action.",
       "trust_basis": "Pinned by commit in tools/rust-prover-tools/REF and fetched by uv from the pinned Git source; the commit is the check.",
       "verified": true
     },
@@ -353,9 +347,9 @@
       "verified": true
     },
     {
-      "tool": "z3-solver 4.16.0.0 distribution",
+      "tool": "Z3 4.16.0 release archive",
       "role": "Supplies Z3 4.16.0, the solver Verus discharges obligations with.",
-      "trust_basis": "Resolved as a pinned Python distribution; the probe records the binary's own digest in the Verus provenance record.",
+      "trust_basis": "Downloaded by the pinned rust-prover-tools, which checks the archive against a SHA-256 digest it carries before extracting it.",
       "verified": true
     }
   ]

@@ -60,13 +60,13 @@ kani: ## Run the cardinality probe's Kani harnesses on an installed Kani
 # Each run's decision, by the Kani log parser, must equal the one recorded for
 # it; most of these harnesses fail on purpose, so an exit status says little.
 kani-corpus: ## Run the Kani log corpus and check each run's recorded decision
-	KANI='$(KANI)' $(PYTHON) scripts/check_kani_corpus.py
+	KANI='$(KANI)' $(UV) run --script scripts/check_kani_corpus.py
 
 kani-full: kani kani-corpus ## Run every Kani proof route
 
 verus: ## Run the Verus proofs and the wiring candidates on an installed Verus
 	$(PROVER_TOOLS) verus run --repo-root . $(foreach file,$(VERUS_PROOF_FILES),--proof-file $(file)) --extra-arg=--crate-type=lib
-	PROVER_TOOLS='$(PROVER_TOOLS)' $(PYTHON) scripts/verus_probe.py
+	PROVER_TOOLS='$(PROVER_TOOLS)' $(UV) run --script scripts/verus_probe.py
 
 TARGET ?= libcombobulate.rlib
 

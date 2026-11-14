@@ -1,3 +1,8 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["cyclopts==5.2.0", "cuprum==0.1.0"]
+# ///
 """Run and qualify the pinned Verus wiring candidates.
 
 The four candidates (macro, attributes, companion and single-root) each hold a
@@ -9,18 +14,21 @@ is analysis that belongs beside the shared prover tools, not a record of how or
 when a run happened. Verus and Z3 come from the shared install-prover-tools
 action (or `make install-verus` locally); nothing here installs them.
 
-Run it with `python3 scripts/verus_probe.py`; `make verus` does.
+Run it with `uv run --script scripts/verus_probe.py`; `make verus` does.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import re
 import shlex
-import subprocess
 import sys
 import tempfile
+from typing import Annotated
+
+from cyclopts import App, Parameter
+
+from captured_command import run_captured
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tools/verifier-fixtures/verus-wiring-probe"
@@ -38,21 +46,32 @@ VERUS_FUNCTIONS = {
 EXPECTED_QUALIFIED = frozenset({"macro", "attributes", "single-root"})
 
 
+# Variables the verifier must not inherit. Verus sets its own toolchain, and
+# cargo-verus makes `verus` the compiler driver, so a compiler wrapper such as
+# sccache would sit in front of it and Verus refuses to start behind one.
+# cuprum overlays variables and cannot unset one, so each command runs through
+# `env -u`.
+INHERITED_VARIABLES = ("RUSTUP_TOOLCHAIN", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER")
+
+
 def _verus_environment(z3_path: Path) -> dict[str, str]:
-    """Return the child environment that binds the calibrated solver."""
-    environment = dict(os.environ)
-    environment.pop("RUSTUP_TOOLCHAIN", None)
-    # cargo-verus makes `verus` the compiler driver. A compiler wrapper such as
-    # sccache would sit in front of it and Verus refuses to start behind one.
-    environment.pop("RUSTC_WRAPPER", None)
-    environment.pop("RUSTC_WORKSPACE_WRAPPER", None)
-    environment["VERUS_Z3_PATH"] = str(z3_path)
-    environment.update(
-        RUSTFLAGS="-D warnings",
-        CARGO_ENCODED_RUSTFLAGS="-D\x1fwarnings",
-        CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm",
-    )
-    return environment
+    """Return the variables overlaid on the child environment.
+
+    They bind the solver, carry the warnings-as-errors policy through both
+    spellings, and name LLVM for any dev-profile backend an opt-in selects.
+    """
+    return {
+        "VERUS_Z3_PATH": str(z3_path),
+        "RUSTFLAGS": "-D warnings",
+        "CARGO_ENCODED_RUSTFLAGS": "-D\x1fwarnings",
+        "CARGO_PROFILE_DEV_CODEGEN_BACKEND": "llvm",
+    }
+
+
+def _without_inherited_variables(argv: list[str]) -> list[str]:
+    """Return ``argv`` run through ``env -u`` for every inherited variable."""
+    unset = [flag for name in INHERITED_VARIABLES for flag in ("-u", name)]
+    return ["env", *unset, *argv]
 
 
 def _refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
@@ -229,13 +248,18 @@ def _qualified_candidates(
 
 
 def _capture(argv: list[str], log: Path, environment: dict[str, str]) -> dict:
-    """Run one verifier command, keep its output as a log, and return its status."""
-    result = subprocess.run(
-        argv, cwd=FIXTURES, env=environment, capture_output=True, text=True, check=False
+    """Run one verifier command, keep its output as a log, and return its status.
+
+    A command that cannot be started raises, so a missing verifier is reported
+    as itself and not as a failed proof; a non-zero exit is an ordinary result
+    here because the mutants are meant to fail.
+    """
+    result = run_captured(
+        _without_inherited_variables(argv), cwd=FIXTURES, env=environment
     )
-    log.write_text(result.stdout + result.stderr)
-    print(f"{log.name}: exit {result.returncode}", flush=True)
-    return {"exit_code": result.returncode}
+    log.write_text(result.output)
+    print(f"{log.name}: exit {result.exit_code}", flush=True)
+    return {"exit_code": result.exit_code}
 
 
 def run_candidates(
@@ -271,34 +295,68 @@ def run_candidates(
     return _qualified_candidates(output, observations, FIXTURES)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _show_unexpected_logs(output: Path, qualified: list[str]) -> None:
+    """Print the logs of every candidate whose outcome was not the expected one.
+
+    The logs may live in a temporary directory that is removed on return, so a
+    failed job must read them here. An expected failure (the companion's, and
+    every mutant's) stays quiet; only a candidate that should have qualified and
+    did not, or should have been refused and was not, is shown.
+    """
+    surprising = EXPECTED_QUALIFIED.symmetric_difference(qualified)
+    for candidate in VERUS_CANDIDATES:
+        if candidate not in surprising:
+            continue
+        for log in sorted(output.glob(f"{candidate}-*.log")):
+            print(f"--- {log.name} ---\n{log.read_text()}", flush=True)
+
+
+app = App(name="verus_probe", help=__doc__)
+
+
+@app.default
+def probe(
+    *,
+    verus_dir: Path | None = None,
+    z3: Annotated[Path | None, Parameter(env_var="VERUS_Z3_PATH")] = None,
+    prover_tools: Annotated[str, Parameter(env_var="PROVER_TOOLS")] = "prover-tools",
+    output: Path | None = None,
+) -> int:
     """Run the wiring candidates on the installed Verus and compare the outcome.
 
     Exits non-zero unless exactly the macro, attributes and single-root
-    candidates qualify, so a regression and an unexpected pass both fail.
+    candidates qualify, so a regression and an unexpected pass both fail. The
+    logs of any candidate that surprised are printed before they are discarded.
 
-    Reads ``VERUS_Z3_PATH`` (set by the shared install action) and takes the
-    Verus release from ``tools/verus/VERSION`` unless ``--verus-dir`` says
-    otherwise. Logs go to a temporary directory unless ``--output`` names one.
+    Parameters
+    ----------
+    verus_dir
+        Installed Verus release directory; defaults to the release
+        ``tools/verus/VERSION`` names under ``.verus``.
+    z3
+        The Z3 binary; read from ``VERUS_Z3_PATH``, which the shared install
+        action sets.
+    prover_tools
+        Command prefix that invokes the shared ``prover-tools`` helper.
+    output
+        Directory to keep the logs in; a temporary one when omitted.
     """
-    import argparse
-
-    parser = argparse.ArgumentParser(description=main.__doc__)
+    if z3 is None:
+        raise SystemExit("set VERUS_Z3_PATH or pass --z3")
     version = (ROOT / "tools/verus/VERSION").read_text().strip()
-    parser.add_argument("--verus-dir", type=Path, default=ROOT / ".verus" / version / "verus")
-    parser.add_argument("--z3", type=Path, default=os.environ.get("VERUS_Z3_PATH"))
-    parser.add_argument("--prover-tools", default=os.environ.get("PROVER_TOOLS", "prover-tools"))
-    parser.add_argument("--output", type=Path)
-    args = parser.parse_args(argv)
-    if args.z3 is None:
-        parser.error("set VERUS_Z3_PATH or pass --z3")
+    # The commands run from the fixture directory, so a relative path given
+    # from the invoking directory would resolve against the wrong one.
+    binaries = (verus_dir or ROOT / ".verus" / version / "verus").resolve()
     with tempfile.TemporaryDirectory() as scratch:
-        output = args.output or Path(scratch)
-        output.mkdir(parents=True, exist_ok=True)
-        qualified = run_candidates(args.verus_dir, args.z3, args.prover_tools, output)
+        logs = output or Path(scratch)
+        logs.mkdir(parents=True, exist_ok=True)
+        qualified = run_candidates(binaries, z3.resolve(), prover_tools, logs)
+        matches = set(qualified) == EXPECTED_QUALIFIED
+        if not matches:
+            _show_unexpected_logs(logs, qualified)
     print("Qualified wiring candidates: " + ", ".join(qualified))
-    return 0 if set(qualified) == EXPECTED_QUALIFIED else 1
+    return 0 if matches else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(app())

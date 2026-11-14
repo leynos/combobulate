@@ -297,12 +297,20 @@ jobs:
           mold --version > build-budget/mold
           # Cranelift is disabled estate-wide (14 November 2026), so the dev
           # profile selects no backend and Cargo uses LLVM, as the proof
-          # profile does. Assert that nothing in the repository selects another
-          # backend, so the record describes the configuration that ran.
-          if grep -E '^[[:space:]]*codegen-backend[[:space:]]*=' .cargo/config.toml; then
-            echo 'the repository selects a dev-profile backend; this record assumes LLVM' >&2
-            exit 1
-          fi
+          # profile does. Ask Cargo for the effective dev-profile backend, which
+          # reads the profile table and the environment but not the unrelated
+          # `[unstable] codegen-backend` key, and require it to be unset, so the
+          # record describes the configuration that ran. AC-04's frozen
+          # environment still names Cranelift for dev builds: amend it before
+          # taking a new measurement that is meant to bind to the control.
+          backend=$(cargo -Z unstable-options config get profile.dev.codegen-backend 2>&1 || true)
+          case "$backend" in
+            *'is not set'*) ;;
+            *)
+              echo "the dev profile selects a backend; this record assumes LLVM: $backend" >&2
+              exit 1
+              ;;
+          esac
           grep -qF 'CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm"' "$PWD/build-budget/kani-codegen"
           date +%s > build-budget/setup-end
       - name: Fetch dependencies once, untimed

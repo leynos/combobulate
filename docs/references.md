@@ -292,9 +292,9 @@ The pinned release is Kani 0.67.0, recorded in `tools/kani/VERSION` and
 installed by `make install-kani` (and, in CI, the shared `install-prover-tools`
 action) through the pinned `rust-prover-tools` helper. The release bundles its
 own Rust nightly, so the ordinary build toolchain is never substituted for the
-one a harness compiles under. The bundle download is not verified against a
-digest by this repository, and the profile record's `trusted_computing_base`
-says so rather than implying an audited input.
+one a harness compiles under. The release archives are verified against digests
+by the pinned helper, not by this repository, and the profile record's
+`trusted_computing_base` says so.
 
 ### E-VERUS-RELEASE
 

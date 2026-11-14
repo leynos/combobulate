@@ -357,29 +357,32 @@ The estate standard is LLVM, which is the default backend here; review is due
 [estate ADR](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
 The `[profile.dev] codegen-backend = "cranelift"` selection in
 `.cargo/config.toml` is commented out; uncommenting it is a persistent opt-in
-that also needs the tests that assert the LLVM default updated. The
-`[unstable] codegen-backend` key and the Cranelift component stay. Every
-`rustflags` source in `.cargo/config.toml` enables the parallel `rustc`
-frontend with `-Zthreads=8`. On native x86_64 GNU Linux, Cargo selects
-`scripts/native-clang-linker.sh` and `-fuse-ld=mold`. The wrapper gives Clang
-`BUILD_TOOLS_PREFIX/bin` as its first linker search directory, so bare Cargo
-builds use the pinned `ld.mold` rather than a system copy. The wrapper refuses
-an absent, diverted, or wrong-version linker before a development link; it
-shares this verification with Make preflight through
-`scripts/build-tools-common.sh`. Cargo applies one `rustflags` source; an
-assigned `RUSTFLAGS` replaces them all, so the Makefile restates both flags in
-`DEV_RUST_FLAGS` for targets that assign `RUSTFLAGS`, appending them to any
-inherited caller flags (including setup-rust's CI value). Use `make release`
-for a production build and `make package` for a verified, publishable Cargo
-archive. Both commands assign `RELEASE_RUST_FLAGS`, select LLVM for the dev and
-release profiles, clear inherited encoded Rust flags, and select Clang directly
-on native x86_64 GNU Linux. The package includes `.cargo/config.toml`; its
-verification build therefore needs the same explicit production route. Direct
-`cargo build --release` and `cargo package` still inherit Cargo's development
-`rustflags` and are not production routes. Coverage assigns its own flags,
-selects LLVM for the dev profile, and uses `lld` because LLVM coverage tooling
-expects LLVM-compatible code generation and linker behaviour.
-`tests/build_standard_contract.rs` checks the configuration sources and recipes.
+that also needs the tests that assert the LLVM default updated. AC-04's frozen
+environment still names Cranelift for dev builds, and the recorded measurements
+keep describing the environment they were taken in: amend the control before
+taking a new measurement meant to bind to it. The `[unstable] codegen-backend`
+key and the Cranelift component stay. Every `rustflags` source in
+`.cargo/config.toml` enables the parallel `rustc` frontend with `-Zthreads=8`.
+On native x86_64 GNU Linux, Cargo selects `scripts/native-clang-linker.sh` and
+`-fuse-ld=mold`. The wrapper gives Clang `BUILD_TOOLS_PREFIX/bin` as its first
+linker search directory, so bare Cargo builds use the pinned `ld.mold` rather
+than a system copy. The wrapper refuses an absent, diverted, or wrong-version
+linker before a development link; it shares this verification with Make
+preflight through `scripts/build-tools-common.sh`. Cargo applies one
+`rustflags` source; an assigned `RUSTFLAGS` replaces them all, so the Makefile
+restates both flags in `DEV_RUST_FLAGS` for targets that assign `RUSTFLAGS`,
+appending them to any inherited caller flags (including setup-rust's CI value).
+Use `make release` for a production build and `make package` for a verified,
+publishable Cargo archive. Both commands assign `RELEASE_RUST_FLAGS`, select
+LLVM for the dev and release profiles, clear inherited encoded Rust flags, and
+select Clang directly on native x86_64 GNU Linux. The package includes
+`.cargo/config.toml`; its verification build therefore needs the same explicit
+production route. Direct `cargo build --release` and `cargo package` still
+inherit Cargo's development `rustflags` and are not production routes. Coverage
+assigns its own flags, selects LLVM for the dev profile, and uses `lld` because
+LLVM coverage tooling expects LLVM-compatible code generation and linker
+behaviour. `tests/build_standard_contract.rs` checks the configuration sources
+and recipes.
 
 Figure 1 shows how Cargo and Make select compiler and linker settings for the
 main build routes. Bare Cargo and development Make builds use LLVM and the
@@ -1344,6 +1347,14 @@ mutant declaration does not qualify. The companion crate is the negative
 control: Verus rejects its wrapper because the production crate carries no
 specification, and the probe fails if it ever qualifies. The analysis helpers
 are private to the script and are not an evidence parser.
+
+Both proof scripts run their verifier through `scripts/captured_command.py`,
+the one cuprum boundary for them. It registers exactly the program it runs in a
+local catalogue, passes arguments without a shell, and returns the exit status
+and combined output without treating a non-zero exit as an error, because a
+mutant or a corpus harness is meant to fail. A verifier that cannot be started
+raises, so it is never mistaken for a failed proof. Any other script that runs
+a verifier should use it rather than add a second capture path.
 
 Kani runs the installed front-end directly (`cargo-kani kani`), not through
 `cargo kani`, so `rustup` does not install the repository's own toolchain

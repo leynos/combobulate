@@ -1,3 +1,8 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["cuprum==0.1.0"]
+# ///
 """Run the Kani corpus and check each run against the decision recorded for it.
 
 The corpus in ``tools/verifier-fixtures/kani-corpus`` mixes harnesses that
@@ -16,10 +21,10 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
+from captured_command import run_captured
 from docs_validation.kani_log import (
     Decision,
     KaniLogError,
@@ -89,14 +94,10 @@ def run_kani(arguments: list[str]) -> tuple[int, str]:
     The front-end comes from ``KANI`` (default ``cargo-kani``), named directly
     so ``rustup`` does not install the repository's own toolchain first.
     """
-    result = subprocess.run(
-        [os.environ.get("KANI", "cargo-kani"), "kani", *arguments],
-        cwd=CORPUS,
-        capture_output=True,
-        text=True,
-        check=False,
+    result = run_captured(
+        [os.environ.get("KANI", "cargo-kani"), "kani", *arguments], cwd=CORPUS
     )
-    return result.returncode, result.stdout + result.stderr
+    return result.exit_code, result.output
 
 
 def check_run(run: dict, recorded: dict, manifest_document: dict) -> list[str]:

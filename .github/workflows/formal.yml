@@ -22,6 +22,7 @@ name: Formal verification
       - 'tools/verus/**'
       - 'tools/rust-prover-tools/**'
       - 'scripts/check_kani_corpus.py'
+      - 'scripts/captured_command.py'
       - 'scripts/verus_probe.py'
       - 'scripts/docs_validation/kani_log/**'
       - 'scripts/tests/fixtures/kani_logs/**'
@@ -58,9 +59,9 @@ jobs:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
           persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: '3.14'
+      # The corpus checker is a `uv run --script` file that declares its own
+      # Python and dependencies.
+      - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
       - name: Install Kani
         uses: leynos/shared-actions/.github/actions/install-prover-tools@88ac795de687eda016db24983f87a25d6db49fdb
         with:
@@ -85,9 +86,6 @@ jobs:
       - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
         with:
           persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
-        with:
-          python-version: '3.14'
       - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
       - name: Install Verus and Z3
         id: prover
