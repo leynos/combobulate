@@ -290,7 +290,17 @@ The thresholds are:
   rebase onto `7e634a4` drops them rather than resurrecting a contract for a
   seam that no longer exists. `make verus-kernel` remains covered by the
   driver's own tests; its hosted run is `formal.yml`'s job.
-- [ ] EP-M3: facade values and expression handles.
+- [x] (2026-11-14) EP-M3: facade values and expression handles.
+  `src/array.rs` holds `Array`, `Dtype` and the private `Storage`;
+  `src/expr/mod.rs` holds `AExpr`, `Unary`, `Binary`, `OperationId`, `identity`,
+  `add`, `Node` and `NodeKind`, with the iterative `Drop` on `Arc::into_inner`
+  and the handwritten non-recursive `Debug`; the root re-exports them. The
+  cases are split by reason: `src/expr/tests.rs` for construction, folding, the
+  length model and FACADE-3, `src/expr/small_stack.rs` for FACADE-5's build,
+  format and drop on a 2 MiB stack, and `src/array.rs`'s own module for its
+  construction and FACADE-3 cases. Red first: the probe written before the
+  modules failed to compile, with unresolved imports of `Array`, `identity` and
+  `add`. Green: 41 unit cases pass, and `make lint` passes.
 - [ ] EP-M4: preparation, execution and errors.
 - [ ] EP-M5: the public consumer fixture, boundary and workflow wiring.
 - [ ] EP-M6: documentation, ADR-0011, the completion record and the roadmap
@@ -423,6 +433,24 @@ The thresholds are:
   the split and 346 after. Impact: `provenance.json` binds both scripts'
   digests, and a test asserts the record names the verdict module, so the
   deciding rules cannot fall outside the record.
+- Observation: Whitaker enforces the 400-line ceiling per Rust *module*, not
+  per file, so writing `src/expr.rs` in one piece failed the gate even though
+  the plan only said "`src/expr.rs` defines …". Evidence:
+  `error: Module expr spans 568 lines, exceeding the allowed 400. -->
+  src/lib.rs:14:5`.
+  Impact: the module became a directory, `src/expr/mod.rs` plus the two
+  `#[cfg(test)]` children `tests.rs` and `small_stack.rs`, and the EP-M3
+  outcome below reads "`src/expr/`" where it said "`src/expr.rs`". The children
+  are gated because they are test-only; the production module is 370 lines and
+  its children 204 and 76.
+- Observation: two EP-M3 queries were written before anything consumed them
+  and had to be removed to keep the gates green. `AExpr::has_mismatch` was a
+  forward declaration for EP-M4 and `NodeKind::Identity` a variant the identity
+  fold never builds, since folding returns the operand's handle (DL-3).
+  Evidence: `error: method has_mismatch is never used` and
+  `warning: variant Identity is never constructed`. Impact: the mismatch tests
+  assert through the non-recursive `Node` `Debug` rendering instead, and
+  `has_mismatch` returns in EP-M4 where preparation consumes it.
 
 ## Decision log
 
@@ -879,7 +907,7 @@ The proof files are:
 | M-mismatch-write | Writes `out[0]` on the mismatch path when non-empty | K5                         |
 | M-early-write    | Writes the wrapped sum at `out[p]`, then `Err`      | K5                         |
 
-_Table 1: Seeded Verus mutants and their target clauses._
+*Table 1: Seeded Verus mutants and their target clauses.*
 
 A body-tier mutant, M-wrap, copies `src/elementwise_add.rs` into a scratch
 directory under `target/`, replaces `checked_add` with `wrapping_add`, and
@@ -1169,8 +1197,8 @@ Compatibility decision: none.
 Outcome:
 
 - `src/array.rs` defines `Array`, `Dtype` and the private `Storage`.
-- `src/expr.rs` defines `AExpr`, `Unary`, `Binary`, `OperationId`,
-  `identity`, `add`, and the crate-private `Node`. `Node` has:
+- `src/expr/` defines `AExpr`, `Unary`, `Binary`, `OperationId`, `identity`,
+  `add`, and the crate-private `Node`. `Node` has:
   - its kind enum;
   - cached length and `mismatch_below`;
   - the iterative `Drop` built on `Arc::into_inner`;
