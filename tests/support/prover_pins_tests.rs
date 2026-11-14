@@ -69,6 +69,8 @@ fn kani_versions_are_rejected(#[case] text: &str, #[case] fragment: &str) {
 #[rstest]
 #[case("0.2027.01.15.abc1234\n")]
 #[case("0.2027.02.20.def5678\n")]
+#[case("0.2028.02.29.abc1234\n")]
+#[case("0.2000.02.29.abc1234\n")]
 fn verus_versions_are_accepted(#[case] text: &str) {
     assert!(
         verus_version("tools/verus/VERSION", text).is_ok(),
@@ -81,6 +83,11 @@ fn verus_versions_are_accepted(#[case] text: &str) {
 #[case("0.2027.1.15.abc1234\n")]
 #[case("0.2027.13.15.abc1234\n")]
 #[case("0.2027.01.32.abc1234\n")]
+#[case("0.2027.02.30.abc1234\n")]
+#[case("0.2027.02.31.abc1234\n")]
+#[case("0.2027.04.31.abc1234\n")]
+#[case("0.2027.02.29.abc1234\n")]
+#[case("0.2100.02.29.abc1234\n")]
 #[case("0.2027.01.15.ABC1234\n")]
 #[case("0.2027.01.15.abc123\n")]
 #[case("1.2027.01.15.abc1234\n")]

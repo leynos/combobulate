@@ -36,6 +36,24 @@ def write_record(root: Path, record: dict) -> None:
     (root / RECORD).write_text(json.dumps(record, indent=2) + '\n', encoding='utf-8')
 
 
+def drifted_kani_release(current: str) -> str:
+    """Return a well-formed Kani release that differs from `current`."""
+    major, minor, patch = current.split('.')
+    return f'{major}.{minor}.{int(patch) + 1}'
+
+
+def drifted_verus_release(current: str) -> str:
+    """Return a well-formed Verus release that differs from `current`.
+
+    Only the abbreviated commit changes, so the result keeps the recorded
+    release's date and stays distinguishable from any real pin regardless of
+    which release the record currently names.
+    """
+    prefix, commit = current.rsplit('.', 1)
+    replacement = '0' if commit[-1] != '0' else '1'
+    return f'{prefix}.{commit[:-1]}{replacement}'
+
+
 class ScratchTree(unittest.TestCase):
     """Provide a scratch copy of the inputs a toolchain check reads.
 
@@ -105,13 +123,26 @@ class SourcedPins(ScratchTree):
         self.assert_fails('repository_channel')
 
     def test_kani_release_drift_is_caught(self):
-        """Change Kani's VERSION file alone and require the disagreement."""
-        (self.root / 'tools/kani/VERSION').write_text('0.68.0\n', encoding='utf-8')
+        """Change Kani's VERSION file alone and require the disagreement.
+
+        The new value is derived from the record rather than restated, so a
+        legitimate release bump cannot make this test write the value the
+        record already holds and then demand a mismatch it never created.
+        """
+        current = record_at(self.root)['pins']['kani_release']['value']
+        (self.root / 'tools/kani/VERSION').write_text(
+            f'{drifted_kani_release(current)}\n', encoding='utf-8')
         self.assert_fails('kani_release')
 
     def test_verus_release_drift_is_caught(self):
-        """Change Verus's VERSION file alone and require the disagreement."""
-        (self.root / 'tools/verus/VERSION').write_text('0.2026.10.01.deadbee\n', encoding='utf-8')
+        """Change Verus's VERSION file alone and require the disagreement.
+
+        As with Kani, the replacement comes from the record so the case keeps
+        testing drift after any legitimate Verus release bump.
+        """
+        current = record_at(self.root)['pins']['verus_release']['value']
+        (self.root / 'tools/verus/VERSION').write_text(
+            f'{drifted_verus_release(current)}\n', encoding='utf-8')
         self.assert_fails('verus_release')
 
     def test_prover_tools_ref_drift_is_caught(self):

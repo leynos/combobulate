@@ -171,25 +171,46 @@ fn is_numeric_component(component: &str) -> bool {
 /// Reports whether a value follows Verus's `0.<date>.<abbreviated-commit>` scheme.
 fn is_verus_version(version: &str) -> bool {
     let parts = version.split('.').collect::<Vec<_>>();
-    match parts.as_slice() {
-        ["0", year, month, day, commit] => {
-            year.len() == 4
-                && year.bytes().all(|byte| byte.is_ascii_digit())
-                && is_calendar_component(month, 12)
-                && is_calendar_component(day, 31)
-                && is_lowercase_hex(commit, 7)
-        }
-        _ => false,
-    }
+    let ["0", year, month, day, commit] = parts.as_slice() else {
+        return false;
+    };
+    let (Some(year_value), Some(month_value), Some(day_value)) = (
+        decimal_field(year, 4),
+        decimal_field(month, 2),
+        decimal_field(day, 2),
+    ) else {
+        return false;
+    };
+    is_lowercase_hex(commit, 7) && is_calendar_date(year_value, month_value, day_value)
 }
 
-/// Reports whether a zero-padded two-digit component falls in `1..=maximum`.
-fn is_calendar_component(component: &str, maximum: u8) -> bool {
-    component.len() == 2
-        && component.bytes().all(|byte| byte.is_ascii_digit())
-        && component
-            .parse::<u8>()
-            .is_ok_and(|value| (1..=maximum).contains(&value))
+/// Parses a zero-padded decimal field of exactly `width` digits.
+fn decimal_field(field: &str, width: usize) -> Option<u16> {
+    if field.len() != width || !field.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    field.parse::<u16>().ok()
+}
+
+/// Reports whether `day` exists in `month` of `year` in the Gregorian calendar.
+///
+/// Checking the month and day ranges independently would accept dates such as
+/// 31 February, which no Verus release can carry. The leap-year rule is the
+/// Gregorian one so a century year is only a leap year when divisible by 400.
+fn is_calendar_date(year: u16, month: u16, day: u16) -> bool {
+    let last_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year(year) => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=last_day).contains(&day)
+}
+
+/// Reports whether `year` is a leap year in the Gregorian calendar.
+fn is_leap_year(year: u16) -> bool {
+    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }
 
 /// Reports whether `value` is exactly `length` lowercase hexadecimal characters.
