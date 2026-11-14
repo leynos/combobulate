@@ -23,7 +23,6 @@ extend-exclude = [
     "scripts/tests/fixtures/kani_logs/*.log",
     "target",
     "tools/probes/observations/*.log",
-    "tools/verifier-fixtures/verus-wiring-probe/observations/*.log",
     "typos.local.toml",
     "typos.toml",
     "uv.lock",

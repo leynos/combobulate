@@ -117,7 +117,7 @@ defaults, while `both` (the default) runs each in turn. Each is its own Cargo
 invocation, because feature unification would otherwise let one profile's
 resolution mask the other's. The record also holds the two verifier toolchains,
 `proof-kani` and `proof-verus`; those are not gate profiles, and the proof
-routes reach them through `make kani` and `make verus-probe`.
+routes reach them through `make kani` and `make verus`.
 
 The dependency direction is frontend to semantic graph to planner to backend
 ports. The semantic module must not import Polars or glam types. The public

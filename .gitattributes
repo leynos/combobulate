@@ -1,4 +1,3 @@
-# Preserve upstream whitespace in digest-bound verifier observations.
+# Preserve upstream whitespace in captured verifier output.
 scripts/tests/fixtures/kani_logs/*.log whitespace=-blank-at-eol,-blank-at-eof
-tools/verifier-fixtures/verus-wiring-probe/observations/*.log whitespace=-blank-at-eol,-blank-at-eof
 tools/probes/observations/*.log whitespace=-blank-at-eol,-blank-at-eof

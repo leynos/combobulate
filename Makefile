@@ -25,40 +25,50 @@ override PROVER_TOOLS_REF := $(shell awk '/^ref:/ { print $$2 }' $(PROVER_TOOLS_
 ifeq ($(shell printf '%s' '$(PROVER_TOOLS_REF)' | grep -Ec '^[0-9a-f]{40}$$'),0)
 $(error PROVER_TOOLS_REF missing or malformed; expected "ref: <40-hex>" in $(PROVER_TOOLS_REF_FILE))
 endif
-override PROVER_TOOLS_SOURCE := git+https://github.com/leynos/rust-prover-tools.git@$(PROVER_TOOLS_REF)
-# Only the paired command-line seam may replace the pinned helper in tests.
-PROVER_TOOLS_ORIGINS := $(origin PROVER_TOOLS_CONTRACT_TEST),$(origin PROVER_TOOLS),$(PROVER_TOOLS_CONTRACT_TEST)
-ifeq ($(PROVER_TOOLS_ORIGINS),command line,command line,1)
-else
-override PROVER_TOOLS := uv tool run --from "$(PROVER_TOOLS_SOURCE)" prover-tools
-endif
-KANI ?= cargo kani
-KANI_INSTALLATION ?= $(HOME)/.kani/kani-$(shell cat tools/kani/VERSION)
+# The shared rust-prover-tools package owns Kani, Verus and Z3 acquisition. CI
+# installs them through the shared install-prover-tools action; `install-kani`
+# and `install-verus` are the local equivalents. The package revision comes from
+# the REF file and the releases from tools/kani/VERSION and tools/verus/VERSION.
+PROVER_TOOLS ?= uv tool run --from git+https://github.com/leynos/rust-prover-tools@$(PROVER_TOOLS_REF) prover-tools
+# Kani drives `rustc` through its own bundled toolchain, so the repository's
+# nightly flags and linker do not apply to it. Naming the front-end directly
+# keeps `rustup` from installing the repository's own toolchain first.
+KANI ?= cargo-kani
 KANI_FLAGS ?=
-KANI_PROBE_ROUTE ?= direct
-VERUS_FLAGS ?=
-FORMAL_STRICT ?= 0
+KANI_PROBE_DIR := tools/calibration/cardinality-probe
+KANI_WORKSPACE_DIR := tools/verifier-fixtures/kani-native-workspace
+# The solver Verus is told to use. It matches the shared action's default
+# location, so a local `make install-verus` and a CI install agree.
+VERUS_Z3_DIR ?= $(CURDIR)/.verus/z3
+VERUS_Z3_PATH ?= $(VERUS_Z3_DIR)/z3
+export VERUS_Z3_PATH
+VERUS_PROOF_FILES ?= tools/calibration/cardinality-probe/verus/cardinality.rs
 
-.PHONY: install-kani kani-check install-verus kani kani-full kani-log-corpus verus-probe
+.PHONY: install-kani install-verus kani kani-corpus kani-full verus
 
 install-kani: ## Install the pinned Kani release
 	$(PROVER_TOOLS) kani install --repo-root .
 
-kani-check: ## Require the calibrated Kani release
-	$(PROVER_TOOLS) kani check-version --repo-root . --kani-command "$(KANI)"
-
-install-verus: ## Install the checksum-verified Verus release
+install-verus: ## Install the checksum-verified Verus release and its Z3
 	$(PROVER_TOOLS) verus install --repo-root .
+	$(PROVER_TOOLS) z3 install --repo-root . --install-dir '$(VERUS_Z3_DIR)' --cache-dir '$(VERUS_Z3_DIR)-cache'
 
-kani kani-full: kani-check ## Report that product proofs arrive in task 1.2.4
-	@printf 'FORMAL-SKIP: %s has no product harnesses until task 1.2.4\n' '$@'
-	@test "$(FORMAL_STRICT)" != 1
+# These harnesses are the cardinality probe's, not the kernel's: the kernel's
+# own harnesses arrive with task 1.2.4 and join this target then.
+kani: ## Run the cardinality probe's and native-workspace Kani harnesses on an installed Kani
+	cd $(KANI_PROBE_DIR) && $(KANI) kani $(KANI_FLAGS)
+	cd $(KANI_WORKSPACE_DIR)/facade && $(KANI) kani $(KANI_FLAGS)
 
-kani-log-corpus: kani-check ## Capture real Kani parser fixtures
-	@uv run --script scripts/run_verifier_probes.py kani --prover-tools '$(PROVER_TOOLS)' --installation '$(KANI_INSTALLATION)' --route '$(KANI_PROBE_ROUTE)' $(KANI_FLAGS)
+# Each run's decision, by the Kani log parser, must equal the one recorded for
+# it; most of these harnesses fail on purpose, so an exit status says little.
+kani-corpus: ## Run the Kani log corpus and check each run's recorded decision
+	KANI='$(KANI)' $(UV) run --script scripts/check_kani_corpus.py
 
-verus-probe: kani-check ## Compare the four pinned Verus wiring candidates
-	@uv run --script scripts/run_verifier_probes.py verus --prover-tools '$(PROVER_TOOLS)' $(VERUS_FLAGS)
+kani-full: kani kani-corpus ## Run every Kani proof route
+
+verus: ## Run the Verus proofs and the wiring candidates on an installed Verus
+	$(PROVER_TOOLS) verus run --repo-root . $(foreach file,$(VERUS_PROOF_FILES),--proof-file $(file)) --extra-arg=--crate-type=lib
+	PROVER_TOOLS='$(PROVER_TOOLS)' $(UV) run --script scripts/verus_probe.py
 
 TARGET ?= libcombobulate.rlib
 

@@ -40,8 +40,8 @@ fn coverage_step_is_safe(step: &Value) -> bool {
 
 /// Every job must set up Rust once, preserving Cargo's development defaults.
 ///
-/// Both required profiles are built with Cranelift, so only measured coverage
-/// may select another backend, and it does so on its own step.
+/// Both required profiles are built with Cargo's default backend, so only
+/// measured coverage may select another backend, and it does so on its own step.
 fn setup_problem(steps: &[Value]) -> Option<&'static str> {
     let setup = steps
         .iter()
@@ -73,7 +73,7 @@ fn coverage_step_problem(step: &Value) -> Option<&'static str> {
     None
 }
 
-/// A job either measures coverage once or not at all, and ordinary tests keep Cranelift.
+/// A job either measures coverage once or not at all, and ordinary tests keep the default backend.
 fn measured_coverage_problem(steps: &[Value]) -> Option<&'static str> {
     let coverage = steps
         .iter()
@@ -92,7 +92,7 @@ fn measured_coverage_problem(steps: &[Value]) -> Option<&'static str> {
         string(step, &["run"]) == Some("make test")
             && path(step, &["env", "CARGO_PROFILE_DEV_CODEGEN_BACKEND"]).is_some()
     }) {
-        return Some("ordinary tests must retain Cranelift");
+        return Some("ordinary tests must not override the development backend");
     }
     None
 }
@@ -207,7 +207,7 @@ fn hosted_coverage_rejects_inherited_dev_flags() {
 }
 
 #[test]
-fn act_setup_preserves_cranelift_defaults() {
+fn act_setup_preserves_cargo_defaults() {
     assert_eq!(
         setup_rust::holds(CI, MAIN, ACT),
         Ok(()),

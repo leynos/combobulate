@@ -352,31 +352,40 @@ host, which is what the boundary checks' `cargo tree --target all` needs.
 
 ## Tooling
 
-Development builds use Cranelift for debug code generation. Every `rustflags`
-source in `.cargo/config.toml` enables the parallel `rustc` frontend with
-`-Zthreads=8`. On native x86_64 GNU Linux, Cargo selects
-`scripts/native-clang-linker.sh` and `-fuse-ld=mold`. The wrapper gives Clang
-`BUILD_TOOLS_PREFIX/bin` as its first linker search directory, so bare Cargo
-builds use the pinned `ld.mold` rather than a system copy. The wrapper refuses
-an absent, diverted, or wrong-version linker before a development link; it
-shares this verification with Make preflight through
-`scripts/build-tools-common.sh`. Cargo applies one `rustflags` source; an
-assigned `RUSTFLAGS` replaces them all, so the Makefile restates both flags in
-`DEV_RUST_FLAGS` for targets that assign `RUSTFLAGS`, appending them to any
-inherited caller flags (including setup-rust's CI value). Use `make release`
-for a production build and `make package` for a verified, publishable Cargo
-archive. Both commands assign `RELEASE_RUST_FLAGS`, select LLVM for the dev and
-release profiles, clear inherited encoded Rust flags, and select Clang directly
-on native x86_64 GNU Linux. The package includes `.cargo/config.toml`; its
-verification build therefore needs the same explicit production route. Direct
-`cargo build --release` and `cargo package` still inherit Cargo's development
-`rustflags` and are not production routes. Coverage assigns its own flags,
-selects LLVM for the dev profile, and uses `lld` because LLVM coverage tooling
-expects LLVM-compatible code generation and linker behaviour.
-`tests/build_standard_contract.rs` checks the configuration sources and recipes.
+The estate standard is LLVM, which is the default backend here; review is due
+14 May 2027 under the
+[estate ADR](https://github.com/leynos/concordat/blob/main/docs/adrs/adr-0004-cranelift-is-not-part-of-the-rust-build-standard.md).
+The `[profile.dev] codegen-backend = "cranelift"` selection in
+`.cargo/config.toml` is commented out; uncommenting it is a persistent opt-in
+that also needs the tests that assert the LLVM default updated. AC-04's frozen
+environment still names Cranelift for dev builds, and the recorded measurements
+keep describing the environment they were taken in: amend the control before
+taking a new measurement meant to bind to it. The `[unstable] codegen-backend`
+key and the Cranelift component stay. Every `rustflags` source in
+`.cargo/config.toml` enables the parallel `rustc` frontend with `-Zthreads=8`.
+On native x86_64 GNU Linux, Cargo selects `scripts/native-clang-linker.sh` and
+`-fuse-ld=mold`. The wrapper gives Clang `BUILD_TOOLS_PREFIX/bin` as its first
+linker search directory, so bare Cargo builds use the pinned `ld.mold` rather
+than a system copy. The wrapper refuses an absent, diverted, or wrong-version
+linker before a development link; it shares this verification with Make
+preflight through `scripts/build-tools-common.sh`. Cargo applies one
+`rustflags` source; an assigned `RUSTFLAGS` replaces them all, so the Makefile
+restates both flags in `DEV_RUST_FLAGS` for targets that assign `RUSTFLAGS`,
+appending them to any inherited caller flags (including setup-rust's CI value).
+Use `make release` for a production build and `make package` for a verified,
+publishable Cargo archive. Both commands assign `RELEASE_RUST_FLAGS`, select
+LLVM for the dev and release profiles, clear inherited encoded Rust flags, and
+select Clang directly on native x86_64 GNU Linux. The package includes
+`.cargo/config.toml`; its verification build therefore needs the same explicit
+production route. Direct `cargo build --release` and `cargo package` still
+inherit Cargo's development `rustflags` and are not production routes. Coverage
+assigns its own flags, selects LLVM for the dev profile, and uses `lld` because
+LLVM coverage tooling expects LLVM-compatible code generation and linker
+behaviour. `tests/build_standard_contract.rs` checks the configuration sources
+and recipes.
 
 Figure 1 shows how Cargo and Make select compiler and linker settings for the
-main build routes. Bare Cargo and development Make builds use Cranelift and the
+main build routes. Bare Cargo and development Make builds use LLVM and the
 parallel frontend; supported native x86_64 GNU Linux builds use the Clang
 wrapper and pinned `mold`. Coverage uses LLVM and `lld`; release and package
 builds use LLVM and the platform linker. This diagram excludes the separate
@@ -389,7 +398,7 @@ flowchart TD
     Route -->|Development Make| Compose[Compose inherited flags with DEV_RUST_FLAGS]
     Route -->|Coverage| Coverage[Use COVERAGE_RUST_FLAGS and LLVM]
     Route -->|Release or package| Release[Use RELEASE_RUST_FLAGS and LLVM]
-    Config --> Dev[Cranelift and parallel rustc frontend with -Zthreads=8]
+    Config --> Dev[LLVM and parallel rustc frontend with -Zthreads=8]
     Compose --> Dev
     Dev --> Linux{Supported native x86_64 GNU Linux?}
     Linux -->|Yes| Mold[Clang wrapper selects pinned mold]
@@ -403,7 +412,7 @@ driver outside the repository and receives no application `RUSTFLAGS`, encoded
 flags, backend override, target, or linker override. The repository check runs
 from the repository root, where Cargo reads the defaults above; Dylint adds
 `-D warnings` and the configured Polonius flags only to that check through
-`DYLINT_RUSTFLAGS`. This preserves Cranelift, `-Zthreads=8`, and the native
+`DYLINT_RUSTFLAGS`. This preserves LLVM, `-Zthreads=8`, and the native
 wrapper/mold route for lint while leaving the coverage route on LLVM and `lld`.
 The clean driver boundary also removes target-specific Rust flags, which Cargo
 would otherwise append after the configured mold linker argument. Preflight
@@ -454,8 +463,8 @@ tests. The measured coverage command and release build still use their separate
 linker flags. The supported `mold` configuration is native x86_64 GNU Linux;
 x86_64 Linux musl and cross-target builds do not select this route. Make
 preflight rejects cross targets and encoded Rust flags that could bypass the
-selected linker or flags. It also rejects a non-Cranelift development backend
-override; coverage explicitly selects LLVM after its coverage-specific
+selected linker or flags. It accepts an unset, LLVM or Cranelift development
+backend; coverage explicitly selects LLVM after its coverage-specific
 preflight. An explicit native target linker must remain the repository's Clang
 wrapper so its search directory and the `mold` link argument apply together.
 
@@ -781,20 +790,7 @@ from an earlier run would quietly turn the next observation warm.
 
 Artefacts are uploaded with `if: always()`, so a route that fails still
 delivers its logs, timings, and sizes. An artefact uploaded only on success
-would discard exactly the evidence a failing route needs. The `verifier-free`
-job uploads the same way, publishing its observations directory and the
-generated `verifier-free.json` even when the container build fails.
-
-`verifier-free` is the second job, with a thirty-minute timeout. It first
-asserts `test -z "${RUSTC_WRAPPER-}"`, because a hosted runner must not carry
-the local admission wrapper across the container boundary, then installs a
-compiler with no verifier present and runs
-`uv run --script scripts/run_verifier_probes.py verifier-free`. That is the
-same command documented for local use above; on a fresh runner it produces a
-passing observation where the local one is explicitly inconclusive. Promoting
-that output to the committed `verifier-free-hosted.json` record is a manual
-step that must carry the run identity and the staged-input digests together
-with the captured logs.
+would discard exactly the evidence a failing route needs.
 
 ## Markdown formatting
 
@@ -1285,14 +1281,24 @@ depends on how it classifies the version; both are normal. The entry sets no
 cooldown: Dependabot's toolchain fetcher publishes no release date, so a
 cooldown would delay nothing.
 
-## Verifier capability probes
+## Formal verification
 
-Task 1.2.1's probes are tool observations, not proofs of Combobulate. Run
-`make install-kani`, `make kani-check`, `make install-verus`,
-`make kani-log-corpus`, and `make verus-probe` from the root. The ordinary
-commit gates do not install or execute a verifier. `make kani` and
-`make kani-full` visibly report `FORMAL-SKIP` until task 1.2.4;
-`FORMAL_STRICT=1` rejects those placeholders.
+The proofs that exist today are the calibration probes', not the kernel's; the
+kernel's own harnesses arrive with task 1.2.4 and join `make kani` and
+`make verus` then. What runs, and where:
+
+| Proof                                                          | Target             | What it must show                                               |
+| -------------------------------------------------------------- | ------------------ | --------------------------------------------------------------- |
+| `tools/calibration/cardinality-probe` (2 Kani harnesses)       | `make kani`        | Both verify                                                     |
+| `tools/verifier-fixtures/kani-native-workspace` (1 harness)    | `make kani`        | The facade's target-facts harness verifies, cover satisfied     |
+| `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus` | Each run decides as `kani_logs/expected.json` records           |
+| `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`       | 8 functions verified, 0 errors                                  |
+| `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`       | Macro, attributes and single-root qualify; companion is refused |
+
+`.github/workflows/formal.yml` runs all of them on a pull request that touches
+them and weekly. The ordinary commit gates do not install or execute a
+verifier. Install locally with `make install-kani` and `make install-verus`; CI
+installs through the shared `install-prover-tools` action and nothing else.
 
 `make install-verus` unpacks the pinned release into `.verus/<version>/` in the
 worktree it runs in, and it does so per worktree rather than once per host. The
@@ -1312,152 +1318,48 @@ installation cannot enter a commit, a Markdown scan, or a spelling scan.
 ### Bumping a verifier pin
 
 A prover-tools change edits `tools/rust-prover-tools/REF` and the
-`rust-prover-tools` requirement in the PEP 723 block of
-`scripts/run_verifier_probes.py` together. PEP 723 metadata cannot read another
-file, so the script restates the repository and revision;
-`probe_script_matches_the_prover_tools_pin` in `tests/prover_tools_contract.rs`
-requires the embedded `git+<repository>@<revision>` to equal the `repository:`
-and `ref:` rows in `REF`. A mismatch fails the test instead of leaving the
-probe to fetch a different helper revision.
+`prover_tools_ref` pin in `spec/toolchain-profiles.json`. The Makefile reads
+the revision from `REF` for the local targets; the workflows pass no revision,
+so the shared `install-prover-tools` action's default (the estate revision)
+applies and a Dependabot bump of that action moves CI. Keep the two in step
+when the estate revision moves.
 
 The Kani and Verus `VERSION` files each hold one release, and
 `tools/verus/SHA256SUMS` holds one `sha256sum` row whose archive name is
-`verus-<VERSION>-x86-linux.zip`. `prover_release_pins_are_complete` checks
-those shapes and the relationship between the two Verus files; it compares no
-literal release, so a legitimate bump does not also edit the test. Archive
-verification against `SHA256SUMS` remains with the commit-pinned helper.
+`verus-<VERSION>-x86-linux.zip`. Archive verification against `SHA256SUMS`
+remains with the pinned helper. After a bump, run `make kani-full` and
+`make verus`: a release that changes how Kani reports a corpus run fails
+`make kani-corpus`, and that failure is the finding to read, not a record to
+recapture.
 
-A prover-tools revision change can alter the probe commands or the provenance
-writers, so recapture the genuine Kani and Verus observations with
-`make kani-log-corpus` and `make verus-probe` and commit them with their
-provenance. `source_digests` binds the parsed input rather than its bytes, so
-reformatting alone leaves a record valid; a change to a parsed token requires
-the recapture.
+`scripts/verus_probe.py` runs the four wiring candidates on the installed Verus
+and applies one rule to their output. Single-root verification uses
+`prover-tools verus run`; crate comparisons use the installed `cargo-verus`
+directly, with `VERUS_Z3_PATH` naming the solver the shared action installed.
+Each selected function is rebuilt because `cargo-verus` does not fingerprint
+function-selection arguments. A successful capability must report exactly one
+verified function, its mutant must report exactly one error and no verified
+function with one postcondition diagnostic located at the seeded mutant
+declaration, and the single-root route additionally verifies
+`production::increment` through `--verify-only-module=production`, because
+`--verify-root` selects only the root module's functions. A mutant verdict
+whose diagnostic names no location, another source, or a line outside the
+mutant declaration does not qualify. The companion crate is the negative
+control: Verus rejects its wrapper because the production crate carries no
+specification, and the probe fails if it ever qualifies. The analysis helpers
+are private to the script and are not an evidence parser.
 
-The CLI in `scripts/run_verifier_probes.py` owns the probe command surface. Its
-private `kani_probe` module owns the Kani route builders and their capture
-loops; the private `verus_probe` module owns solver resolution, the Verus
-command builders, and mutant qualification; the private
-`verifier_probe_support` module owns capture, digests, and scratch workspace
-construction; the private `probe_provenance` module owns the source digest
-records and the captured-output guard; and the private `verifier_free_probe`
-module owns the container workflow. Only the probe scripts may import them.
-These helpers are not an evidence parser and must not enter the evidence gate
-or product code. Recording fixtures and result-based expectations stay private
-to the prover command contracts. The runner reuses `rust-prover-tools`' Cuprum
-command boundary rather than another installer.
+Both proof scripts run their verifier through `scripts/captured_command.py`,
+the one cuprum boundary for them. It registers exactly the program it runs in a
+local catalogue, passes arguments without a shell, and returns the exit status
+and combined output without treating a non-zero exit as an error, because a
+mutant or a corpus harness is meant to fail. A verifier that cannot be started
+raises, so it is never mistaken for a failed proof. Any other script that runs
+a verifier should use it rather than add a second capture path.
 
-The Kani builders — `kani_prefix`, `_kani_arguments`, `_kani_observations`, and
-`_kani_in_place_observation` — live in `kani_probe`, and the Verus builders —
-`select_solver`, `qualify_solver`, `_pinned_solver_executable`,
-`_verus_environment`, `_refresh_candidate_fingerprint`, `_verus_command`, and
-`_qualified_candidates` — live in `verus_probe`, so the CLI file stays within
-the repository's 400-line module limit. Solver resolution is split at the
-command boundary: `select_solver` applies the selection policy and starts
-nothing, `qualify_solver` validates a version invocation the CLI observed, and
-`_pinned_solver_executable` — the one resolver that may consult a package index
-and write to uv's cache — is a required parameter of `select_solver` rather
-than a default, so the CLI passes it explicitly at the boundary. The
-fingerprint refresh is a command, separate from `_verus_command`, because
-cargo-verus does not fingerprint the function-selection arguments and the proof
-file must be touched immediately before each build. The provenance writers
-`_write_kani_provenance` and `_write_verus_provenance` and the guard
-`require_captured_output` live in `probe_provenance`. The verifier-free
-workflow lives in `verifier_free_probe` as `_verifier_free_containerfile`,
-`_write_inconclusive_record`, `_stage_verifier_free_workspace`,
-`ensure_base_image`, `container_run_command`, and `run_verifier_free`. These
-helpers are private to the probe scripts. They exist so each route step can be
-read and tested on its own. They are not a public API, must not be imported by
-the support module, the evidence gate, or product code, and a new probe route
-composes them instead of adding a parallel capture path.
-
-Committed metadata must not publish host detail. `capture` still executes the
-real argument vector but stores a portable copy, replacing the repository root
-with `<repo>` and the home directory with `~`; `_write_verus_provenance`
-applies the same rewrite to the resolved solver path. Without it, a record
-would name the developer's account and worktree and could not be reproduced
-elsewhere. Captured observation logs stay verbatim: they are the tool's own
-output, and rewriting them would break the evidence the digest binds. The split
-is deliberate — metadata is rewritten, output is not. A record captured before
-this rule keeps the path it ran under until it is rewritten in place; because
-the digest binds the log and not the metadata, that edit leaves the evidence
-valid. The provenance test scans every committed fixture record and fails on
-any remaining account home.
-
-Each `source_digests` value is a structural digest, written `ast-sha256:<hex>`
-by `scripts/structural_digest.py`, which the writers and the digest test share.
-It hashes the parsed input rather than its bytes: TOML and JSON as canonical
-JSON, Python as its `ast` dump, and Rust as its tree-sitter syntax tree with
-plain comments dropped and doc comments kept. Shell and `VERSION` files have no
-parser here, so their comment-only and blank lines are dropped before hashing.
-A reformat or comment edit therefore leaves a record valid, while any change to
-a parsed token, including the toolchain channel, does not. A bare 64-digit hex
-value is a legacy byte digest and is rejected.
-
-The one soft case is the toolchain: when the only mismatch in a record is
-`rust-toolchain.toml`, and setting its `channel` back to the one the record
-built with (its `RUSTUP_TOOLCHAIN=` entry) reproduces the recorded digest, the
-digest test passes and prints a `::warning::` annotation naming both channels.
-A change to components or targets, or to any other input, still fails.
-
-Both provenance writers bind their inputs with `source_digests`. The Kani
-record covers the corpus manifest and lockfile, the harness sources, the
-harness and listing inventories, the probe modules that build and record the
-run, and `.cargo/config.toml`, because Cargo reads the repository's profile and
-target configuration during the corpus build. It additionally records
-`lint_tables_sha256`, the structural digest of the `[workspace.lints.*]` tables
-the `in_place` route copies into its scratch workspace. Binding the extracted
-tables rather than the whole root manifest keeps an unrelated dependency edit
-from forcing a recapture while still covering the lints the run applied. The
-Verus record covers the four candidate proof files, the shared production
-source, the workspace manifest, lockfile, and member manifests, plus the probe
-modules that generate and record the observations. The provenance test
-recomputes every recorded digest and requires each `provenance.json` to carry a
-non-empty digest map, so a Verus record cannot pass merely by omitting the
-field.
-
-The pinned helper rejects ancestor `codegen-backend` configuration before
-running Kani. The `Makefile` therefore defaults `KANI_PROBE_ROUTE` to `direct`,
-which selects Kani 0.67.0's matching LLVM SDK and child flags, retains compiler
-admission, and changes no ordinary Cargo file or executable source body. The
-script's own default is `helper`. Installation and version checks still use the
-helper. Set `KANI_PROBE_ROUTE=helper` to retest that compatibility boundary.
-The child toolchain is read from the installed release's own
-`rust-toolchain-version` record and checked against `KANI_SDK_TOOLCHAIN`. The
-record names that declared toolchain and the constant it was checked against
-(`toolchain` and `expected_toolchain_prefix`). The record is a declaration by
-the release, not proof of which compiler binary ran: `_kani_environment` also
-asks the driver for its version and compares it with the repository pin, and
-that second observation is what ties the run to a release. A pin bump that
-lands a release bundling a different nightly therefore fails the check or
-changes the record, rather than leaving a constant that merely agreed with the
-environment at the time it was written.
-
-The Verus archive does not bundle Z3. The probe's tool environment therefore
-uses `z3-solver==4.16.0.0`, checks its executable reports Z3 4.16.0, and
-supplies its resolved path through `VERUS_Z3_PATH`. The default `z3` selection
-resolves that pinned distribution even when another `z3` appears on `PATH`, and
-fails rather than falling back to `PATH` when that resolution does not succeed,
-because the record would otherwise name the pin for a binary the pin did not
-supply. An explicitly named solver is used as given but must pass the same
-version check; the record keeps its path and digest and records no distribution
-attribution, because only the default resolver consults `z3-solver==4.16.0.0`.
-Neither the package-index resolver nor the version command is a default inside
-the resolution module: the CLI names the resolver it passes and runs the
-selected executable itself, so a caller reading `select_solver` or
-`qualify_solver` can see that neither touches the network or a process. The
-Kani provenance label and the Z3 distribution come from their pin files and
-named module constants rather than being restated at each call site.
-Single-root verification uses `prover-tools verus run`; crate comparisons use
-the pinned `cargo-verus` directly. Each selected function is rebuilt because
-`cargo-verus` does not fingerprint function-selection arguments. A successful
-capability must report exactly one verified function, its mutant must report
-exactly one error and no verified function with one postcondition diagnostic
-located at the seeded mutant declaration, and the single-root route
-additionally verifies `production::increment` through
-`--verify-only-module=production`, because `--verify-root` selects only the
-root module's functions. A mutant verdict whose diagnostic names no location,
-another source, or a line outside the mutant declaration does not qualify.
+Kani runs the installed front-end directly (`cargo-kani kani`), not through
+`cargo kani`, so `rustup` does not install the repository's own toolchain
+before Kani selects the one it bundles.
 
 Kani harness inventory (all subjects are deliberately separate fixture bodies):
 
@@ -1473,26 +1375,22 @@ Kani harness inventory (all subjects are deliberately separate fixture bodies):
 | `expected_panic`         | No symbolic inputs                                  | Expected-panic output semantics            |
 | `seeded_wrapping_mutant` | Every `u8`                                          | Failed wrapping arithmetic mutant          |
 
-Run definitions, the tool-produced inventory, source digests, exact commands,
-and statuses accompany the captured logs. Exit status alone cannot establish a
-verdict: the impossible-cover subject exits successfully. The corpus is not
-itself an evidence parser; `kani` is registered in
-`spec/evidence-reason-codes.json` and read by the adapter described under
-[the evidence-admission boundary](#compose-the-evidence-admission-boundary). A
-record still cites the corpus's inventory as its manifest, and a manifest whose
-digest differs from the one the record binds is refused.
+Run definitions are in `harnesses.json`, and the committed logs of the same
+runs sit in `scripts/tests/fixtures/kani_logs/` with the command and exit
+status of each in `runs.json`. Exit status alone cannot establish a verdict:
+the impossible-cover subject exits successfully. `scripts/check_kani_corpus.py`
+(`make kani-corpus`) therefore decides each fresh log with the Kani log parser
+against `harness-manifest.json` and compares the decision with the one recorded
+in `expected.json`. The corpus is not itself an evidence parser; `kani` is
+registered in `spec/evidence-reason-codes.json` and read by the adapter
+described under
+[the evidence-admission boundary](#compose-the-evidence-admission-boundary).
 
-`uv run --script scripts/run_verifier_probes.py verifier-free` builds the
-comparison sources in a rootless container without verifier installations. This
-local host's admission supervisor launches compilers outside the container
-namespace, so its result is explicitly inconclusive. The script refuses to
-remove the wrapper; the separate hosted observation job uses a fresh runner.
-Its record is
-`tools/verifier-fixtures/verus-wiring-probe/verifier-free-hosted.json`, with
-the container build and probe logs in the adjacent `observations/` directory.
-The record carries `source_digests` for every file the staging step copies: the
-fixture tree minus evidence records and build output, plus the root toolchain,
-linker, build-tool, and mold pin files. The hosted record is excluded from the
-staged set so it can bind the inputs without hashing itself. The recorded
-observation must be recaptured whenever the build script or a staged input
-changes, so the stored command, digests, and the code under test stay the same.
+Known facts about the corpus: five of its nine harnesses fail by design, and
+`multiplication_timeout` needs `--harness-timeout 5s` (its run definition
+carries it), otherwise it runs for over eighteen minutes.
+
+The Kani log parser (`scripts/docs_validation/kani_log/`), the trust-audit
+scanner (`scripts/docs_validation/trust_audit/`) and `scripts/verus_probe.py`
+are prover-output tooling that the shared `rust-prover-tools` is expected to
+adopt; the request is <https://github.com/leynos/rust-prover-tools/issues/250>.

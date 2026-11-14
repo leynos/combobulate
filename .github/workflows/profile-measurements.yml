@@ -151,10 +151,11 @@ jobs:
   #
   # The proof profile's timed region is Kani codegen of the kernel, not
   # `cargo build`. It runs through the installed driver directly rather than
-  # through the helper's `kani exec` route, because that route refuses this
-  # repository's `[profile.dev] codegen-backend = "cranelift"`: it cannot prove
-  # isolation of a backend it does not control, and the accepted route for the
-  # repository is the direct driver (DL-24). The driver is selected by the
+  # through the helper's `kani exec` route, because that route refuses a
+  # `[profile.dev] codegen-backend` selection (the repository's Cranelift opt-in
+  # is commented out): it cannot prove isolation of a backend it does not
+  # control, and the accepted route for the repository is the direct driver
+  # (DL-24). The driver is selected by the
   # environment `kani-driver` needs — the release's bundled SDK toolchain,
   # warnings-as-errors through both rustflags spellings, LLVM for the verifier,
   # and the release's own `bin` and `toolchain/bin` ahead of `PATH`.
@@ -198,17 +199,19 @@ jobs:
           sudo apt-get install --yes --no-install-recommends clang lld mold
       - name: Install the pinned build standard
         run: make install-build-tools
-      - name: Install the pinned Kani release
-        run: make install-kani
-      - name: Require the calibrated Kani release
-        run: make kani-check
-      - name: Install the checksum-verified Verus release
+      - name: Install the pinned Kani and Verus releases
         # AC-04's frozen environment registers Verus and Z3 alongside rustc,
         # Kani, and mold, and the acceptance binding refuses a record that
         # omits any of them. Installing them here is what lets the tool-identity
         # step below report a version it actually observed rather than one
-        # copied from the control.
-        run: make install-verus
+        # copied from the control. The shared action reads the releases from
+        # tools/kani/VERSION and tools/verus/VERSION, installs Z3 with Verus, and
+        # checks the installed Kani version.
+        id: prover
+        uses: leynos/shared-actions/.github/actions/install-prover-tools@88ac795de687eda016db24983f87a25d6db49fdb
+        with:
+          tools: kani verus
+          runner-image: ubuntu2404
       - name: Resolve the installed Kani release root
         run: |
           set -euo pipefail
@@ -236,8 +239,8 @@ jobs:
           # policy, and `CARGO_ENCODED_RUSTFLAGS` carries it too because Cargo
           # prefers the encoded form when both are set: an inherited value would
           # otherwise replace the policy silently rather than being overridden
-          # by it. The LLVM backend is the verifier's own and must displace the
-          # Cranelift the repository selects for dev builds; and the release's
+          # by it. The LLVM backend is the verifier's own and must displace any
+          # dev-profile backend an opt-in selects; and the release's
           # `toolchain/bin` and `bin` come first on `PATH` so the driver finds
           # its bundled rustc and CBMC. The version is not named here: the
           # release root comes from `tools/kani/VERSION`, so the pin has one
@@ -260,14 +263,16 @@ jobs:
           grep -qF -- '--only-codegen' "$launcher"
           grep -qF -- '--manifest-path crates/combobulate-kernel/Cargo.toml' "$launcher"
       - name: Record the tool identities
+        env:
+          Z3_PATH: ${{ steps.prover.outputs.z3-path }}
         run: |
           set -euo pipefail
           # AC-04 registers five toolchains and the acceptance binding refuses a
           # record that omits any of them, so each is observed here rather than
           # copied from the control. Every pin is read from the file that
           # already owns it — `tools/*/VERSION` for Kani, Verus, and mold, and
-          # `Z3_DISTRIBUTION` for the solver — so this step cannot drift from
-          # the version the build actually uses.
+          # the solver the shared install action reports — so this step cannot
+          # drift from the version the build actually uses.
           rustc -vV > build-budget/rustc
           cargo -V > build-budget/cargo
           cargo kani --version > build-budget/kani
@@ -283,22 +288,29 @@ jobs:
           rustup toolchain install "$verus_toolchain" --profile minimal --no-self-update
           "$verus_root/verus" --version > build-budget/verus
 
-          # The Verus archive deliberately omits Z3; the probes take it from the
-          # pinned `z3-solver` distribution instead, and the solver is reported
-          # from the binary that distribution installed rather than from
-          # whichever `z3` happens to be on `PATH`.
-          z3_distribution=$(sed -n 's/^Z3_DISTRIBUTION = "\(.*\)"$/\1/p' scripts/probe_provenance.py)
-          test -n "$z3_distribution"
-          z3_path=$(uv tool run --from "$z3_distribution" python \
-            -c "import shutil; print(shutil.which('z3') or '')")
-          test -n "$z3_path"
-          "$z3_path" --version > build-budget/z3
+          # The Verus archive deliberately omits Z3; the shared action installs
+          # the pinned solver beside it, and the solver is reported from that
+          # binary rather than from whichever `z3` happens to be on `PATH`.
+          test -x "$Z3_PATH"
+          "$Z3_PATH" --version > build-budget/z3
 
           mold --version > build-budget/mold
-          # The dev profile's backend is Cranelift and the proof profile's is
-          # LLVM; both are asserted from the files that select them, so the
-          # record describes the configuration that ran.
-          grep -qF 'codegen-backend = "cranelift"' .cargo/config.toml
+          # Cranelift is disabled estate-wide (14 November 2026), so the dev
+          # profile selects no backend and Cargo uses LLVM, as the proof
+          # profile does. Ask Cargo for the effective dev-profile backend, which
+          # reads the profile table and the environment but not the unrelated
+          # `[unstable] codegen-backend` key, and require it to be unset, so the
+          # record describes the configuration that ran. AC-04's frozen
+          # environment still names Cranelift for dev builds: amend it before
+          # taking a new measurement that is meant to bind to the control.
+          backend=$(cargo -Z unstable-options config get profile.dev.codegen-backend 2>&1 || true)
+          case "$backend" in
+            *'is not set'*) ;;
+            *)
+              echo "the dev profile selects a backend; this record assumes LLVM: $backend" >&2
+              exit 1
+              ;;
+          esac
           grep -qF 'CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm"' "$PWD/build-budget/kani-codegen"
           date +%s > build-budget/setup-end
       - name: Fetch dependencies once, untimed
@@ -400,34 +412,3 @@ jobs:
         with:
           name: build-budget
           path: build-budget/
-
-  verifier-free:
-    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'measure-profiles'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@900f2210b1d28bbbd0bd22d17926b9e224e8f231
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
-      - name: Prepare an ordinary compiler without verifier installations
-        run: |
-          test -z "${RUSTC_WRAPPER-}"
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends clang lld mold podman
-      - name: Install the pinned build standard
-        run: make install-build-tools
-      - name: Fetch ordinary dependencies
-        run: cargo fetch --locked --manifest-path tools/verifier-fixtures/verus-wiring-probe/Cargo.toml
-      - name: Build inside the verifier-free rootless container
-        run: uv run --script scripts/run_verifier_probes.py verifier-free
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        if: always()
-        with:
-          name: verifier-free-observations
-          path: |
-            tools/verifier-fixtures/verus-wiring-probe/observations/
-            tools/verifier-fixtures/verus-wiring-probe/verifier-free.json

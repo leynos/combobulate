@@ -1,12 +1,12 @@
-"""Load the committed Kani log corpus, its manifests, and its record of how it was produced.
+"""Load the committed Kani log corpus, its manifests, and the commands that produced it.
 
-The corpus is evidence, so nothing in this module may invent a fact about it.
-Every helper either reads a committed file or derives a value from one, and the
-one place that would otherwise need a guess — which manifest a log belongs to —
-is read from `provenance.json`, which records the exact command that produced
-each log. Reading the `--harness` arguments from that command is what lets a
-test decide a whole-crate manifest against the subset a record claims, instead
-of hard-coding the pairing in a second place that could drift.
+Nothing in this module may invent a fact about the corpus. Every helper either
+reads a committed file or derives a value from one, and the one place that
+would otherwise need a guess — which manifest a log belongs to — is read from
+`runs.json`, which records the command that produced each log. Reading the
+`--harness` arguments from that command is what lets a test decide a
+whole-crate manifest against the subset a run selected, instead of hard-coding
+the pairing in a second place that could drift.
 
 Examples
 --------
@@ -17,7 +17,6 @@ Examples
 """
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -32,7 +31,7 @@ HARNESS_FLAG = '--harness'
 
 
 def corpus_root() -> Path:
-    """Return the directory holding the committed logs and their provenance."""
+    """Return the directory holding the committed logs and their run commands."""
     return CORPUS
 
 
@@ -46,32 +45,18 @@ def log_text(name: str) -> str:
     return CORPUS.joinpath(f'{name}.log').read_text(encoding='utf-8')
 
 
-def log_bytes(name: str) -> bytes:
-    """Return one committed log's bytes, which is what the provenance digests cover."""
-    return CORPUS.joinpath(f'{name}.log').read_bytes()
-
-
-def digest(text: str) -> str:
-    """Return the SHA-256 a log's bytes would have, from its text as decoded."""
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()
-
-
-def provenance() -> dict[str, Any]:
-    """Return the committed record of how the corpus was produced."""
-    return json.loads(CORPUS.joinpath('provenance.json').read_text(encoding='utf-8'))
-
-
 def observations() -> list[dict[str, Any]]:
-    """Return every recorded observation, one per committed log."""
-    return list(provenance()['observations'])
+    """Return every recorded run, one per committed log."""
+    document = json.loads(CORPUS.joinpath('runs.json').read_text(encoding='utf-8'))
+    return list(document['runs'])
 
 
 def observation(name: str) -> dict[str, Any]:
-    """Return the observation whose log is ``name``; e.g. ``observation('verified')['exit_code']``."""
+    """Return the run whose log is ``name``; e.g. ``observation('verified')['exit_code']``."""
     for entry in observations():
-        if Path(entry['log']).stem == name:
+        if entry['id'] == name:
             return entry
-    raise KeyError(f'the provenance records no observation for {name!r}')
+    raise KeyError(f'runs.json records no run for {name!r}')
 
 
 def harness_arguments(command: list[str]) -> tuple[str, ...]:
@@ -98,7 +83,7 @@ def in_place_manifest() -> Manifest:
 def manifest_for(name: str) -> Manifest:
     """Return the manifest one log must be decided against, narrowed to its selection."""
     selected = harness_arguments(observation(name)['command'])
-    if Path(observation(name)['log']).stem == 'in_place':
+    if name == 'in_place':
         return in_place_manifest()
     if not selected:
         return crate_manifest()

@@ -1,4 +1,4 @@
 repository: https://github.com/leynos/rust-prover-tools.git
 branch: main
-ref: 9c4a27a86c678ceac1155404f45d95ee4a14a172
-verify: git fetch --depth 1 https://github.com/leynos/rust-prover-tools.git 9c4a27a86c678ceac1155404f45d95ee4a14a172 && git rev-parse FETCH_HEAD
+ref: 592558f7183b554fc749696246984c5d7300d029
+verify: git fetch --depth 1 https://github.com/leynos/rust-prover-tools.git 592558f7183b554fc749696246984c5d7300d029 && git rev-parse FETCH_HEAD

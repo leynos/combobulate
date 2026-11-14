@@ -192,22 +192,22 @@ class SourcedPins(ScratchTree):
     def test_a_pin_with_no_reader_is_still_bound_to_its_sites(self):
         """Require the citation check to cover pins no owning file can re-derive.
 
-        Six of the twelve pins have a reader; the rest are known only through
+        Six of the eleven pins have a reader; the rest are known only through
         the sites the record names for them. A sweep that visited the reader's
-        pins alone would report a clean record while the other six had drifted,
+        pins alone would report a clean record while the other five had drifted,
         which is the failure this case pins down.
         """
         record = record_at(self.root)
-        self.assertNotIn('kani_toolchain',
+        self.assertNotIn('kani_cbmc',
                          {'repository_channel', 'kani_release', 'verus_release',
                           'prover_tools_ref', 'verus_vstd', 'polars_release'},
                          'the case is meaningless if the pin it edits has a reader')
-        site = self.root / 'tests/support/prover_tools_probe.rs'
+        site = self.root / 'scripts/tests/fixtures/kani_logs/counterexample.log'
         self.assertTrue(site.is_file(), 'the fixture tree must contain the cited site')
-        needle = record['pins']['kani_toolchain']['value']
+        needle = record['pins']['kani_cbmc']['value']
         site.write_text(site.read_text(encoding='utf-8').replace(needle, 'X'),
                         encoding='utf-8')
-        self.assert_fails('pin kani_toolchain cites a site that does not contain')
+        self.assert_fails('pin kani_cbmc cites a site that does not contain')
 
 
 class PinSweep(ScratchTree):

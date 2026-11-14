@@ -1,0 +1,20 @@
+{
+  "description": "The Kani command that produced each committed log and the exit status it returned, so a test can decide a log against the harnesses its run selected. Each id names the log beside this file.",
+  "runs": [
+    {"id": "verified", "exit_code": 0, "command": ["kani", "--harness", "harnesses::verified", "--exact", "--verbose"]},
+    {"id": "counterexample", "exit_code": 1, "command": ["kani", "--harness", "harnesses::counterexample", "--exact", "--verbose"]},
+    {"id": "unsatisfied_cover", "exit_code": 0, "command": ["kani", "--harness", "harnesses::unsatisfied_cover", "--exact", "--verbose"]},
+    {"id": "multiplication_timeout", "exit_code": 1, "command": ["kani", "--harness", "harnesses::multiplication_timeout", "--exact", "--verbose", "-Z", "unstable-options", "--harness-timeout", "5s"]},
+    {"id": "insufficient_unwind", "exit_code": 1, "command": ["kani", "--harness", "harnesses::insufficient_unwind", "--exact", "--verbose"]},
+    {"id": "vacuous_assumption", "exit_code": 0, "command": ["kani", "--harness", "harnesses::vacuous_assumption", "--exact", "--verbose"]},
+    {"id": "unsupported", "exit_code": 1, "command": ["kani", "--harness", "harnesses::unsupported", "--exact", "--verbose"]},
+    {"id": "expected_panic", "exit_code": 0, "command": ["kani", "--harness", "harnesses::expected_panic", "--exact", "--verbose"]},
+    {"id": "seeded_wrapping_mutant", "exit_code": 1, "command": ["kani", "--harness", "harnesses::seeded_wrapping_mutant", "--exact", "--verbose"]},
+    {"id": "selected_harness", "exit_code": 0, "command": ["kani", "--harness", "harnesses::verified", "--exact", "--verbose"]},
+    {"id": "fail_fast", "exit_code": 1, "command": ["kani", "--harness", "harnesses::counterexample", "--harness", "harnesses::verified", "--harness", "harnesses::seeded_wrapping_mutant", "--exact", "--fail-fast", "--verbose"]},
+    {"id": "truncated", "exit_code": 124, "command": ["--signal=TERM", "8s", "kani", "--harness", "harnesses::multiplication_timeout", "--exact", "--verbose"]},
+    {"id": "list", "exit_code": 0, "command": ["kani", "list", "--format", "json"]},
+    {"id": "in_place", "exit_code": 0, "command": ["kani", "--harness", "verification::target_facts", "--exact", "--verbose"]},
+    {"id": "default_unwind", "exit_code": 1, "command": ["kani", "--harness", "harnesses::verified", "--harness", "harnesses::seeded_wrapping_mutant", "--exact", "--verbose", "--default-unwind", "2"]}
+  ]
+}

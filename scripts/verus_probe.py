@@ -1,25 +1,37 @@
-"""Build and qualify the pinned Verus wiring observations.
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["cyclopts==5.2.0", "cuprum==0.1.0"]
+# ///
+"""Run and qualify the pinned Verus wiring candidates.
 
-Only the verifier probe CLI imports this module. It keeps solver resolution,
-command construction, and mutant qualification together so the CLI stays
-within the repository's module-size limit, and it is not an evidence parser.
+The four candidates (macro, attributes, companion and single-root) each hold a
+capability proof that must verify and a seeded mutant that must fail at its own
+declaration. This module runs them on an installed Verus and applies one rule:
+a candidate qualifies only when its log reports the exact counts and the mutant
+failure names the seeded region. It reads proof output and nothing else, so it
+is analysis that belongs beside the shared prover tools, not a record of how or
+when a run happened. Verus and Z3 come from the shared install-prover-tools
+action (or `make install-verus` locally); nothing here installs them.
+
+Run it with `uv run --script scripts/verus_probe.py`; `make verus` does.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-import os
 from pathlib import Path
 import re
 import shlex
-import shutil
+import sys
+import tempfile
+from typing import Annotated
 
-from rust_prover_tools.commands import CommandSpec, run_command
+from cyclopts import App, Parameter
 
-from probe_provenance import Z3_DISTRIBUTION
-from verifier_probe_support import ROOT
+from captured_command import run_captured
 
-Z3_VERSION_BANNER = "Z3 version 4.16.0 - 64 bit"
+ROOT = Path(__file__).resolve().parents[1]
+FIXTURES = ROOT / "tools/verifier-fixtures/verus-wiring-probe"
 VERUS_CANDIDATES = ("macro", "attributes", "companion", "single-root")
 VERUS_FUNCTIONS = {
     "macro": ("capability", "mutant"),
@@ -27,173 +39,39 @@ VERUS_FUNCTIONS = {
     "companion": ("capability", "mutant"),
     "single-root": ("capability", "helper", "mutant"),
 }
+# The companion crate is a negative control: Verus rejects its wrapper because
+# the production crate carries no specification, which is the finding that
+# chose the other wirings. It must keep failing; a pass would mean it verified
+# an executable body it has no contract for.
+EXPECTED_QUALIFIED = frozenset({"macro", "attributes", "single-root"})
 
 
-def _pinned_solver_executable() -> str | None:
-    """Ask the pinned distribution where it installed the solver.
-
-    ``uv tool run`` may consult a package index and unpack ``z3-solver`` into
-    uv's cache, so this is a command-side effect rather than a lookup. It is
-    therefore never a default: the probe CLI passes it as the resolver seam,
-    and a caller that only needs the selection policy supplies its own.
-
-    Returns
-    -------
-    str | None
-        The executable ``uv`` reported, or ``None`` when it reported nothing.
-
-    Raises
-    ------
-    RuntimeError
-        When the pinned distribution could not be resolved. The record names
-        the calibrated distribution, so a failed resolver must not fall back to
-        whichever ``z3`` sits on ``PATH``: that binary would be recorded as the
-        pin's own.
-    """
-    selected = run_command(
-        CommandSpec(
-            (
-                "uv",
-                "tool",
-                "run",
-                "--from",
-                Z3_DISTRIBUTION,
-                "python",
-                "-c",
-                "import shutil; print(shutil.which('z3') or '')",
-            )
-        )
-    )
-    if selected.exit_code != 0:
-        raise RuntimeError(
-            "the pinned z3-solver distribution could not be resolved: "
-            f"{selected.stderr.strip() or 'uv exited with an error'}"
-        )
-    return selected.stdout.strip() or None
-
-
-def select_solver(
-    selection: str,
-    *,
-    pinned: Callable[[], str | None],
-    discovery: Callable[[str], str | None] = shutil.which,
-) -> tuple[Path, str | None]:
-    """Choose the solver a selection names, without running anything.
-
-    The selection policy and its side effects are separate steps: this
-    function decides which executable a selection refers to, and the caller
-    observes its version. ``pinned`` is a required parameter rather than a
-    default because it is the one resolver that may consult a package index and
-    write to uv's cache; a caller that only needs the policy still has to name
-    the resolver it wants, so no innocuous-looking default can reach the
-    network.
-
-    Parameters
-    ----------
-    selection : str
-        A solver name or path. The default ``z3`` name resolves the pinned
-        ``z3-solver`` distribution, while any explicit selection is looked up
-        as given. ``PATH`` is never consulted for the default: doing so would
-        silently substitute an uncalibrated solver.
-    pinned : Callable[[], str | None]
-        Resolver for the pinned distribution. Supplied by the command boundary.
-    discovery : Callable[[str], str | None]
-        Lookup used for an explicit selection; a pure ``PATH``-style lookup by
-        default.
-
-    Returns
-    -------
-    tuple[Path, str | None]
-        The selected executable and the pinned distribution when the resolver
-        supplied it. An explicit selection records ``None``: its path and
-        digest identify it, and attributing it to the pin would claim a source
-        the probe never consulted.
-
-    Raises
-    ------
-    RuntimeError
-        When the selection resolves to no executable.
-
-    Examples
-    --------
-    The default route names the pin, and an explicit path does not::
-
-        select_solver('z3', pinned=lambda: '/pinned/z3')
-        # (PosixPath('/pinned/z3'), 'z3-solver==4.16.0.0')
-        select_solver('/opt/z3', pinned=lambda: '/pinned/z3')
-        # (PosixPath('/opt/z3'), None)
-    """
-    solver = pinned() if selection == "z3" else discovery(selection)
-    if solver is None:
-        raise RuntimeError("the pinned Z3 executable is unavailable")
-    distribution = Z3_DISTRIBUTION if selection == "z3" else None
-    return Path(solver).resolve(), distribution
-
-
-def qualify_solver(
-    z3_path: Path,
-    *,
-    exit_code: int,
-    reported: str,
-    distribution: str | None,
-) -> tuple[Path, str, str | None]:
-    """Validate an observed solver invocation and name the recorded solver.
-
-    The version command runs at the command boundary because it launches the
-    resolved executable. This function receives its status and output, so
-    qualification itself starts no process and a caller cannot mistake it for a
-    step that does.
-
-    Parameters
-    ----------
-    z3_path : Path
-        Executable the selection resolved to.
-    exit_code : int
-        Exit status reported by ``z3_path --version``.
-    reported : str
-        Standard output of that invocation, already stripped.
-    distribution : str | None
-        Pinned distribution when its resolver supplied the executable.
-
-    Returns
-    -------
-    tuple[Path, str, str | None]
-        The validated executable, the exact banner it reported, and the
-        distribution attribution. An explicit selection keeps ``None``: its
-        path and digest identify it, and only the default resolver consults the
-        pin.
-
-    Raises
-    ------
-    RuntimeError
-        When the run failed or its banner is not the calibrated one.
-
-    Examples
-    --------
-    A calibrated banner is returned unchanged::
-
-        qualify_solver(Path('/pinned/z3'), exit_code=0,
-                       reported=Z3_VERSION_BANNER,
-                       distribution=Z3_DISTRIBUTION)
-        # (PosixPath('/pinned/z3'), 'Z3 version 4.16.0 - 64 bit', 'z3-solver==4.16.0.0')
-    """
-    if exit_code != 0 or reported != Z3_VERSION_BANNER:
-        raise RuntimeError("the solver must report the calibrated Z3 4.16.0 release")
-    return z3_path, reported, distribution
-
+# Variables the verifier must not inherit. Verus sets its own toolchain, and
+# cargo-verus makes `verus` the compiler driver, so a compiler wrapper such as
+# sccache would sit in front of it and Verus refuses to start behind one.
+# cuprum overlays variables and cannot unset one, so each command runs through
+# `env -u`.
+INHERITED_VARIABLES = ("RUSTUP_TOOLCHAIN", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER")
 
 
 def _verus_environment(z3_path: Path) -> dict[str, str]:
-    """Return the child environment that binds the calibrated solver."""
-    environment = dict(os.environ)
-    environment.pop("RUSTUP_TOOLCHAIN", None)
-    environment["VERUS_Z3_PATH"] = str(z3_path)
-    environment.update(
-        RUSTFLAGS="-D warnings",
-        CARGO_ENCODED_RUSTFLAGS="-D\x1fwarnings",
-        CARGO_PROFILE_DEV_CODEGEN_BACKEND="llvm",
-    )
-    return environment
+    """Return the variables overlaid on the child environment.
+
+    They bind the solver, carry the warnings-as-errors policy through both
+    spellings, and name LLVM for any dev-profile backend an opt-in selects.
+    """
+    return {
+        "VERUS_Z3_PATH": str(z3_path),
+        "RUSTFLAGS": "-D warnings",
+        "CARGO_ENCODED_RUSTFLAGS": "-D\x1fwarnings",
+        "CARGO_PROFILE_DEV_CODEGEN_BACKEND": "llvm",
+    }
+
+
+def _without_inherited_variables(argv: list[str]) -> list[str]:
+    """Return ``argv`` run through ``env -u`` for every inherited variable."""
+    unset = [flag for name in INHERITED_VARIABLES for flag in ("-u", name)]
+    return ["env", *unset, *argv]
 
 
 def _refresh_candidate_fingerprint(directory: Path, candidate: str) -> None:
@@ -367,3 +245,135 @@ def _qualified_candidates(
             continue
         qualified.append(candidate)
     return qualified
+
+
+def _capture(argv: list[str], log: Path, environment: dict[str, str]) -> dict:
+    """Run one verifier command, keep its output as a log, and return its status.
+
+    A command that cannot be started raises, so a missing verifier is reported
+    as itself and not as a failed proof; a non-zero exit is an ordinary result
+    here because the mutants are meant to fail.
+    """
+    result = run_captured(
+        _without_inherited_variables(argv), cwd=FIXTURES, env=environment
+    )
+    log.write_text(result.output)
+    print(f"{log.name}: exit {result.exit_code}", flush=True)
+    return {"exit_code": result.exit_code}
+
+
+def run_candidates(
+    binaries: Path, z3_path: Path, prover_tools: str, output: Path
+) -> list[str]:
+    """Run every candidate's functions and return the candidates that qualify.
+
+    Parameters
+    ----------
+    binaries : Path
+        Installed Verus release directory that holds ``cargo-verus``.
+    z3_path : Path
+        The Z3 binary Verus is told to use.
+    prover_tools : str
+        Command prefix that invokes the shared ``prover-tools`` helper, which
+        the single-root candidate runs through.
+    output : Path
+        Directory receiving one log per candidate and function.
+    """
+    environment = _verus_environment(z3_path)
+    observations = []
+    for candidate in VERUS_CANDIDATES:
+        for function in VERUS_FUNCTIONS[candidate]:
+            _refresh_candidate_fingerprint(FIXTURES, candidate)
+            command = _verus_command(binaries, candidate, FIXTURES, function, prover_tools)
+            observations.append(
+                {
+                    "candidate": candidate,
+                    "function": function,
+                    **_capture(command, output / f"{candidate}-{function}.log", environment),
+                }
+            )
+    return _qualified_candidates(output, observations, FIXTURES)
+
+
+def _companion_rejected_as_expected(output: Path) -> bool:
+    """Report whether the companion crate failed for the reason it is a control.
+
+    Its wrapper calls into the production crate, which carries no Verus
+    specification, so Verus must say the callee "is not supported" and offer
+    ``assume_specification``. Any other failure (a toolchain error, a missing
+    solver) would also keep the companion from qualifying, and must not pass as
+    the expected rejection.
+    """
+    log = (output / "companion-capability.log").read_text()
+    return "is not supported" in log and "assume_specification" in log
+
+
+def _show_unexpected_logs(output: Path, qualified: list[str]) -> None:
+    """Print the logs of every candidate whose outcome was not the expected one.
+
+    The logs may live in a temporary directory that is removed on return, so a
+    failed job must read them here. An expected failure (the companion's, and
+    every mutant's) stays quiet; only a candidate that should have qualified and
+    did not, or should have been refused and was not, is shown.
+    """
+    surprising = EXPECTED_QUALIFIED.symmetric_difference(qualified)
+    for candidate in VERUS_CANDIDATES:
+        if candidate not in surprising:
+            continue
+        for log in sorted(output.glob(f"{candidate}-*.log")):
+            print(f"--- {log.name} ---\n{log.read_text()}", flush=True)
+
+
+app = App(name="verus_probe", help=__doc__)
+
+
+@app.default
+def probe(
+    *,
+    verus_dir: Path | None = None,
+    z3: Annotated[Path | None, Parameter(env_var="VERUS_Z3_PATH")] = None,
+    prover_tools: Annotated[str, Parameter(env_var="PROVER_TOOLS")] = "prover-tools",
+    output: Path | None = None,
+) -> int:
+    """Run the wiring candidates on the installed Verus and compare the outcome.
+
+    Exits non-zero unless exactly the macro, attributes and single-root
+    candidates qualify, so a regression and an unexpected pass both fail. The
+    logs of any candidate that surprised are printed before they are discarded.
+
+    Parameters
+    ----------
+    verus_dir
+        Installed Verus release directory; defaults to the release
+        ``tools/verus/VERSION`` names under ``.verus``.
+    z3
+        The Z3 binary; read from ``VERUS_Z3_PATH``, which the shared install
+        action sets.
+    prover_tools
+        Command prefix that invokes the shared ``prover-tools`` helper.
+    output
+        Directory to keep the logs in; a temporary one when omitted.
+    """
+    if z3 is None:
+        raise SystemExit("set VERUS_Z3_PATH or pass --z3")
+    version = (ROOT / "tools/verus/VERSION").read_text().strip()
+    # The commands run from the fixture directory, so a relative path given
+    # from the invoking directory would resolve against the wrong one.
+    binaries = (verus_dir or ROOT / ".verus" / version / "verus").resolve()
+    with tempfile.TemporaryDirectory() as scratch:
+        logs = output or Path(scratch)
+        logs.mkdir(parents=True, exist_ok=True)
+        qualified = run_candidates(binaries, z3.resolve(), prover_tools, logs)
+        companion_ok = _companion_rejected_as_expected(logs)
+        matches = set(qualified) == EXPECTED_QUALIFIED and companion_ok
+        if not matches:
+            _show_unexpected_logs(logs, qualified)
+            if not companion_ok:
+                companion = (logs / "companion-capability.log").read_text()
+                print(f"--- companion-capability.log ---\n{companion}", flush=True)
+    print("Qualified wiring candidates: " + ", ".join(qualified))
+    return 0 if matches else 1
+
+
+if __name__ == "__main__":
+    sys.exit(app())
