@@ -7,6 +7,7 @@ commit contracts below are Combobulate's semantic baseline, recorded as `SC-01`
 to `SC-09` and `SC-11` in `spec/semantic-contracts.json`. Records D09, D10, and
 D14, and the numerical and array semantics subject assigned here by D07, in the
 [decision register](../decision-register.md).
+Amended on 2026-11-14, adding `SC-12`: see [Amendments](#amendments).
 
 ## Date
 
@@ -78,15 +79,57 @@ backend could substitute a cheaper but different aggregation.
 
 ## Consequences
 
-- `spec/examples.json` holds tagged-scalar examples (`EX21` to `EX88`) for
+- `spec/examples.json` holds tagged-scalar examples (`EX21` to `EX95`) for
   every rule, and each contract names seeded mutations (left association, floor
   division, an erroring empty sum, an identity used as a seed, implicit
   promotion, NaN-ignoring `min`, two-valued logic, exact-quotient `div`, cell
-  flattening, partial output, ignored `ddof`, and one-pass variance) that the
-  documentation model shows change an outcome.
+  flattening, partial output, ignored `ddof`, one-pass variance, and wrapping
+  addition) that the documentation model shows change an outcome.
 - Each contract carries a proof sketch for the Verus lemmas and Kani harnesses
   that its discharging obligation component must provide; task 1.2.3 replays
   the examples as `rstest` cases.
 - Native Polars aggregations that differ, such as NaN-ignoring minima or
   reassociated sums, are ineligible unless a later decision accepts a named
   numeric policy.
+
+## Amendments
+
+2026-11-14: `SC-12`, "Elementwise checked I64 addition and equal-shape
+agreement", is added, and `ShapeAgreement` joins the closed `error_codes` set in
+`spec/semantic-contracts.json`. This implements the amendment duty assigned
+here by D07 and named by the 1.2.2 ExecPlan as DL-4.
+
+Why a new record rather than an edit of `SC-04`: `SC-04` is the
+dtype-conversion contract, and it reaches `add` only through the mixed-operand
+`DtypeMismatch` rule. It says nothing about operand lengths, about which
+overflow position is reported, or about what a failed addition does to its
+destination. Those three facts are what the kernel in task 1.2.2 must satisfy,
+so they need a record a later task can cite and a proof obligation can
+discharge.
+
+What the record fixes, in the terms the rest of this document uses:
+
+- Preconditions: both operands are rank-one I64 vectors, and both are
+  materialized before the addition is applied.
+- Success relation: the pointwise sum of two equal-length vectors, with no
+  reassociation, operand reordering, or widening.
+- Error relation: `ShapeAgreement` when the lengths differ, which is a
+  preparation failure because it is decidable without evaluating anything; and
+  `IntegerOverflow` at the least overflowing position, which is an execution
+  failure.
+- Frame: neither operand is modified, and a failed addition publishes no output
+  at all, including where earlier positions summed successfully.
+- Termination: one pass to find the least overflowing position and one pass to
+  write the sums, both O(n).
+
+`ShapeAgreement` is reused rather than aliased. `spec/examples.json` already
+names it for broadcast failure (`EX08`), so the closed error-code set was
+missing a name the documentation model already used; registering it closes that
+gap rather than introducing new vocabulary.
+
+`spec/examples.json` gains `EX89` to `EX95`: a pointwise success, two empty
+vectors, both I64 boundaries, an overflow at a position above zero, an overflow
+where a later position also overflows, and two length failures. The
+`wrapping-add` seeded mutation changes the outcome of both overflow examples
+and neither of the others, which is what makes it a discriminating control
+rather than a change nobody could observe.
