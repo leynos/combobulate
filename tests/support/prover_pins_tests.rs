@@ -5,6 +5,7 @@ use rstest::rstest;
 use crate::pins::{
     PinError,
     PinSource,
+    is_calendar_date,
     kani_version,
     pinned_ref,
     pinned_repository,
@@ -208,5 +209,34 @@ fn diagnostics_name_the_file() {
     assert!(
         fails_with(kani_version(pin_source(FILE, "0.67\n")), FILE),
         "a diagnostic must name the file it read"
+    );
+}
+
+/// Counts the calendar days in one year, exercising every candidate date.
+fn days_in_year(year: u16) -> usize {
+    (1..=12)
+        .flat_map(|month| (1..=31).map(move |day| (month, day)))
+        .filter(|&(month, day)| is_calendar_date(year, month, day))
+        .count()
+}
+
+/// A 400-year Gregorian cycle has 146 097 days and 97 leap years.
+///
+/// The calendar repeat period is not derivable from a single month-length
+/// table, so checking the whole cycle catches a wrong month length or a
+/// misapplied century rule that individual cases could miss.
+#[test]
+fn calendar_cycle_matches_the_gregorian_constants() {
+    let days = (1600..2000).map(days_in_year).sum::<usize>();
+    assert_eq!(
+        days, 146_097,
+        "a 400-year Gregorian cycle must contain 146 097 days"
+    );
+    let leap_years = (1600..2000)
+        .filter(|&year| is_calendar_date(year, 2, 29))
+        .count();
+    assert_eq!(
+        leap_years, 97,
+        "a 400-year Gregorian cycle must contain 97 leap years"
     );
 }

@@ -110,7 +110,7 @@ fn sole_helper_requirement<'a>(
         let text = dependency
             .as_str()
             .ok_or_else(|| script.error("every embedded dependency must be a string"))?;
-        let requirement = Requirement(text);
+        let requirement = Requirement::parse(text);
         if requirement.is_helper() {
             if found.is_some() {
                 return Err(script.error("must list rust-prover-tools exactly once"));
@@ -126,6 +126,13 @@ fn sole_helper_requirement<'a>(
 struct Requirement<'a>(&'a str);
 
 impl<'a> Requirement<'a> {
+    /// Parses a requirement, discarding the padding PEP 508 permits around it.
+    ///
+    /// Without this, a requirement written as `" rust-prover-tools @ ..."`
+    /// yields an empty name, so a second helper requirement would go
+    /// unnoticed instead of being rejected as a duplicate.
+    fn parse(text: &'a str) -> Self { Self(text.trim()) }
+
     /// Returns the distribution name, before any version or URL marker.
     fn name(self) -> &'a str {
         self.0
@@ -173,7 +180,7 @@ fn parse_helper_requirement(
     let Some((name, location)) = text.split_once(" @ ") else {
         return Err(script.error("rust-prover-tools must use `@ git+<repository>@<revision>`"));
     };
-    if !Requirement(name).is_helper() {
+    if !Requirement::parse(name).is_helper() {
         return Err(script.error(format!(
             "expected the rust-prover-tools requirement, got {name:?}"
         )));

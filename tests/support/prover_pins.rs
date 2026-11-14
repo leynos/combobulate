@@ -234,7 +234,7 @@ fn decimal_field(field: &str, width: usize) -> Option<u16> {
 /// Checking the month and day ranges independently would accept dates such as
 /// 31 February, which no Verus release can carry. The leap-year rule is the
 /// Gregorian one so a century year is only a leap year when divisible by 400.
-fn is_calendar_date(year: u16, month: u16, day: u16) -> bool {
+pub(crate) fn is_calendar_date(year: u16, month: u16, day: u16) -> bool {
     let last_day = match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,

@@ -55,6 +55,25 @@ fn bare_comment_lines_and_normalized_names_are_accepted() {
     );
 }
 
+/// PEP 508 padding before the name must not hide the helper requirement.
+#[test]
+fn padded_helper_requirements_are_accepted() {
+    let revision = "a".repeat(40);
+    for padding in [" ", "\t", "  "] {
+        let source = script_with(&format!(
+            "\"{padding}rust-prover-tools @ git+https://example.test/tools.git@{revision}\""
+        ));
+        assert_eq!(
+            script_dependency(pin_source("script.py", &source)),
+            Ok(ScriptDependency {
+                repository: "https://example.test/tools.git".to_owned(),
+                revision: revision.clone(),
+            }),
+            "a helper padded with {padding:?} must still be read"
+        );
+    }
+}
+
 /// A malformed PEP 723 block names the rule it broke.
 #[test]
 fn script_blocks_are_rejected() {
@@ -114,6 +133,14 @@ fn helper_requirements_are_rejected() {
             "normalized duplicate",
             script_with(&format!(
                 "\"{helper}\",\n#   \"rust_prover_tools @ git+https://example.test/tools.git@{revision}\""
+            )),
+            "exactly once",
+        ),
+        (
+            "padded duplicate at another revision",
+            script_with(&format!(
+                "\"{helper}\",\n#   \" rust-prover-tools @ git+https://example.test/tools.git@{}\"",
+                "b".repeat(40)
             )),
             "exactly once",
         ),
