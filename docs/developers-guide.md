@@ -271,6 +271,20 @@ and are bounded by nextest when it runs them. The gate preparation itself is a
 Cargo command, but it is a Make recipe that runs before any test body, not
 something a test body starts.
 
+The one compiling test body is `tests/native_consumer_e2e.rs`, and it is a
+bounded exception rather than the incident's shape. It builds
+`tools/fixtures/native-consumer/`, a separate workspace whose only dependency
+is the facade by path with default features off, so nothing it compiles is the
+repository's own crate graph and no dev-dependency of this suite reaches it.
+That separation is the point: the test exists to prove the profile works for a
+consumer outside the workspace, which cannot be shown by anything already
+inside it. The nested Cargo runs with `--locked` and its target directory under
+`CARGO_TARGET_TMPDIR`, so it neither resolves a new lockfile nor writes into
+the repository, and a second build in the same run reuses the first's output.
+Nextest bounds it with the default tier; measured at four seconds warm on an
+idle host, and it is the fixture's own compile rather than a build of this
+repository.
+
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
 chains onto it and builds the gate's test binary with `--no-run`.

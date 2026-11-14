@@ -322,7 +322,38 @@ The thresholds are:
   (Clippy over both profiles, Whitaker, interrogate at 100%), `test`,
   `markdownlint`, `nixie`, `spelling` and `design-check` under Python 3.14
   (1272 passed, 2650 subtests).
-- [ ] EP-M5: the public consumer fixture, boundary and workflow wiring.
+- [x] (2026-11-14) EP-M5: the public consumer fixture, boundary and workflow
+  wiring. `tools/fixtures/native-consumer/src/bin/ordinary_application.rs` runs
+  the `Purpose` program over public names and prints its three lines; the
+  fixture's `main.rs`, `Cargo.toml`, `Cargo.lock` and Dependabot entry are
+  unchanged. `tests/native_consumer_e2e.rs` builds the fixture once and selects
+  both binaries from that build's JSON messages; the lookup lives in the new
+  `tests/support/native_consumer_build.rs`, whose `#[cfg(test)]` cases cover
+  both `bin` artefacts in either order and a stream with no such target, so the
+  test binary stays under 400 lines. Its output is compared with
+  `tests/snapshots/native_consumer_e2e__ordinary_application.snap`. VO-6 is
+  widened in `tests/support/workspace_source.rs`, which now walks the whole
+  kernel tree; the attribute reader moved to the new child module
+  `tests/support/workspace_attributes.rs` for the same length limit. The seeded
+  negative control is `tests/fixtures/kernel-source/`, a clean `lib.rs` beside
+  a submodule that breaks every per-file rule. `.github/workflows/formal.yml`
+  runs `make verus-kernel` after `make install-verus` and uploads its log;
+  `tests/formal_workflow_contract.rs` checks that order.
+  `docs/developers-guide.md` records the compiling test body as a bounded
+  exception. Red first: the e2e lookup and the widened scan failed against the
+  old single-binary JSON helper and the root-only walk. Green:
+  `native_consumer_e2e` passes with the snapshot matched,
+  `workspace_kernel_boundary`'s 43 cases pass, and `formal_workflow_contract`'s
+  3 cases pass. The seeded tree needed one fix: an `external_body` attribute
+  there failed `make design-check`, because
+  `scripts/docs_validation/trust_audit_check.py` audits every `.rs` under
+  `tests/` as shipped source. Every gate passes: `check-fmt`, `lint`, `test`
+  (573 and 579 cases in the two profiles), `markdownlint`, `nixie`, `spelling`
+  and `design-check` under Python 3.14 (1272 passed, 2650 subtests). A review
+  pass folded the weaker of the two lookup-error cases into
+  `tests/support/native_consumer_build.rs`, which is where the lookup lives, so
+  the per-profile counts fell by one. The hosted `build-test` time is recorded
+  under EP-M6, once the branch is published.
 - [ ] EP-M6: documentation, ADR-0011, the completion record and the roadmap
   tick.
 
@@ -527,6 +558,38 @@ The thresholds are:
   Impact: the FACADE-8 snapshots set `snapshot_path => "../snapshots"` and
   shorten the name, giving the plan's
   `tests/snapshots/ordinary_application__*.snap`.
+- Observation: every `.rs` file under `tests/` is audited as shipped source, so
+  a seeded negative control cannot carry trust vocabulary. The first
+  `tests/fixtures/kernel-source/elementwise_add.rs` included an
+  `#[verifier::external_body]` attribute to broaden its rule set, and
+  `make design-check` failed with `shipped crates must contain no trust items`,
+  naming that file at line 21 and the `external_body` it found. Evidence:
+  `scripts/docs_validation/trust_audit_check.py` treats
+  `COMPILED_DIRECTORIES = ('tests', 'benches', 'examples')` as shipped and
+  audits every file, fixtures included. Impact: the seeded fixture breaks only
+  the VO-6 rules, which are the ones the scan reads; seeded trust items belong
+  under `tools/verifier-fixtures/`, where that check expects them, and the
+  fixture's module doc states this so the next edit does not reintroduce it.
+- Observation: one nested `cargo build` names several executables, and a
+  `--message-format=json` consumer that takes the first `executable` it sees
+  gets whichever binary Cargo reported first. Evidence: the previous e2e helper
+  matched only `combobulate`-style `lib` artefacts or the first binary, and
+  adding `ordinary_application` made the profile assertion compare the
+  application's three lines against the one-line profile snapshot. Impact: the
+  lookup selects by `/target/name` and `/target/kind` in
+  `tests/support/native_consumer_build.rs`, and its unit cases feed both
+  artefacts in either order.
+- Observation: `clippy::case_sensitive_file_extension_comparisons` is denied,
+  so an extension test written as `name.ends_with(".rs")` fails the gate even
+  though the directory walk is the author's own. Evidence: `make lint` on the
+  first `sources_under` draft. Impact: `has_rust_extension` splits on the last
+  dot and compares with `eq_ignore_ascii_case`, which also handles a `Lib.RS`
+  file the way the walk needs.
+- Observation: Whitaker's `conditional_max_n_branches` counts the `&&` terms of
+  a single condition, not just `if`/`else` arms. A three-term guard on whether
+  an attribute substitutes a function body failed the gate; it became the named
+  predicate `substitutes_a_function`. Evidence: `make lint`'s Whitaker pass on
+  `tests/support/workspace_source.rs`.
 
 ## Decision log
 
