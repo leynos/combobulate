@@ -31,9 +31,14 @@ use metadata::Metadata;
 /// The live checks must describe the workspace, not the caller's shell. An
 /// inherited `CARGO_BUILD_TARGET` would silently resolve a different target
 /// than the one under test, and inherited flags would make the recorded graph
-/// depend on how the suite happened to be invoked.
+/// depend on how the suite happened to be invoked. `CARGO_NET_OFFLINE` is set
+/// explicitly so a cold cache reaches the recovery message instead of the
+/// network, and so the setting is visible to the command-introspection
+/// contract rather than inherited from whoever ran the suite.
 pub(super) fn configure_cargo(command: &mut Command) {
-    command.current_dir(env!("CARGO_MANIFEST_DIR"));
+    command
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env("CARGO_NET_OFFLINE", "true");
     for name in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
         command.env_remove(name);
     }
@@ -49,9 +54,13 @@ pub(super) fn cargo_command(arguments: &[&str]) -> Command {
 
 /// Builds the `cargo fetch` invocation that populates every target's packages.
 ///
-/// The suite no longer runs this; `make prepare-dependencies` does. The
-/// contract below still pins its shape, so the preparation step and the
-/// offline checks cannot drift apart.
+/// The suite never runs this and Make does not use it; `make
+/// prepare-dependencies` runs the recipe's own `cargo fetch --locked`. This
+/// helper therefore cannot keep the recipe and the offline reads in step, so
+/// the two can drift apart without failing here. It also sets
+/// `CARGO_NET_OFFLINE=true` through `configure_cargo`, which the recipe makes
+/// no claim to match. `parallel_all_runs_each_gate_in_order` in
+/// `tests/make_gate_order.rs` checks the real root fetch.
 ///
 /// `--target` takes a target triple, not `all`, so it must not appear here:
 /// a plain `cargo fetch --locked` already resolves the whole lockfile graph,
