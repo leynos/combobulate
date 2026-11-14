@@ -1,5 +1,8 @@
 //! Mutation tests for hosted workflow and manual Act route contracts.
 
+/// Coordinated action bumps must satisfy every workflow contract.
+#[path = "act_workflow_bump_tests.rs"]
+mod bumps;
 /// Direct regressions for the composed hosted CI route.
 #[path = "act_workflow_route_tests.rs"]
 mod ci_route;
@@ -293,96 +296,4 @@ fn ignores_inert_package_references() {
             "inert package text must not satisfy installation: {inert}"
         );
     }
-}
-
-/// Repoints an action that the committed source must contain.
-///
-/// The helper lives outside a `#[test]` body, where the repository's strict
-/// `expect_used` lint applies, so it panics with an explicit message instead.
-fn repointed(source: &str, path: &str, reference: &str) -> String {
-    let Some(changed) = super::super::action_ref::repoint_action(source, path, reference) else {
-        panic!("the committed workflow must contain {path}")
-    };
-    changed
-}
-
-/// Immutable action bumps retain contracts without lockstep expected-SHA changes.
-///
-/// CI and the manual Act route receive the same synthetic reference, so this is
-/// also the coordinated-bump case: agreement survives a bump that moves every
-/// identity-bearing route together.
-#[test]
-fn immutable_action_bumps_preserve_workflow_contract() {
-    let reference = "0".repeat(40);
-    let mut ci = CI_WORKFLOW.to_owned();
-    for (path, ..) in super::ACTIONS {
-        ci = repointed(&ci, path, &reference);
-    }
-    let mut manual = ACT_VALIDATION_WORKFLOW.to_owned();
-    for path in [
-        "actions/checkout",
-        "leynos/shared-actions/.github/actions/install-mdtablefix",
-        super::super::action_ref::SETUP_RUST_PATH,
-    ] {
-        manual = repointed(&manual, path, &reference);
-    }
-    assert!(
-        contracts_hold(&ci, &manual),
-        "a coordinated immutable bump must preserve the workflow contracts"
-    );
-}
-
-/// Setup-rust must agree across routes and remain a commit reference.
-///
-/// A one-sided bump or a floating manual reference changes behaviour, so the
-/// contract must reject it even though the new value is itself SHA-shaped.
-#[test]
-fn setup_rust_divergence_breaks_the_contract() {
-    let reference = "1".repeat(40);
-    let hosted = repointed(
-        CI_WORKFLOW,
-        super::super::action_ref::SETUP_RUST_PATH,
-        &reference,
-    );
-    let manual = repointed(
-        ACT_VALIDATION_WORKFLOW,
-        super::super::action_ref::SETUP_RUST_PATH,
-        &reference,
-    );
-    let floating = repointed(
-        ACT_VALIDATION_WORKFLOW,
-        super::super::action_ref::SETUP_RUST_PATH,
-        "main",
-    );
-    for (reason, ci, act) in [
-        (
-            "hosted setup-rust moved alone",
-            hosted.as_str(),
-            ACT_VALIDATION_WORKFLOW,
-        ),
-        (
-            "manual setup-rust moved alone",
-            CI_WORKFLOW,
-            manual.as_str(),
-        ),
-        (
-            "manual setup-rust is floating",
-            CI_WORKFLOW,
-            floating.as_str(),
-        ),
-    ] {
-        assert!(
-            !contracts_hold(ci, act),
-            "contract must reject a setup-rust divergence: {reason}"
-        );
-    }
-    assert_ne!(hosted, CI_WORKFLOW, "hosted mutation must change source");
-    assert_ne!(
-        manual, ACT_VALIDATION_WORKFLOW,
-        "manual mutation must change source"
-    );
-    assert_ne!(
-        floating, ACT_VALIDATION_WORKFLOW,
-        "manual floating mutation must change source"
-    );
 }

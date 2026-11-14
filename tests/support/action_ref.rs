@@ -35,13 +35,31 @@ pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Opt
     ))
 }
 
+/// Replaces every occurrence of the action's current source reference.
+///
+/// A coordinated bump must move all of an action's call sites: leaving one
+/// behind would make the fixture test an inconsistency rather than a bump.
+pub(crate) fn repoint_all_actions(source: &str, path: &str, replacement: &str) -> Option<String> {
+    let prefix = format!("{path}@");
+    let (_, suffix) = source.split_once(&prefix)?;
+    let current_ref = suffix.split_whitespace().next()?;
+    let needle = format!("{prefix}{current_ref}");
+    Some(source.replace(&needle, &format!("{prefix}{replacement}")))
+}
+
 #[cfg(test)]
 mod tests {
     //! Shape and bump regressions shared by all action-reference consumers.
 
     use rstest::rstest;
 
-    use super::{SETUP_RUST_PATH, is_sha_pinned, matches_pinned_action, repoint_action};
+    use super::{
+        SETUP_RUST_PATH,
+        is_sha_pinned,
+        matches_pinned_action,
+        repoint_action,
+        repoint_all_actions,
+    };
 
     /// The shared setup-rust path matches itself only when it stays pinned.
     #[test]
@@ -99,6 +117,30 @@ mod tests {
         assert_ne!(
             changed, source,
             "each current-pin fixture must actually change"
+        );
+    }
+
+    /// A coordinated bump must move every call site of the same action.
+    #[test]
+    fn every_call_site_is_repointed() {
+        let current = "a".repeat(40);
+        let source = format!(
+            "jobs:\n  one:\n    steps:\n      - uses: owner/action@{current}\n  two:\n    \
+             steps:\n      - uses: owner/action@{current}\n"
+        );
+        let replacement = "b".repeat(40);
+        let changed = repoint_all_actions(&source, "owner/action", &replacement)
+            .expect("the action fixture must exist");
+        assert!(
+            !changed.contains(&current),
+            "no call site may keep the previous reference: {changed}"
+        );
+        assert_eq!(
+            changed
+                .matches(&format!("owner/action@{replacement}"))
+                .count(),
+            2,
+            "every call site must take the new reference: {changed}"
         );
     }
 }

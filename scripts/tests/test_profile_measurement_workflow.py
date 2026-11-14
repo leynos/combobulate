@@ -162,13 +162,15 @@ class ToolPinTests(unittest.TestCase):
             self.assertIn(pin, script, f'the workflow must install {pin}')
 
     def test_whitaker_installer_pins_its_version_and_digest(self) -> None:
-        """The installer digest verifies the download, so its shape is asserted.
+        """The installer digest must agree with the action's own manifest.
 
         The digest's value is owned by the installer release, so restating it
-        would turn every deliberate repin into a test edit. Its presence and
-        64-character lowercase hexadecimal shape are what the workflow
-        requires; the installer itself checks the downloaded archive against
-        whichever value the workflow supplies.
+        would turn every deliberate repin into a test edit. The action gives
+        its manifest precedence and rejects a supplied digest that conflicts
+        with it; the manifest names the Linux x86-64 archive for the pinned
+        version. The workflow therefore keeps the version and digest aligned
+        rather than letting the digest select the archive, and only their
+        presence and shape are asserted here.
         """
         steps = _job('measure-profile')['steps']
         installer = next(

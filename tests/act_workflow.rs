@@ -16,12 +16,34 @@ mod model;
 /// Optional real Act compatibility test over derived fixture actions.
 #[path = "support/act_workflow_smoke.rs"]
 mod smoke;
+/// Repository-wide action pin shape and consistency contract.
+#[path = "support/workflow_action_pins.rs"]
+mod workflow_pins;
 use model::{Step, Workflow};
 
 /// Committed manual Act validation workflow.
 const ACT_VALIDATION_WORKFLOW: &str = include_str!("../.github/workflows/act-validation.yml");
 /// Committed hosted CI workflow.
 const CI_WORKFLOW: &str = include_str!("../.github/workflows/ci.yml");
+
+/// Reports repository-wide pin violations for the supplied workflow sources.
+///
+/// The rules live in `workflow_pins` so the dedicated pin suite and these
+/// bump fixtures apply exactly the same contract. Exceptions are left out
+/// because fixtures name their own workflows.
+fn pin_violations(sources: &[(&str, &str)]) -> Vec<String> {
+    let documents = sources
+        .iter()
+        .map(|(name, source)| {
+            let document = match workflow_pins::parse_workflow(name, source) {
+                Ok(document) => document,
+                Err(error) => panic!("{name} fixture must parse: {error}"),
+            };
+            ((*name).to_owned(), document)
+        })
+        .collect::<Vec<_>>();
+    workflow_pins::workflow_violations(&documents, &[])
+}
 
 /// Workflow YAML awaiting strict mapping validation and typed parsing.
 #[derive(Clone, Copy)]

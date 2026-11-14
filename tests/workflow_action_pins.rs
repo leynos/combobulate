@@ -7,12 +7,63 @@ mod action_ref;
 #[path = "support/workflow_action_pins.rs"]
 mod pins;
 
+use std::error::Error;
+
+use camino::Utf8Path;
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use serde_yaml::Value;
 
 /// A valid immutable reference used by fixtures.
 const SHA_ONE: &str = "1111111111111111111111111111111111111111";
 /// A second distinct immutable reference used by divergence fixtures.
 const SHA_TWO: &str = "2222222222222222222222222222222222222222";
+
+/// The only pin difference the repository accepts.
+///
+/// The scheduled audit does not pass the `rustflags` capability and does not
+/// reuse the pull-request build route, so it keeps its own setup revision
+/// rather than moving in lockstep with the shared one.
+const PIN_EXCEPTIONS: &[pins::PinException] = &[pins::PinException {
+    workflow: "audit.yml",
+    path: action_ref::SETUP_RUST_PATH,
+    reason: "the scheduled audit does not pass rustflags or reuse the build route",
+}];
+
+/// Reads every committed workflow, rejecting duplicate YAML mapping keys.
+///
+/// Discovered names are sorted so diagnostics and grouping are deterministic.
+fn read_workflows() -> Result<Vec<(String, Value)>, Box<dyn Error>> {
+    let root = Dir::open_ambient_dir(
+        Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
+        ambient_authority(),
+    )?;
+    let mut documents = Vec::new();
+    for listing in root
+        .read_dir(".github/workflows")
+        .map_err(|error| format!(".github/workflows: {error}"))?
+    {
+        let entry = listing.map_err(|error| format!(".github/workflows: {error}"))?;
+        let name = entry
+            .file_name()
+            .map_err(|error| format!(".github/workflows: {error}"))?;
+        if !is_workflow_name(&name) {
+            continue;
+        }
+        let source = root
+            .read_to_string(format!(".github/workflows/{name}"))
+            .map_err(|error| format!("{name}: cannot read workflow: {error}"))?;
+        documents.push((name.clone(), pins::parse_workflow(&name, &source)?));
+    }
+    documents.sort_by(|left, right| left.0.cmp(&right.0));
+    Ok(documents)
+}
+
+/// Accepts the committed YAML extensions regardless of their case.
+fn is_workflow_name(name: &str) -> bool {
+    Utf8Path::new(name).extension().is_some_and(|extension| {
+        extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
+    })
+}
 
 /// Builds a single-job workflow whose named steps consume the given actions.
 fn workflow(actions: &[(&str, &str)]) -> String {
@@ -40,11 +91,11 @@ fn documents(fixtures: &[(&str, String)]) -> Vec<(String, Value)> {
 /// The committed workflows must satisfy every pin rule and exception bound.
 #[test]
 fn committed_workflows_pin_every_action_to_one_revision() {
-    let documents = match pins::read_workflows() {
+    let documents = match read_workflows() {
         Ok(documents) => documents,
         Err(error) => panic!("committed workflows must be readable: {error}"),
     };
-    let violations = pins::workflow_violations(&documents, pins::PIN_EXCEPTIONS);
+    let violations = pins::workflow_violations(&documents, PIN_EXCEPTIONS);
     assert!(
         violations.is_empty(),
         "workflow action pin contract violations:\n{}",
@@ -261,7 +312,7 @@ fn workflow_names_accept_yaml_extensions_case_insensitively() {
         ("README.md", false),
     ] {
         assert_eq!(
-            pins::is_workflow_name(name),
+            is_workflow_name(name),
             expected,
             "workflow extension contract: {name}"
         );
