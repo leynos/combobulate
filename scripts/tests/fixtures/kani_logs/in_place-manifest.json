@@ -1,11 +1,11 @@
 {
   "revision": "0.1",
-  "corpus": "target/epm1-native-workspace/facade",
-  "description": "The harness the in-place probe generates from scripts/verifier_probe_support.py. It is not part of the kani-corpus crate, so it has its own manifest: the probe compiles the shipped kernel into a scratch workspace and verifies one harness there.",
+  "corpus": "tools/verifier-fixtures/kani-native-workspace/facade",
+  "description": "The harness in the native-workspace fixture. It is not part of the kani-corpus crate, so it has its own manifest: the fixture's facade consumes a dependency-free kernel body and verifies one harness over its target facts.",
   "sources": [
     {
-      "path": "scripts/verifier_probe_support.py",
-      "sha256": "df7849b558acb37b12b732a1af408c78e60bde9a2e4f751a92ed682cd4730d94"
+      "path": "tools/verifier-fixtures/kani-native-workspace/facade/src/lib.rs",
+      "sha256": "45e51868dbc2912e633e27704f25a188305b4326a166df2b54a5fea277292a86"
     }
   ],
   "harnesses": [

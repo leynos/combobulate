@@ -56,7 +56,7 @@ facade features select. The array algebra in the
 | `tools/kani/`                                   | Pinned Kani version used by the corpus routes.                                                 |
 | `tools/verus/`                                  | Pinned Verus release markers and archive checksums.                                            |
 | `tools/rust-prover-tools/`                      | Pinned `rust-prover-tools` revision that installs and runs both verifiers.                     |
-| `tools/verifier-fixtures/`                      | Non-member Kani corpus and Verus wiring fixtures with captured observations.                   |
+| `tools/verifier-fixtures/`                      | Non-member Kani corpus, Kani native-workspace and Verus wiring fixtures.                       |
 | `tools/probes/`                                 | Recorded toolchain and Polars capability observations, plus the Polars profile probe.          |
 | `tools/gates/`                                  | Standalone compile-fail gates; each is its own workspace with its own lockfile.                |
 | `tools/mold/`                                   | Pinned native linker version and archive digest.                                               |

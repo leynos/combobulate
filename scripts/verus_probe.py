@@ -295,6 +295,19 @@ def run_candidates(
     return _qualified_candidates(output, observations, FIXTURES)
 
 
+def _companion_rejected_as_expected(output: Path) -> bool:
+    """Report whether the companion crate failed for the reason it is a control.
+
+    Its wrapper calls into the production crate, which carries no Verus
+    specification, so Verus must say the callee "is not supported" and offer
+    ``assume_specification``. Any other failure (a toolchain error, a missing
+    solver) would also keep the companion from qualifying, and must not pass as
+    the expected rejection.
+    """
+    log = (output / "companion-capability.log").read_text()
+    return "is not supported" in log and "assume_specification" in log
+
+
 def _show_unexpected_logs(output: Path, qualified: list[str]) -> None:
     """Print the logs of every candidate whose outcome was not the expected one.
 
@@ -351,9 +364,13 @@ def probe(
         logs = output or Path(scratch)
         logs.mkdir(parents=True, exist_ok=True)
         qualified = run_candidates(binaries, z3.resolve(), prover_tools, logs)
-        matches = set(qualified) == EXPECTED_QUALIFIED
+        companion_ok = _companion_rejected_as_expected(logs)
+        matches = set(qualified) == EXPECTED_QUALIFIED and companion_ok
         if not matches:
             _show_unexpected_logs(logs, qualified)
+            if not companion_ok:
+                companion = (logs / "companion-capability.log").read_text()
+                print(f"--- companion-capability.log ---\n{companion}", flush=True)
     print("Qualified wiring candidates: " + ", ".join(qualified))
     return 0 if matches else 1
 

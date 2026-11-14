@@ -36,6 +36,7 @@ PROVER_TOOLS ?= uv tool run --from git+https://github.com/leynos/rust-prover-too
 KANI ?= cargo-kani
 KANI_FLAGS ?=
 KANI_PROBE_DIR := tools/calibration/cardinality-probe
+KANI_WORKSPACE_DIR := tools/verifier-fixtures/kani-native-workspace
 # The solver Verus is told to use. It matches the shared action's default
 # location, so a local `make install-verus` and a CI install agree.
 VERUS_Z3_DIR ?= $(CURDIR)/.verus/z3
@@ -54,8 +55,9 @@ install-verus: ## Install the checksum-verified Verus release and its Z3
 
 # These harnesses are the cardinality probe's, not the kernel's: the kernel's
 # own harnesses arrive with task 1.2.4 and join this target then.
-kani: ## Run the cardinality probe's Kani harnesses on an installed Kani
+kani: ## Run the cardinality probe's and native-workspace Kani harnesses on an installed Kani
 	cd $(KANI_PROBE_DIR) && $(KANI) kani $(KANI_FLAGS)
+	cd $(KANI_WORKSPACE_DIR)/facade && $(KANI) kani $(KANI_FLAGS)
 
 # Each run's decision, by the Kani log parser, must equal the one recorded for
 # it; most of these harnesses fail on purpose, so an exit status says little.

@@ -98,6 +98,35 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(command[-1], '--verify-function=capability')
 
 
+COMPANION_REJECTION = (
+    'error: `wiring_production::implementation::increment` is not supported\n'
+    '  = help: pub assume_specification [wiring_production::increment] (_0: u8) -> u8;\n'
+)
+
+
+class CompanionControlTests(unittest.TestCase):
+    """The companion must fail for the reason that makes it a control."""
+
+    def _log(self, text: str) -> bool:
+        """Return the verdict for a companion capability log with this text."""
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            (directory / 'companion-capability.log').write_text(text, encoding='utf-8')
+            return verus_probe._companion_rejected_as_expected(directory)
+
+    def test_the_missing_specification_diagnostic_is_accepted(self) -> None:
+        """Verus naming the unsupported callee is the expected rejection."""
+        self.assertTrue(self._log(COMPANION_REJECTION))
+
+    def test_an_unrelated_failure_is_not_the_expected_rejection(self) -> None:
+        """A toolchain or solver failure must not pass as the control."""
+        self.assertFalse(self._log('error: could not find the Z3 solver\n'))
+
+    def test_a_clean_run_is_not_a_rejection(self) -> None:
+        """A companion that verifies has stopped being a negative control."""
+        self.assertFalse(self._log('verification results:: 1 verified, 0 errors\n'))
+
+
 class EnvironmentTests(unittest.TestCase):
     """The child neither inherits a wrapper nor loses the solver."""
 
@@ -148,6 +177,7 @@ class OutcomeReportingTests(unittest.TestCase):
         def fake_run(binaries, z3_path, prover_tools, output):
             """Record the paths the probe would hand to the commands."""
             seen.update(binaries=binaries, z3=z3_path)
+            (output / 'companion-capability.log').write_text(COMPANION_REJECTION, encoding='utf-8')
             return sorted(verus_probe.EXPECTED_QUALIFIED)
 
         with tempfile.TemporaryDirectory() as name, mock.patch.object(

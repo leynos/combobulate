@@ -1290,6 +1290,7 @@ kernel's own harnesses arrive with task 1.2.4 and join `make kani` and
 | Proof                                                          | Target             | What it must show                                               |
 | -------------------------------------------------------------- | ------------------ | --------------------------------------------------------------- |
 | `tools/calibration/cardinality-probe` (2 Kani harnesses)       | `make kani`        | Both verify                                                     |
+| `tools/verifier-fixtures/kani-native-workspace` (1 harness)    | `make kani`        | The facade's target-facts harness verifies, cover satisfied     |
 | `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus` | Each run decides as `kani_logs/expected.json` records           |
 | `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`       | 8 functions verified, 0 errors                                  |
 | `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`       | Macro, attributes and single-root qualify; companion is refused |
