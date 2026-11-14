@@ -54,9 +54,13 @@ pub(super) fn cargo_command(arguments: &[&str]) -> Command {
 
 /// Builds the `cargo fetch` invocation that populates every target's packages.
 ///
-/// The suite no longer runs this; `make prepare-dependencies` does. The
-/// contract below still pins its shape, so the preparation step and the
-/// offline checks cannot drift apart.
+/// The suite never runs this and Make does not use it; `make
+/// prepare-dependencies` runs the recipe's own `cargo fetch --locked`. This
+/// helper therefore cannot keep the recipe and the offline reads in step, so
+/// the two can drift apart without failing here. It also sets
+/// `CARGO_NET_OFFLINE=true` through `configure_cargo`, which the recipe makes
+/// no claim to match. `parallel_all_runs_each_gate_in_order` in
+/// `tests/make_gate_order.rs` checks the real root fetch.
 ///
 /// `--target` takes a target triple, not `all`, so it must not appear here:
 /// a plain `cargo fetch --locked` already resolves the whole lockfile graph,
