@@ -1,8 +1,8 @@
 """Check the verifier-free workspace lifecycle and its staged-input binding.
 
-These cases exercise the staging helpers with real filesystem operations and
-no container, so a stale destination file, a refused removal, a planted
-symbolic link, or a mismatched staged tree is caught without podman.
+These cases exercise the staging helpers with real filesystem operations, so a
+stale file, a refused removal, a planted link, or a stale staged tree is
+caught without a container.
 """
 
 from __future__ import annotations
@@ -37,8 +37,7 @@ def _module() -> ModuleType:
 def _boundary() -> Iterator[Path]:
     """Yield a temporary staging boundary with a nested workspace path.
 
-    Unittest discovery never passes pytest fixtures, so this shared setup is a
-    context manager: the documented exception to the fixture rule.
+    Unittest discovery passes no fixtures, so this setup is a context manager.
 
     Examples
     --------
@@ -61,13 +60,14 @@ class _GuardCase:
     --------
     A linked workspace keeps both the link and its target::
 
-        _GuardCase('must not be a symbolic link', link, boundary, present=(marker, link))
+        _GuardCase('must not be a symbolic link', link, boundary, files=(marker,), links=(link,))
     """
 
     pattern: str
     path: Path
     boundary: Path
-    present: tuple[Path, ...] = ()
+    files: tuple[Path, ...] = ()
+    links: tuple[Path, ...] = ()
     absent: tuple[Path, ...] = ()
 
 
@@ -81,14 +81,14 @@ class WorkspaceGuardTests(unittest.TestCase):
         --------
         A refused link keeps both its target and itself::
 
-            self._assert_workspace_refused(
-                _GuardCase(PATTERN, link, boundary, present=(link,))
-            )
+            self._assert_workspace_refused(_GuardCase(PATTERN, link, boundary, links=(link,)))
         """
         with self.assertRaisesRegex(ValueError, case.pattern):
             _module()._recreate_workspace(case.path, case.boundary)
-        for survivor in case.present:
-            self.assertTrue(survivor.exists(), f'{survivor} must remain untouched')
+        for survivor in case.files:
+            self.assertTrue(survivor.is_file(), f'{survivor} must remain a file')
+        for link in case.links:
+            self.assertTrue(link.is_symlink(), f'{link} must remain a link')
         for missing in case.absent:
             self.assertFalse(missing.exists(), f'{missing} must not be created')
 
@@ -103,7 +103,7 @@ class WorkspaceGuardTests(unittest.TestCase):
             link.symlink_to(target, target_is_directory=True)
 
             self._assert_workspace_refused(
-                _GuardCase('must not be a symbolic link', link, boundary, present=(marker, link))
+                _GuardCase('must not be a symbolic link', link, boundary, files=(marker,), links=(link,))
             )
 
     def test_a_symlinked_boundary_is_refused_and_its_target_survives(self) -> None:
@@ -121,7 +121,8 @@ class WorkspaceGuardTests(unittest.TestCase):
                     r'staging boundary .* must not be a symbolic link',
                     boundary / 'workspace',
                     boundary,
-                    present=(marker, boundary),
+                    files=(marker,),
+                    links=(boundary,),
                 )
             )
 
@@ -140,7 +141,7 @@ class WorkspaceGuardTests(unittest.TestCase):
                     'must not be reached through symbolic links',
                     alias / 'workspace',
                     boundary,
-                    present=(marker,),
+                    files=(marker,),
                     absent=(real / 'workspace',),
                 )
             )
@@ -156,7 +157,7 @@ class WorkspaceGuardTests(unittest.TestCase):
                     'must be strictly inside',
                     boundary / '..',
                     boundary,
-                    present=(marker,),
+                    files=(marker,),
                 )
             )
 
@@ -179,7 +180,7 @@ class WorkspaceGuardTests(unittest.TestCase):
 
             self._assert_workspace_refused(
                 _GuardCase(
-                    'must be strictly inside', boundary, boundary, present=(marker,)
+                    'must be strictly inside', boundary, boundary, files=(marker,)
                 )
             )
 
@@ -194,7 +195,7 @@ class WorkspaceGuardTests(unittest.TestCase):
                     'must be a real directory',
                     workspace,
                     boundary,
-                    present=(workspace,),
+                    files=(workspace,),
                 )
             )
 
@@ -204,8 +205,6 @@ class SourceLinkTests(unittest.TestCase):
 
     def _relocated_module(self, boundary: Path) -> tuple[ModuleType, Path]:
         """Point the module at a temporary repository and return its fixture.
-
-        The pins are created as empty files; only their paths matter here.
 
         Examples
         --------
