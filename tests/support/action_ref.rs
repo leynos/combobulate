@@ -39,182 +39,156 @@ fn current_reference(suffix: &str) -> Option<&str> {
         .filter(|reference| !reference.is_empty())
 }
 
-/// Replaces the action's current source reference without coupling fixtures to its SHA.
-pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Option<String> {
-    let prefix = format!("{path}@");
-    let (_, suffix) = source.split_once(&prefix)?;
-    let current_ref = current_reference(suffix)?;
-    Some(source.replacen(
-        &format!("{prefix}{current_ref}"),
-        &format!("{prefix}{replacement}"),
-        1,
-    ))
+/// Returns the byte offset where a YAML comment starts, if the line has one.
+///
+/// A `#` opens a comment only at the start of a line or after whitespace, so a
+/// scalar fragment such as `path@ref#suffix` is not truncated.
+fn comment_start(line: &str) -> Option<usize> {
+    line.char_indices()
+        .find(|(index, character)| {
+            *character == '#'
+                && (*index == 0
+                    || line
+                        .get(..*index)
+                        .is_some_and(|prefix| prefix.ends_with(char::is_whitespace)))
+        })
+        .map(|(index, _)| index)
 }
 
-/// Replaces every occurrence of the action's current source reference.
+/// Returns the part of a line that YAML treats as code rather than prose.
+fn code_before_comment(line: &str) -> &str {
+    comment_start(line).map_or(line, |index| line.split_at(index).0)
+}
+
+/// Byte offsets of the scalar values that follow each `uses:` key on a line.
+///
+/// A flow sequence can hold more than one step, so every key on the line is
+/// visited rather than only the first.
+fn uses_value_starts(line: &str) -> Vec<usize> {
+    let key = "uses:";
+    let mut starts = Vec::new();
+    let mut search = 0;
+    while let Some(rest) = line.get(search..) {
+        let Some(found) = rest.find(key) else {
+            break;
+        };
+        let key_start = search + found;
+        let is_key = key_start == 0
+            || line.get(..key_start).is_some_and(|prefix| {
+                prefix.ends_with(|character: char| {
+                    character.is_whitespace() || matches!(character, '{' | ',')
+                })
+            });
+        if is_key {
+            starts.push(key_start + key.len());
+        }
+        search = key_start + key.len();
+    }
+    starts
+}
+
+/// Whether the scalar after `uses:` introduces a block value on the next line.
+fn is_block_indicator(value: &str) -> bool {
+    matches!(value.trim_start().chars().next(), Some('>' | '|'))
+}
+
+/// Resolves the scalar text that follows a `uses:` value position.
+///
+/// A block indicator (`>-`, `|`) places the scalar on the following line; any
+/// other form keeps it on the same line. The returned offset is absolute.
+fn uses_scalar<'a>(
+    lines: &[(usize, &'a str)],
+    index: usize,
+    value_start: usize,
+) -> Option<(usize, &'a str)> {
+    let (line_start, line) = *lines.get(index)?;
+    let value = code_before_comment(line).split_at(value_start).1;
+    if !is_block_indicator(value) {
+        let indent = value.len() - value.trim_start().len();
+        return Some((line_start + value_start + indent, value.split_at(indent).1));
+    }
+    let (next_start, next_line) = *lines.get(index + 1)?;
+    let next_code = code_before_comment(next_line);
+    let indent = next_code.len() - next_code.trim_start().len();
+    Some((next_start + indent, next_code.split_at(indent).1))
+}
+
+/// Byte ranges of action references that appear in job- or step-level `uses`.
+///
+/// Comments and every other key are excluded: prose that mentions an action, or
+/// a `with:` input that restates one, is not a call site to repoint. Block
+/// scalar `uses:` values are read from the following line.
+fn reference_spans(source: &str, prefix: &str) -> Vec<(usize, usize)> {
+    let lines = source
+        .split_inclusive('\n')
+        .scan(0usize, |offset, line| {
+            let start = *offset;
+            *offset += line.len();
+            Some((start, line))
+        })
+        .collect::<Vec<_>>();
+    let mut spans = Vec::new();
+    for (index, (_, line)) in lines.iter().enumerate() {
+        let code = code_before_comment(line);
+        for value_start in uses_value_starts(code) {
+            let Some((absolute, scalar)) = uses_scalar(&lines, index, value_start) else {
+                continue;
+            };
+            let Some(found) = scalar.find(prefix) else {
+                continue;
+            };
+            let start = absolute + found;
+            let Some(reference) = current_reference(source.split_at(start + prefix.len()).1) else {
+                continue;
+            };
+            spans.push((start, start + prefix.len() + reference.len()));
+        }
+    }
+    spans
+}
+
+/// Replaces the first, or every, `uses` reference to an action path.
+fn replace_references(
+    source: &str,
+    path: &str,
+    replacement: &str,
+    first_only: bool,
+) -> Option<String> {
+    let prefix = format!("{path}@");
+    let mut changed = String::with_capacity(source.len());
+    let mut cursor = 0;
+    let mut replaced = false;
+    for (start, end) in reference_spans(source, &prefix) {
+        changed.push_str(source.get(cursor..start).unwrap_or_default());
+        changed.push_str(&prefix);
+        changed.push_str(replacement);
+        cursor = end;
+        replaced = true;
+        if first_only {
+            break;
+        }
+    }
+    if !replaced {
+        return None;
+    }
+    changed.push_str(source.get(cursor..).unwrap_or_default());
+    Some(changed)
+}
+
+/// Replaces the first `uses` reference without coupling fixtures to its SHA.
+pub(crate) fn repoint_action(source: &str, path: &str, replacement: &str) -> Option<String> {
+    replace_references(source, path, replacement, true)
+}
+
+/// Replaces every `uses` reference to the action.
 ///
 /// A coordinated bump must move all of an action's call sites: leaving one
 /// behind would make the fixture test an inconsistency rather than a bump.
 pub(crate) fn repoint_all_actions(source: &str, path: &str, replacement: &str) -> Option<String> {
-    let prefix = format!("{path}@");
-    let (_, suffix) = source.split_once(&prefix)?;
-    let current_ref = current_reference(suffix)?;
-    let needle = format!("{prefix}{current_ref}");
-    Some(source.replace(&needle, &format!("{prefix}{replacement}")))
+    replace_references(source, path, replacement, false)
 }
 
+/// Shape and bump regressions shared by all action-reference consumers.
 #[cfg(test)]
-mod tests {
-    //! Shape and bump regressions shared by all action-reference consumers.
-
-    use rstest::rstest;
-    use serde_yaml::Value;
-
-    use super::{
-        SETUP_RUST_PATH,
-        is_sha_pinned,
-        matches_pinned_action,
-        repoint_action,
-        repoint_all_actions,
-    };
-
-    /// The shared setup-rust path matches itself only when it stays pinned.
-    #[test]
-    fn setup_rust_path_names_a_pinned_action() {
-        let pinned = format!("{SETUP_RUST_PATH}@{}", "a".repeat(40));
-        assert!(
-            matches_pinned_action(&pinned, SETUP_RUST_PATH),
-            "the shared setup-rust reference must match its own path"
-        );
-        assert!(
-            !matches_pinned_action(&format!("{SETUP_RUST_PATH}@main"), SETUP_RUST_PATH),
-            "a floating setup-rust reference must not match"
-        );
-    }
-
-    /// Only immutable lowercase hexadecimal references satisfy the pin policy.
-    #[rstest]
-    #[case("0".repeat(40), true)]
-    #[case("a".repeat(40), true)]
-    #[case("main".to_owned(), false)]
-    #[case("a".repeat(39), false)]
-    #[case("a".repeat(41), false)]
-    #[case("A".repeat(40), false)]
-    #[case("g".repeat(40), false)]
-    fn action_pin_requires_full_lowercase_sha(#[case] reference: String, #[case] expected: bool) {
-        let uses = format!("owner/action@{reference}");
-        assert_eq!(
-            is_sha_pinned(&uses),
-            expected,
-            "reference shape contract: {reference}"
-        );
-        assert_eq!(
-            matches_pinned_action(&uses, "owner/action"),
-            expected,
-            "path and reference contract"
-        );
-        assert!(
-            !matches_pinned_action(&uses, "other/action"),
-            "different actions must fail independently of pin shape"
-        );
-    }
-
-    /// Mutation fixtures keep changing source after an immutable-reference bump.
-    #[rstest]
-    #[case("0".repeat(40))]
-    #[case("a".repeat(40))]
-    fn action_mutation_is_independent_of_current_pin(#[case] reference: String) {
-        let source = format!("uses: owner/action@{reference}\n");
-        let changed =
-            repoint_action(&source, "owner/action", "main").expect("the action fixture must exist");
-        assert_eq!(
-            changed, "uses: owner/action@main\n",
-            "mutation must replace the current pin"
-        );
-        assert_ne!(
-            changed, source,
-            "each current-pin fixture must actually change"
-        );
-    }
-
-    /// A coordinated bump must move every call site of the same action.
-    ///
-    /// The quoted cases place the quoted value first, which is where an
-    /// over-greedy reference extraction would silently leave later unquoted
-    /// sites behind and consume the closing quote.
-    #[rstest]
-    #[case("", "")]
-    #[case("\"", "\"")]
-    #[case("'", "'")]
-    fn every_call_site_is_repointed(#[case] open: &str, #[case] close: &str) {
-        let current = "a".repeat(40);
-        let source = format!(
-            "jobs:\n  one:\n    steps:\n      - uses: {open}owner/action@{current}{close}\n  \
-             two:\n    steps:\n      - uses: owner/action@{current}\n"
-        );
-        let replacement = "b".repeat(40);
-        let changed = repoint_all_actions(&source, "owner/action", &replacement)
-            .expect("the action fixture must exist");
-        assert!(
-            !changed.contains(&current),
-            "no call site may keep the previous reference: {changed}"
-        );
-        assert_eq!(
-            changed
-                .matches(&format!("owner/action@{replacement}"))
-                .count(),
-            2,
-            "every call site must take the new reference: {changed}"
-        );
-        assert!(
-            changed.contains(&format!("{open}owner/action@{replacement}{close}")),
-            "the bump must preserve call-site quoting: {changed}"
-        );
-    }
-
-    /// Flow mappings end a value at `}` or `,` with no intervening space.
-    ///
-    /// Treating either delimiter as part of the reference consumes it and
-    /// leaves invalid YAML, so the bumped document must still parse.
-    #[test]
-    fn flow_mapping_call_sites_keep_their_delimiters() {
-        let current = "a".repeat(40);
-        let replacement = "b".repeat(40);
-        let source = format!(
-            "jobs:\n  one:\n    steps:\n      - {{uses: owner/action@{current}}}\n  two:\n    \
-             steps:\n      - {{uses: owner/action@{current}, name: two}}\n"
-        );
-        let changed = repoint_all_actions(&source, "owner/action", &replacement)
-            .expect("the action fixture must exist");
-        assert!(
-            !changed.contains(&current),
-            "no call site may keep the previous reference: {changed}"
-        );
-        let document: Value =
-            serde_yaml::from_str(&changed).expect("a bumped flow mapping must remain valid YAML");
-        for job in ["one", "two"] {
-            let uses = document
-                .get("jobs")
-                .and_then(|jobs| jobs.get(job))
-                .and_then(|entry| entry.get("steps"))
-                .and_then(Value::as_sequence)
-                .and_then(|steps| steps.first())
-                .and_then(|step| step.get("uses"))
-                .and_then(Value::as_str)
-                .expect("each flow-mapping step must keep its action reference");
-            assert_eq!(
-                uses,
-                format!("owner/action@{replacement}"),
-                "the bumped reference must stay intact in job {job}"
-            );
-        }
-        assert!(
-            changed.contains(&format!("owner/action@{replacement}}}")),
-            "the closing brace must survive the bump: {changed}"
-        );
-        assert!(
-            changed.contains(&format!("owner/action@{replacement},")),
-            "the flow separator must survive the bump: {changed}"
-        );
-    }
-}
+#[path = "action_ref_tests.rs"]
+mod tests;

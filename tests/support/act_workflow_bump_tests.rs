@@ -23,11 +23,11 @@ fn repointed_all(source: &str, path: &str, reference: &str) -> String {
     changed
 }
 
-/// Every action path a workflow references at job or step level.
+/// Every `uses` value a workflow declares at job or step level.
 ///
-/// A coordinated bump must move each path once, not once per fixture list, so
-/// the paths come from the workflow itself.
-fn action_paths(source: &str) -> BTreeSet<String> {
+/// Reading the parsed values rather than the source text is what lets a bump
+/// fixture prove it moved the call sites, not merely that some text changed.
+fn uses_values(source: &str) -> Vec<String> {
     let document = match serde_yaml::from_str::<Value>(source) {
         Ok(document) => document,
         Err(error) => panic!("the workflow fixture must parse: {error}"),
@@ -35,10 +35,10 @@ fn action_paths(source: &str) -> BTreeSet<String> {
     let Some(jobs) = document.get("jobs").and_then(Value::as_mapping) else {
         panic!("the workflow fixture must declare jobs");
     };
-    let mut paths = BTreeSet::new();
+    let mut values = Vec::new();
     for job in jobs.values() {
         if let Some(uses) = job.get("uses").and_then(Value::as_str) {
-            paths.insert(action_ref::action_path(uses).to_owned());
+            values.push(uses.to_owned());
         }
         for step in job
             .get("steps")
@@ -47,11 +47,22 @@ fn action_paths(source: &str) -> BTreeSet<String> {
             .flatten()
         {
             if let Some(uses) = step.get("uses").and_then(Value::as_str) {
-                paths.insert(action_ref::action_path(uses).to_owned());
+                values.push(uses.to_owned());
             }
         }
     }
-    paths
+    values
+}
+
+/// Every action path a workflow references at job or step level.
+///
+/// A coordinated bump must move each path once, not once per fixture list, so
+/// the paths come from the workflow itself.
+fn action_paths(source: &str) -> BTreeSet<String> {
+    uses_values(source)
+        .iter()
+        .map(|uses| action_ref::action_path(uses).to_owned())
+        .collect()
 }
 
 /// Moves every action reference in one workflow to a shared reference.
@@ -79,6 +90,20 @@ fn immutable_action_bumps_preserve_workflow_contract() {
         manual, ACT_VALIDATION_WORKFLOW,
         "the Act bump must change the source"
     );
+    for (name, source) in [
+        ("ci.yml", ci.as_str()),
+        ("act-validation.yml", manual.as_str()),
+    ] {
+        for uses in uses_values(source)
+            .into_iter()
+            .filter(|uses| !uses.starts_with("./"))
+        {
+            assert!(
+                uses.ends_with(&format!("@{reference}")),
+                "{name} must take the bumped reference at every call site: {uses}"
+            );
+        }
+    }
     assert!(
         contracts_hold(&ci, &manual),
         "a coordinated immutable bump must preserve the workflow contracts"
