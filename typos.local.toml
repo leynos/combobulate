@@ -52,9 +52,8 @@ ignore = [
 ]
 
 [files]
-# Verifier output is evidence: changing its spelling would invalidate digests.
+# Verifier output is captured verbatim: changing its spelling would falsify it.
 exclude = [
   "scripts/tests/fixtures/kani_logs/*.log",
-  "tools/verifier-fixtures/verus-wiring-probe/observations/*.log",
   "tools/probes/observations/*.log",
 ]

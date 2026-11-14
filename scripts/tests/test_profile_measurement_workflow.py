@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/profile-measurements.yml'
 
 ROUTES = ('rustdoc', 'clippy', 'whitaker', 'nextest', 'coverage', 'ui')
-MEASUREMENT_JOBS = ('measure-profile', 'build-budget', 'verifier-free')
+MEASUREMENT_JOBS = ('measure-profile', 'build-budget')
 LABEL_GATE = "github.event.label.name == 'measure-profiles'"
 DISPATCH_GATE = "github.event_name == 'workflow_dispatch'"
 
@@ -406,7 +406,8 @@ class BuildBudgetTests(unittest.TestCase):
         self.assertLess(assertion, cold, 'the assertion must precede the first timed build')
         self.assertLess(cold - assertion, 2,
                         'only the fetch may sit between the assertion and the timed builds')
-        for installed in ('Install the pinned build standard', 'Install the pinned Kani release'):
+        for installed in ('Install the pinned build standard',
+                          'Install the pinned Kani and Verus releases'):
             self.assertLess(names.index(installed), assertion,
                             f'setup step {installed!r} must run before the assertion observes it')
 
@@ -469,12 +470,16 @@ class BuildBudgetTests(unittest.TestCase):
 
     def test_the_verus_release_is_installed_before_it_is_reported(self) -> None:
         """A version report is worthless unless the release was installed first."""
-        install = _step_run_matching(_job('build-budget'), 'install-verus')
+        steps = _job('build-budget')['steps']
+        names = [step.get('name', '') for step in steps]
+        install = steps[names.index('Install the pinned Kani and Verus releases')]
         report = _step_run_matching(_job('build-budget'), 'build-budget/verus')
 
-        self.assertIn('make install-verus', install,
+        self.assertIn('install-prover-tools@', install['uses'],
+                      'the job must install through the shared prover action')
+        self.assertIn('verus', install['with']['tools'].split(),
                       'the job must install the pinned Verus release')
-        self.assertNotIn('install-verus', report,
+        self.assertNotIn('make install', report,
                          'the report step must observe, not install')
 
     def test_the_verus_release_gets_the_toolchain_it_was_built_against(self) -> None:
@@ -492,39 +497,20 @@ class BuildBudgetTests(unittest.TestCase):
         self.assertIn('rustup toolchain install "$verus_toolchain"', script,
                       'the release toolchain must be installed before it is run')
 
-    def test_the_solver_is_taken_from_the_pinned_distribution(self) -> None:
-        """`PATH` may hold any z3; the record must name the pinned one.
+    def test_the_solver_is_the_one_the_install_action_reports(self) -> None:
+        """`PATH` may hold any z3; the record must name the installed one.
 
-        The Verus archive omits Z3, so the probes resolve it from the
-        `z3-solver` distribution. Reporting a `z3` found on `PATH` would record
-        a binary the proof route never uses.
+        The Verus archive omits Z3, so the shared action installs it and reports
+        its path. Reporting a `z3` found on `PATH` would record a binary the
+        proof route never uses.
         """
-        script = _step_run_matching(_job('build-budget'), 'build-budget/z3')
+        job = _job('build-budget')
+        step = next(step for step in job['steps'] if 'build-budget/z3' in step.get('run', ''))
 
-        self.assertIn('Z3_DISTRIBUTION', script,
-                      'the solver pin must come from the repository record')
-        self.assertIn('uv tool run --from "$z3_distribution"', script,
-                      'the solver must be resolved through its pinned distribution')
-
-
-class VerifierFreeJobTests(unittest.TestCase):
-    """Keep the hosted verifier-free run free of the admission wrapper."""
-
-    def test_the_job_refuses_a_host_compiler_wrapper(self) -> None:
-        """A wrapper on the runner would compile outside the container namespace."""
-        script = _step_run_matching(_job('verifier-free'), 'RUSTC_WRAPPER')
-
-        self.assertIn('test -z "${RUSTC_WRAPPER-}"', script, 'the job must reject an inherited wrapper')
-
-    def test_the_job_runs_the_recorded_probe_command(self) -> None:
-        """The hosted route must be the same command documented for local use."""
-        script = _step_run_matching(_job('verifier-free'), 'run_verifier_probes.py')
-
-        self.assertIn(
-            'uv run --script scripts/run_verifier_probes.py verifier-free',
-            script,
-            'the job must run the committed probe command',
-        )
+        self.assertEqual(step['env']['Z3_PATH'], '${{ steps.prover.outputs.z3-path }}',
+                         'the solver path must come from the install action')
+        self.assertIn('"$Z3_PATH" --version > build-budget/z3', step['run'],
+                      'the recorded version must come from that binary')
 
 
 if __name__ == '__main__':

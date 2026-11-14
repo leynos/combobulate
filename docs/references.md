@@ -289,11 +289,12 @@ brittle coupling; the public SDK must avoid requiring them.
 [Kani releases](https://github.com/model-checking/kani/releases).
 
 The pinned release is Kani 0.67.0, recorded in `tools/kani/VERSION` and
-installed by `make install-kani` through the commit-pinned `rust-prover-tools`
-helper. The release bundles its own Rust nightly, so the ordinary build
-toolchain is never substituted for the one a harness compiles under. The bundle
-download is not verified against a digest by this repository, and the profile
-record's `trusted_computing_base` says so rather than implying an audited input.
+installed by `make install-kani` (and, in CI, the shared `install-prover-tools`
+action) through the pinned `rust-prover-tools` helper. The release bundles its
+own Rust nightly, so the ordinary build toolchain is never substituted for the
+one a harness compiles under. The bundle download is not verified against a
+digest by this repository, and the profile record's `trusted_computing_base`
+says so rather than implying an audited input.
 
 ### E-VERUS-RELEASE
 
@@ -302,8 +303,8 @@ record's `trusted_computing_base` says so rather than implying an audited input.
 The pinned release is Verus 0.2026.09.06.8dea4a2 on Rust 1.98.0, recorded in
 `tools/verus/VERSION` with its archive digest in `tools/verus/SHA256SUMS`.
 `make install-verus` verifies that digest before unpacking, and the release
-archive omits Z3, which the probes obtain from the pinned `z3-solver==4.16.0.0`
-distribution.
+archive omits Z3, which the same installer provides (Z3 4.16.0) and
+`VERUS_Z3_PATH` names.
 
 ### E-VERUS-FEATURES
 

@@ -31,7 +31,7 @@ facade features select. The array algebra in the
 | `.github/workflows/coverage-main.yml`           | Main-branch coverage publication and ratchet baseline.                                         |
 | `.github/workflows/act-validation.yml`          | Manually dispatched full Act compatibility check.                                              |
 | `.github/workflows/profile-measurements.yml`    | Hosted profile and build-budget measurements that feed the acceptance controls.                |
-| `.github/workflows/formal.yml`                  | Weekly verifier-route check; never gates a merge.                                              |
+| `.github/workflows/formal.yml`                  | Kani and Verus proofs, on pull requests that touch them and weekly.                            |
 | `.github/workflows/audit.yml`                   | Scheduled dependency audit.                                                                    |
 | `.github/workflows/mutation-testing.yml`        | Scheduled shared Rust mutation workflow.                                                       |
 | `.github/dependabot.yml`                        | Cargo and GitHub Actions dependency updates.                                                   |
