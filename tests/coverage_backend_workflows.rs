@@ -1,5 +1,12 @@
 //! Contracts for the hosted coverage backend and Act's development defaults.
 
+/// Shared action-path and immutable-reference checks.
+#[path = "support/action_ref.rs"]
+mod action_ref;
+/// Three-way setup-rust agreement across the hosted, coverage, and Act routes.
+#[path = "support/coverage_setup_rust.rs"]
+mod setup_rust;
+
 use serde_yaml::Value;
 
 const CI: &str = include_str!("../.github/workflows/ci.yml");
@@ -201,23 +208,56 @@ fn hosted_coverage_rejects_inherited_dev_flags() {
 
 #[test]
 fn act_setup_preserves_cranelift_defaults() {
-    let document = parse_workflow(ACT).expect("parse Act workflow with unique keys");
-    let steps = path(&document, &["jobs", "act-validation", "steps"])
-        .and_then(Value::as_sequence)
-        .expect("read Act job steps");
-    let setup = steps
-        .iter()
-        .find(|step| string(step, &["name"]) == Some("Setup Rust"))
-        .expect("find Act's Rust setup");
-    assert!(
-        string(setup, &["uses"])
-            .is_some_and(|action| action.ends_with("@47b337e4f230b591891656534d4ffad868131740")),
-        "Act must use the setup action that supports rustflags passthrough"
-    );
     assert_eq!(
-        string(setup, &["with", "rustflags"]),
-        Some(""),
-        "Act Rust setup must leave Cargo's defaults active"
+        setup_rust::holds(CI, MAIN, ACT),
+        Ok(()),
+        "the committed setup-rust routes must satisfy the three-way contract"
+    );
+}
+
+/// A one-sided or floating setup-rust change must fail the three-way contract.
+#[test]
+fn setup_rust_mutations_break_the_three_way_contract() {
+    let reference = "1".repeat(40);
+    let hosted = setup_rust::repoint(CI, &reference);
+    let coverage = setup_rust::repoint(MAIN, &reference);
+    let manual = setup_rust::repoint(ACT, &reference);
+    let floating = setup_rust::repoint(ACT, "main");
+    let overridden = ACT.replace("rustflags: ''", "rustflags: '-C target-cpu=native'");
+    assert_eq!(
+        setup_rust::holds(&hosted, &coverage, &manual),
+        Ok(()),
+        "a coordinated setup-rust bump must preserve the contract"
+    );
+    for (reason, changed_ci, changed_main, changed_act) in [
+        ("hosted setup-rust moved alone", hosted.as_str(), MAIN, ACT),
+        (
+            "coverage setup-rust moved alone",
+            CI,
+            coverage.as_str(),
+            ACT,
+        ),
+        ("manual setup-rust moved alone", CI, MAIN, manual.as_str()),
+        ("manual setup-rust is floating", CI, MAIN, floating.as_str()),
+        (
+            "manual rustflags input overridden",
+            CI,
+            MAIN,
+            overridden.as_str(),
+        ),
+    ] {
+        assert!(
+            setup_rust::holds(changed_ci, changed_main, changed_act).is_err(),
+            "contract must detect {reason}"
+        );
+    }
+    assert_ne!(hosted, CI, "hosted mutation must change source");
+    assert_ne!(coverage, MAIN, "coverage mutation must change source");
+    assert_ne!(manual, ACT, "manual mutation must change source");
+    assert_ne!(floating, ACT, "floating mutation must change source");
+    assert_ne!(
+        overridden, ACT,
+        "rustflags mutation must change the manual workflow"
     );
 }
 

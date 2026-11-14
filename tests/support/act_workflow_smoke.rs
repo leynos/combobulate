@@ -18,6 +18,7 @@ use super::{
     ACT_VALIDATION_WORKFLOW,
     CI_WORKFLOW,
     WorkflowSource,
+    action_ref,
     contract,
     validate_mapping_keys,
 };
@@ -96,7 +97,7 @@ impl ActSmoke {
                 continue;
             };
             let (expected, _, inputs) = contracts.get(action_index).ok_or("unmapped action")?;
-            if !contract::matches_action_revision(uses, expected) {
+            if !action_ref::matches_pinned_action(uses, expected) {
                 return Err(format!("unmapped action: {uses}").into());
             }
             let action_path = format!(".github/actions/fixture-{action_index}");

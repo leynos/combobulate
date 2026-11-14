@@ -1,5 +1,8 @@
 //! Mutation tests for hosted workflow and manual Act route contracts.
 
+/// Coordinated action bumps must satisfy every workflow contract.
+#[path = "act_workflow_bump_tests.rs"]
+mod bumps;
 /// Direct regressions for the composed hosted CI route.
 #[path = "act_workflow_route_tests.rs"]
 mod ci_route;
@@ -293,30 +296,4 @@ fn ignores_inert_package_references() {
             "inert package text must not satisfy installation: {inert}"
         );
     }
-}
-
-/// Immutable action bumps retain contracts without lockstep expected-SHA changes.
-#[test]
-fn immutable_action_bumps_preserve_workflow_contract() {
-    let reference = "0".repeat(40);
-    let mut ci = CI_WORKFLOW.to_owned();
-    for (path, ..) in super::ACTIONS {
-        if !path.contains('@') {
-            ci = super::super::action_ref::repoint_action(&ci, path, &reference)
-                .expect("every contracted action must exist in CI");
-        }
-    }
-    let mut manual = ACT_VALIDATION_WORKFLOW.to_owned();
-    for path in [
-        "actions/checkout",
-        "leynos/shared-actions/.github/actions/install-mdtablefix",
-    ] {
-        manual = super::super::action_ref::repoint_action(&manual, path, &reference)
-            .expect("every manual provisioning action must exist");
-    }
-    assert!(
-        contracts_hold(&ci, &manual),
-        "new immutable refs must preserve workflow contracts and the setup-rust capability \
-         exception"
-    );
 }

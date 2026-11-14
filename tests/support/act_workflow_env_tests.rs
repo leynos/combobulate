@@ -175,8 +175,9 @@ fn whole_workflow_cache_mutations_break_the_contract() {
 /// Act's manual route is contracted separately from the hosted job environment.
 ///
 /// The manual workflow may not acquire a pull-request trigger, which would make
-/// it repeat the full hosted validation, and its action revision may not drift
-/// off the pin the hosted route records. Neither is a `build-test` environment
+/// it repeat the full hosted validation, its action revision may not drift off
+/// the pin the hosted route records, and its Rust setup may not override the
+/// rustflags Cargo already supplies. None is a `build-test` environment
 /// concern, so the cases live here rather than growing the loop above.
 fn act_route_mutations_break_the_contract() {
     let enabled_pr_act = ACT_VALIDATION_WORKFLOW.replace(
@@ -191,8 +192,13 @@ fn act_route_mutations_break_the_contract() {
         !contracts_hold(CI_WORKFLOW, &enabled_pr_act),
         "Act must not repeat full validation on pull requests"
     );
-    let wrong_manual_pin =
-        ACT_VALIDATION_WORKFLOW.replace("47b337e4f230b591891656534d4ffad868131740", "main");
+    let Some(wrong_manual_pin) = super::super::action_ref::repoint_action(
+        ACT_VALIDATION_WORKFLOW,
+        super::super::action_ref::SETUP_RUST_PATH,
+        "main",
+    ) else {
+        panic!("the manual workflow must contain the setup-rust action")
+    };
     assert_ne!(
         wrong_manual_pin, ACT_VALIDATION_WORKFLOW,
         "manual pin mutation must change source"
@@ -200,5 +206,15 @@ fn act_route_mutations_break_the_contract() {
     assert!(
         !contracts_hold(CI_WORKFLOW, &wrong_manual_pin),
         "manual Act's action revision must stay pinned"
+    );
+    let overridden_rustflags =
+        ACT_VALIDATION_WORKFLOW.replace("rustflags: ''", "rustflags: '-C target-cpu=native'");
+    assert_ne!(
+        overridden_rustflags, ACT_VALIDATION_WORKFLOW,
+        "rustflags mutation must change source"
+    );
+    assert!(
+        !contracts_hold(CI_WORKFLOW, &overridden_rustflags),
+        "manual Act's Rust setup must preserve Cargo's default rustflags"
     );
 }
