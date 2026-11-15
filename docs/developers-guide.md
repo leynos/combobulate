@@ -701,7 +701,7 @@ The action checks its own installer archive and Clippy snapshot digests against
 the manifests committed at the same pinned commit; the probe does not
 authenticate those digests.
 
-Installer 0.2.11 builds the Dylint driver from a verified Clippy snapshot
+Installer 0.2.12 builds the Dylint driver from a verified Clippy snapshot
 instead of cloning Clippy's `master` branch, which upstream Dylint 6.0.1 still
 expects and which no longer exists. The action resolves the snapshot named in
 `clippy-snapshots.tsv`, checks its archive against `snapshot-digests.sha256`,
@@ -758,11 +758,11 @@ recompilation so a warm local cache cannot shorten a cold measurement.
 Tool identities are pinned in the workflow rather than resolved from a moving
 release:
 
-| Tool     | Pin                                           |
-| -------- | --------------------------------------------- |
-| nextest  | `cargo-nextest@0.9.150`                       |
-| coverage | `cargo-llvm-cov@0.9.1`                        |
-| Whitaker | installer `0.2.11`, sha256 `a32a665d…5410236` |
+| Tool     | Pin                                            |
+| -------- | ---------------------------------------------- |
+| nextest  | `cargo-nextest@0.9.150`                        |
+| coverage | `cargo-llvm-cov@0.9.1`                         |
+| Whitaker | installer `0.2.12`, sha256 `62f12e79…07465e1f` |
 
 Those are the versions behind the accepted measurement runs 41163302274 and
 41227443972. A tool release between runs would move the timings the controls
