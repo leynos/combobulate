@@ -16,7 +16,6 @@ recorded evidence::
 
 from __future__ import annotations
 
-import re
 import unittest
 from pathlib import Path
 from typing import cast
@@ -178,16 +177,9 @@ class ToolPinTests(unittest.TestCase):
         )
         inputs = installer['with']
 
-        self.assertEqual(inputs['installer-version'], '0.2.11', 'the installer version must stay pinned')
-        digest = inputs.get('installer-sha256')
-        self.assertIsNotNone(
-            digest,
-            'a pinned installer version must also name its archive digest',
-        )
-        self.assertIsNotNone(
-            re.fullmatch(r'[0-9a-f]{64}', digest),
-            f'the installer digest must be 64 lowercase hex characters, got {digest!r}',
-        )
+        self.assertNotIn('installer-version', inputs, 'the action pin owns the installer version')
+        self.assertNotIn('installer-sha256', inputs, 'the action pin owns the installer digest')
+        self.assertRegex(installer['uses'], r'@[0-9a-f]{40}$', 'the action must be pinned by SHA')
 
 
 class ColdRunTests(unittest.TestCase):
