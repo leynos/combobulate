@@ -44,10 +44,14 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # far from tripping on contention, and the hosted lanes are still ended first
 # by their own 8-minute `timeout-minutes`.
 #
-# The bound earns its place on `coverage-main.yml`, which declares no
-# `timeout-minutes`, so GitHub's 360-minute default would otherwise apply
-# there, and on a local `cargo nextest` run. It does not cover steps that run
-# before nextest, such as `make prepare-ui-gate`.
+# The bound is an outer limit for nextest itself, chiefly on a local
+# `cargo nextest` run. It is not what ends a hung coverage lane: the pinned
+# `generate-coverage` action runs Cargo under its own 1,800-second watchdog
+# (`INPUT_CARGO_WAIT_TIMEOUT`), which `coverage-main.yml` does not override, so
+# that watchdog stops Cargo before nextest reaches 60 minutes. Neither covers
+# steps that run before nextest, such as `make prepare-ui-gate`, and a
+# descendant process that outlives its parent is bounded by neither (see "Test
+# timeouts" in the developers' guide).
 #
 # The shared `generate-coverage` action writes a temporary nextest config (180 s
 # / `terminate-after` 1 / `grace-period` 5 s, plus `global-timeout = "10m"`)
@@ -86,5 +90,5 @@ slow-timeout = { period = "60s", terminate-after = 10 }
 nested-cargo = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'binary(polars_surface_ui)'
+filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(cardinality_probe_ui)'
 test-group = "nested-cargo"
