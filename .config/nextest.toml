@@ -86,10 +86,13 @@ slow-timeout = { period = "60s", terminate-after = 10 }
 # Tests that start Cargo run one at a time, so their nested builds do not
 # compete with each other for cores or the package-cache lock (Concordat
 # NC-004). Add the binary of any new test that spawns Cargo or rustc to the
-# filter below (NC-005).
+# filter below (NC-005). The three `workspace_*` and `build_toolchain_contract`
+# binaries only read (`cargo tree`, `metadata` or `config`), but they share the
+# package-cache lock with the builds, so they join the group too: the policy is
+# "every test that starts Cargo", with no exception for read-only commands.
 [test-groups]
 nested-cargo = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(cardinality_probe_ui)'
+filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(cardinality_probe_ui) | binary(workspace_profiles) | binary(workspace_boundaries) | binary(build_toolchain_contract)'
 test-group = "nested-cargo"
