@@ -63,6 +63,23 @@ updates:
     schedule:
       interval: "daily"
 
+  # The Polars profile probe is a measurement probe: its pins (Polars and
+  # `trybuild`) feed pre-registered timing controls, so Dependabot must not move
+  # them; each pin is named below, so any other dependency the probe gains is
+  # still updated (Concordat NC-003). A bump of a pin is a scope decision for
+  # those controls, as for the root manifest's Polars pin.
+  - package-ecosystem: "cargo"
+    directory: "/tools/probes/polars-profile"
+    ignore:
+      - dependency-name: "polars*"
+      - dependency-name: "trybuild"
+    open-pull-requests-limit: 1
+    labels:
+      - "dependencies"
+      - "cargo"
+    schedule:
+      interval: "daily"
+
   # Keep the pinned nightly in rust-toolchain.toml current.
   - package-ecosystem: "rust-toolchain"
     directory: "/"

@@ -30,6 +30,40 @@
 # sixfold margin for a test that genuinely computes rather than waits.
 slow-timeout = { period = "60s", terminate-after = 5 }
 
+# The whole run is bounded at 60 minutes (Concordat NC-004).
+#
+# This file used to omit a `global-timeout` on purpose. The reasoning was that a
+# whole-run budget on a developer's host would diagnose local compile-queue
+# contention rather than a defect, that the host is shared with other agents,
+# and that the hosted `build-test` lane already has `timeout-minutes: 8`, so a
+# runaway suite there is ended by the job rather than by nextest. The user's
+# ruling of 16 November 2026 on the nested-cargo rules supersedes that
+# reasoning: a run with tests that start nested builds carries a whole-run
+# bound. No concrete failure stands against the figure. The slowest sample on
+# record for a single test is 443 s under 185 queued builds, so 60 minutes is
+# far from tripping on contention, and the hosted lanes are still ended first
+# by their own 8-minute `timeout-minutes`.
+#
+# The bound is an outer limit for nextest itself, chiefly on a local
+# `cargo nextest` run. It is not what ends a hung coverage lane: the pinned
+# `generate-coverage` action runs Cargo under its own 1,800-second watchdog
+# (`INPUT_CARGO_WAIT_TIMEOUT`), which `coverage-main.yml` does not override, so
+# that watchdog stops Cargo before nextest reaches 60 minutes. The watchdog
+# covers the compilation inside its own Cargo invocation, but neither bound
+# covers a separate earlier workflow step such as `make prepare-ui-gate`, and a
+# descendant process that outlives its parent is bounded by neither (see "Test
+# timeouts" in the developers' guide).
+#
+# The shared `generate-coverage` action writes a temporary nextest config (180 s
+# / `terminate-after` 1 / `grace-period` 5 s, plus `global-timeout = "10m"`)
+# only when no config resolves, and it prefers any existing one. Landing this
+# file therefore replaced that temporary file in `build-test`: the per-test
+# allowance is 300 s instead of 180 s, and the whole-run cap is 60 minutes
+# instead of 10. The lane's effective ceiling does not move, because the job's
+# own 8-minute `timeout-minutes` is stricter than either cap, and no workspace
+# member test comes close to the per-test figure.
+global-timeout = "60m"
+
 # An anchored regex, not `test(=NAME)`. Nextest's `=` form compares the whole
 # test name, but a parameterized `#[rstest]` is identified by its instances,
 # `name::case_1_…`, so `test(=NAME)` would match none of them and the test
@@ -42,31 +76,23 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # hosted profile measurement, 377.2 s locally while the shared compile queue
 # held 86 waiting builds, and 443.24 s locally with 185 builds queued ahead.
 # Ten periods (600 s) clears the slowest contended sample by 157 s. It stays
-# below the whole-run cap discussed below and still ends a genuinely hung
+# below the whole-run cap above and still ends a genuinely hung
 # nested build long before an outer job timeout would.
 
 [[profile.default.overrides]]
 filter = 'test(/^checked_cardinality_result_must_be_used($|::)/)'
 slow-timeout = { period = "60s", terminate-after = 10 }
 
-# No `global-timeout` here, deliberately.
-#
-# A whole-run budget on a developer's host would diagnose local compile-queue
-# contention rather than a defect, and this repository's host is shared with
-# other agents. The hosted lanes are the ones with a fixed clock, and they
-# already have one on `build-test`, which declares `timeout-minutes: 8`, so a
-# runaway suite there is ended by the job rather than by nextest.
-# `coverage-main.yml` declares none, so GitHub's 360-minute default applies
-# there, and the per-test `terminate-after` limits do not cover steps that run
-# before nextest, such as `make prepare-ui-gate`.
-#
-# That matters for the coverage lane specifically. The shared
-# `generate-coverage` action writes a temporary nextest config (180 s /
-# `terminate-after` 1 / `grace-period` 5 s, plus `global-timeout = "10m"`) only
-# when no config resolves, and it prefers any existing one. Landing this file
-# therefore replaces that temporary file in `build-test`: the per-test
-# allowance becomes 300 s instead of 180 s, and the 10-minute whole-run cap
-# disappears. Neither change moves the lane's effective ceiling, because the
-# job's own 8-minute `timeout-minutes` is already stricter than the 10-minute
-# cap it replaces. Only a longer per-test allowance remains, and no workspace
-# member test comes close to either figure.
+# Tests that start Cargo run one at a time, so their nested builds do not
+# compete with each other for cores or the package-cache lock (Concordat
+# NC-004). Add the binary of any new test that spawns Cargo or rustc to the
+# filter below (NC-005). The three `workspace_*` and `build_toolchain_contract`
+# binaries only read (`cargo tree`, `metadata` or `config`), but they share the
+# package-cache lock with the builds, so they join the group too: the policy is
+# "every test that starts Cargo", with no exception for read-only commands.
+[test-groups]
+nested-cargo = { max-threads = 1 }
+
+[[profile.default.overrides]]
+filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(cardinality_probe_ui) | binary(workspace_profiles) | binary(workspace_boundaries) | binary(build_toolchain_contract)'
+test-group = "nested-cargo"

@@ -216,20 +216,32 @@ test. Nextest bounds that work: `.config/nextest.toml` sets a 60 s slow warning
 with `terminate-after = 5`, so an ordinary test ends at 300 s. The cardinality
 gate's `trybuild` test has its own override at `terminate-after = 10`, because
 it compiles a generated crate; the comment there records the measurements the
-figure came from. Those numbers, the arithmetic behind them, and the reasons
-there is no `global-timeout` are policy, and they live in that file beside the
-values rather than here.
+figure came from. The whole run carries a `global-timeout` of 60 minutes, far
+above any measured test and above the hosted jobs' own 8-minute limit, so in
+practice it is an outer limit on local `cargo nextest` runs; the coverage
+action's own 1,800-second Cargo watchdog stops a hung coverage lane first. An
+earlier version of this file left the bound out on purpose, and the file
+records why that was superseded. Tests that start Cargo or rustc
+(`polars_surface_ui`, `native_consumer_e2e`, the cardinality gate's
+`cardinality_probe_ui`, and the read-only `workspace_profiles`,
+`workspace_boundaries` and `build_toolchain_contract`) run one at a time in the
+`nested-cargo` test group, so their nested builds and queries do not compete
+for cores or the package-cache lock; a new test that spawns Cargo, even only to
+read metadata, is added to that group's override filter. Those numbers, the
+arithmetic behind them, and the reasons for the bound are policy, and they live
+in that file beside the values rather than here.
 
 Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
 that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
 because nextest then has no process left to escalate to `SIGKILL`. Only the
 job's own `timeout-minutes` bounds it (all three required jobs set 8;
-`coverage-main.yml` sets none, so GitHub's 360-minute default applies, and
-nextest's limits do not cover `make prepare-ui-gate`, which runs before it),
-and a local `cargo test` run, which `make test` falls back to when
-cargo-nextest is missing, has no limit at all. Ordinary builds and sleeping
-children do end under nextest.
+`coverage-main.yml` sets none, so GitHub's 360-minute default applies there,
+and neither nextest's limits, including the 60-minute `global-timeout`, nor the
+coverage action's Cargo watchdog bound a surviving descendant, and none of them
+cover `make prepare-ui-gate`, which runs before it), and a local `cargo test`
+run, which `make test` falls back to when cargo-nextest is missing, has no
+limit at all. Ordinary builds and sleeping children do end under nextest.
 
 `make test-ui` is the one route with its own bound. It runs the recorded gate
 binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600
