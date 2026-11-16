@@ -21,7 +21,7 @@ fn assert_capability_order(trace: &[Vec<String>]) {
     };
     let Some(install) = trace
         .iter()
-        .position(|event| event.first().map(String::as_str) == Some("action-6"))
+        .position(|event| event.first().map(String::as_str) == Some("action-7"))
     else {
         panic!("Act must execute the Whitaker fixture action");
     };
@@ -135,7 +135,7 @@ fn assert_executor_guards(trace: &[Vec<String>]) {
     assert!(
         !trace
             .iter()
-            .any(|event| event.first().map(String::as_str) == Some("action-7")),
+            .any(|event| event.first().map(String::as_str) == Some("action-8")),
         "the hosted coverage action must be skipped by Act's real expression evaluation"
     );
 }

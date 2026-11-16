@@ -14,6 +14,12 @@ use super::{action_ref, at, text};
 /// Marks an input whose value is checked elsewhere rather than restated here.
 pub(crate) const ANY_VALUE: &str = "<any>";
 
+/// The shared action that installs the pinned, digest-verified test runner.
+///
+/// It replaces `cargo binstall`, which fell back to a source build when its
+/// cache missed and so pushed the eight-minute jobs past their limit.
+const INSTALL_TOOL_PATH: &str = "leynos/shared-actions/.github/actions/install-tool";
+
 /// One action path, name, and required inputs.
 ///
 /// Every entry is path-only: its revision is checked for shape by
@@ -97,6 +103,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             "leynos/shared-actions/.github/actions/install-mdtablefix",
             "DavidAnson/markdownlint-cli2-action",
             "astral-sh/setup-uv",
+            INSTALL_TOOL_PATH,
             "actions/setup-python",
             "leynos/shared-actions/.github/actions/install-whitaker",
             "leynos/shared-actions/.github/actions/generate-coverage",
@@ -158,7 +165,11 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Test"),
             Some("Test the single-feature isolation profiles"),
         ],
-        actions: &["actions/checkout", action_ref::SETUP_RUST_PATH],
+        actions: &[
+            "actions/checkout",
+            action_ref::SETUP_RUST_PATH,
+            INSTALL_TOOL_PATH,
+        ],
         env: &[
             ("CARGO_TERM_COLOR", "always"),
             ("BUILD_PROFILE", "debug"),
@@ -201,6 +212,11 @@ pub(crate) const ACTIONS: &[ActionContract] = &[
         &[("globs", "**/*.md")],
     ),
     ("astral-sh/setup-uv", "Setup uv", &[]),
+    (
+        INSTALL_TOOL_PATH,
+        "Install test runner",
+        &[("tool", "cargo-nextest"), ("version", "0.9.143")],
+    ),
     (
         "actions/setup-python",
         "Setup Python for audit manifest extraction",
