@@ -47,6 +47,10 @@ pub(super) fn configure_cargo(command: &mut Command) {
 /// Builds a Cargo child with the caller's build selectors removed.
 pub(super) fn cargo_command(arguments: &[&str]) -> Command {
     let mut command = Command::new(env!("CARGO"));
+    // Frozen before the arguments and before `configure_cargo`, so a reader of
+    // this file sees offline mode set ahead of the calls it cannot follow
+    // (Concordat NC-007). `fetch_command` below is never run; see its docs.
+    command.arg("--frozen");
     command.args(arguments);
     configure_cargo(&mut command);
     command
@@ -105,6 +109,8 @@ pub(super) fn offline_recovery(detail: &str) -> String {
 /// Runs a live Cargo read; under nextest, nextest bounds the test that calls it.
 pub(super) fn run_read(arguments: &[&str]) -> Result<Output, Box<dyn Error>> {
     let mut command = Command::new(env!("CARGO"));
+    // Frozen first, as in `cargo_command` (Concordat NC-007).
+    command.arg("--frozen");
     command.args(arguments);
     configure_cargo(&mut command);
     Ok(command.output()?)

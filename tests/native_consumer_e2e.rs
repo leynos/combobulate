@@ -80,6 +80,9 @@ fn snapshot_body(contents: &str) -> Result<&str, Box<dyn Error>> {
 /// this test does not look.
 fn fixture_cargo(arguments: &[&str], target_dir: &Path) -> Command {
     let mut command = Command::new(env!("CARGO"));
+    // Frozen before the arguments, so a reader of this file sees offline mode
+    // on every command this helper returns (Concordat NC-007).
+    command.arg("--frozen");
     command.args(arguments);
     command.current_dir(Path::new(env!("CARGO_MANIFEST_DIR")));
     command.env("CARGO_TARGET_DIR", target_dir);
