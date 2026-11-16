@@ -250,8 +250,7 @@ const STUB: &str = concat!(
     "case \"$name:$*\" in\n",
     "  'make:install-build-tools'|'make:check-fmt'|'make:spelling'|'make:audit'|'make:lint'|'make:\
      test') ;;\n",
-    "  'cargo:binstall --no-confirm --locked cargo-nextest'|'cargo:binstall --no-confirm \
-     cargo-audit') ;;\n",
+    "  'cargo:binstall --no-confirm cargo-audit') ;;\n",
     "  'rustc:--version') printf '%s\\n' 'rustc fixture'; exit 0 ;;\n",
     "  'sccache:--show-stats') printf '%s\\n' 'Cache location                  GitHub Actions \
      Cache'; exit 0 ;;\n",

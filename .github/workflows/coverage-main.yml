@@ -95,9 +95,10 @@ jobs:
         # Coverage excludes mold, but its test suite reaches Make targets that check it.
         run: make install-build-tools
       - name: Install test runner
-        env:
-          RUSTFLAGS: ""
-        run: cargo binstall --no-confirm --locked cargo-nextest
+        uses: leynos/shared-actions/.github/actions/install-tool@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
+        with:
+          tool: cargo-nextest
+          version: 0.9.143
       - name: Build the cardinality gate's test binary
         # The coverage run reaches tests/cardinality_probe_ui.rs, which only
         # reads and runs the binary this target records.

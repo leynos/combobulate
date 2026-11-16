@@ -66,7 +66,6 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
         Some("Install the build standard") => "make install-build-tools",
         Some("Format") => "make check-fmt",
         Some("Check spelling") => "make spelling",
-        Some("Install test runner") => "cargo binstall --no-confirm --locked cargo-nextest",
         Some("Install cargo-audit") => "cargo binstall --no-confirm cargo-audit",
         Some("Verify Whitaker capability") => concat!(
             "uv run --with PyYAML==6.0.3 python scripts/whitaker_probe.py ",
@@ -94,7 +93,7 @@ fn valid_step_command(item: &Value, name: Option<&str>) -> bool {
 /// Requires only the known per-step environment, including explicit LLVM coverage.
 fn valid_step_env(item: &Value, name: Option<&str>) -> bool {
     let expected: &[(&str, &str)] = match name {
-        Some("Install test runner" | "Install cargo-audit") => &[("RUSTFLAGS", "")],
+        Some("Install cargo-audit") => &[("RUSTFLAGS", "")],
         Some("Lint") => &[(
             "DYLINT_DRIVER_PATH",
             "${{ runner.temp }}/combobulate-whitaker-driver",

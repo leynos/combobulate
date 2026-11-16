@@ -117,10 +117,15 @@ jobs:
         uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
       - name: Check spelling
         run: make spelling
+      # A pinned, digest-verified release archive that the action caches by
+      # version. `cargo binstall` queried GitHub and fell back to a source
+      # build on a cache miss, which took three minutes and pushed the job past
+      # its eight-minute limit; this step never invokes Cargo.
       - name: Install test runner
-        env:
-          RUSTFLAGS: ""
-        run: cargo binstall --no-confirm --locked cargo-nextest
+        uses: leynos/shared-actions/.github/actions/install-tool@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
+        with:
+          tool: cargo-nextest
+          version: 0.9.143
       # Dependency audits report advisories against the whole lockfile, so a
       # newly published advisory would fail every Dependabot PR regardless of
       # content and deadlock auto-merge. The scheduled audit workflow covers
@@ -316,9 +321,10 @@ jobs:
         # The pinned toolchain and mold must precede every local suite route.
         run: make install-build-tools
       - name: Install test runner
-        env:
-          RUSTFLAGS: ""
-        run: cargo binstall --no-confirm --locked cargo-nextest
+        uses: leynos/shared-actions/.github/actions/install-tool@1123a35f1cc7810f65bfffa5ea4c8b981d6c0090
+        with:
+          tool: cargo-nextest
+          version: 0.9.143
       - name: Test
         # `make test` runs `make act-validation` only under `WITH_ACT=1`; the
         # hosted lane must never recurse into Act.
