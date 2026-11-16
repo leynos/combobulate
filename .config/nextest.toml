@@ -48,8 +48,9 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # `cargo nextest` run. It is not what ends a hung coverage lane: the pinned
 # `generate-coverage` action runs Cargo under its own 1,800-second watchdog
 # (`INPUT_CARGO_WAIT_TIMEOUT`), which `coverage-main.yml` does not override, so
-# that watchdog stops Cargo before nextest reaches 60 minutes. Neither covers
-# steps that run before nextest, such as `make prepare-ui-gate`, and a
+# that watchdog stops Cargo before nextest reaches 60 minutes. The watchdog
+# covers the compilation inside its own Cargo invocation, but neither bound
+# covers a separate earlier workflow step such as `make prepare-ui-gate`, and a
 # descendant process that outlives its parent is bounded by neither (see "Test
 # timeouts" in the developers' guide).
 #
