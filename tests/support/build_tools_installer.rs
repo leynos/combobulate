@@ -24,6 +24,23 @@ pub(super) const ARCHIVE_SHA256: &str =
 /// Fixture archive name corresponding to the fixture mold pin.
 pub(super) const ARCHIVE_NAME: &str = "mold-9.8.7-x86_64-linux.tar.gz";
 
+/// Opens the system temporary directory as a capability, returning it with its UTF-8 path.
+fn open_temp_parent() -> Read<(Utf8PathBuf, Dir)> {
+    let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
+        .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
+    let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
+    Ok((parent_path, parent))
+}
+
+/// Names a fixture directory uniquely within this process and across processes.
+fn unique_fixture_name() -> String {
+    format!(
+        "combobulate-installer-{}-{}",
+        std::process::id(),
+        NEXT_ID.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
 /// Owns private executors, pin files, logs and quote-bearing scratch paths.
 pub(super) struct InstallerFixture {
     /// Capability parent used for cleanup only.
@@ -39,14 +56,8 @@ pub(super) struct InstallerFixture {
 impl InstallerFixture {
     /// Constructs fake tools without changing the test process environment.
     pub(super) fn new() -> Read<Self> {
-        let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
-            .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
-        let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
-        let name = format!(
-            "combobulate-installer-{}-{}",
-            std::process::id(),
-            NEXT_ID.fetch_add(1, Ordering::Relaxed)
-        );
+        let (parent_path, parent) = open_temp_parent()?;
+        let name = unique_fixture_name();
         parent.create_dir(&name)?;
         let fixture = Self {
             directory: parent.open_dir(&name)?,
@@ -54,17 +65,22 @@ impl InstallerFixture {
             parent,
             name,
         };
-        fixture.directory.create_dir("scratch'quoted")?;
-        fixture.directory.write("archive", "fixture archive\n")?;
-        fixture.directory.write("mold-version", "9.8.7\n")?;
-        fixture.directory.write(
+        fixture.write_pins()?;
+        fixture.write_executors()?;
+        Ok(fixture)
+    }
+
+    /// Writes the scratch directory, archive and pin files every case starts from.
+    fn write_pins(&self) -> io::Result<()> {
+        self.directory.create_dir("scratch'quoted")?;
+        self.directory.write("archive", "fixture archive\n")?;
+        self.directory.write("mold-version", "9.8.7\n")?;
+        self.directory.write(
             "toolchain.toml",
             "[toolchain]\nchannel = \"nightly-2001-02-03\"\ncomponents = [\n  \"clippy\",\n  \
              \"rustfmt\",\n]\n",
         )?;
-        fixture.checksums(&format!("{ARCHIVE_SHA256}  {ARCHIVE_NAME}\n"))?;
-        fixture.write_executors()?;
-        Ok(fixture)
+        self.checksums(&format!("{ARCHIVE_SHA256}  {ARCHIVE_NAME}\n"))
     }
 
     /// Writes a chosen checksum manifest while preserving the fixture's identity.

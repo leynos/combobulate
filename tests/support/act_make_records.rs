@@ -129,17 +129,20 @@ fn parse_token(cursor: &mut RecordCursor<'_>) -> io::Result<GitHubToken> {
 
 /// Parses exactly the declared argument count and preserves internal empty fields.
 fn parse_arguments(cursor: &mut RecordCursor<'_>) -> io::Result<Vec<String>> {
+    let argument_count = parse_argument_count(cursor)?;
+    cursor.require_field("argv")?;
+    (0..argument_count)
+        .map(|_| cursor.next_field().map(str::to_owned))
+        .collect()
+}
+
+/// Reads the `argc` marker and the declared argument count that follows it.
+fn parse_argument_count(cursor: &mut RecordCursor<'_>) -> io::Result<usize> {
     cursor.require_field("argc")?;
-    let argument_count = cursor
+    cursor
         .next_field()?
         .parse::<usize>()
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    cursor.require_field("argv")?;
-    let mut arguments = Vec::with_capacity(argument_count);
-    for _ in 0..argument_count {
-        arguments.push(cursor.next_field()?.to_owned());
-    }
-    Ok(arguments)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
 }
 
 /// Owns borrowed log fields and their current parsing position.

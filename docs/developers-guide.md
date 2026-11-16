@@ -429,10 +429,13 @@ and nesting depth to 4. Fix findings at their source. Keep exceptions narrow,
 documented, and reasoned; do not use lint allowances to defer work. Code that
 reads environment values should receive an injected `mockable::Env` or a narrow
 equivalent, and tests should use `MockEnv` or a child process with controlled
-`Command::env` settings. The pinned nightly in `rust-toolchain.toml` supplies
-`clippy`, `rustfmt`, `rust-analyzer`, `rustc-codegen-cranelift-preview`, and
-`llvm-tools-preview` for the required lint, formatting, analysis, development,
-and coverage routes.
+`Command::env` settings. `disallowed-methods` in `clippy.toml` also rejects
+`std::env::set_var`, `remove_var` and `set_current_dir`: pass a directory in,
+or use `Command::current_dir` for a child process, rather than changing the
+process's own working directory. The pinned nightly in `rust-toolchain.toml`
+supplies `clippy`, `rustfmt`, `rust-analyzer`,
+`rustc-codegen-cranelift-preview`, and `llvm-tools-preview` for the required
+lint, formatting, analysis, development, and coverage routes.
 
 Rust denies unknown, renamed, and removed lints, unsafe code, and missing
 documentation. Rustdoc denies missing crate-level documentation, broken

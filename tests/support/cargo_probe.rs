@@ -41,6 +41,53 @@ pub type Read<T> = Result<T, Box<dyn Error>>;
 /// Keeps probe directories from colliding across threads in one process.
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// Opens the system temporary directory as a capability, returning it with its UTF-8 path.
+fn open_temp_parent() -> Read<(Utf8PathBuf, Dir)> {
+    let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
+        .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
+    let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
+    Ok((parent_path, parent))
+}
+
+/// Names a probe directory uniquely within this process and across processes.
+fn unique_probe_name() -> String {
+    format!(
+        "combobulate-cargo-probe-{}-{}",
+        std::process::id(),
+        NEXT_ID.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+/// Writes `contents` as an owner-executable script called `name`.
+fn write_script(directory: &Dir, name: &str, contents: &str) -> io::Result<()> {
+    directory.write(name, contents)?;
+    directory.set_permissions(name, Permissions::from_mode(0o700))
+}
+
+/// Writes the fake `probe-cargo`, `preflight` and `probe-python` scripts.
+fn write_probe_scripts(directory: &Dir) -> io::Result<()> {
+    write_script(
+        directory,
+        "probe-cargo",
+        concat!(
+            "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ ",
+            "\"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' 'cargo-nextest 0.9.0'; exit ",
+            "0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n ",
+            "\"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\n",
+        ),
+    )?;
+    write_script(
+        directory,
+        "preflight",
+        "#!/bin/sh\nprintf '%s\\n' preflight >> \"$CARGO_LOG\"\n",
+    )?;
+    write_script(
+        directory,
+        "probe-python",
+        "#!/bin/sh\nprintf '%s\\n' \"probe-python $*\" >> \"$CARGO_LOG\"\n",
+    )
+}
+
 /// Owns a fake Cargo executable and records only its build invocations.
 pub struct CargoProbe {
     parent: Dir,
@@ -72,37 +119,11 @@ impl CargoProbe {
     /// the script must exit non-zero to model an absent Nextest. The caller
     /// sets the variable to state which world it wants.
     pub fn new() -> Read<Self> {
-        let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
-            .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
-        let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
-        let name = format!(
-            "combobulate-cargo-probe-{}-{}",
-            std::process::id(),
-            NEXT_ID.fetch_add(1, Ordering::Relaxed)
-        );
+        let (parent_path, parent) = open_temp_parent()?;
+        let name = unique_probe_name();
         parent.create_dir(&name)?;
         let directory = parent.open_dir(&name)?;
-        directory.write(
-            "probe-cargo",
-            concat!(
-                "#!/bin/sh\nif [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n  if [ ",
-                "\"${NEXTEST_AVAILABLE:-0}\" = 0 ]; then printf '%s\\n' 'cargo-nextest 0.9.0'; \
-                 exit ",
-                "0; fi\n  exit 1\nfi\nprintf '%s\\n' \"$*\" >> \"$CARGO_LOG\"\nif [ -n ",
-                "\"${PRODUCTION_LOG:-}\" ]; then env | sort > \"$PRODUCTION_LOG\"; fi\n",
-            ),
-        )?;
-        directory.set_permissions("probe-cargo", Permissions::from_mode(0o700))?;
-        directory.write(
-            "preflight",
-            "#!/bin/sh\nprintf '%s\\n' preflight >> \"$CARGO_LOG\"\n",
-        )?;
-        directory.set_permissions("preflight", Permissions::from_mode(0o700))?;
-        directory.write(
-            "probe-python",
-            "#!/bin/sh\nprintf '%s\\n' \"probe-python $*\" >> \"$CARGO_LOG\"\n",
-        )?;
-        directory.set_permissions("probe-python", Permissions::from_mode(0o700))?;
+        write_probe_scripts(&directory)?;
         Ok(Self {
             parent,
             directory,

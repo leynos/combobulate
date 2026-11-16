@@ -135,25 +135,31 @@ fn table_flags(table: &toml::Value) -> Option<Flags> {
 }
 
 /// Returns every `rustflags` source in the configuration, by table name.
-pub(super) fn sources() -> Read<Vec<(String, Flags)>> {
+pub(super) fn sources() -> Read<Vec<(String, Flags)>> { Ok(flag_sources(&read_cargo_config()?)) }
+
+/// Reads and parses the repository's `.cargo/config.toml`.
+fn read_cargo_config() -> Read<toml::Value> {
     let root = Dir::open_ambient_dir(
         Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
         ambient_authority(),
     )?;
     let text = root.read_to_string(".cargo/config.toml")?;
-    let config: toml::Value = toml::from_str(&text)?;
-    let mut found = Vec::new();
-    if let Some(flags) = config.get("build").and_then(table_flags) {
-        found.push(("build".to_owned(), flags));
-    }
-    if let Some(targets) = config.get("target").and_then(toml::Value::as_table) {
-        for (key, table) in targets {
-            if let Some(flags) = table_flags(table) {
-                found.push((key.clone(), flags));
-            }
-        }
-    }
-    Ok(found)
+    Ok(toml::from_str(&text)?)
+}
+
+/// Collects the `[build]` flags, then each `[target.*]` table's flags, in order.
+fn flag_sources(config: &toml::Value) -> Vec<(String, Flags)> {
+    let build = config
+        .get("build")
+        .and_then(table_flags)
+        .map(|flags| ("build".to_owned(), flags));
+    let targets = config
+        .get("target")
+        .and_then(toml::Value::as_table)
+        .into_iter()
+        .flatten()
+        .filter_map(|(key, table)| table_flags(table).map(|flags| (key.clone(), flags)));
+    build.into_iter().chain(targets).collect()
 }
 
 /// Expands an assigned value as the recipe's shell would, with or without an
