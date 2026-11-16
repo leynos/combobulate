@@ -19,6 +19,72 @@ use cap_std::{
 type Read<T> = Result<T, Box<dyn Error>>;
 static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
 
+/// Opens the system temporary directory as a capability, returning it with its UTF-8 path.
+fn open_temp_parent() -> Read<(Utf8PathBuf, Dir)> {
+    let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
+        .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
+    let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
+    Ok((parent_path, parent))
+}
+
+/// Names a fixture directory uniquely within this process and across processes.
+fn unique_fixture_name() -> String {
+    format!(
+        "combobulate-clang-wrapper-{}-{}",
+        std::process::id(),
+        NEXT_ID.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+/// Writes the fake `mold`, `clang` and `rustup` executables into `directory`.
+fn write_fake_tools(directory: &Dir) -> io::Result<()> {
+    write_fake_mold(directory)?;
+    write_fake_clang(directory)?;
+    write_fake_rustup(directory)?;
+    make_executable(directory, &["bin/mold", "clang", "rustup"])
+}
+
+/// Writes the fake `mold` linker and its `ld.mold` symlink.
+fn write_fake_mold(directory: &Dir) -> io::Result<()> {
+    directory.create_dir("bin")?;
+    directory.write(
+        "bin/mold",
+        "#!/bin/sh\nprintf 'mold %s (compatible with GNU ld)\\n' \"$FAKE_MOLD_VERSION\"\n",
+    )?;
+    directory.symlink("mold", "bin/ld.mold")
+}
+
+/// Writes the fake `clang` that answers the linker probes and logs a real link.
+fn write_fake_clang(directory: &Dir) -> io::Result<()> {
+    directory.write(
+        "clang",
+        concat!(
+            "#!/bin/sh\nselected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\ncase \" $* ",
+            "\" in\n  *' -print-prog-name=ld.mold '*) printf '%s\\n' \"$selected\" ;;\n  *' -### ",
+            "'*) printf ' \"%s\" \"--hash-style=gnu\"\\n' \"$selected\" >&2 ;;\n  *) printf ",
+            "'%s\\n' invoked > \"$LINKER_LOG\" ;;\nesac\n",
+        ),
+    )
+}
+
+/// Writes the fake `rustup` that reports the host triple.
+fn write_fake_rustup(directory: &Dir) -> io::Result<()> {
+    directory.write(
+        "rustup",
+        concat!(
+            "#!/bin/sh\nif [ \"$1\" = show ]; then printf 'Default host: %s\\n' ",
+            "\"$FAKE_HOST_TRIPLE\"; else exit 1; fi\n",
+        ),
+    )
+}
+
+/// Marks each named file in `directory` owner-executable.
+fn make_executable(directory: &Dir, names: &[&str]) -> io::Result<()> {
+    names
+        .iter()
+        .try_for_each(|name| directory.set_permissions(name, Permissions::from_mode(0o700)))
+}
+
 /// Owns a private Clang search path and records whether its linker was reached.
 struct LinkerFixture {
     parent: Dir,
@@ -37,43 +103,11 @@ struct LinkerSetting<'a> {
 
 impl LinkerFixture {
     fn new() -> Read<Self> {
-        let parent_path = Utf8PathBuf::from_path_buf(std::env::temp_dir())
-            .map_err(|path| io::Error::other(format!("non-UTF-8 temp path: {}", path.display())))?;
-        let parent = Dir::open_ambient_dir(&parent_path, ambient_authority())?;
-        let name = format!(
-            "combobulate-clang-wrapper-{}-{}",
-            std::process::id(),
-            NEXT_ID.fetch_add(1, Ordering::Relaxed)
-        );
+        let (parent_path, parent) = open_temp_parent()?;
+        let name = unique_fixture_name();
         parent.create_dir(&name)?;
         let directory = parent.open_dir(&name)?;
-        directory.create_dir("bin")?;
-        directory.write(
-            "bin/mold",
-            "#!/bin/sh\nprintf 'mold %s (compatible with GNU ld)\\n' \"$FAKE_MOLD_VERSION\"\n",
-        )?;
-        directory.symlink("mold", "bin/ld.mold")?;
-        directory.write(
-            "clang",
-            concat!(
-                "#!/bin/sh\nselected=${FAKE_LINKER_PATH:-$BUILD_TOOLS_PREFIX/bin/ld.mold}\ncase \
-                 \" $* ",
-                "\" in\n  *' -print-prog-name=ld.mold '*) printf '%s\\n' \"$selected\" ;;\n  *' \
-                 -### ",
-                "'*) printf ' \"%s\" \"--hash-style=gnu\"\\n' \"$selected\" >&2 ;;\n  *) printf ",
-                "'%s\\n' invoked > \"$LINKER_LOG\" ;;\nesac\n",
-            ),
-        )?;
-        directory.write(
-            "rustup",
-            concat!(
-                "#!/bin/sh\nif [ \"$1\" = show ]; then printf 'Default host: %s\\n' ",
-                "\"$FAKE_HOST_TRIPLE\"; else exit 1; fi\n",
-            ),
-        )?;
-        for executable in ["bin/mold", "clang", "rustup"] {
-            directory.set_permissions(executable, Permissions::from_mode(0o700))?;
-        }
+        write_fake_tools(&directory)?;
         Ok(Self {
             parent,
             directory,

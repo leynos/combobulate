@@ -55,6 +55,16 @@ const FETCH_ARGUMENTS: [&str; 2] = ["fetch", "--locked"];
 #[test]
 fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
     let tree = cargo::tree_command(&["-p", KERNEL, "--target", "all"]);
+    assert_tree_passes_locked_and_offline(&tree);
+    assert_tree_sets_offline_environment(&tree);
+    assert_fetch_arguments_are_locked_and_target_free();
+    for command in [tree, cargo::fetch_command()] {
+        assert_build_overrides_cleared(&command);
+    }
+}
+
+/// The live tree check passes `--locked` and `--offline` on its command line.
+fn assert_tree_passes_locked_and_offline(tree: &std::process::Command) {
     let tree_arguments: Vec<String> = tree
         .get_args()
         .map(|argument| argument.to_string_lossy().into_owned())
@@ -65,9 +75,11 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
             "the live tree check must pass {expected}: {tree_arguments:?}"
         );
     }
+}
 
-    // `--offline` is the argv half of the contract; this is the environment
-    // half. Both must be present, because either can be dropped on its own.
+/// `--offline` is the argv half of the contract; this is the environment
+/// half. Both must be present, because either can be dropped on its own.
+fn assert_tree_sets_offline_environment(tree: &std::process::Command) {
     let environment: Vec<(&OsStr, Option<&OsStr>)> = tree.get_envs().collect();
     let offline_setting = environment
         .iter()
@@ -79,7 +91,10 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
         "the live tree check must set CARGO_NET_OFFLINE=true so a cold cache fails instead of \
          fetching mid-test: {environment:?}"
     );
+}
 
+/// The recorded fetch form is locked and carries no `--target` selector.
+fn assert_fetch_arguments_are_locked_and_target_free() {
     let fetch_arguments: Vec<String> = FETCH_ARGUMENTS
         .iter()
         .map(|argument| (*argument).to_owned())
@@ -97,19 +112,20 @@ fn live_invocations_pin_the_lockfile_and_clear_build_overrides() {
         "cargo fetch takes a target triple, not `all`; its plain form already resolves every \
          target's packages: {fetch_arguments:?}"
     );
+}
 
-    for command in [tree, cargo::fetch_command()] {
-        let cleared: Vec<String> = command
-            .get_envs()
-            .filter(|(_, value)| value.is_none())
-            .map(|(name, _)| name.to_string_lossy().into_owned())
-            .collect();
-        for expected in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
-            assert!(
-                cleared.iter().any(|name| name == expected),
-                "{expected} must not reach the Cargo child: {cleared:?}"
-            );
-        }
+/// No caller build selector survives into the Cargo child.
+fn assert_build_overrides_cleared(command: &std::process::Command) {
+    let cleared: Vec<String> = command
+        .get_envs()
+        .filter(|(_, value)| value.is_none())
+        .map(|(name, _)| name.to_string_lossy().into_owned())
+        .collect();
+    for expected in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"] {
+        assert!(
+            cleared.iter().any(|name| name == expected),
+            "{expected} must not reach the Cargo child: {cleared:?}"
+        );
     }
 }
 

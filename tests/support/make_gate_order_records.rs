@@ -73,15 +73,10 @@ fn invocation_fields(bytes: &[u8]) -> Read<Vec<&[u8]>> {
 /// Parses one complete invocation and requires its closing marker.
 fn parse_invocation(fields: &[&[u8]], index: &mut usize) -> Read<Invocation> {
     require_field(fields, index, "invocation-v1")?;
-    let executable = next_field(fields, index)?.to_owned();
-    let working_directory = next_field(fields, index)?.to_owned();
+    let (executable, working_directory) = parse_process(fields, index)?;
     let environment = parse_environment(fields, index)?;
     let secrets = parse_secrets(fields, index)?;
-
-    require_field(fields, index, "stage")?;
-    let stage = next_field(fields, index)?.to_owned();
-    require_field(fields, index, "cache-state")?;
-    let cache_state = next_field(fields, index)?.to_owned();
+    let (stage, cache_state) = parse_stage(fields, index)?;
     let arguments = parse_arguments(fields, index)?;
     let result = parse_result(fields, index)?;
     require_field(fields, index, "end-invocation")?;
@@ -97,26 +92,41 @@ fn parse_invocation(fields: &[&[u8]], index: &mut usize) -> Read<Invocation> {
     })
 }
 
+/// Parses the executable filename and working directory.
+fn parse_process(fields: &[&[u8]], index: &mut usize) -> Read<(String, String)> {
+    let executable = next_field(fields, index)?.to_owned();
+    let working_directory = next_field(fields, index)?.to_owned();
+    Ok((executable, working_directory))
+}
+
+/// Parses the gate stage and the Whitaker cache state that follow the secrets.
+fn parse_stage(fields: &[&[u8]], index: &mut usize) -> Read<(String, String)> {
+    let stage = labelled_field(fields, index, "stage")?.to_owned();
+    let cache_state = labelled_field(fields, index, "cache-state")?.to_owned();
+    Ok((stage, cache_state))
+}
+
+/// Requires a record marker, then reads the value that follows it.
+fn labelled_field<'a>(fields: &[&'a [u8]], index: &mut usize, marker: &str) -> Read<&'a str> {
+    require_field(fields, index, marker)?;
+    next_field(fields, index)
+}
+
 /// Parses exactly the declared argument count, preserving empty arguments.
 fn parse_arguments(fields: &[&[u8]], index: &mut usize) -> Read<Vec<String>> {
-    require_field(fields, index, "argc")?;
-    let argument_count = next_field(fields, index)?
+    let argument_count = labelled_field(fields, index, "argc")?
         .parse::<usize>()
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     require_field(fields, index, "argv")?;
-    let mut arguments = Vec::with_capacity(argument_count);
-    for _ in 0..argument_count {
-        arguments.push(next_field(fields, index)?.to_owned());
-    }
-    Ok(arguments)
+    (0..argument_count)
+        .map(|_| next_field(fields, index).map(str::to_owned))
+        .collect()
 }
 
 /// Parses optional query output while rejecting inconsistent result states.
 fn parse_result(fields: &[&[u8]], index: &mut usize) -> Read<Option<String>> {
-    require_field(fields, index, "result-state")?;
-    let result_state = next_field(fields, index)?;
-    require_field(fields, index, "result")?;
-    let result_value = next_field(fields, index)?.to_owned();
+    let result_state = labelled_field(fields, index, "result-state")?;
+    let result_value = labelled_field(fields, index, "result")?.to_owned();
     let result = match result_state {
         "none" if result_value.is_empty() => None,
         "value" => Some(result_value),

@@ -216,14 +216,14 @@ impl GateProbe {
             Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
             ambient_authority(),
         )?;
-        self.directory
-            .write("Makefile", repository.read("Makefile")?)?;
+        self.copy_from(&repository, "Makefile")?;
         self.directory.create_dir_all("tools/rust-prover-tools")?;
-        self.directory.write(
-            "tools/rust-prover-tools/REF",
-            repository.read("tools/rust-prover-tools/REF")?,
-        )?;
-        Ok(())
+        self.copy_from(&repository, "tools/rust-prover-tools/REF")
+    }
+
+    /// Copies one repository file to the same relative path in the fixture.
+    fn copy_from(&self, repository: &Dir, path: &str) -> Read<()> {
+        Ok(self.directory.write(path, repository.read(path)?)?)
     }
 
     /// Returns structured records from every controlled Make executor.
