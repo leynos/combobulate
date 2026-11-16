@@ -65,13 +65,14 @@ updates:
 
   # The Polars profile probe is a measurement probe: its pins (Polars and
   # `trybuild`) feed pre-registered timing controls, so Dependabot must not move
-  # any of them. The entry exists so the probe is a named, deliberately ignored
-  # manifest rather than one nothing covers (Concordat NC-003); a bump is a scope
-  # decision for those controls, as for the root manifest's Polars pin.
+  # them; each pin is named below, so any other dependency the probe gains is
+  # still updated (Concordat NC-003). A bump of a pin is a scope decision for
+  # those controls, as for the root manifest's Polars pin.
   - package-ecosystem: "cargo"
     directory: "/tools/probes/polars-profile"
     ignore:
-      - dependency-name: "*"
+      - dependency-name: "polars*"
+      - dependency-name: "trybuild"
     open-pull-requests-limit: 1
     labels:
       - "dependencies"
