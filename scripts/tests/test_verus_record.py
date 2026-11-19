@@ -102,6 +102,26 @@ class RecordTests(unittest.TestCase):
         """The structural digest is a rule too, so its source must be bound."""
         self.assertIn('scripts/kernel_record.py', self._record()['source_digests'])
 
+    def test_every_source_digest_still_describes_the_committed_file(self) -> None:
+        """A bound digest must be recomputable from the source beside it.
+
+        Binding a source is only useful if the stored digest still matches it:
+        an entry left behind by an edit names a file no reader can check, and
+        nothing else in the record would show the difference. A driver edit
+        that is not followed by ``make verus-kernel`` fails here.
+        """
+        stale = {
+            relative: recorded
+            for relative, recorded in self._record()['source_digests'].items()
+            if self.record.structural_digest(ROOT / relative) != recorded
+        }
+
+        self.assertEqual(
+            stale,
+            {},
+            f'run `make verus-kernel` to rebind edited sources: {sorted(stale)}',
+        )
+
     def test_the_record_hands_admission_to_the_proof_profile(self) -> None:
         """The observations must name PF05 as the admitting component."""
         admission = self._record()['admission']

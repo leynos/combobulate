@@ -413,6 +413,29 @@ The thresholds are:
   `make check-coverage-tools` reports `ld.lld is missing for coverage`, so
   `cargo llvm-cov` cannot link. The hosted `build-test` lane installs clang and
   lld itself, so the ratchet is decided there, not here.
+- [x] (2026-11-19) Hosted `Verus` failed on the published head with
+  `ModuleNotFoundError: No module named 'tree_sitter'`, raised while
+  `_write_record` digested its bound sources. The proof itself had passed:
+  every candidate produced its expected verdict before the record was written.
+  The cause is the PEP 723 block, which built the script's environment from
+  `cyclopts` and `cuprum` alone while `scripts/kernel_record.py` imports
+  `tree_sitter` inside `_rust_form`. The local environment already held the
+  package, so the omission could not show here; a cold cache reproduces it.
+  `scripts/verus_kernel.py` now declares `tree-sitter` and `tree-sitter-rust`.
+
+  The repair also pins `requires-python` to `>=3.14,<3.15`. The grammar ships
+  `cp39-abi3` wheels that stop at CPython 3.14, so declaring the dependency
+  under uv's default free-threaded 3.15 interpreter replaced a missing import
+  with a failing source build of `tree_sitter_rust`.
+
+  Two guards were added, each verified by mutating the repair back:
+  `scripts/tests/test_script_dependencies.py` follows the import graph beneath
+  every PEP 723 script and rejects a block that omits a distribution it
+  reaches, and `test_verus_record.py` recomputes every bound source digest so
+  an edit that is not followed by `make verus-kernel` fails instead of leaving
+  a stale entry. The record was then rebound by re-running the proof (19
+  verified, six mutants rejected); only `scripts/verus_kernel.py`'s digest
+  changed.
 
 ## Surprises & discoveries
 
