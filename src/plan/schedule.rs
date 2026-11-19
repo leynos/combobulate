@@ -111,13 +111,9 @@ fn record(
             record_mismatch(handle, lhs, rhs, mismatches);
             // Both slots exist: the walk finishes every operand before its
             // consumer, and `seen` means a shared operand is expanded once.
-            let (Some(lhs_slot), Some(rhs_slot)) = (slot_of(slots, lhs), slot_of(slots, rhs))
-            else {
-                return;
-            };
             steps.push(Step::Add {
-                lhs: lhs_slot,
-                rhs: rhs_slot,
+                lhs: slot_of(slots, lhs),
+                rhs: slot_of(slots, rhs),
             });
         }
     }
@@ -141,7 +137,15 @@ fn record_mismatch(handle: &AExpr, lhs: &AExpr, rhs: &AExpr, mismatches: &mut Ve
     }
 }
 
-/// The slot an already-expanded operand occupies, if it has one.
-fn slot_of(slots: &HashMap<*const Node, Slot>, operand: &AExpr) -> Option<Slot> {
-    slots.get(&Arc::as_ptr(&operand.node)).copied()
+/// The slot an already-expanded operand occupies.
+///
+/// # Panics
+///
+/// Panics if `operand` has not been expanded. The walk expands both operands
+/// before their consumer and expands each node once, so no caller can reach
+/// that state; failing loudly is what stops a schedule from silently losing a
+/// step if the guard it relies on is ever weakened. FACADE-1 and FACADE-4
+/// quantify over every generated graph shape and are the evidence.
+fn slot_of(slots: &HashMap<*const Node, Slot>, operand: &AExpr) -> Slot {
+    slots[&Arc::as_ptr(&operand.node)]
 }

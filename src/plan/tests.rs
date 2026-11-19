@@ -262,6 +262,32 @@ fn the_dispatch_route_is_the_verified_kernel() {
     );
 }
 
+/// A plan's `Debug` reports its schedule as step kinds, not as buffers.
+///
+/// The view exists so a failing test can print a plan without dumping every
+/// input; that contract is only observable through the rendering itself. The
+/// operands hold multi-digit values that no structural number in the view
+/// could produce, so a derived `Debug` — which prints the buffers — is caught
+/// by looking for them rather than by a risky single-digit check.
+#[test]
+fn a_plan_renders_its_step_kinds_and_no_elements() {
+    let left = Array::from_i64(vec![111, 222, 333]).expr();
+    let right = Array::from_i64(vec![444, 555, 666]).expr();
+    let plan = add()
+        .apply(&left, &right)
+        .prepare(&engine())
+        .expect("equal shapes agree");
+    let rendered = format!("{plan:?}");
+    assert!(
+        rendered.contains(r#"steps: ["input", "input", "add"]"#),
+        "the view must list the step kinds in schedule order, got {rendered}"
+    );
+    assert!(
+        ["111", "444"].iter().all(|value| !rendered.contains(value)),
+        "the view must not print operand buffers, got {rendered}"
+    );
+}
+
 #[test]
 fn a_plan_can_be_executed_more_than_once() {
     let values = Array::from_i64(vec![1, -1]).expr();
