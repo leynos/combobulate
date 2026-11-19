@@ -6,7 +6,7 @@
       "check": "markdown-structure",
       "status": "pass",
       "detail": "Markdown parses; titles, fences, code widths, whitespace, and local links pass. This is not the repository markdownlint gate.",
-      "count": 25
+      "count": 24
     },
     {
       "check": "local-links",
@@ -90,7 +90,7 @@
       "check": "python-tools",
       "status": "pass",
       "detail": "All delivered Python tool and helper-script files parse; generator, exporter, and checker execution also exercised their main paths.",
-      "count": 170
+      "count": 158
     },
     {
       "check": "contract-examples",
@@ -150,7 +150,7 @@
       "check": "toolchain-profiles",
       "status": "pass",
       "detail": "Pins agree with every site the record names, no unlisted site repeats a pin, and every capability status that claims an observation cites its log.",
-      "count": 21
+      "count": 20
     },
     {
       "check": "trust-audit",
