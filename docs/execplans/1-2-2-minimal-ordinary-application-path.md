@@ -389,6 +389,30 @@ The thresholds are:
   `scripts/export_roadmap.py` refreshes `spec/roadmap.json`. The Step 1.2
   finding is recorded under `Outcomes & retrospective`, with the two
   predictions that did not hold stated as they measured.
+- [x] (2026-11-19) Rebase onto `origin/main`'s `7e634a4` and re-validate the
+  whole candidate. The Replayed series is `9dd6e3c..b3c05ec`; the new head
+  after the post-rebase repairs is recorded by the branch itself. The rebase
+  dropped the probe-provenance apparatus main deleted in `b7bd51c` and
+  re-housed this branch's purpose on the surviving boundaries (see the EP-M2
+  entry and `Surprises & discoveries`). Validation after the rebuild:
+  `make check-fmt`, `make typecheck`, `make lint` (rustdoc, Clippy, Whitaker
+  and Interrogate), `make test` (both profiles plus doctests),
+  `make markdownlint`, `make spelling`, `make nixie`, `make design-check` under
+  Python 3.14 (1120 unittest cases and 1207 pytest cases with 2579 subtests),
+  and `make verus-kernel` (19 verified, 0 errors; five mutants and `wrap`
+  rejected). Four defects surfaced under those gates and are fixed in their own
+  commits: a `bumpy_road_function` rejection in
+  `tests/support/workspace_source.rs`, a `weave` annotation that leaked into
+  `scripts/tests/test_verus_kernel.py`, a regenerated validation report, and —
+  found by running the proof rather than by reading it — a stale prover-tools
+  pin in the committed record, uv's cache-dependent install line inside
+  `positive.log`, and `kernel_record.py` missing from the record's bound
+  sources.
+
+  Measured coverage could not be taken on this host:
+  `make check-coverage-tools` reports `ld.lld is missing for coverage`, so
+  `cargo llvm-cov` cannot link. The hosted `build-test` lane installs clang and
+  lld itself, so the ratchet is decided there, not here.
 
 ## Surprises & discoveries
 
