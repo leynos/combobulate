@@ -409,10 +409,10 @@ The thresholds are:
   `positive.log`, and `kernel_record.py` missing from the record's bound
   sources.
 
-  Measured coverage could not be taken on this host:
   `make check-coverage-tools` reports `ld.lld is missing for coverage`, so
-  `cargo llvm-cov` cannot link. The hosted `build-test` lane installs clang and
-  lld itself, so the ratchet is decided there, not here.
+  `make coverage` cannot run here. Calling `cargo llvm-cov` directly with the
+  default linker still instruments and links, and it reproduces the hosted
+  percentage exactly; that is the route the later coverage finding used.
 - [x] (2026-11-19) Hosted `Verus` failed on the published head with
   `ModuleNotFoundError: No module named 'tree_sitter'`, raised while
   `_write_record` digested its bound sources. The proof itself had passed:
@@ -436,6 +436,39 @@ The thresholds are:
   a stale entry. The record was then rebound by re-running the proof (19
   verified, six mutants rejected); only `scripts/verus_kernel.py`'s digest
   changed.
+- [x] (2026-11-19) Hosted `build-test` refused the head with "Coverage
+  decreased": 96.19% against a 100.00% baseline, outside the ±1.00 point
+  tolerance. The baseline is honest — `coverage-main.yml` measured 100.00% on
+  this branch's own base — and the same 96.19% occurred on the pre-rebase head,
+  so the shortfall is a stable branch condition, not a rebase artefact. It is
+  not caused by the PEP 723 repair either: 18 of 473 lines were missed before
+  that commit and after it.
+
+  The host cannot run `make coverage` (`ld.lld` is absent), but
+  `cargo llvm-cov nextest --no-default-features --workspace` links through
+  clang and reproduced 96.19% exactly, so the report was taken locally. Four
+  sites were uncovered, and each was a real gap rather than a stray line:
+
+  - `Binary`'s and `Unary`'s `operation_id` accessors were reachable but never
+    called by a test, so a copy claiming the wrong catalogue entry would have
+    read plausibly at every call site. The new test binds each descriptor to
+    the constant its own constructor names.
+  - `Node`'s `Debug` was exercised only through the `Add` arm; the `input` arm
+    was never rendered, so a mislabelled input node was invisible.
+  - `PreparedPlan`'s `Debug` promises a plan's step kinds without its
+    buffers, and nothing tested that promise. The new test prints a plan whose
+    operands hold distinctive values and rejects a view that prints them.
+  - `slot_of` returned `Option` and `record` silently dropped the addition step
+    when an operand's slot was missing. That branch cannot fire, but if the
+    walk's guard were ever weakened it would have corrupted the plan rather
+    than failed. `slot_of` now returns the slot directly and documents the
+    invariant its caller establishes, matching how `plan::slot` already reads
+    its results vector.
+
+  All four repairs are guarded, and each new guard was verified by mutating the
+  production code back to the defect: the wrong catalogue entry, the input arm
+  reporting `add`, and a plan view that prints its step buffers each fail their
+  test. Measured after the change: 0 of 471 lines missed, 100.00%.
 
 ## Surprises & discoveries
 

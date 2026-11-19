@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use rstest::rstest;
 
-use super::{AExpr, NodeKind, add, identity};
+use super::{AExpr, NodeKind, OperationId, add, identity};
 use crate::array::Array;
 
 /// An expression over `width` values, with the buffer pointer it started from.
@@ -200,5 +200,46 @@ fn agreeing_operands_record_no_mismatch() {
     assert!(
         format!("{:?}", sum.node).contains("mismatch_below: false"),
         "equal operand lengths are not a disagreement"
+    );
+}
+
+/// A node's `Debug` names its kind, without descending into the graph.
+///
+/// Both kinds must render: a reader who prints one node to diagnose a plan
+/// gets no walk of the graph, so the kind name is the whole of what the line
+/// says about it. Reaching an input node also pins that the arm is not simply
+/// unreachable behind the addition case.
+#[rstest]
+#[case::input(expr_of(2), "input")]
+#[case::add(add().apply(&expr_of(1), &expr_of(1)), "add")]
+fn a_node_names_its_kind_without_descending(#[case] expression: AExpr, #[case] kind: &str) {
+    let rendered = format!("{:?}", expression.node);
+    assert!(
+        rendered.contains(&format!("kind: {kind}")),
+        "the node must name its kind `{kind}`, got {rendered}"
+    );
+    assert!(
+        !rendered.contains("input(") && !rendered.contains("add("),
+        "the node's view must not render operands, got {rendered}"
+    );
+}
+
+/// Every expression reports the operation it was built from.
+///
+/// `Binary` has an identical accessor, so a copy that returned the wrong
+/// catalogue entry would still read plausibly at the call site. Checking both
+/// descriptors against their own constants keeps each accessor tied to the
+/// constructor beside it.
+#[test]
+fn a_descriptor_reports_the_operation_the_constructor_names() {
+    assert_eq!(
+        identity().operation_id(),
+        OperationId::IDENTITY,
+        "the identity descriptor must report the identity operation"
+    );
+    assert_eq!(
+        add().operation_id(),
+        OperationId::ADD,
+        "the addition descriptor must report the addition operation"
     );
 }
