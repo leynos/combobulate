@@ -29,6 +29,7 @@ proposal.
 | `scripts/verus_kernel.py`                       | Pipeline that verifies the shipped kernel, rejects its mutants, and writes the record.         |
 | `scripts/verus_kernel_verdicts.py`              | The log-reading rules that decide a positive, mutant, or body-mutant verdict.                  |
 | `scripts/verus_kernel_identity.py`              | Composes the DL-14 identity tuple naming the operation a proof record is about.                |
+| `scripts/kernel_record.py`                      | Structural digests for the record, and the log rewriting that keeps it reproducible.           |
 | `scripts/tests/`                                | Python unittest and pytest suites, supporting helpers, and fixtures.                           |
 | `scripts/docs_validation/`                      | Documentation-model checker package.                                                           |
 | `scripts/docs_validation/trust_audit/`          | Trusted-item scanner behind the evidence gate and the trust-audit design check.                |

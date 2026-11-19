@@ -1481,7 +1481,18 @@ code by itself: a type, syntax or unsupported-feature error fails the run.
 else; `scripts/verus_kernel.py` owns the pipeline, the log capture and the
 record. Keeping the split means the deciding rules can be unit-tested against
 synthetic logs without a solver, which is what
-`scripts/tests/test_verus_kernel.py` does.
+`scripts/tests/test_verus_kernel.py` does. The record's own reproduction is
+tested separately in `scripts/tests/test_verus_record.py`, and the loader that
+stubs the driver's module-scope imports lives in
+`scripts/tests/verus_kernel_fixtures.py`.
+
+A committed log carries the verifier's own words and nothing else. Two kinds of
+line are removed before a log is written: an absolute path that names the
+capture worktree, and the shared helper's `Installed N packages in …` report of
+an environment it has just built. Neither says anything about the proof, and
+both differ between checkouts and cache states, so keeping either would make
+the record irreproducible. `scripts/kernel_record.py` owns both rewrites, in
+`portable_argument` and `portable_log`.
 
 The record lives at `tools/verifier-fixtures/verus-kernel/provenance.json`
 beside one log per candidate. It binds the tool identities, a structural digest
@@ -1492,9 +1503,9 @@ different body. The tuple is composed by `scripts/verus_kernel_identity.py` and
 checked against the shipped Rust declarations, so a catalogue id or symbol that
 drifts from the code fails a test rather than leaving a record about an
 operation that no longer exists. Re-run `make verus-kernel` after any edit to
-the kernel, the contract, the mutants, or either script: the record is fully
-regenerated, and `make design-check` fails while the committed digests disagree
-with the sources.
+the kernel, the contract, the mutants, or any of the four scripts: the record
+is fully regenerated, and a committed digest that disagrees with its source
+fails a test.
 
 `.github/workflows/formal.yml` runs `make verus-kernel` in its Verus job after
 the shared install-prover-tools action has installed Verus and Z3, and uploads

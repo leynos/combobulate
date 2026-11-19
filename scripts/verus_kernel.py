@@ -52,6 +52,7 @@ from kernel_record import (
     exact_digest,
     is_structural_digest,
     portable_argument,
+    portable_log,
     structural_digest,
 )
 from verus_kernel_identity import identity
@@ -69,6 +70,7 @@ PRODUCTION = KERNEL / "src/elementwise_add.rs"
 VERDICTS = ROOT / "scripts/verus_kernel_verdicts.py"
 DRIVER = ROOT / "scripts/verus_kernel.py"
 IDENTITY = ROOT / "scripts/verus_kernel_identity.py"
+RECORD = ROOT / "scripts/kernel_record.py"
 OBSERVATIONS = ROOT / "tools/verifier-fixtures/verus-kernel"
 KERNEL_WRAP = ROOT / "target/verus-kernel-wrap"
 
@@ -159,13 +161,13 @@ def _without_inherited_variables(argv: list[str]) -> list[str]:
 def _capture(
     argv: list[str], cwd: Path, output: Path, environment: dict[str, str]
 ) -> dict:
-    """Capture one run, with the committed log stripped of host paths.
+    """Capture one run, with the committed log stripped of host-bound noise.
 
-    Verus prints absolute source paths in its diagnostics. Committing those
-    would bind the record to one worktree and make every checkout produce a
-    different file, so the portable form replaces the repository root and the
-    home directory before the log is written. The execution is unaffected: only
-    the copy that is read back and committed is rewritten.
+    Verus prints absolute source paths in its diagnostics, and the shared
+    helper prints an install line whenever it has just built its environment.
+    Committing either would bind the record to one worktree and one cache
+    state, so both are removed from the copy that is written. The execution is
+    unaffected: only the copy that is read back and committed is rewritten.
 
     Raises
     ------
@@ -176,7 +178,7 @@ def _capture(
         _without_inherited_variables(argv), cwd=cwd, env=environment
     )
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(portable_argument(result.output), encoding="utf-8")
+    output.write_text(portable_log(result.output), encoding="utf-8")
     print(f"{output.name}: exit {result.exit_code}", flush=True)
     # The digest must bind the committed bytes, not the pre-sanitisation ones,
     # or a reader checking the record against the file would see a mismatch.
@@ -338,7 +340,16 @@ def _write_record(version: str, z3_path: Path, observations: list[dict]) -> None
     the identity statement outside the record.
     """
     OBSERVATIONS.mkdir(parents=True, exist_ok=True)
-    sources = [CONTRACT, PRODUCTION, POSITIVE_ROOT, MUTANT_ROOT, DRIVER, VERDICTS, IDENTITY]
+    sources = [
+        CONTRACT,
+        PRODUCTION,
+        POSITIVE_ROOT,
+        MUTANT_ROOT,
+        DRIVER,
+        VERDICTS,
+        IDENTITY,
+        RECORD,
+    ]
     digests = {
         str(source.relative_to(ROOT)): structural_digest(source) for source in sources
     }

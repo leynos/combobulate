@@ -128,7 +128,10 @@
         "tests/ordinary_application.rs",
         "tests/native_consumer_e2e.rs",
         "tools/fixtures/native-consumer/Cargo.toml",
-        "scripts/kernel_record.py"
+        "scripts/kernel_record.py",
+        "scripts/tests/test_verus_kernel.py",
+        "scripts/tests/test_verus_record.py",
+        "scripts/tests/verus_kernel_fixtures.py"
       ]
     }
   ]
