@@ -276,9 +276,9 @@ The thresholds are:
 - [x] (2026-11-14) EP-M2 (prototype): kernel
   `elementwise_add::add_i64_into`, the three Verus roots, the five wrapper
   mutants and the body-tier `wrap` mutant, `scripts/verus_kernel.py` with
-  `scripts/verus_kernel_verdicts.py` and `scripts/tests/test_verus_kernel.py`,
-  `make verus-kernel`, the trust-audit subjects, the const evaluation and
-  `tests/kernel_elementwise_add.rs`. Every gate passes: `make verus-kernel`,
+  `scripts/verus_kernel_verdicts.py` and the `scripts/tests/test_verus_*`
+  suites, `make verus-kernel`, the trust-audit subjects, the const evaluation
+  and `tests/kernel_elementwise_add.rs`. Every gate passes: `make verus-kernel`,
   `check-fmt`, `lint`, `test`, `markdownlint`, `nixie`, `spelling` and
   `design-check` under Python 3.14. The run verified 19 obligations, rejected
   five mutants and `wrap`, and ran 449 and 455 Rust tests across the two
@@ -364,7 +364,7 @@ The thresholds are:
   `"source_digests"` and binds its own source, and `make verus-kernel`
   regenerated `tools/verifier-fixtures/verus-kernel/provenance.json` with 19
   verified and all six mutants rejected. Three new cases in
-  `scripts/tests/test_verus_kernel.py` pin each component, the source binding,
+  `scripts/tests/test_verus_record.py` pin each component, the source binding,
   and — reading the Rust files rather than the constants — that the tuple names
   what the code declares; they failed first with `KeyError: 'identity'` and a
   missing `source_digests` entry, then passed at 27 cases and 12 subtests. A
@@ -820,7 +820,8 @@ otherwise.
   - The new `scripts/verus_kernel.py` runs both passes and delegates every
     verdict to `scripts/verus_kernel_verdicts.py`, and imports
     `verus_probe` helpers without editing them. It passes `--edition=2024`.
-    Its tests live in `scripts/tests/test_verus_kernel.py`.
+    Its tests live in `scripts/tests/test_verus_kernel.py` and
+    `scripts/tests/test_verus_record.py`.
   Rationale: a positive run limited to the root module never checks the shipped
   body (`Surprises`). Shared spec functions stop mutant contracts drifting from
   the shipped one. Date/Author: 2026-11-11, planning agent.

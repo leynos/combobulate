@@ -16,6 +16,11 @@ A byte digest is offered beside the structural one for the captured logs:
 those are prose rather than code, and a reader checking a log against the
 record wants the exact bytes.
 
+:func:`portable_log` strips the one line the shared prover helper prints when
+it installs its own environment. That line reports a package count and a
+duration, so it differs between a cold and a warm cache and would make a
+committed log differ for a reason that says nothing about the proof.
+
 For example, editing a comment in the kernel body leaves
 :func:`structural_digest` unchanged, while adding a loop changes it.
 """
@@ -35,6 +40,11 @@ PREFIX = 'ast-sha256:'
 _COMMENTS = frozenset({'line_comment', 'block_comment'})
 _DOC_MARKERS = frozenset({'outer_doc_comment_marker', 'inner_doc_comment_marker'})
 _SCRIPT_BLOCK = re.compile(r'(?m)^# /// script$(?P<body>(?:\n#(?: .*)?$)*?)\n# ///$')
+# uv reports an environment it has just built as "Installed 10 packages in
+# 27ms" on standard error, wrapped in the ANSI styling it uses for a terminal.
+# The count and duration follow the cache's warmth rather than the proof.
+_ANSI = re.compile(r'\x1b\[[0-9;]*m')
+_UV_INSTALL = re.compile(r'^Installed \d+ packages? in [^\n]*$')
 
 
 def is_structural_digest(value: str) -> bool:
@@ -72,6 +82,27 @@ def portable_argument(text: str) -> str:
 def portable_text(text: str) -> str:
     """Apply :func:`portable_argument` to a whole captured log."""
     return portable_argument(text)
+
+
+def portable_log(text: str) -> str:
+    """Return a captured log with host paths and bootstrap noise removed.
+
+    Two kinds of line carry nothing about the proof: an absolute path that
+    names this checkout, and the helper's report of an environment it has just
+    built. Both are removed rather than rewritten, because a reader comparing
+    two logs wants the verifier's own words.
+
+    Examples
+    --------
+    >>> portable_log('Installed 10 packages in 27ms\\nverification results:: 19')
+    'verification results:: 19'
+    """
+    kept = (
+        line
+        for line in _ANSI.sub('', text).splitlines(keepends=True)
+        if not _UV_INSTALL.match(line.rstrip('\n'))
+    )
+    return portable_argument(''.join(kept))
 
 
 def structural_digest(path: Path) -> str:

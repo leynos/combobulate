@@ -5,83 +5,27 @@ mutant only on a located postcondition failure at that mutant's own clause.
 These tests exercise those two rules and the portable-log rewriting, so a
 changed summary, a disqualified error, or a host path in a committed log fails
 here rather than silently weakening the record.
+
+The loader that stubs the driver's module-scope imports lives in
+:mod:`verus_kernel_fixtures`, so this file states what each rule must decide.
 """
 
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import json
 import unittest
 from pathlib import Path
-from types import ModuleType
-from unittest.mock import patch
 
-SCRIPTS = Path(__file__).resolve().parents[1]
-ROOT = SCRIPTS.parent
-RECORD = ROOT / 'tools/verifier-fixtures/verus-kernel/provenance.json'
-
-
-def _load_driver() -> ModuleType:
-    """Load ``verus_kernel.py`` with its solver and helper imports stubbed.
-
-    The driver imports its siblings by bare name, so every stub is installed
-    at once rather than one dependency at a time. Nothing here reaches a
-    solver, a helper or the network.
-    """
-    stubs = {
-        'cyclopts': _Cyclopts(),
-        'captured_command': _Namespace(run_captured=None),
-    }
-    with patch.dict('sys.modules', stubs):
-        record = _load('kernel_record', SCRIPTS / 'kernel_record.py')
-        stubs['kernel_record'] = record
-        verdicts = _load('verus_kernel_verdicts', SCRIPTS / 'verus_kernel_verdicts.py')
-        stubs['verus_kernel_verdicts'] = verdicts
-        stubs['verus_kernel_identity'] = _load(
-            'verus_kernel_identity', SCRIPTS / 'verus_kernel_identity.py'
-        )
-        spec = importlib.util.spec_from_file_location(
-            'verus_kernel', SCRIPTS / 'verus_kernel.py'
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-    return module
-
-
-def _load_verdicts() -> ModuleType:
-    """Load ``verus_kernel_verdicts.py``, which imports nothing but the stdlib."""
-    return _load('verus_kernel_verdicts', SCRIPTS / 'verus_kernel_verdicts.py')
-
-
-def _load(name: str, path: Path) -> ModuleType:
-    """Execute ``path`` as ``name``, resolving imports from ``sys.modules``."""
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-class _Namespace:
-    """Minimal attribute holder for one stubbed import."""
-
-    def __init__(self, **attributes: object) -> None:
-        """Expose each keyword as an attribute, so a stub can name what it fakes."""
-        self.__dict__.update(attributes)
-
-
-class _Cyclopts:
-    """Cyclopts stand-in whose ``App`` accepts parameters and a default."""
-
-    def App(self, **_: object) -> _Namespace:
-        """Return an app whose ``default`` decorator is the identity."""
-        return _Namespace(default=lambda function: function)
-
-    @staticmethod
-    def Parameter(**attributes: object) -> _Namespace:
-        """Accept the environment-first annotations the driver declares."""
-        return _Namespace(**attributes)
-
+from verus_kernel_fixtures import (
+    RECORD,
+    ROOT,
+    SUMMARY,
+    load,
+    load_driver,
+    load_verdicts,
+)
+from verus_kernel_fixtures import SCRIPTS
 
 SUMMARY = 'verification results:: 19 verified, 0 errors\n'
 
@@ -91,7 +35,7 @@ class PositiveQualificationTests(unittest.TestCase):
 
     def setUp(self) -> None:
         """Load the driver once per test."""
-        self.driver = _load_verdicts()
+        self.driver = load_verdicts()
 
     def test_the_pinned_count_qualifies(self) -> None:
         """The recorded count with no suffix must be accepted."""
@@ -129,8 +73,8 @@ class MutantQualificationTests(unittest.TestCase):
 
     def setUp(self) -> None:
         """Load the verdict rules once per test."""
-        self.verdicts = _load_verdicts()
-        self.driver = _load_driver()
+        self.verdicts = load_verdicts()
+        self.driver = load_driver()
 
     def _diagnostic(self, clause: str) -> str:
         """Return a located failure naming the line that writes ``clause``."""
@@ -203,7 +147,7 @@ class BodyMutantTests(unittest.TestCase):
 
     def setUp(self) -> None:
         """Load the verdict rules once per test."""
-        self.driver = _load_verdicts()
+        self.driver = load_verdicts()
 
     def test_a_loop_invariant_failure_qualifies(self) -> None:
         """An invariant failure with a non-zero error count is the verdict."""
@@ -231,155 +175,12 @@ class BodyMutantTests(unittest.TestCase):
             self.driver._qualify_body(log, 1)
 
 
-class RecordTests(unittest.TestCase):
-    """Keep the committed record reproducible and free of host paths."""
-
-    def setUp(self) -> None:
-        """Load the driver, its record module and the identity module per test."""
-        self.driver = _load_driver()
-        self.record = _load('kernel_record', SCRIPTS / 'kernel_record.py')
-        self.identity = _load(
-            'verus_kernel_identity', SCRIPTS / 'verus_kernel_identity.py'
-        )
-
-    def _record(self) -> dict:
-        """Read the committed record, which every assertion here inspects."""
-        return json.loads(RECORD.read_text(encoding='utf-8'))
-
-    def test_portable_text_removes_both_roots(self) -> None:
-        """Both the repository root and the home directory must be rewritten."""
-        text = f'{ROOT}/crates and {Path.home()}/cache'
-
-        rewritten = self.record.portable_text(text)
-
-        self.assertEqual(rewritten, '<repo>/crates and ~/cache')
-
-    def test_the_committed_record_carries_no_host_path(self) -> None:
-        """A committed observation must not publish a worktree or account name."""
-        text = RECORD.read_text(encoding='utf-8')
-
-        self.assertNotIn(str(ROOT), text)
-        self.assertNotIn(str(Path.home()), text)
-
-    def test_every_committed_log_matches_its_digest(self) -> None:
-        """A digest must bind the exact bytes a reader can check."""
-        for observation in self._record()['observations']:
-            with self.subTest(candidate=observation['candidate']):
-                log = ROOT / observation['log']
-                digest = hashlib.sha256(log.read_bytes()).hexdigest()
-                self.assertEqual(digest, observation['sha256'])
-
-    def test_the_record_binds_the_verdict_rules_it_was_decided_by(self) -> None:
-        """Splitting the rules out must not leave them outside the record.
-
-        The digests bind the scripts that produced these observations. A driver
-        whose rules moved to a sibling module still has to name that module, or
-        a reader could re-run the recorded commands against different rules.
-        """
-        digests = self._record()['source_digests']
-
-        self.assertIn('scripts/verus_kernel.py', digests)
-        self.assertIn('scripts/verus_kernel_verdicts.py', digests)
-
-    def test_the_record_binds_the_digest_rule_it_was_computed_by(self) -> None:
-        """The structural digest is a rule too, so its source must be bound."""
-        self.assertIn('scripts/kernel_record.py', self._record()['source_digests'])
-
-    def test_the_record_hands_admission_to_the_proof_profile(self) -> None:
-        """The observations must name PF05 as the admitting component."""
-        admission = self._record()['admission']
-
-        self.assertIn('PF05.proof@2.3.5', admission)
-
-    def test_the_record_states_the_identity_it_is_about(self) -> None:
-        """DL-14's tuple must name the operation, not just carry its digests.
-
-        The digests are already in the record unlabelled, so a reader could
-        not tell which catalogue entry, dtype or policy they verify. Each
-        component is checked against the committed value, and the executable
-        and specification entries must carry the same digests the record
-        holds for those files, or the tuple would name files it does not bind.
-        """
-        record = self._record()
-        tuple_ = record['identity']
-        digests = record['source_digests']
-
-        self.assertEqual(tuple_['catalogue_id'], 'V001')
-        self.assertEqual(tuple_['operation'], {'name': 'add', 'catalogue_id': 'V001'})
-        self.assertEqual(tuple_['dtype'], 'I64')
-        self.assertEqual(
-            tuple_['symbol'], 'combobulate_kernel::elementwise_add::add_i64_into'
-        )
-        self.assertEqual(tuple_['semantic_policy'], 'checked-i64')
-        self.assertEqual(tuple_['executable']['digest'], digests[tuple_['executable']['path']])
-        self.assertEqual(
-            tuple_['specification']['digest'], digests[tuple_['specification']['path']]
-        )
-
-    def test_the_record_binds_the_identity_module(self) -> None:
-        """The tuple's own source must be in the digests, as the rules' is."""
-        self.assertIn(
-            'scripts/verus_kernel_identity.py', self._record()['source_digests']
-        )
-
-    def test_the_committed_tuple_is_what_the_module_composes(self) -> None:
-        """The record must be the module's output, not a stale copy of it.
-
-        Every other assertion here reads the committed record, so a constant
-        edited in ``verus_kernel_identity.py`` without a re-run would leave
-        the record naming the operation the source no longer describes, and
-        nothing would fail. Composing the tuple again from the digests the
-        record already binds is what makes the record reproducible rather
-        than merely well-formed. The digests are passed in so this case does
-        not depend on an unrelated source edit invalidating the record.
-        """
-        record = self._record()
-        tuple_ = record['identity']
-
-        self.assertEqual(
-            self.identity.identity(
-                tuple_['executable']['digest'], tuple_['specification']['digest']
-            ),
-            tuple_,
-        )
-
-    def test_the_identity_names_what_the_rust_source_declares(self) -> None:
-        """The tuple is a claim about the code, so it must match it.
-
-        A catalogue id or a symbol that drifts from the shipped source would
-        make the record a statement about an operation that no longer exists.
-        The check reads the two declarations rather than trusting the
-        constants, so renaming one without the other fails here.
-        """
-        source = (ROOT / 'crates/combobulate-kernel/src/elementwise_add.rs').read_text(
-            encoding='utf-8'
-        )
-        facade = (ROOT / 'src/expr/mod.rs').read_text(encoding='utf-8')
-        tuple_ = self._record()['identity']
-
-        self.assertIn(f'fn {tuple_["operation"]["name"]}_i64_into(', source)
-        self.assertIn(f'name: "{tuple_["operation"]["name"]}"', facade)
-        self.assertIn(f'catalogue_id: "{tuple_["catalogue_id"]}"', facade)
-
-    def test_every_mutant_is_recorded_once(self) -> None:
-        """One observation per mutant, plus the positive root and the wrap copy."""
-        candidates = [
-            observation['candidate']
-            for observation in self._record()['observations']
-        ]
-
-        self.assertEqual(candidates.count('positive'), 1)
-        self.assertEqual(candidates.count('wrap'), 1)
-        for name in self.driver.MUTANTS:
-            self.assertEqual(candidates.count(name), 1, name)
-
-
 class InvocationTests(unittest.TestCase):
     """Build the helper argv both the positive and mutant runs share."""
 
     def setUp(self) -> None:
         """Load the driver once per test."""
-        self.driver = _load_driver()
+        self.driver = load_driver()
 
     def test_the_helper_prefix_is_split_from_the_pin(self) -> None:
         """A quoted helper command must reach the helper as separate arguments."""
@@ -410,7 +211,7 @@ class SummaryPatternTests(unittest.TestCase):
 
     def test_the_suffix_is_captured_rather_than_dropped(self) -> None:
         """A pattern that stopped at the count could not reject a selection."""
-        driver = _load_verdicts()
+        driver = load_verdicts()
         match = driver._SUMMARY.search(
             'verification results:: 1 verified, 0 errors (partial verification with `--verify-*`)\n'
         )
@@ -420,7 +221,7 @@ class SummaryPatternTests(unittest.TestCase):
 
     def test_the_location_pattern_reads_a_verus_diagnostic(self) -> None:
         """A diagnostic's file, line and column must all be recoverable."""
-        driver = _load_verdicts()
+        driver = load_verdicts()
         match = driver._LOCATION.search('  --> /tmp/root.rs:42:13\n')
 
         self.assertIsNotNone(match)
@@ -429,7 +230,7 @@ class SummaryPatternTests(unittest.TestCase):
 
     def test_the_clause_pattern_reads_a_clause_call(self) -> None:
         """A clause line is whatever `k1` to `k5` call it starts with."""
-        driver = _load_verdicts()
+        driver = load_verdicts()
         match = driver._CLAUSE.match('        k4(lhs@, rhs@, old(out)@, final(out)@, r),')
 
         self.assertIsNotNone(match)
