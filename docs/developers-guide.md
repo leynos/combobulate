@@ -1526,6 +1526,22 @@ tested separately in `scripts/tests/test_verus_record.py`, and the loader that
 stubs the driver's module-scope imports lives in
 `scripts/tests/verus_kernel_fixtures.py`.
 
+A bound source digest is only evidence while it still describes the file beside
+it, so `test_verus_record.py` recomputes every entry and fails on any that an
+edit has left behind. Rebinding is `make verus-kernel`'s job, not a manual
+edit: the digest is a property of the run that produced the observations.
+
+Each `uv run --script` script builds its environment from its own PEP 723
+block, so a third-party import that the block omits is absent on a machine
+whose cache is cold — even when it is installed here. `scripts/verus_kernel.py`
+therefore declares `tree-sitter` and `tree-sitter-rust`, which only
+`scripts/kernel_record.py` names, and inside a function rather than at module
+scope. `scripts/tests/test_script_dependencies.py` follows the import graph
+beneath every script and fails when a block omits a distribution it reaches. It
+also holds `verus_kernel.py` below Python 3.15, because the grammar publishes
+abi3 wheels only up to 3.14 and uv would otherwise build it from source and
+fail. A dependency that is declared but cannot install is still a broken script.
+
 A committed log carries the verifier's own words and nothing else. Two kinds of
 line are removed before a log is written: an absolute path that names the
 capture worktree, and the shared helper's `Installed N packages in …` report of

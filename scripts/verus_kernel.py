@@ -1,7 +1,12 @@
 #!/usr/bin/env -S uv run --script
 # /// script
-# requires-python = ">=3.14"
-# dependencies = ["cyclopts==5.2.0", "cuprum==0.1.0"]
+# requires-python = ">=3.14,<3.15"
+# dependencies = [
+#     "cyclopts==5.2.0",
+#     "cuprum==0.1.0",
+#     "tree-sitter==0.25.2",
+#     "tree-sitter-rust==0.24.2",
+# ]
 # ///
 """Verify the shipped kernel against SC-12, and reject every seeded mutant.
 

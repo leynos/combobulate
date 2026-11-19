@@ -131,6 +131,7 @@
         "scripts/kernel_record.py",
         "scripts/tests/test_verus_kernel.py",
         "scripts/tests/test_verus_record.py",
+        "scripts/tests/test_script_dependencies.py",
         "scripts/tests/verus_kernel_fixtures.py"
       ]
     }
