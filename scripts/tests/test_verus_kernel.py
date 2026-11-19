@@ -438,4 +438,3 @@ class SummaryPatternTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-# weave: run 'weave explain scripts/tests/test_verus_kernel.py' for per-hunk detail, 'weave check' to verify your resolution

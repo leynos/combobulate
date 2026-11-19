@@ -98,19 +98,44 @@ fn collect(directory: &Dir, prefix: &str, files: &mut Vec<KernelFile>) -> io::Re
     for listing in directory.read_dir(".")? {
         let entry = listing?;
         let name = entry.file_name()?;
-        let path = if prefix.is_empty() {
-            name.clone()
-        } else {
-            format!("{prefix}/{name}")
-        };
+        let path = join_path(prefix, &name);
+        // A subdirectory is descended into rather than inspected: the rules are
+        // about files, and a directory that shares the kernel's shape must be
+        // walked just as the root is.
         if entry.file_type()?.is_dir() {
             collect(&directory.open_dir(&name)?, &path, files)?;
-        } else if has_rust_extension(&name) {
-            files.push(KernelFile {
-                source: directory.read_to_string(&name)?,
-                path,
-            });
+        } else {
+            push_if_rust(directory, &name, path, files)?;
         }
+    }
+    Ok(())
+}
+
+/// Returns the repository-relative path of an entry named `name`.
+///
+/// The walk's first level has no prefix, so an empty one must not produce a
+/// leading separator: `lib.rs`, not `/lib.rs`.
+fn join_path(prefix: &str, name: &str) -> String {
+    if prefix.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{prefix}/{name}")
+    }
+}
+
+/// Reads `name` into `files` when Rust would compile it, and ignores it
+/// otherwise.
+fn push_if_rust(
+    directory: &Dir,
+    name: &str,
+    path: String,
+    files: &mut Vec<KernelFile>,
+) -> io::Result<()> {
+    if has_rust_extension(name) {
+        files.push(KernelFile {
+            source: directory.read_to_string(name)?,
+            path,
+        });
     }
     Ok(())
 }
