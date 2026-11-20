@@ -76,13 +76,27 @@ class MutantQualificationTests(unittest.TestCase):
         self.verdicts = load_verdicts()
         self.driver = load_driver()
 
-    def _diagnostic(self, clause: str) -> str:
-        """Return a located failure naming the line that writes ``clause``."""
+    def _diagnostic(self, clause: str, name: str = 'mutant_err') -> str:
+        """Return a failure naming ``clause`` inside the mutant called ``name``.
+
+        The clause line is searched from the named mutant's own signature, so a
+        helper cannot accidentally report another wrapper's line and let a
+        region check pass for the wrong reason.
+        """
         source = self.driver.MUTANT_ROOT
+        return self._located(clause, name, source)
+
+    def _located(self, clause: str, name: str, source: Path) -> str:
+        """Return a Verus log naming ``clause`` of ``name`` in ``source``."""
         lines = source.read_text(encoding='utf-8').splitlines()
-        line = next(
+        first = next(
             index
             for index, text in enumerate(lines, start=1)
+            if text.startswith(f'pub fn {name}(')
+        )
+        line = next(
+            index
+            for index, text in enumerate(lines[first:], start=first + 1)
             if text.strip().startswith(f'{clause}(')
         )
         return (
@@ -101,17 +115,21 @@ class MutantQualificationTests(unittest.TestCase):
         for name, clause in self.driver.MUTANTS.items():
             with self.subTest(mutant=name):
                 clauses = [clause]
-                verdict = self._qualify(self._diagnostic(clause), 1, name, clauses)
+                verdict = self._qualify(self._diagnostic(clause, name), 1, name, clauses)
                 self.assertEqual(verdict['kind'], 'mutant')
                 self.assertEqual(verdict['clauses'], clauses)
 
     def test_a_neighbouring_clause_is_rejected(self) -> None:
-        """A failure at a clause the mutant does not owe must not qualify."""
+        """A failure at a clause the mutant does not owe must not qualify.
+
+        The failure is located inside the requested mutant's own region, so
+        the rejection turns on the clause rather than on the region.
+        """
         name = 'mutant_late'
         intended = self.driver.MUTANTS[name]
         wrong = next(clause for clause in ('k1', 'k2', 'k3', 'k5') if clause != intended)
         with self.assertRaisesRegex(RuntimeError, 'not the intended'):
-            self._qualify(self._diagnostic(wrong), 1, name, [intended])
+            self._qualify(self._diagnostic(wrong, name), 1, name, [intended])
 
     def test_an_unlocated_diagnostic_is_rejected(self) -> None:
         """A failure naming no clause line must not be a rejection."""
@@ -124,6 +142,18 @@ class MutantQualificationTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, 'own region'):
                 self._qualify(log, 1, 'mutant_err', ['k2'])
+
+    def test_another_mutants_clause_line_is_rejected(self) -> None:
+        """A failure outside this mutant's region must not qualify it.
+
+        Every wrapper states the same five clauses, so a checker that matched
+        the clause text anywhere in the file would accept `mutant_late`'s `k4`
+        line for `mutant_err`. The distinguishing fact is the enclosing
+        function, which the region check must require.
+        """
+        foreign = self._diagnostic('k4', 'mutant_late')
+        with self.assertRaisesRegex(RuntimeError, 'own region'):
+            self._qualify(foreign, 1, 'mutant_err', ['k4'])
 
     def test_a_disqualifying_error_is_rejected(self) -> None:
         """A type, syntax or unsupported-feature error must fail the run."""
@@ -145,33 +175,65 @@ class BodyMutantTests(unittest.TestCase):
     """Require the wrapping body to fail a loop invariant, not something else."""
 
     def setUp(self) -> None:
-        """Load the verdict rules once per test."""
-        self.driver = load_verdicts()
+        """Load the verdict rules and the body they qualify once per test."""
+        self.driver = load_driver()
+        self.invariant = self._invariant_line()
+
+    def _invariant_line(self) -> int:
+        """Return the line of the scan loop's invariant in the shipped body."""
+        lines = self.driver.PRODUCTION.read_text(encoding='utf-8').splitlines()
+        return next(
+            index
+            for index, text in enumerate(lines, start=1)
+            if 'invariant' in text
+        )
 
     def test_a_loop_invariant_failure_qualifies(self) -> None:
         """An invariant failure with a non-zero error count is the verdict."""
         log = (
             'error: invariant not satisfied at loop head\n'
+            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
             'verification results:: 14 verified, 1 errors\n'
         )
-        verdict = self.driver._qualify_body(log, 1)
+        verdict = self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
 
         self.assertEqual(verdict['clause'], 'loop-invariant')
 
     def test_a_verified_body_is_rejected(self) -> None:
         """A body that verifies is not a rejected mutant."""
         with self.assertRaisesRegex(RuntimeError, 'must not verify'):
-            self.driver._qualify_body(SUMMARY, 0)
+            self.driver._qualify_body(SUMMARY, 0, self.driver.WRAP_BODY)
 
     def test_a_postcondition_only_failure_is_rejected(self) -> None:
         """Some other obligation must not stand in for the loop invariant."""
         log = (
             'error: postcondition not satisfied\n'
-            '  --> scratch.rs:10:5\n'
+            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
             'verification results:: 0 verified, 1 errors\n'
         )
         with self.assertRaisesRegex(RuntimeError, 'must fail a loop invariant'):
-            self.driver._qualify_body(log, 1)
+            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
+
+    def test_an_assertion_outside_the_body_is_rejected(self) -> None:
+        """An admitted assertion is only evidence when the body raised it."""
+        log = (
+            'error: invariant not satisfied at end of loop body\n'
+            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
+            'error: assertion failed\n'
+            '  --> wrap.rs:9:5\n'
+            'verification results:: 14 verified, 2 errors\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, 'must all be located in the body'):
+            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
+
+    def test_an_unlocated_invariant_is_rejected(self) -> None:
+        """An invariant error with no location is not evidence about the body."""
+        log = (
+            'error: invariant not satisfied at loop head\n'
+            'verification results:: 14 verified, 1 errors\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, 'must name a line of the body'):
+            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
 
 
 class InvocationTests(unittest.TestCase):

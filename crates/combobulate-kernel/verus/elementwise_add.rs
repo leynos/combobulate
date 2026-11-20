@@ -114,8 +114,11 @@ pub fn witness_least_overflow() -> (r: Result<(), AddFailure>)
 /// The determinacy lemma applies to the shipped function's outcome.
 ///
 /// Stating the lemma is not evidence that it says anything about this body.
-/// This wrapper instantiates it at a concrete call, so the lemma's premises
-/// are discharged from the exported contract rather than assumed.
+/// This witness supplies the premise and then *uses* the lemma: the concrete
+/// call satisfies `contract_holds`, and every other outcome at the same input
+/// is therefore the one that call produced. Applying the lemma to two equal
+/// outcomes would establish nothing, because its conclusion would then be
+/// reflexivity rather than a fact about the clauses.
 pub proof fn witness_determinacy()
     ensures
         contract_holds(
@@ -125,16 +128,34 @@ pub proof fn witness_determinacy()
             seq![11_i64, 22, 33],
             Ok(()),
         ),
+        forall|post: Seq<i64>, r: Result<(), AddFailure>|
+            contract_holds(
+                seq![1_i64, 2, 3],
+                seq![10_i64, 20, 30],
+                seq![0_i64, 0, 0],
+                post,
+                r,
+            ) ==> post == seq![11_i64, 22, 33] && r == Ok(()),
 {
-    lemma_contract_determinate(
-        seq![1_i64, 2, 3],
-        seq![10_i64, 20, 30],
-        seq![0_i64, 0, 0],
-        seq![11_i64, 22, 33],
-        Ok(()),
-        seq![11_i64, 22, 33],
-        Ok(()),
-    );
+    assert forall|post: Seq<i64>, r: Result<(), AddFailure>|
+        contract_holds(
+            seq![1_i64, 2, 3],
+            seq![10_i64, 20, 30],
+            seq![0_i64, 0, 0],
+            post,
+            r,
+        ) implies post == seq![11_i64, 22, 33] && r == Ok(())
+    by {
+        lemma_contract_determinate(
+            seq![1_i64, 2, 3],
+            seq![10_i64, 20, 30],
+            seq![0_i64, 0, 0],
+            seq![11_i64, 22, 33],
+            Ok(()),
+            post,
+            r,
+        );
+    }
 }
 
 }
