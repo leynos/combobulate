@@ -1346,7 +1346,7 @@ with task 1.2.4 and join `make kani` then. What runs, and where:
 | `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus`  | Each run decides as `kani_logs/expected.json` records           |
 | `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`        | 8 functions verified, 0 errors                                  |
 | `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`        | Macro, attributes and single-root qualify; companion is refused |
-| `crates/combobulate-kernel/verus/elementwise_add.rs`           | `make verus-kernel` | 19 verified, 0 errors; five mutants and `wrap` rejected         |
+| `crates/combobulate-kernel/verus/elementwise_add.rs`           | `make verus-kernel` | 20 verified, 0 errors; five mutants and `wrap` rejected         |
 
 `.github/workflows/formal.yml` runs all of them on a pull request that touches
 them and weekly. The ordinary commit gates do not install or execute a
@@ -1461,14 +1461,16 @@ these logs.
 
 Two roots run. `verus/elementwise_add.rs` includes the production file by
 `#[path]`, so the proof is about the bytes Cargo compiles, and it must report
-exactly the pinned `19 verified, 0 errors` with no partial-verification suffix;
+exactly the pinned `20 verified, 0 errors` with no partial-verification suffix;
 a selection-sized run is not the crate. `verus/elementwise_add_mutants.rs`
 states the same clauses for five deliberately wrong bodies, and each runs alone
 with `--verify-root --verify-function=<name>`. A sixth, body-tier `wrap` mutant
 copies the production file under `target/`, replaces the checked addition with
-a wrapping one, and must fail a loop invariant. That sixth run is what shows
-the shipped body's own annotation catches a wrong body rather than only a wrong
-wrapper: without it, a mutant suite could be satisfied entirely by the
+a wrapping one, and must fail a loop invariant located in that copy. It runs
+under a generated root that includes the mutated copy, not under the positive
+root, which would include the unmutated production file. That sixth run is what
+shows the shipped body's own annotation catches a wrong body rather than only a
+wrong wrapper: without it, a mutant suite could be satisfied entirely by the
 wrapper's postcondition.
 
 A mutant counts as rejected only when its diagnostic is a postcondition failure
@@ -1477,6 +1479,10 @@ resolved from the file rather than hard-coded, so moving a clause keeps the
 record honest instead of stale. A diagnostic that names no location, another
 source, or a neighbouring clause does not qualify, and neither does an exit
 code by itself: a type, syntax or unsupported-feature error fails the run.
+Qualification is per diagnostic, not per distinct error text:
+`scripts/verus_kernel_diagnostic.py` pairs each `error:` with the `-->` line
+that follows it, so two failures that read alike stay two failures and an
+unlocated one cannot be absorbed by a located twin.
 `scripts/verus_kernel_verdicts.py` owns those rules and reads a log and nothing
 else; `scripts/verus_kernel.py` owns the pipeline, the log capture and the
 record. Keeping the split means the deciding rules can be unit-tested against
@@ -1519,9 +1525,12 @@ different body. The tuple is composed by `scripts/verus_kernel_identity.py` and
 checked against the shipped Rust declarations, so a catalogue id or symbol that
 drifts from the code fails a test rather than leaving a record about an
 operation that no longer exists. Re-run `make verus-kernel` after any edit to
-the kernel, the contract, the mutants, or any of the four scripts: the record
-is fully regenerated, and a committed digest that disagrees with its source
-fails a test.
+the kernel, the contract, the mutants, or any of the scripts the record binds:
+the record is fully regenerated, and a committed digest that disagrees with its
+source fails a test. The bound set is the driver, the verdict rules, the
+diagnostic reader, the body mutation, the identity statement and the record
+writer, so splitting one of them does not leave a deciding rule outside the
+record.
 
 `.github/workflows/formal.yml` runs `make verus-kernel` in its Verus job after
 the shared install-prover-tools action has installed Verus and Z3, and uploads
