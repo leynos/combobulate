@@ -75,6 +75,10 @@ MUTANT_ROOT = KERNEL / "verus/elementwise_add_mutants.rs"
 CONTRACT = KERNEL / "verus/elementwise_add_contract.rs"
 PRODUCTION = KERNEL / "src/elementwise_add.rs"
 VERDICTS = ROOT / "scripts/verus_kernel_verdicts.py"
+# The reader that pairs each diagnostic with the line it names. The verdict
+# rules are only as strong as that pairing, so a change to it must move the
+# record rather than leave a verdict attributed to an unbound rule.
+DIAGNOSTIC = ROOT / "scripts/verus_kernel_diagnostic.py"
 DRIVER = ROOT / "scripts/verus_kernel.py"
 IDENTITY = ROOT / "scripts/verus_kernel_identity.py"
 RECORD = ROOT / "scripts/kernel_record.py"
@@ -347,6 +351,7 @@ def _write_record(version: str, z3_path: Path, observations: list[dict]) -> None
         MUTANT_ROOT,
         DRIVER,
         VERDICTS,
+        DIAGNOSTIC,
         BODY,
         IDENTITY,
         RECORD,

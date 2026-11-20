@@ -49,11 +49,11 @@ class RecordTests(unittest.TestCase):
         a warm run and make the record irreproducible.
         """
         styled = '\x1b[2mInstalled \x1b[1m10 packages\x1b[0m \x1b[2min 27ms\x1b[0m\n'
-        log = f'{styled}verification results:: 19 verified, 0 errors\n'
+        log = f'{styled}verification results:: 20 verified, 0 errors\n'
 
         cleaned = self.record.portable_log(log)
 
-        self.assertEqual(cleaned, 'verification results:: 19 verified, 0 errors\n')
+        self.assertEqual(cleaned, 'verification results:: 20 verified, 0 errors\n')
 
     def test_portable_log_keeps_a_verifier_line_that_mentions_installing(self) -> None:
         """Only the helper's exact bootstrap line is noise.
@@ -97,6 +97,7 @@ class RecordTests(unittest.TestCase):
 
         self.assertIn('scripts/verus_kernel.py', digests)
         self.assertIn('scripts/verus_kernel_verdicts.py', digests)
+        self.assertIn('scripts/verus_kernel_diagnostic.py', digests)
 
     def test_the_record_binds_the_mutation_it_was_proved_by(self) -> None:
         """The wrap mutant is built by a module, so that module is a rule too.

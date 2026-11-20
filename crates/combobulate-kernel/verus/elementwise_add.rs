@@ -81,11 +81,12 @@ pub fn witness_length_mismatch() -> (r: Result<(), AddFailure>)
     r
 }
 
-/// K4's premise is inhabited: the least overflow is position 1, not 0.
+/// K4's premise is inhabited: an in-range prefix, then an overflow.
 ///
-/// The second assertion is what makes the witness discriminate: a body that
-/// reported position 0 would satisfy "some overflowing position" but not
-/// "the least one".
+/// This pins the exact position for an input whose only overflow is the last
+/// one. It does not by itself separate "least overflow" from "some overflow",
+/// which needs two overflowing positions; `witness_two_overflows` supplies
+/// that control.
 pub fn witness_least_overflow() -> (r: Result<(), AddFailure>)
     ensures
         r == Err(AddFailure::Overflow { position: 1 }),
@@ -104,6 +105,34 @@ pub fn witness_least_overflow() -> (r: Result<(), AddFailure>)
             assert(all_in_range(lhs, rhs));
         }
     };
+    assert(!(r matches Err(AddFailure::LengthMismatch))) by {
+        assert(same_len(lhs, rhs, seq![0_i64, 0]));
+    };
+    assert(out@ == seq![0_i64, 0]);
+    r
+}
+
+/// K4's "least" is inhabited: two overflows, and position 0 is named.
+///
+/// `witness_least_overflow` cannot separate "least" from "some", because its
+/// input has one overflowing position and any reporting body would name it.
+/// Here positions 0 and 1 both leave the I64 range, so a body that reported
+/// the last failing position, or any position other than the first, would
+/// satisfy "some overflowing position" and fail K4. That is the distinction
+/// the clause exists to draw, and this is the concrete input that draws it.
+pub fn witness_two_overflows() -> (r: Result<(), AddFailure>)
+    ensures
+        r == Err(AddFailure::Overflow { position: 0 }),
+        same_len(seq![i64::MAX, 1], seq![1, i64::MAX], seq![0_i64, 0]),
+        !in_range_at(seq![i64::MAX, 1], seq![1, i64::MAX], 0),
+        !in_range_at(seq![i64::MAX, 1], seq![1, i64::MAX], 1),
+{
+    let mut out = [0_i64; 2];
+    let r = add_i64_into(&[i64::MAX, 1], &[1, i64::MAX], &mut out);
+    let ghost lhs = seq![i64::MAX, 1];
+    let ghost rhs = seq![1, i64::MAX];
+    assert(!in_range_at(lhs, rhs, 0)) by { reveal(in_range_at); };
+    assert(!in_range_at(lhs, rhs, 1)) by { reveal(in_range_at); };
     assert(!(r matches Err(AddFailure::LengthMismatch))) by {
         assert(same_len(lhs, rhs, seq![0_i64, 0]));
     };
