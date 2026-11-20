@@ -14,6 +14,8 @@ mod deep_chain;
 mod diagnostics;
 #[path = "ordinary_application/failures.rs"]
 mod failures;
+#[path = "ordinary_application/ordinary_path.rs"]
+mod ordinary_path;
 #[path = "ordinary_application/refinement/mod.rs"]
 mod refinement;
 #[path = "ordinary_application/sharing.rs"]
