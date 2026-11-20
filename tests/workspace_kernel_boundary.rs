@@ -34,10 +34,13 @@ const KERNEL_SOURCE: &str = "crates/combobulate-kernel/src";
 /// The seeded tree whose root is clean and whose module is not.
 const SEEDED_TREE: &str = "tests/fixtures/kernel-source";
 
+/// A path constant in the form the walk takes.
+fn tree(path: &str) -> &camino::Utf8Path { camino::Utf8Path::new(path) }
+
 /// One in-memory file, for the cases that do not need a directory.
 fn file(path: &str, source: &str) -> KernelFile {
     KernelFile {
-        path: path.to_owned(),
+        path: camino::Utf8PathBuf::from(path),
         source: source.to_owned(),
     }
 }
@@ -58,9 +61,12 @@ fn kernel_keeps_the_no_std_boundary() {
 /// VO-6 widened: every live kernel file passes every substitute-body rule.
 #[test]
 fn every_kernel_file_keeps_one_executable_body() {
-    let files = source::sources_under(KERNEL_SOURCE).expect("the kernel source must be readable");
+    let files =
+        source::sources_under(tree(KERNEL_SOURCE)).expect("the kernel source must be readable");
     assert!(
-        files.iter().any(|file| file.path == "elementwise_add.rs"),
+        files
+            .iter()
+            .any(|file| file.path == camino::Utf8Path::new("elementwise_add.rs")),
         "the walk must reach the kernel's operation module, read {:?}",
         files.iter().map(|file| &file.path).collect::<Vec<_>>()
     );
@@ -79,7 +85,7 @@ fn every_kernel_file_keeps_one_executable_body() {
 /// last assertion.
 #[test]
 fn the_seeded_submodule_is_not_missed() {
-    let files = source::sources_under(SEEDED_TREE).expect("the seeded tree must be readable");
+    let files = source::sources_under(tree(SEEDED_TREE)).expect("the seeded tree must be readable");
     let violations = source::kernel_tree_violations(&files).join("\n");
     for expected in [
         "elementwise_add.rs: must not contain extern crate alloc",

@@ -45,12 +45,19 @@ def _scripts() -> Iterator[Path]:
     return (path for path in sorted(SCRIPTS.glob('*.py')) if _is_script(path))
 
 
+def _is_absolute_import_from(node: ast.AST) -> bool:
+    """Return whether ``node`` imports from an absolute, named module."""
+    if not isinstance(node, ast.ImportFrom):
+        return False
+    return node.level == 0 and bool(node.module)
+
+
 def _imported_modules(path: Path) -> Iterator[str]:
     """Yield each absolute module ``path`` imports, dotted names included."""
     for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
         if isinstance(node, ast.Import):
             yield from (alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+        elif _is_absolute_import_from(node):
             yield node.module
 
 
@@ -64,6 +71,26 @@ def _local_sources(module: str) -> list[Path]:
     return []
 
 
+def _resolve_module(module: str, visited: set[Path]) -> set[str]:
+    """Return what importing ``module`` costs the script's environment.
+
+    A standard-library module costs nothing, a module the repository itself
+    supplies costs whatever its own imports cost, and anything else must be
+    declared.
+    """
+    root = module.split('.')[0]
+    if root in sys.stdlib_module_names:
+        return set()
+    local = _local_sources(module)
+    if local:
+        return {
+            name
+            for source in local
+            for name in _third_party_imports(source, visited)
+        }
+    return {root}
+
+
 def _third_party_imports(path: Path, seen: set[Path] | None = None) -> set[str]:
     """Return every non-stdlib, non-local module the script tree imports.
 
@@ -75,17 +102,11 @@ def _third_party_imports(path: Path, seen: set[Path] | None = None) -> set[str]:
     if path in visited:
         return set()
     visited.add(path)
-    found: set[str] = set()
-    for module in _imported_modules(path):
-        if module.split('.')[0] in sys.stdlib_module_names:
-            continue
-        local = _local_sources(module)
-        if local:
-            for source in local:
-                found |= _third_party_imports(source, visited)
-        else:
-            found.add(module.split('.')[0])
-    return found
+    return {
+        name
+        for module in _imported_modules(path)
+        for name in _resolve_module(module, visited)
+    }
 
 
 def _normalise(name: str) -> str:

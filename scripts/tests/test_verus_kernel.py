@@ -93,9 +93,8 @@ class MutantQualificationTests(unittest.TestCase):
 
     def _qualify(self, log: str, exit_code: int, name: str, clauses: list[str]) -> dict:
         """Qualify ``log`` against the mutant root the driver compiles."""
-        return self.verdicts._qualify_mutant(
-            log, exit_code, name, clauses, self.driver.MUTANT_ROOT
-        )
+        request = self.verdicts.MutantRequest(name, clauses, self.driver.MUTANT_ROOT)
+        return self.verdicts._qualify_mutant(log, exit_code, request)
 
     def test_the_intended_clause_qualifies(self) -> None:
         """Each mutant's own clause line must produce a rejection verdict."""

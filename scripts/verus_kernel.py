@@ -62,6 +62,7 @@ from kernel_record import (
 )
 from verus_kernel_identity import identity
 from verus_kernel_verdicts import (
+    MutantRequest,
     _qualify_body,
     _qualify_mutant,
     _qualify_positive,
@@ -134,10 +135,11 @@ def main(
     environment = _verus_environment(solver)
     output = output_dir or OBSERVATIONS
     invocation = _Invocation(prover_tools, installation)
-    observations = [_positive(invocation, output, environment)]
+    context = _Context(invocation, output, environment)
+    observations = [_positive(context)]
     for name, clause in MUTANTS.items():
-        observations.append(_mutant(invocation, name, clause, output, environment))
-    observations.append(_body_mutant(invocation, output, environment))
+        observations.append(_mutant(context, name, clause))
+    observations.append(_body_mutant(context))
     _report(observations)
     if output_dir is None:
         _write_record(version, solver, observations)
@@ -228,37 +230,49 @@ class _Invocation:
         ]
 
 
-def _positive(invocation: _Invocation, output: Path, environment: dict[str, str]) -> dict:
+class _Context:
+    """The settings every observation in one run shares.
+
+    They are fixed for the whole run and meaningless apart — an output
+    directory without the environment that decides which solver those logs
+    describe is not a context. Bundling them keeps each builder's own
+    parameter, its candidate, readable without a trailing list of constants.
+    """
+
+    def __init__(
+        self, invocation: _Invocation, output: Path, environment: dict[str, str]
+    ) -> None:
+        """Remember the invocation, where logs go, and the overlaid environment."""
+        self.invocation = invocation
+        self.output = output
+        self.environment = environment
+
+
+def _positive(context: _Context) -> dict:
     """Run the positive root and qualify its exact verified count."""
-    log = output / "positive.log"
-    record = _capture(invocation.command(POSITIVE_ROOT), ROOT, log, environment)
+    log = context.output / "positive.log"
+    record = _capture(context.invocation.command(POSITIVE_ROOT), ROOT, log, context.environment)
     record["candidate"] = "positive"
     record["verdict"] = _qualify_positive(log.read_text(), record["exit_code"])
     return record
 
 
-def _mutant(
-    invocation: _Invocation,
-    name: str,
-    clause: str,
-    output: Path,
-    environment: dict[str, str],
-) -> dict:
+def _mutant(context: _Context, name: str, clause: str) -> dict:
     """Run one seeded mutant and qualify its rejection."""
-    argv = invocation.command(
+    argv = context.invocation.command(
         MUTANT_ROOT, "--extra-arg=--verify-root", f"--extra-arg=--verify-function={name}"
     )
-    log = output / f"{name}.log"
-    record = _capture(argv, ROOT, log, environment)
+    log = context.output / f"{name}.log"
+    record = _capture(argv, ROOT, log, context.environment)
     record["candidate"] = name
     clauses = [clause, *([EXTRA_CLAUSES[name]] if name in EXTRA_CLAUSES else [])]
     record["verdict"] = _qualify_mutant(
-        log.read_text(), record["exit_code"], name, clauses, MUTANT_ROOT
+        log.read_text(), record["exit_code"], MutantRequest(name, clauses, MUTANT_ROOT)
     )
     return record
 
 
-def _body_mutant(invocation: _Invocation, output: Path, environment: dict[str, str]) -> dict:
+def _body_mutant(context: _Context) -> dict:
     """Verify a wrapping copy of the shipped body and require a loop failure.
 
     The copy lives under ``target/`` so it is never built by an ordinary Cargo
@@ -281,9 +295,9 @@ def _body_mutant(invocation: _Invocation, output: Path, environment: dict[str, s
     (scratch / "elementwise_add.rs").write_text(mutated, encoding="utf-8")
     (scratch / "contract.rs").write_text(CONTRACT.read_text(encoding="utf-8"), encoding="utf-8")
     (scratch / "wrap.rs").write_text(_WRAP_ROOT, encoding="utf-8")
-    log = output / "wrap.log"
+    log = context.output / "wrap.log"
     record = _capture(
-        invocation.command(scratch / "wrap.rs"), ROOT, log, environment
+        context.invocation.command(scratch / "wrap.rs"), ROOT, log, context.environment
     )
     record["candidate"] = BODY_MUTANT
     record["verdict"] = _qualify_body(log.read_text(), record["exit_code"])

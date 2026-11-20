@@ -16,6 +16,7 @@ record.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 # The pinned positive count. It is recorded, not predicted: a change to the
@@ -38,6 +39,20 @@ _PERMITTED = ("error: postcondition not satisfied", "error: aborting due to")
 def _errors(log: str) -> list[str]:
     """Return the ``error:`` lines a Verus log reported."""
     return [line for line in log.splitlines() if line.startswith("error:")]
+
+
+@dataclass(frozen=True)
+class MutantRequest:
+    """What one mutant run claims, which its log must bear out.
+
+    The request travels as one value because the fields are only meaningful
+    together: a name without its clauses, or a clause list without the source
+    it must be read from, would let a verdict qualify the wrong region.
+    """
+
+    name: str
+    clauses: list[str]
+    source: Path
 
 
 def _qualify_positive(log: str, exit_code: int) -> dict:
@@ -64,11 +79,34 @@ def _qualify_positive(log: str, exit_code: int) -> dict:
     match = _SUMMARY.search(log)
     if match is None:
         raise RuntimeError("the positive run reported no verification summary")
+    _require_whole_crate(match)
+    _require_verified(match, exit_code)
+    return {"kind": "positive", "verified": POSITIVE_VERIFIED}
+
+
+def _require_whole_crate(match: re.Match) -> None:
+    """Reject a run that verified a selection rather than the whole crate.
+
+    Raises
+    ------
+    RuntimeError
+        When the summary carries a partial-verification suffix.
+    """
     if match["suffix"].strip():
         raise RuntimeError(
             "the positive root must verify the whole crate, not a selection: "
             f"got {match['suffix'].strip()!r}"
         )
+
+
+def _require_verified(match: re.Match, exit_code: int) -> None:
+    """Reject a run that did not verify the pinned number of obligations.
+
+    Raises
+    ------
+    RuntimeError
+        When the run failed, reported errors, or verified another count.
+    """
     if exit_code != 0 or match["errors"] != "0":
         raise RuntimeError(f"the positive run did not verify: exit {exit_code}")
     if int(match["verified"]) != POSITIVE_VERIFIED:
@@ -76,11 +114,9 @@ def _qualify_positive(log: str, exit_code: int) -> dict:
             f"the positive root verified {match['verified']}, not the pinned "
             f"{POSITIVE_VERIFIED}; review the change and update the pin"
         )
-    return {"kind": "positive", "verified": POSITIVE_VERIFIED}
 
 
-def _qualify_mutant(log: str, exit_code: int, name: str, clauses: list[str],
-                    source: Path) -> dict:
+def _qualify_mutant(log: str, exit_code: int, request: MutantRequest) -> dict:
     """Check that one mutant failed its own clauses and nothing else.
 
     The failure locations are read from the compiled source, so the recorded
@@ -93,12 +129,9 @@ def _qualify_mutant(log: str, exit_code: int, name: str, clauses: list[str],
         The captured Verus output.
     exit_code
         The helper's exit status.
-    name
-        The mutant's function name, used in every diagnostic here.
-    clauses
-        Clauses this mutant is required to violate.
-    source
-        The mutant root the diagnostic must point inside.
+    request
+        The mutant's name, the clauses it must violate, and the source its
+        diagnostic must point inside.
 
     Returns
     -------
@@ -113,26 +146,67 @@ def _qualify_mutant(log: str, exit_code: int, name: str, clauses: list[str],
     """
     match = _SUMMARY.search(log)
     if match is None:
-        raise RuntimeError(f"{name}: no verification summary was reported")
+        raise RuntimeError(f"{request.name}: no verification summary was reported")
     if exit_code != 1:
-        raise RuntimeError(f"{name}: expected exit 1, got {exit_code}")
-    errors = _errors(log)
-    if not errors:
-        raise RuntimeError(f"{name}: no error was reported")
-    unexpected = [line for line in errors if not line.startswith(_PERMITTED)]
-    if unexpected:
-        raise RuntimeError(f"{name}: disqualifying error {unexpected[0]!r}")
-    located = _located_clauses(log, source)
+        raise RuntimeError(f"{request.name}: expected exit 1, got {exit_code}")
+    located = _rejection_clauses(log, request)
+    return {"kind": "mutant", "clauses": request.clauses, "lines": located}
+
+
+def _rejection_clauses(log: str, request: MutantRequest) -> dict[int, str]:
+    """Return the located clauses, once the log is a clean rejection of them.
+
+    Every step below rejects a log that cannot be the failure the mutant owes:
+    an error the driver does not permit, no failure inside the mutant's own
+    region, or a failure at some clause other than the intended one.
+
+    Raises
+    ------
+    RuntimeError
+        When the log is not a rejection at the requested clauses.
+    """
+    _require_permitted(_errors(log), request)
+    located = _located_clauses(log, request.source)
     if not located:
-        raise RuntimeError(f"{name}: no failure named a clause of its own region")
+        raise RuntimeError(f"{request.name}: no failure named a clause of its own region")
     reported = set(located.values())
-    missing = [clause for clause in clauses if clause not in reported]
+    missing = [clause for clause in request.clauses if clause not in reported]
     if missing:
         raise RuntimeError(
-            f"{name}: the failure named {sorted(reported)}, not the intended "
-            f"{sorted(clauses)}"
+            f"{request.name}: the failure named {sorted(reported)}, not the intended "
+            f"{sorted(request.clauses)}"
         )
-    return {"kind": "mutant", "clauses": clauses, "lines": located}
+    return located
+
+
+def _disqualifying(errors: list[str], permitted: tuple[str, ...]) -> list[str]:
+    """Return the error lines outside ``permitted``, which no verdict admits.
+
+    Both tiers ask the same question of a log — whether every error it
+    reported is one its verdict allows — so the test lives in one place and
+    each caller supplies the set it permits.
+    """
+    return [line for line in errors if not line.startswith(permitted)]
+
+
+def _require_permitted(errors: list[str], request: MutantRequest) -> None:
+    """Reject a log whose errors include one the mutant does not owe.
+
+    A rejection is a compile that reached the verifier and failed an
+    obligation. A type, syntax, or unsupported-feature error means the
+    candidate never got that far, so it is not evidence whatever else the log
+    says.
+
+    Raises
+    ------
+    RuntimeError
+        When no error was reported, or one is outside the permitted set.
+    """
+    if not errors:
+        raise RuntimeError(f"{request.name}: no error was reported")
+    unexpected = _disqualifying(errors, _PERMITTED)
+    if unexpected:
+        raise RuntimeError(f"{request.name}: disqualifying error {unexpected[0]!r}")
 
 
 def _located_clauses(log: str, source: Path) -> dict[int, str]:
@@ -182,14 +256,22 @@ def _qualify_body(log: str, exit_code: int) -> dict:
         raise RuntimeError("the body mutant reported no verification summary")
     if exit_code != 1 or match["errors"] == "0":
         raise RuntimeError("the wrapping body must not verify")
-    errors = _errors(log)
-    unexpected = [
-        line
-        for line in errors
-        if not line.startswith((*_PERMITTED, "error: invariant not satisfied"))
-    ]
+    _require_loop_invariant(_errors(log))
+    return {"kind": "body-mutant", "clause": "loop-invariant"}
+
+
+def _require_loop_invariant(errors: list[str]) -> None:
+    """Reject a body mutant that failed at anything but a loop invariant.
+
+    Raises
+    ------
+    RuntimeError
+        When an error is outside the permitted set, or no loop invariant is
+        among them.
+    """
+    permitted = (*_PERMITTED, "error: invariant not satisfied")
+    unexpected = _disqualifying(errors, permitted)
     if unexpected:
         raise RuntimeError(f"body mutant: disqualifying error {unexpected[0]!r}")
     if not any("invariant not satisfied" in line for line in errors):
         raise RuntimeError("the body mutant must fail a loop invariant")
-    return {"kind": "body-mutant", "clause": "loop-invariant"}
