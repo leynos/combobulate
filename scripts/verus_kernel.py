@@ -60,6 +60,7 @@ from kernel_record import (
     portable_log,
     structural_digest,
 )
+from verus_kernel_body import WRAP_ROOT, wrapping_body
 from verus_kernel_identity import identity
 from verus_kernel_verdicts import (
     MutantRequest,
@@ -77,8 +78,16 @@ VERDICTS = ROOT / "scripts/verus_kernel_verdicts.py"
 DRIVER = ROOT / "scripts/verus_kernel.py"
 IDENTITY = ROOT / "scripts/verus_kernel_identity.py"
 RECORD = ROOT / "scripts/kernel_record.py"
+# The rule that builds the wrap mutant. It decides an observation, so the
+# record must name it: a changed mutation would otherwise leave a verdict
+# attributed to whichever script was bound at the time.
+BODY = ROOT / "scripts/verus_kernel_body.py"
 OBSERVATIONS = ROOT / "tools/verifier-fixtures/verus-kernel"
 KERNEL_WRAP = ROOT / "target/verus-kernel-wrap"
+
+# The copy of the shipped body the wrap root compiles, which the
+# body mutant's verdict must locate its failure inside.
+WRAP_BODY = KERNEL_WRAP / "elementwise_add.rs"
 
 # Variables the verifier must not inherit. Verus sets its own toolchain, and a
 # compiler wrapper such as sccache would sit in front of it; Verus refuses to
@@ -282,45 +291,17 @@ def _body_mutant(context: _Context) -> dict:
     shutil.rmtree(scratch, ignore_errors=True)
     scratch.mkdir(parents=True)
     shipped = PRODUCTION.read_text(encoding="utf-8")
-    mutated = shipped.replace(
-        "lhs[scan].checked_add(rhs[scan]).is_none()",
-        "lhs[scan].checked_add(rhs[scan]).is_some() && false",
-    )
-    if mutated == shipped:
-        raise RuntimeError(
-            "the body mutation no longer matches the shipped source; it replaces "
-            "`lhs[scan].checked_add(rhs[scan]).is_none()`, so renaming the pass-1 "
-            "counter breaks it rather than silently producing an unmutated copy"
-        )
-    (scratch / "elementwise_add.rs").write_text(mutated, encoding="utf-8")
+    mutated = wrapping_body(shipped)
+    WRAP_BODY.write_text(mutated, encoding="utf-8")
     (scratch / "contract.rs").write_text(CONTRACT.read_text(encoding="utf-8"), encoding="utf-8")
-    (scratch / "wrap.rs").write_text(_WRAP_ROOT, encoding="utf-8")
+    (scratch / "wrap.rs").write_text(WRAP_ROOT, encoding="utf-8")
     log = context.output / "wrap.log"
     record = _capture(
         context.invocation.command(scratch / "wrap.rs"), ROOT, log, context.environment
     )
     record["candidate"] = BODY_MUTANT
-    record["verdict"] = _qualify_body(log.read_text(), record["exit_code"])
+    record["verdict"] = _qualify_body(log.read_text(), record["exit_code"], WRAP_BODY)
     return record
-
-
-_WRAP_ROOT = """//! Generated root for the body-tier wrapping mutant.
-#![no_std]
-#![feature(proc_macro_hygiene)]
-#![allow(dead_code)]
-use vstd::prelude::*;
-
-#[path = "contract.rs"]
-mod contract;
-#[path = "elementwise_add.rs"]
-mod elementwise_add;
-
-verus! {
-pub fn wrap(lhs: &[i64], rhs: &[i64], out: &mut [i64]) -> (r: Result<(), elementwise_add::AddFailure>) {
-    elementwise_add::add_i64_into(lhs, rhs, out)
-}
-}
-"""
 
 
 def _report(observations: list[dict]) -> None:
@@ -366,6 +347,7 @@ def _write_record(version: str, z3_path: Path, observations: list[dict]) -> None
         MUTANT_ROOT,
         DRIVER,
         VERDICTS,
+        BODY,
         IDENTITY,
         RECORD,
     ]

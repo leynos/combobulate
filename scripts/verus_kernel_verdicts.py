@@ -28,6 +28,7 @@ _SUMMARY = re.compile(
     r"(?m)^verification results:: (?P<verified>\d+) verified, (?P<errors>\d+) errors(?P<suffix>[^\n]*)$"
 )
 _LOCATION = re.compile(r"(?m)^\s*-->\s*(?P<path>.+?):(?P<line>\d+):(?P<column>\d+)$")
+_FUNCTION = re.compile(r"(?m)^\s*pub fn (?P<name>\w+)\s*\(")
 _CLAUSE = re.compile(r"(?m)^\s*(?P<clause>k[1-5])\(.*$")
 
 # Errors that may accompany a verdict without disqualifying it. A rejection is
@@ -166,7 +167,7 @@ def _rejection_clauses(log: str, request: MutantRequest) -> dict[int, str]:
         When the log is not a rejection at the requested clauses.
     """
     _require_permitted(_errors(log), request)
-    located = _located_clauses(log, request.source)
+    located = _located_clauses(log, request)
     if not located:
         raise RuntimeError(f"{request.name}: no failure named a clause of its own region")
     reported = set(located.values())
@@ -209,20 +210,57 @@ def _require_permitted(errors: list[str], request: MutantRequest) -> None:
         raise RuntimeError(f"{request.name}: disqualifying error {unexpected[0]!r}")
 
 
-def _located_clauses(log: str, source: Path) -> dict[int, str]:
+def _region(text: list[str], name: str) -> tuple[int, int]:
+    """Return the first and last line of the mutant function called ``name``.
+
+    The mutant root holds every seeded wrapper in one file, so a line number
+    alone cannot say which mutant a diagnostic belongs to: `mutant_err` and
+    `mutant_late` both state `k4`, and only their enclosing functions differ.
+    The region runs from the function's own signature to the closing brace at
+    column zero, which is the form every wrapper in this file takes.
+
+    Raises
+    ------
+    RuntimeError
+        When no function of that name is defined, since a verdict about a
+        missing region would be a verdict about nothing.
+    """
+    starts = [
+        index
+        for index, line in enumerate(text, start=1)
+        if (found := _FUNCTION.match(line)) is not None and found["name"] == name
+    ]
+    if not starts:
+        raise RuntimeError(f"the mutant source defines no function {name!r}")
+    start = starts[0]
+    end = next(
+        (line for line in range(start, len(text) + 1) if text[line - 1] == "}"),
+        len(text),
+    )
+    return start, end
+
+
+def _located_clauses(log: str, request: MutantRequest) -> dict[int, str]:
     """Map each failed clause line to the clause name written there.
 
     A diagnostic names a file and a line; the clause is whatever `k1` to `k5`
-    call sits on that line of the mutant source. Reading it from the source
-    means a reordered clause list cannot produce a false pass.
+    call sits on that line. Both facts are read from the source, and the line
+    must fall inside the region of the mutant being verified, so a rejection
+    reported for another wrapper in the same file cannot qualify this one.
+
+    Raises
+    ------
+    RuntimeError
+        When no function of the requested name exists in the source.
     """
-    text = source.read_text(encoding="utf-8").splitlines()
+    text = request.source.read_text(encoding="utf-8").splitlines()
+    first, last = _region(text, request.name)
     located: dict[int, str] = {}
     for match in _LOCATION.finditer(log):
-        if Path(match["path"]).name != source.name:
+        if Path(match["path"]).name != request.source.name:
             continue
         line = int(match["line"])
-        if not 1 <= line <= len(text):
+        if not first <= line <= last:
             continue
         clause = _CLAUSE.match(text[line - 1])
         if clause is not None:
@@ -230,7 +268,7 @@ def _located_clauses(log: str, source: Path) -> dict[int, str]:
     return located
 
 
-def _qualify_body(log: str, exit_code: int) -> dict:
+def _qualify_body(log: str, exit_code: int, source: Path) -> dict:
     """Check the body mutant failed a loop invariant and nothing else.
 
     Parameters
@@ -239,6 +277,8 @@ def _qualify_body(log: str, exit_code: int) -> dict:
         The captured Verus output.
     exit_code
         The helper's exit status.
+    source
+        The mutated body the invariant failure must be located in.
 
     Returns
     -------
@@ -256,22 +296,68 @@ def _qualify_body(log: str, exit_code: int) -> dict:
         raise RuntimeError("the body mutant reported no verification summary")
     if exit_code != 1 or match["errors"] == "0":
         raise RuntimeError("the wrapping body must not verify")
-    _require_loop_invariant(_errors(log))
+    _require_loop_invariant(log, _errors(log), source)
     return {"kind": "body-mutant", "clause": "loop-invariant"}
 
 
-def _require_loop_invariant(errors: list[str]) -> None:
-    """Reject a body mutant that failed at anything but a loop invariant.
+def _failures_in(log: str, source: Path) -> list[str]:
+    """Return the error lines whose diagnostic names ``source``.
+
+    Verus prints an error and then, on a following line, the `-->` location it
+    refers to. Reading the two together is what lets a rule ask whether a
+    failure happened in the body, rather than whether the file was named
+    somewhere in the log.
+    """
+    found: list[str] = []
+    pending: str | None = None
+    for line in log.splitlines():
+        if line.startswith("error:"):
+            pending = line
+        elif (location := _LOCATION.match(line)) is not None:
+            if pending is not None and Path(location["path"]).name == source.name:
+                found.append(pending)
+            pending = None
+    return found
+
+
+def _require_loop_invariant(log: str, errors: list[str], source: Path) -> None:
+    """Reject a body mutant that failed at anything but a located loop invariant.
+
+    An invariant error is only evidence about the mutated body when the
+    diagnostic names a line inside it. A run that reported the failure without
+    a location could have failed anywhere, including in the wrapper that is
+    supposed to be unchanged, so the location is required rather than assumed.
+
+    A mutation that replaces arithmetic also breaks the body's own proof
+    assertions, which are obligations about the mutated code that fail for the
+    same reason the invariant does. `error: assertion failed` is therefore
+    admitted, but only when the failures located in the body explain every
+    admitted error: an assertion anywhere else still disqualifies the run.
 
     Raises
     ------
     RuntimeError
-        When an error is outside the permitted set, or no loop invariant is
-        among them.
+        When an error is outside the permitted set, no loop invariant is among
+        them, or some failure carries no location in the body.
     """
-    permitted = (*_PERMITTED, "error: invariant not satisfied")
+    permitted = (*_PERMITTED, "error: invariant not satisfied", "error: assertion failed")
     unexpected = _disqualifying(errors, permitted)
     if unexpected:
         raise RuntimeError(f"body mutant: disqualifying error {unexpected[0]!r}")
     if not any("invariant not satisfied" in line for line in errors):
         raise RuntimeError("the body mutant must fail a loop invariant")
+    located = _failures_in(log, source)
+    if not located:
+        raise RuntimeError("the body mutant's invariant failure must name a line of the body")
+    # An obligation reported without a location could have failed in the
+    # wrapper, so every admitted failure has to be one the body raised.
+    unexplained = [
+        line
+        for line in errors
+        if not line.startswith("error: aborting due to") and line not in located
+    ]
+    if unexplained:
+        raise RuntimeError(
+            f"the body mutant's failures must all be located in the body, but "
+            f"{unexplained[0]!r} names no line of it"
+        )

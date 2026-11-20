@@ -98,6 +98,16 @@ class RecordTests(unittest.TestCase):
         self.assertIn('scripts/verus_kernel.py', digests)
         self.assertIn('scripts/verus_kernel_verdicts.py', digests)
 
+    def test_the_record_binds_the_mutation_it_was_proved_by(self) -> None:
+        """The wrap mutant is built by a module, so that module is a rule too.
+
+        ``verus_kernel_body`` decides which two sites the wrap root mutates and
+        what replaces them. An unbound mutation would let a reader re-run the
+        recorded command against a different body and still call it the same
+        evidence.
+        """
+        self.assertIn('scripts/verus_kernel_body.py', self._record()['source_digests'])
+
     def test_the_record_binds_the_digest_rule_it_was_computed_by(self) -> None:
         """The structural digest is a rule too, so its source must be bound."""
         self.assertIn('scripts/kernel_record.py', self._record()['source_digests'])

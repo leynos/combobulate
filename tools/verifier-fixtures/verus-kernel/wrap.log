@@ -1,11 +1,23 @@
 verification results:: 14 verified, 1 errors
+note: while loop: not all errors may have been reported; rerun with a higher value for --multiple-errors to find other potential errors in this function
+   --> <repo>/target/verus-kernel-wrap/elementwise_add.rs:133:5
+    |
+133 |     while scan < n {
+    |     ^^^^^^^^^^^^^^
+
 error: invariant not satisfied at end of loop body
    --> <repo>/target/verus-kernel-wrap/elementwise_add.rs:129:13
     |
 129 |             forall|j: int| 0 <= j < scan ==> #[trigger] in_range_at(lhs@, rhs@, j),
     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: aborting due to 1 previous error
+error: assertion failed
+   --> <repo>/target/verus-kernel-wrap/elementwise_add.rs:138:29
+    |
+138 |             proof! { assert(!in_range_at(lhs@, rhs@, scan as int)); }
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ assertion failed
+
+error: aborting due to 2 previous errors
 
 Verus proofs failed (exit 1).
 Binary: <repo>/.verus/0.2026.09.06.8dea4a2/verus/verus
