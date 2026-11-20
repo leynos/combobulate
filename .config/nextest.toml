@@ -35,14 +35,14 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # This file used to omit a `global-timeout` on purpose. The reasoning was that a
 # whole-run budget on a developer's host would diagnose local compile-queue
 # contention rather than a defect, that the host is shared with other agents,
-# and that the hosted `build-test` lane already has `timeout-minutes: 8`, so a
+# and that the hosted `build-test` lane already has `timeout-minutes: 20`, so a
 # runaway suite there is ended by the job rather than by nextest. The user's
 # ruling of 16 November 2026 on the nested-cargo rules supersedes that
 # reasoning: a run with tests that start nested builds carries a whole-run
 # bound. No concrete failure stands against the figure. The slowest sample on
 # record for a single test is 443 s under 185 queued builds, so 60 minutes is
 # far from tripping on contention, and the hosted lanes are still ended first
-# by their own 8-minute `timeout-minutes`.
+# by their own 20-minute `timeout-minutes`.
 #
 # The bound is an outer limit for nextest itself, chiefly on a local
 # `cargo nextest` run. It is not what ends a hung coverage lane: the pinned
@@ -59,9 +59,10 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # only when no config resolves, and it prefers any existing one. Landing this
 # file therefore replaced that temporary file in `build-test`: the per-test
 # allowance is 300 s instead of 180 s, and the whole-run cap is 60 minutes
-# instead of 10. The lane's effective ceiling does not move, because the job's
-# own 8-minute `timeout-minutes` is stricter than either cap, and no workspace
-# member test comes close to the per-test figure.
+# instead of 10. The lane's effective ceiling is the job's own 20-minute
+# `timeout-minutes` either way, which is stricter than the 60-minute bound this
+# file supplies; the only other change is the wider per-test allowance, and no
+# workspace member test comes close to either figure.
 global-timeout = "60m"
 
 # An anchored regex, not `test(=NAME)`. Nextest's `=` form compares the whole

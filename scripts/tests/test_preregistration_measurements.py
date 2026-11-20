@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import re
 import sys
 import unittest
 from datetime import datetime, timedelta
@@ -174,24 +175,32 @@ class WorkflowAndCi(unittest.TestCase):
     """Pin the hosted CI control and prevent failures hiding in the p90 tail."""
 
     def test_workflow_runner_and_timeout_match_ac07(self):
-        """Bind the CI workflow runner and timeout to AC-07."""
-        jobs = (RequiredJob('build-test', 'ubuntu-24.04', 8),
-                RequiredJob('polars-lint', 'ubuntu-24.04', 8),
-                RequiredJob('polars-test', 'ubuntu-24.04', 8))
+        """Bind the CI workflow runner and timeout to AC-07.
+
+        The budget is read from the register rather than written here: a
+        hard-coded figure would make this fixture disagree with the control the
+        moment the control's budget changed, and the disagreement would read as
+        a workflow defect rather than a stale test.
+        """
+        timeout = CI_CONTROL['frozen']['decision_rule']['thresholds']['timeout_minutes']
+        jobs = (RequiredJob('build-test', 'ubuntu-24.04', timeout),
+                RequiredJob('polars-lint', 'ubuntu-24.04', timeout),
+                RequiredJob('polars-test', 'ubuntu-24.04', timeout))
         check_acceptance_workflow(AcceptanceWorkflowSettings(jobs), CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'runner.*does not match AC-07'):
             check_acceptance_workflow(
-                AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-latest', 8),)),
+                AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-latest', timeout),)),
                 CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'timeout.*does not match AC-07'):
             check_acceptance_workflow(
-                AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-24.04', 9),)),
+                AcceptanceWorkflowSettings((RequiredJob('build-test', 'ubuntu-24.04', timeout + 1),)),
                 CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'at least one required pull-request job'):
             check_acceptance_workflow(AcceptanceWorkflowSettings(()), CI_CONTROL)
         with self.assertRaisesRegex(AssertionError, 'polars-test runner'):
             check_acceptance_workflow(
-                AcceptanceWorkflowSettings(jobs[:2] + (RequiredJob('polars-test', 'ubuntu-latest', 8),)),
+                AcceptanceWorkflowSettings(
+                    jobs[:2] + (RequiredJob('polars-test', 'ubuntu-latest', timeout),)),
                 CI_CONTROL)
 
     def test_two_timeouts_fail_even_when_fast_successes_keep_p90_low(self):
@@ -315,18 +324,27 @@ class WorkflowAndCi(unittest.TestCase):
             RECORD_VALIDATOR.validate(no_samples)
 
     def test_calibration_p90_must_fit_registered_budget(self):
-        """Reject calibration whose recorded p90 exceeds the frozen budget."""
+        """Reject calibration whose recorded p90 exceeds the frozen budget.
+
+        The over-budget sample is derived from the registered p90 threshold
+        rather than written down, so widening the budget cannot leave this case
+        asserting a figure the control no longer holds. A sample exactly one
+        second past the budget keeps the boundary the one under test.
+        """
         calibration = ValidationContext(ROOT).load('spec/calibration/ci-history.json')
         control = copy.deepcopy(CI_CONTROL)
+        budget_seconds = control['frozen']['decision_rule']['thresholds']['p90_minutes'] * 60
+        over_budget = float(budget_seconds + 1)
         workload = next(item for item in calibration['workloads'] if item['id'] == 'ci-build-test')
-        workload['samples'] = [500.0] * 20
-        workload['median'] = 500.0
+        workload['samples'] = [over_budget] * 20
+        workload['median'] = over_budget
         for attempt in workload['attempts']:
-            attempt['wall_seconds'] = 500.0
+            attempt['wall_seconds'] = over_budget
             started_at = datetime.fromisoformat(attempt['started_at'].replace('Z', '+00:00'))
-            attempt['completed_at'] = (started_at + timedelta(seconds=500)).isoformat().replace('+00:00', 'Z')
-        control['frozen']['calibration']['derivation'] = 'nearest-rank p90 500 s.'
-        with self.assertRaisesRegex(AssertionError, 'calibration p90 500.0 s exceeds its 480 s budget'):
+            attempt['completed_at'] = (started_at + timedelta(seconds=over_budget)).isoformat().replace('+00:00', 'Z')
+        control['frozen']['calibration']['derivation'] = f'nearest-rank p90 {over_budget} s.'
+        expected = f'calibration p90 {over_budget} s exceeds its {budget_seconds} s budget'
+        with self.assertRaisesRegex(AssertionError, re.escape(expected)):
             check_ci_calibration(control, {'spec/calibration/ci-history.json': calibration})
 
     def test_calibration_derivation_must_match_the_recorded_attempt_p90(self):

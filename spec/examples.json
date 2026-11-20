@@ -1046,6 +1046,132 @@
         }
       ],
       "expected_error": "DtypeMismatch"
+    },
+    {
+      "id": "EX89",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          10,
+          20,
+          30
+        ]
+      ],
+      "expected": [
+        11,
+        22,
+        33
+      ]
+    },
+    {
+      "id": "EX90",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [],
+        []
+      ],
+      "expected": []
+    },
+    {
+      "id": "EX91",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [
+          {
+            "i64": "9223372036854775807"
+          },
+          {
+            "i64": "-9223372036854775808"
+          }
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "expected": [
+        {
+          "i64": "9223372036854775807"
+        },
+        {
+          "i64": "-9223372036854775808"
+        }
+      ]
+    },
+    {
+      "id": "EX92",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [
+          0,
+          {
+            "i64": "9223372036854775807"
+          }
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "expected_error": "IntegerOverflow at position 1"
+    },
+    {
+      "id": "EX93",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [
+          {
+            "i64": "9223372036854775807"
+          },
+          {
+            "i64": "9223372036854775807"
+          }
+        ],
+        [
+          1,
+          1
+        ]
+      ],
+      "expected_error": "IntegerOverflow at position 0"
+    },
+    {
+      "id": "EX94",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [
+          1,
+          2,
+          3
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "expected_error": "ShapeAgreement"
+    },
+    {
+      "id": "EX95",
+      "contract": "SC-12",
+      "operation": "elementwise_add",
+      "args": [
+        [],
+        [
+          1
+        ]
+      ],
+      "expected_error": "ShapeAgreement"
     }
   ],
   "semantic_changes_from_0_1": "none"

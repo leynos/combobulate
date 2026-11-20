@@ -1,0 +1,278 @@
+{
+  "verus": "0.2026.09.06.8dea4a2",
+  "z3": "~/.cache/uv/archive-v0/hPnTuCdDC4hFXVHn/bin/z3",
+  "z3_sha256": "a06c2a851d58c5f5a7c1e5de188fd0e1b1135e778112aee83ffd1a433685516b",
+  "admission": "PF05.proof@2.3.5 re-runs these; they are not admitted evidence",
+  "identity": {
+    "catalogue_id": "V001",
+    "operation": {
+      "name": "add",
+      "catalogue_id": "V001"
+    },
+    "dtype": "I64",
+    "symbol": "combobulate_kernel::elementwise_add::add_i64_into",
+    "executable": {
+      "path": "crates/combobulate-kernel/src/elementwise_add.rs",
+      "digest": "ast-sha256:13f2a4f28333824f43ece4f4001bd031cd812efe486c38f125e83ec1a2b145dd"
+    },
+    "specification": {
+      "path": "crates/combobulate-kernel/verus/elementwise_add_contract.rs",
+      "digest": "ast-sha256:a170f3ef3104e330c4663b8f971b46b54ad05e28512643fb0805394f84399b0f"
+    },
+    "semantic_policy": "checked-i64"
+  },
+  "source_digests": {
+    "crates/combobulate-kernel/verus/elementwise_add_contract.rs": "ast-sha256:a170f3ef3104e330c4663b8f971b46b54ad05e28512643fb0805394f84399b0f",
+    "crates/combobulate-kernel/src/elementwise_add.rs": "ast-sha256:13f2a4f28333824f43ece4f4001bd031cd812efe486c38f125e83ec1a2b145dd",
+    "crates/combobulate-kernel/verus/elementwise_add.rs": "ast-sha256:1693aaf7d97b7391410f1c53e96c2abd87b3a1fad1a3858d849e63b0ca01a9ea",
+    "crates/combobulate-kernel/verus/elementwise_add_mutants.rs": "ast-sha256:1d07bb6b817f5e9791196484a6027fe22d6517a583e729fa56b74788ef29aa3c",
+    "scripts/verus_kernel.py": "ast-sha256:b1a1b2acbe2cc9fae855a05b04ead6eafe06343431cc5e2d853be5278c945802",
+    "scripts/verus_kernel_verdicts.py": "ast-sha256:042da6bf558d640dd06335d0585087f1a7c31a88917990dedf2338bc318c29b6",
+    "scripts/verus_kernel_diagnostic.py": "ast-sha256:73ccfb4f8aa78af4feaae1f5e65dba4f6dc24bdb6a4ce917d167535e23d62f21",
+    "scripts/verus_kernel_body.py": "ast-sha256:bce1275f98485e35eb9994e8652b3c2a5afcc9d0f7ad051e6e9361ed4534435e",
+    "scripts/verus_kernel_identity.py": "ast-sha256:7b378dcdc8812c7d7ba7b255e856ddae692a61cfeb2844a957ed0a48ee207d0f",
+    "scripts/kernel_record.py": "ast-sha256:bd6ee1ad459573658928caa7797596f9e1dda1fad23c4ce4ef133aae51ef075f"
+  },
+  "observations": [
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/crates/combobulate-kernel/verus/elementwise_add.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "log": "tools/verifier-fixtures/verus-kernel/positive.log",
+      "sha256": "5d154b875cfeff83eb8ac9f15167b4f5ecd2b322e141f9bef3c4e0fa7b7a807d",
+      "candidate": "positive",
+      "verdict": {
+        "kind": "positive",
+        "verified": 20
+      }
+    },
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=mutant_err"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-kernel/mutant_err.log",
+      "sha256": "639cffdc2e330cf409a8e38481bf1dbf94d8539e698d06268147a4543c3cd459",
+      "candidate": "mutant_err",
+      "verdict": {
+        "kind": "mutant",
+        "clauses": [
+          "k2",
+          "k3"
+        ],
+        "lines": {
+          "40": "k2",
+          "41": "k3"
+        }
+      }
+    },
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=mutant_late"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-kernel/mutant_late.log",
+      "sha256": "f428e1e773134692a0666ba28692070073bec954eddf9b2b90187d8702529043",
+      "candidate": "mutant_late",
+      "verdict": {
+        "kind": "mutant",
+        "clauses": [
+          "k4"
+        ],
+        "lines": {
+          "58": "k4"
+        }
+      }
+    },
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=mutant_ok_on_overflow"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-kernel/mutant_ok_on_overflow.log",
+      "sha256": "1bbc85ee5106dd18f12e935556b4110c93ae6b9ae335a7a036b943dcb9cf1bf0",
+      "candidate": "mutant_ok_on_overflow",
+      "verdict": {
+        "kind": "mutant",
+        "clauses": [
+          "k1"
+        ],
+        "lines": {
+          "82": "k1"
+        }
+      }
+    },
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=mutant_mismatch_write"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-kernel/mutant_mismatch_write.log",
+      "sha256": "4baaa2ac3e48bc55f152ad3948463a647e4c1be3782a8cddc58af30ec8a64c16",
+      "candidate": "mutant_mismatch_write",
+      "verdict": {
+        "kind": "mutant",
+        "clauses": [
+          "k5"
+        ],
+        "lines": {
+          "107": "k5"
+        }
+      }
+    },
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024",
+        "--extra-arg=--verify-root",
+        "--extra-arg=--verify-function=mutant_early_write"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-kernel/mutant_early_write.log",
+      "sha256": "fecdf1b5d73f754820059f4531a265fad0366080956966b18885e85dfed5abde",
+      "candidate": "mutant_early_write",
+      "verdict": {
+        "kind": "mutant",
+        "clauses": [
+          "k5"
+        ],
+        "lines": {
+          "133": "k5"
+        }
+      }
+    },
+    {
+      "command": [
+        "uv",
+        "tool",
+        "run",
+        "--from",
+        "git+https://github.com/leynos/rust-prover-tools@592558f7183b554fc749696246984c5d7300d029",
+        "prover-tools",
+        "verus",
+        "run",
+        "--repo-root",
+        "<repo>",
+        "--proof-file",
+        "<repo>/target/verus-kernel-wrap/wrap.rs",
+        "--verus-bin",
+        "<repo>/.verus/0.2026.09.06.8dea4a2/verus",
+        "--extra-arg=--crate-type=lib",
+        "--extra-arg=--edition=2024"
+      ],
+      "cwd": ".",
+      "exit_code": 1,
+      "log": "tools/verifier-fixtures/verus-kernel/wrap.log",
+      "sha256": "292a14444db64d014843de5c10977582dea62585c49a279d2294f134f60a60b3",
+      "candidate": "wrap",
+      "verdict": {
+        "kind": "body-mutant",
+        "clause": "loop-invariant"
+      }
+    }
+  ]
+}

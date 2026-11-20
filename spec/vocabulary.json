@@ -13,7 +13,7 @@
       "name": "add",
       "signature": "(numeric, numeric) -> numeric",
       "shape": "Same shape or scalar extension.",
-      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates. Contract: SC-04.",
+      "contract": "Same dtype; checked I64 overflow; F64 follows the specified floating operation; null propagates. Elementwise I64 add requires equal lengths and reports the least overflowing position. Contract: SC-04 for dtype conversion; SC-12 for checked I64 addition.",
       "execution": "Pointwise; no reassociation or operand reordering by default.",
       "scope": "Core",
       "roadmap_tasks": [

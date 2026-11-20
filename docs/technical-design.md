@@ -102,9 +102,11 @@ asserts that against live `cargo metadata` and `cargo tree` output.
 The default facade features enable macros and Polars, spelled
 `default = ["macros", "polars"]`. Native-only execution and the proof SDK
 profiles remain available without Polars; ordinary consumers need no verifier
-installation. The facade's only public item in this task is `BuildProfile`,
-which reports the compiled features and the target's `usize` width. Glam is
-opt-in. A companion proof package can organize exported metadata/lemmas, but
+installation. Task 1.2.1's facade item is `BuildProfile`, which reports the
+compiled features and the target's `usize` width; task 1.2.2 adds the minimal
+value and expression path described in §4.1 and
+[ADR-0012](adrs/adr-0012-minimal-value-and-expression-representation.md). Glam
+is opt-in. A companion proof package can organize exported metadata/lemmas, but
 must bind to production bodies rather than replace them. The early
 shared-kernel and downstream probes must validate this arrangement before
 feature or proof-API stabilization.
@@ -160,6 +162,22 @@ graph fragments. A `PreparedPlan` records validated requirements, eligible
 stages, dynamic obligations, resource bindings, and the chosen execution
 policy. N-ary operations use the same internal argument-vector model without
 adding large public generic types.
+
+Task 1.2.2 implements the first slice of that model, recorded in
+[ADR-0012](adrs/adr-0012-minimal-value-and-expression-representation.md). The
+facade exports `Array`, `Dtype`, `AExpr`, `Unary`, `Binary`, `OperationId`,
+`identity`, `add`, `NativeExecutor`, `PreparedPlan`, `Stage`, `Failure` and
+`ExpressionError`. `Array::from_i64` moves a `Vec<i64>` into shared storage
+without copying it, `AExpr::then` applies a `Unary` and `AExpr::prepare` builds
+a plan, and the plan's `execute` or the expression's `collect` produces the
+value. Values hold their elements in one `Arc<Vec<i64>>`: identity returns its
+operand's handle rather than a node, and an addition allocates one output
+buffer. Applying `identity` or `add` to an expression runs no kernel; the
+`elementwise_add` kernel module in `combobulate-kernel` is reached only from
+execution, through the facade's single crate-private dispatch function. The
+static length model and its failure ordering, the linear schedule preparation
+emits, and the identity tuple that binds the verified body to `SC-12` are all
+stated in ADR-0012.
 
 Array dtypes are dynamic metadata. Typed batches retain a coarse element type
 in Rust. Optional rank markers can improve a small set of APIs, but arbitrary
@@ -336,7 +354,7 @@ Both routes implement the same ordered neighbourhood and numeric contract.
 ### 6.1. Dtypes and exceptional values
 
 [ADR-0006](adrs/adr-0006-numeric-validity-and-reduction-contracts.md) records
-the contracts of this section as `SC-01` to `SC-09` and `SC-11` in
+the contracts of this section as `SC-01` to `SC-09`, `SC-11` and `SC-12` in
 `spec/semantic-contracts.json`, each with executable examples, seeded
 mutations, and a proof sketch.
 
@@ -345,9 +363,11 @@ subtype. Mixed I64/F64 arithmetic requires an explicit cast except for `div`,
 which converts each operand to F64 (round to nearest, ties to even) and then
 applies IEEE division ([D14](decision-register.md#d14)). `idiv` truncates
 towards zero; `rem` follows the truncating quotient. Checked integer operations
-reject overflow, including the specified MIN/-1 division/remainder case. The
-conversion of large I64 values to F64 can round and remains explicit except
-within documented true division and aggregate definitions.
+reject overflow, including the specified MIN/-1 division/remainder case.
+Elementwise I64 `add` is fixed by `SC-12`: equal operand lengths are required,
+and of the positions that overflow it reports the least. The conversion of
+large I64 values to F64 can round and remains explicit except within documented
+true division and aggregate definitions.
 
 F64 arithmetic follows the selected floating implementation's operation
 semantics. Ordinary division, square root, logarithm, and power can produce
@@ -565,6 +585,34 @@ or refuses the transformation. Explain output shows rejected high-value fast
 paths when a semantic mismatch would otherwise confuse the user, such as
 null-skipping or scan association. A performance preference never overrides a
 requirement to execute faithfully.
+
+### 8.1. Denotation of values and graphs
+
+Contract `SC-12` fixes the meaning that preparation and execution must preserve
+for the minimal I64 path, and later denotations extend it rather than replace
+it. A materialized value is an I64 vector with visible shape `[|s|]`, and
+expression handles denote deferred vectors rather than holding one.
+
+- Length is a partial static model. An input has its own length; `identity`
+  preserves its operand's; an `add` has a length only when both operands do and
+  the two agree. A length disagreement is therefore a root-cause node, and the
+  nodes above it have no length rather than a second copy of the same failure.
+- Preparation reports every such root-cause disagreement once, in
+  first-completion, left-first post-order, which is deterministic for a given
+  graph and independent of how often a node is referenced. It never evaluates
+  an element to do so.
+- Execution is the pointwise sum, failing at the least overflowing position.
+  A shared node has one denotation however many times it is referenced, which
+  is what makes evaluating each distinct node once (rather than once per
+  reference) an implementation choice and not a change of meaning.
+- A failed execution publishes nothing: the frame is that no input is modified
+  and no output escapes from a failure, including one that follows positions
+  that summed successfully.
+
+[ADR-0012](adrs/adr-0012-minimal-value-and-expression-representation.md)
+records the representation this denotation is carried by in task 1.2.2: how
+values hold storage, what identity folding returns, which schedule preparation
+emits, and the identity tuple that binds the verified `add_i64_into` to `SC-12`.
 
 ## 9. Extension and kernel contracts
 

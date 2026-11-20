@@ -128,7 +128,7 @@ baseline dependency lock. See `technical-design.md` §§3-4, 7, 10.
   - [ ] Build the trust-audit scanner over the ADR-0009 vocabulary and register
     a verifier log parser only with tests over real logs, including a timeout,
     an unsatisfied cover, and a skipped harness.
-- [ ] 1.2.2. Implement the minimal values, expression handles, and ordinary
+- [x] 1.2.2. Implement the minimal values, expression handles, and ordinary
   application path.
   - Requires 1.1.2, 1.2.1.
   - See `technical-design.md` §§4, 7-8, 17.

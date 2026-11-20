@@ -8,8 +8,35 @@
 
 use std::{iter::Peekable, str::Chars};
 
+/// Rust source text with its comments and literals removed.
+///
+/// Every kernel rule is stated over code the compiler acts on, and a comment or
+/// literal that merely names `#![no_std]` must not satisfy the boundary. Passing
+/// plain text let a rule be handed raw source by mistake — the very mistake the
+/// checks exist to catch — so the stripped form is its own type and only this
+/// module produces it.
+#[derive(Clone)]
+pub(super) struct Code(String);
+
+impl Code {
+    /// Take ownership of `text`, which must already have been stripped.
+    ///
+    /// The caller promises the text carries no comment or literal. Both
+    /// constructors are sibling-only, so no check outside this support module
+    /// can hand a rule raw source.
+    pub(super) fn stripped(text: String) -> Self { Self(text) }
+
+    /// Return the stripped text.
+    pub(super) fn text(&self) -> &str { &self.0 }
+}
+
 /// Removes comments and literals, leaving their surrounding tokens separated.
-pub(super) fn strip_comments_and_literals(source: &str) -> String {
+pub(super) fn strip_comments_and_literals(source: &str) -> Code {
+    Code::stripped(strip_comments_and_literals_text(source))
+}
+
+/// The stripped text behind [`strip_comments_and_literals`].
+fn strip_comments_and_literals_text(source: &str) -> String {
     let mut code = String::with_capacity(source.len());
     let mut chars = source.chars().peekable();
     while let Some(ch) = chars.next() {
@@ -264,7 +291,7 @@ mod tests {
     #[case::placeholder(r"let _: &'_ str = value;")]
     fn lifetime_ticks_survive_the_literal_scan(#[case] source_text: &str) {
         assert_that!(
-            strip_comments_and_literals(source_text).as_str(),
+            strip_comments_and_literals(source_text).text(),
             contains_substring("'"),
             "a lifetime tick must not be dropped from the scanned code"
         );

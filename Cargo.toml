@@ -48,6 +48,10 @@ cap-std = { version = "3.4.6", features = ["fs_utf8"] }
 googletest = "0.14.3"
 insta = "1.49.0"
 pretty_assertions = "1.4.1"
+# The FACADE-1 refinement claim quantifies over generated expression DAGs and
+# values, which a finite table cannot cover (DL-6). It is dev-only: the shipped
+# dependency closure is unchanged apart from the lockfile.
+proptest = "1.12.0"
 rstest = { version = "0.27.0", default-features = false }
 rstest-bdd = "0.6.0"
 rstest-bdd-macros = "0.6.0"

@@ -1,0 +1,6 @@
+---
+source: tests/ordinary_application/diagnostics.rs
+expression: error.to_string()
+---
+expression failed during execution
+- add (V001) overflows I64 at position 0
