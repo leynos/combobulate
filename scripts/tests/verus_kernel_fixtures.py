@@ -26,7 +26,7 @@ RECORD = ROOT / 'tools/verifier-fixtures/verus-kernel/provenance.json'
 # The exact summary the pinned positive root must print. It is one line, and
 # the pattern that reads it is anchored to the end of the log, so a test that
 # appends anything to it is testing the suffix rule rather than the count.
-SUMMARY = 'verification results:: 19 verified, 0 errors\n'
+SUMMARY = 'verification results:: 20 verified, 0 errors\n'
 
 
 class _Namespace:
@@ -73,7 +73,12 @@ def load_driver() -> ModuleType:
 
 
 def load_verdicts() -> ModuleType:
-    """Load ``verus_kernel_verdicts.py``, which imports nothing but the stdlib."""
+    """Load ``verus_kernel_verdicts.py`` with its diagnostic reader available.
+
+    The verdict rules import the diagnostic reader by bare name, as the driver
+    imports its siblings, so the reader is registered before the rules run.
+    """
+    load('verus_kernel_diagnostic', SCRIPTS / 'verus_kernel_diagnostic.py')
     return load('verus_kernel_verdicts', SCRIPTS / 'verus_kernel_verdicts.py')
 
 

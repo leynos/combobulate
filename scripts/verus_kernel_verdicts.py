@@ -2,15 +2,20 @@
 
 Three rules live here, one per tier of candidate. A positive run is admitted
 only on exactly the pinned whole-crate count with no partial-verification
-suffix. A mutant is admitted only when its exit status is 1, at least one error
-was reported, every error is a postcondition failure inside that mutant's own
-source region, and the intended clause is among the failures. A body-tier
-mutant is admitted only when the run fails a loop invariant.
+suffix. A mutant is admitted only when its exit status is 1, every diagnostic it
+reported is a postcondition failure inside that mutant's own source region, and
+the intended clause is among the failures. A body-tier mutant is admitted only
+when the run fails a loop invariant located in the mutated body.
+
+Every rule reads the log as a list of diagnostics: an error text together with
+the line it named, paired by :mod:`verus_kernel_diagnostic`. That pairing is
+what lets a rule ask whether *this* failure happened where the candidate claims,
+rather than whether the file was named somewhere in the log.
 
 The rules are separated from the driver so that each can be read as a statement
 about a log rather than as part of a subprocess pipeline. Nothing here runs a
-solver, touches the filesystem beyond reading the mutant source, or writes a
-record.
+solver, touches the filesystem beyond reading the mutant and body sources, or
+writes a record.
 """
 
 from __future__ import annotations
@@ -19,15 +24,16 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from verus_kernel_diagnostic import Diagnostic, diagnostics, texts
+
 # The pinned positive count. It is recorded, not predicted: a change to the
 # shipped body or its specification moves it, and the run then fails until the
 # new figure has been reviewed and written here.
-POSITIVE_VERIFIED = 19
+POSITIVE_VERIFIED = 20
 
 _SUMMARY = re.compile(
     r"(?m)^verification results:: (?P<verified>\d+) verified, (?P<errors>\d+) errors(?P<suffix>[^\n]*)$"
 )
-_LOCATION = re.compile(r"(?m)^\s*-->\s*(?P<path>.+?):(?P<line>\d+):(?P<column>\d+)$")
 _FUNCTION = re.compile(r"(?m)^\s*pub fn (?P<name>\w+)\s*\(")
 _CLAUSE = re.compile(r"(?m)^\s*(?P<clause>k[1-5])\(.*$")
 
@@ -36,10 +42,17 @@ _CLAUSE = re.compile(r"(?m)^\s*(?P<clause>k[1-5])\(.*$")
 # never reached the obligation it was supposed to fail.
 _PERMITTED = ("error: postcondition not satisfied", "error: aborting due to")
 
-
-def _errors(log: str) -> list[str]:
-    """Return the ``error:`` lines a Verus log reported."""
-    return [line for line in log.splitlines() if line.startswith("error:")]
+# The obligations a mutated body may fail. An invariant failure is the verdict
+# the body tier exists for. The body's own assertion beside the overflow test
+# fails for the same reason: it states that the current position is out of
+# range, which a wrapping sum detects at a different set of positions. Both are
+# qualified on location, so an assertion anywhere else still disqualifies the
+# run.
+_BODY_PERMITTED = (
+    *_PERMITTED,
+    "error: invariant not satisfied",
+    "error: assertion failed",
+)
 
 
 @dataclass(frozen=True)
@@ -158,7 +171,7 @@ def _rejection_clauses(log: str, request: MutantRequest) -> dict[int, str]:
     """Return the located clauses, once the log is a clean rejection of them.
 
     Every step below rejects a log that cannot be the failure the mutant owes:
-    an error the driver does not permit, no failure inside the mutant's own
+    an error the driver does not permit, a diagnostic outside the mutant's own
     region, or a failure at some clause other than the intended one.
 
     Raises
@@ -166,8 +179,9 @@ def _rejection_clauses(log: str, request: MutantRequest) -> dict[int, str]:
     RuntimeError
         When the log is not a rejection at the requested clauses.
     """
-    _require_permitted(_errors(log), request)
-    located = _located_clauses(log, request)
+    found = diagnostics(log)
+    _require_permitted(found, request, _PERMITTED)
+    located = _located_clauses(found, request)
     if not located:
         raise RuntimeError(f"{request.name}: no failure named a clause of its own region")
     reported = set(located.values())
@@ -180,17 +194,19 @@ def _rejection_clauses(log: str, request: MutantRequest) -> dict[int, str]:
     return located
 
 
-def _disqualifying(errors: list[str], permitted: tuple[str, ...]) -> list[str]:
-    """Return the error lines outside ``permitted``, which no verdict admits.
+def _disqualifying(items: list[Diagnostic], permitted: tuple[str, ...]) -> list[str]:
+    """Return the error texts outside ``permitted``, which no verdict admits.
 
     Both tiers ask the same question of a log — whether every error it
     reported is one its verdict allows — so the test lives in one place and
     each caller supplies the set it permits.
     """
-    return [line for line in errors if not line.startswith(permitted)]
+    return [text for text in texts(items) if not text.startswith(permitted)]
 
 
-def _require_permitted(errors: list[str], request: MutantRequest) -> None:
+def _require_permitted(
+    items: list[Diagnostic], request: MutantRequest, permitted: tuple[str, ...]
+) -> None:
     """Reject a log whose errors include one the mutant does not owe.
 
     A rejection is a compile that reached the verifier and failed an
@@ -203,9 +219,9 @@ def _require_permitted(errors: list[str], request: MutantRequest) -> None:
     RuntimeError
         When no error was reported, or one is outside the permitted set.
     """
-    if not errors:
+    if not items:
         raise RuntimeError(f"{request.name}: no error was reported")
-    unexpected = _disqualifying(errors, _PERMITTED)
+    unexpected = _disqualifying(items, permitted)
     if unexpected:
         raise RuntimeError(f"{request.name}: disqualifying error {unexpected[0]!r}")
 
@@ -240,7 +256,7 @@ def _region(text: list[str], name: str) -> tuple[int, int]:
     return start, end
 
 
-def _located_clauses(log: str, request: MutantRequest) -> dict[int, str]:
+def _located_clauses(items: list[Diagnostic], request: MutantRequest) -> dict[int, str]:
     """Map each failed clause line to the clause name written there.
 
     A diagnostic names a file and a line; the clause is whatever `k1` to `k5`
@@ -248,20 +264,34 @@ def _located_clauses(log: str, request: MutantRequest) -> dict[int, str]:
     must fall inside the region of the mutant being verified, so a rejection
     reported for another wrapper in the same file cannot qualify this one.
 
+    The region check is applied to every diagnostic, not only to the ones that
+    name a clause: a permitted failure anywhere else means the run broke
+    something it did not claim to break, and the record would attribute a
+    confounded run to this mutant.
+
     Raises
     ------
     RuntimeError
-        When no function of the requested name exists in the source.
+        When a diagnostic falls outside the mutant's own region, or no function
+        of the requested name exists in the source.
     """
     text = request.source.read_text(encoding="utf-8").splitlines()
     first, last = _region(text, request.name)
     located: dict[int, str] = {}
-    for match in _LOCATION.finditer(log):
-        if Path(match["path"]).name != request.source.name:
+    for item in items:
+        if item.is_abort_summary:
             continue
-        line = int(match["line"])
+        line = item.location_in(request.source)
+        if line is None:
+            raise RuntimeError(
+                f"{request.name}: {item.text!r} names no line of its own source, "
+                "so it could have failed outside its own region"
+            )
         if not first <= line <= last:
-            continue
+            raise RuntimeError(
+                f"{request.name}: {item.text!r} at line {line} is outside its own "
+                f"region ({first}-{last}), so it belongs to another wrapper"
+            )
         clause = _CLAUSE.match(text[line - 1])
         if clause is not None:
             located[line] = clause["clause"]
@@ -288,76 +318,49 @@ def _qualify_body(log: str, exit_code: int, source: Path) -> dict:
     Raises
     ------
     RuntimeError
-        When the wrap copy verified, or failed at some obligation other than a
-        loop invariant.
+        When the wrap copy verified, or failed at some obligation other than
+        the loop invariant its mutated overflow test breaks.
     """
     match = _SUMMARY.search(log)
     if match is None:
         raise RuntimeError("the body mutant reported no verification summary")
     if exit_code != 1 or match["errors"] == "0":
         raise RuntimeError("the wrapping body must not verify")
-    _require_loop_invariant(log, _errors(log), source)
+    _require_loop_invariant(diagnostics(log), source)
     return {"kind": "body-mutant", "clause": "loop-invariant"}
 
 
-def _failures_in(log: str, source: Path) -> list[str]:
-    """Return the error lines whose diagnostic names ``source``.
-
-    Verus prints an error and then, on a following line, the `-->` location it
-    refers to. Reading the two together is what lets a rule ask whether a
-    failure happened in the body, rather than whether the file was named
-    somewhere in the log.
-    """
-    found: list[str] = []
-    pending: str | None = None
-    for line in log.splitlines():
-        if line.startswith("error:"):
-            pending = line
-        elif (location := _LOCATION.match(line)) is not None:
-            if pending is not None and Path(location["path"]).name == source.name:
-                found.append(pending)
-            pending = None
-    return found
-
-
-def _require_loop_invariant(log: str, errors: list[str], source: Path) -> None:
-    """Reject a body mutant that failed at anything but a located loop invariant.
+def _require_loop_invariant(items: list[Diagnostic], source: Path) -> None:
+    """Reject a body mutant that failed at anything but its own obligations.
 
     An invariant error is only evidence about the mutated body when the
     diagnostic names a line inside it. A run that reported the failure without
     a location could have failed anywhere, including in the wrapper that is
     supposed to be unchanged, so the location is required rather than assumed.
 
-    A mutation that replaces arithmetic also breaks the body's own proof
-    assertions, which are obligations about the mutated code that fail for the
-    same reason the invariant does. `error: assertion failed` is therefore
-    admitted, but only when the failures located in the body explain every
-    admitted error: an assertion anywhere else still disqualifies the run.
+    A mutation that replaces the overflow test also breaks the body's own proof
+    assertion, which is an obligation about the mutated code that fails for the
+    same reason the invariant does. It is admitted, but each diagnostic is
+    qualified on its own: a located failure cannot account for a second one
+    that merely repeats its wording, because the second names no line.
 
     Raises
     ------
     RuntimeError
         When an error is outside the permitted set, no loop invariant is among
-        them, or some failure carries no location in the body.
+        them, or a diagnostic names no line of the body.
     """
-    permitted = (*_PERMITTED, "error: invariant not satisfied", "error: assertion failed")
-    unexpected = _disqualifying(errors, permitted)
-    if unexpected:
-        raise RuntimeError(f"body mutant: disqualifying error {unexpected[0]!r}")
-    if not any("invariant not satisfied" in line for line in errors):
+    request = MutantRequest("body mutant", [], source)
+    _require_permitted(items, request, _BODY_PERMITTED)
+    if not any("invariant not satisfied" in item.text for item in items):
         raise RuntimeError("the body mutant must fail a loop invariant")
-    located = _failures_in(log, source)
-    if not located:
+    if not any("invariant not satisfied" in item.text and item.names(source) for item in items):
         raise RuntimeError("the body mutant's invariant failure must name a line of the body")
-    # An obligation reported without a location could have failed in the
-    # wrapper, so every admitted failure has to be one the body raised.
-    unexplained = [
-        line
-        for line in errors
-        if not line.startswith("error: aborting due to") and line not in located
+    unlocated = [
+        item.text for item in items if not item.is_abort_summary and not item.names(source)
     ]
-    if unexplained:
+    if unlocated:
         raise RuntimeError(
-            f"the body mutant's failures must all be located in the body, but "
-            f"{unexplained[0]!r} names no line of it"
+            "the body mutant's failures must all be located in the body, but "
+            f"{unlocated[0]!r} names no line of it"
         )

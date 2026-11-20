@@ -27,7 +27,7 @@ from verus_kernel_fixtures import (
 )
 from verus_kernel_fixtures import SCRIPTS
 
-SUMMARY = 'verification results:: 19 verified, 0 errors\n'
+SUMMARY = 'verification results:: 20 verified, 0 errors\n'
 
 
 class PositiveQualificationTests(unittest.TestCase):
@@ -41,11 +41,11 @@ class PositiveQualificationTests(unittest.TestCase):
         """The recorded count with no suffix must be accepted."""
         verdict = self.driver._qualify_positive(SUMMARY, 0)
 
-        self.assertEqual(verdict, {'kind': 'positive', 'verified': 19})
+        self.assertEqual(verdict, {'kind': 'positive', 'verified': 20})
 
     def test_a_different_count_is_rejected(self) -> None:
         """Any count other than the pin must request a reviewed update."""
-        for count in (18, 20, 119):
+        for count in (19, 21, 119):
             summary = f'verification results:: {count} verified, 0 errors\n'
             with self.assertRaisesRegex(RuntimeError, 'update the pin'):
                 self.driver._qualify_positive(summary, 0)
@@ -58,7 +58,7 @@ class PositiveQualificationTests(unittest.TestCase):
 
     def test_reported_errors_are_rejected(self) -> None:
         """A non-zero error count must fail even at the pinned total."""
-        failing = 'verification results:: 19 verified, 1 errors\n'
+        failing = 'verification results:: 20 verified, 1 errors\n'
         with self.assertRaisesRegex(RuntimeError, 'did not verify'):
             self.driver._qualify_positive(failing, 1)
 
@@ -88,21 +88,38 @@ class MutantQualificationTests(unittest.TestCase):
 
     def _located(self, clause: str, name: str, source: Path) -> str:
         """Return a Verus log naming ``clause`` of ``name`` in ``source``."""
+        return (
+            'error: postcondition not satisfied\n'
+            f'  --> {source}:{self._clause_line(clause, name, source)}:13\n'
+            'verification results:: 0 verified, 1 errors\n'
+        )
+
+    def _clause_line(self, clause: str, name: str, source: Path) -> int:
+        """Return the line that states ``clause`` inside ``name``'s region."""
         lines = source.read_text(encoding='utf-8').splitlines()
         first = next(
             index
             for index, text in enumerate(lines, start=1)
             if text.startswith(f'pub fn {name}(')
         )
-        line = next(
+        return next(
             index
             for index, text in enumerate(lines[first:], start=first + 1)
             if text.strip().startswith(f'{clause}(')
         )
+
+    def _diagnostic_at(self, path: Path, line: int, subject: str = 'this postcondition') -> str:
+        """Return Verus's ``error:`` line naming ``subject`` at ``path:line``.
+
+        The text is byte-for-byte what Verus prints, because a rule that matches
+        diagnostics by wording must be exercised with the wording it matches.
+        """
         return (
-            'error: postcondition not satisfied\n'
-            f'  --> {source}:{line}:13\n'
-            'verification results:: 0 verified, 1 errors\n'
+            f'error: postcondition not satisfied\n'
+            f'  --> {path}:{line}:13\n'
+            f'   |\n'
+            f'{line} |           k1(lhs@, rhs@, old(out)@, final(out)@, r),\n'
+            f'   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed {subject}\n'
         )
 
     def _qualify(self, log: str, exit_code: int, name: str, clauses: list[str]) -> dict:
@@ -155,6 +172,64 @@ class MutantQualificationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'own region'):
             self._qualify(foreign, 1, 'mutant_err', ['k4'])
 
+    def test_a_failure_outside_the_region_among_others_is_rejected(self) -> None:
+        """A located failure elsewhere must disqualify a log that also names ours.
+
+        The requested mutant fails at its own clause, so a rule that only asks
+        whether the intended clause appears accepts the log. The run also
+        reported a failure in another wrapper, which means the mutant was not
+        the only obligation that broke and the record would attribute a
+        confounded run to this mutant.
+        """
+        name = 'mutant_late'
+        intended = self.driver.MUTANTS[name]
+        own = self._diagnostic(intended, name)
+        foreign = self._diagnostic_at(
+            self.driver.MUTANT_ROOT,
+            self._clause_line('k2', 'mutant_err', self.driver.MUTANT_ROOT),
+        )
+        log = (own + foreign).replace(
+            'verification results:: 0 verified, 1 errors\n',
+            'error: aborting due to 2 previous errors\n'
+            'verification results:: 0 verified, 2 errors\n',
+        )
+        with self.assertRaisesRegex(RuntimeError, 'outside its own region'):
+            self._qualify(log, 1, name, [intended])
+
+    def test_an_unlocated_failure_among_others_is_rejected(self) -> None:
+        """A second failure naming no location must disqualify the run.
+
+        Verus can report an obligation it could not locate. Such a failure
+        could belong to any line in the crate, so it cannot be attributed to
+        the mutant whose region happens to contain the other diagnostic.
+        """
+        name = 'mutant_late'
+        intended = self.driver.MUTANTS[name]
+        log = (
+            self._diagnostic(intended, name)
+            + 'error: postcondition not satisfied\n'
+            'verification results:: 0 verified, 2 errors\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, 'outside its own region'):
+            self._qualify(log, 1, name, [intended])
+
+    def test_a_same_named_file_at_another_path_is_rejected(self) -> None:
+        """A diagnostic in another ``elementwise_add_mutants.rs`` is not ours.
+
+        Both tiers compare only the file name today, so a copy of the mutant
+        root under a scratch directory would satisfy the path rule. The region
+        is in that copy, not in the file the driver compiled.
+        """
+        source = self.driver.MUTANT_ROOT
+        line = self._clause_line('k2', 'mutant_err', source)
+        elsewhere = source.with_name(source.name).parent / 'target' / source.name
+        log = (
+            self._diagnostic_at(elsewhere, line)
+            + 'verification results:: 0 verified, 1 errors\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, 'own region'):
+            self._qualify(log, 1, 'mutant_err', ['k2'])
+
     def test_a_disqualifying_error_is_rejected(self) -> None:
         """A type, syntax or unsupported-feature error must fail the run."""
         log = (
@@ -188,12 +263,23 @@ class BodyMutantTests(unittest.TestCase):
             if 'invariant' in text
         )
 
+    def _assertion_line(self) -> int:
+        """Return the line of the scan pass's own assertion."""
+        lines = self.driver.PRODUCTION.read_text(encoding='utf-8').splitlines()
+        return next(
+            index
+            for index, text in enumerate(lines, start=1)
+            if 'assert(!in_range_at' in text
+        )
+
     def test_a_loop_invariant_failure_qualifies(self) -> None:
         """An invariant failure with a non-zero error count is the verdict."""
         log = (
             'error: invariant not satisfied at loop head\n'
             f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
-            'verification results:: 14 verified, 1 errors\n'
+            'error: assertion failed\n'
+            f'  --> {self.driver.WRAP_BODY}:{self._assertion_line()}:29\n'
+            'verification results:: 14 verified, 2 errors\n'
         )
         verdict = self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
 
@@ -214,6 +300,33 @@ class BodyMutantTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'must fail a loop invariant'):
             self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
 
+    def test_a_duplicated_invariant_with_one_location_is_rejected(self) -> None:
+        """One located failure must not account for two reported failures.
+
+        Verus can report the same obligation twice, once with a location and
+        once without. Comparing error text alone treats the second as
+        explained; it is a separate diagnostic that could have failed anywhere.
+        """
+        log = (
+            'error: invariant not satisfied at end of loop body\n'
+            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
+            'error: invariant not satisfied at end of loop body\n'
+            'verification results:: 14 verified, 2 errors\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, 'must all be located in the body'):
+            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
+
+    def test_a_same_named_body_at_another_path_is_rejected(self) -> None:
+        """A failure located in a copy of the body is not evidence about it."""
+        elsewhere = Path('/tmp/another-checkout/elementwise_add.rs')
+        log = (
+            'error: invariant not satisfied at end of loop body\n'
+            f'  --> {elsewhere}:{self.invariant}:13\n'
+            'verification results:: 14 verified, 1 errors\n'
+        )
+        with self.assertRaisesRegex(RuntimeError, 'must name a line of the body'):
+            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
+
     def test_an_assertion_outside_the_body_is_rejected(self) -> None:
         """An admitted assertion is only evidence when the body raised it."""
         log = (
@@ -225,6 +338,24 @@ class BodyMutantTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, 'must all be located in the body'):
             self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
+
+    def test_the_committed_wrap_log_is_the_verdict_it_records(self) -> None:
+        """The recorded body mutant must still be the run its log describes.
+
+        The log is the transcript of a real run, so it is the strongest
+        available check that the rule admits the observation it was written
+        for rather than only the shapes its unit tests construct. It is
+        committed with the repository root rewritten to ``<repo>``, so it also
+        exercises the marker restoration a fresh log does not need.
+        """
+        driver = load_driver()
+        log = (ROOT / 'tools/verifier-fixtures/verus-kernel/wrap.log').read_text(
+            encoding='utf-8'
+        )
+
+        verdict = driver._qualify_body(log, 1, driver.WRAP_BODY)
+
+        self.assertEqual(verdict['clause'], 'loop-invariant')
 
     def test_an_unlocated_invariant_is_rejected(self) -> None:
         """An invariant error with no location is not evidence about the body."""
@@ -282,8 +413,8 @@ class SummaryPatternTests(unittest.TestCase):
 
     def test_the_location_pattern_reads_a_verus_diagnostic(self) -> None:
         """A diagnostic's file, line and column must all be recoverable."""
-        driver = load_verdicts()
-        match = driver._LOCATION.search('  --> /tmp/root.rs:42:13\n')
+        diagnostic = load('verus_kernel_diagnostic', SCRIPTS / 'verus_kernel_diagnostic.py')
+        match = diagnostic._LOCATION.search('  --> /tmp/root.rs:42:13\n')
 
         self.assertIsNotNone(match)
         self.assertEqual((match['path'], match['line'], match['column']),
