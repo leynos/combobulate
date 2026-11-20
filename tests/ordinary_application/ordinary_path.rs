@@ -74,6 +74,10 @@ struct World {
     left_origin: Slot<Option<*const i64>>,
     /// The pointer of the second operand's buffer, taken before any step ran.
     right_origin: Slot<Option<*const i64>>,
+    /// The values the first operand held, taken before any step ran.
+    left_values: Slot<Vec<i64>>,
+    /// The values the second operand held, taken before any step ran.
+    right_values: Slot<Vec<i64>>,
 }
 
 // `#[fixture]` expands a single-expression body into a nested block, which
@@ -90,16 +94,31 @@ struct World {
 #[rstest::fixture]
 fn world() -> World { World::default() }
 
-/// Records `array` as the first operand, with the buffer pointer it had.
+/// Records `array` as the first operand, as it was before any step ran.
+///
+/// The values are saved alongside the pointer because a shared buffer can be
+/// rewritten in place: a step that compares only pointers would accept an
+/// addition that overwrote its operands' storage, which is the defect the
+/// "unchanged" scenario exists to rule out.
 fn record_left(world: &World, array: Array) {
     world.left_origin.set(buffer_ptr(&array));
+    world.left_values.set(operand_values(&array));
     world.left.set(array);
 }
 
-/// Records `array` as the second operand, with the buffer pointer it had.
+/// Records `array` as the second operand, as it was before any step ran.
 fn record_right(world: &World, array: Array) {
     world.right_origin.set(buffer_ptr(&array));
+    world.right_values.set(operand_values(&array));
     world.right.set(array);
+}
+
+/// The I64 values `array` currently holds, which an operand may not change.
+fn operand_values(array: &Array) -> Vec<i64> {
+    array
+        .as_i64_slice()
+        .expect("this scenario's operands are I64 vectors")
+        .to_vec()
 }
 
 /// The first operand, which a scenario that names none has not supplied.
@@ -208,21 +227,44 @@ fn the_result_shares_the_input(world: &World) {
 
 #[then("both inputs are unchanged")]
 fn both_inputs_are_unchanged(world: &World) {
+    let left_origin = world
+        .left_origin
+        .get()
+        .expect("the first operand must be recorded");
+    let left_values = world
+        .left_values
+        .get()
+        .expect("the first operand's values must be recorded");
+    let right_origin = world
+        .right_origin
+        .get()
+        .expect("the second operand must be recorded");
+    let right_values = world
+        .right_values
+        .get()
+        .expect("the second operand's values must be recorded");
+    // The pointer and the contents are separate claims. A shared buffer keeps
+    // its address while its contents change, so the pointer alone would pass
+    // for an addition that wrote over its first operand.
     assert_eq!(
         buffer_ptr(&left(world)),
-        world
-            .left_origin
-            .get()
-            .expect("the first operand must be recorded"),
+        left_origin,
         "an addition must not replace the first operand's buffer"
     );
     assert_eq!(
+        operand_values(&left(world)),
+        left_values,
+        "an addition must not overwrite the first operand's values in place"
+    );
+    assert_eq!(
         buffer_ptr(&right(world)),
-        world
-            .right_origin
-            .get()
-            .expect("the second operand must be recorded"),
+        right_origin,
         "an addition must not replace the second operand's buffer"
+    );
+    assert_eq!(
+        operand_values(&right(world)),
+        right_values,
+        "an addition must not overwrite the second operand's values in place"
     );
 }
 
