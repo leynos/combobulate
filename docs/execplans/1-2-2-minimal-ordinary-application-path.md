@@ -517,9 +517,12 @@ The thresholds are:
   6. *The negative controls*. The always-`Err` kernel stub and the three
      FACADE mutations were run rather than described; their transcripts are in
      `Artefacts and notes`. The always-`Err` stub fails the positive stage at
-     K1 and the output-length clause and drops the count from 19 to 16, so the
-     witnesses reject it too. Each FACADE mutation fails the case that names
-     it, including a 24-level memoization measurement of 33,554,431 steps
+     the output-length clause (K0), at K2, and — once `--multiple-errors=10`
+     raises Verus's default one-obligation-per-function limit — at K3 and K5,
+     dropping the count from 20 to 17. The K3 evidence is the one the EP-M2
+     criterion names, and the first run did not reach it; `Artefacts and notes`
+     records both runs and that limit. Each FACADE mutation fails the case that
+     names it, including a 24-level memoization measurement of 33,554,431 steps
      against 25.
   7. *Plan record and scope* (below).
 
@@ -584,6 +587,63 @@ The thresholds are:
     for tests. None suppresses a correctness lint, and none is
     function-scoped-beyond-one-site. `missing_const_for_fn` was not needed:
     `add_i64_into` is a `const fn`.
+
+- [x] (2026-11-20) The follow-up assessments returned six further findings on
+  `3ad8edd`. Four were repaired here, one was resolved by rebuttal with
+  measurement, and one is escalated rather than self-granted.
+
+  1. *Per-diagnostic qualification* (`verus_kernel_verdicts.py`). The rule
+     compared the log's **set of error texts**, so two diagnostics with the
+     same text collapsed into one and an unlocated or foreign occurrence was
+     never counted as unexplained. The reader now lives in
+     `scripts/verus_kernel_diagnostic.py`, which pairs each `error:` with the
+     `-->` location that follows it, and both tiers consume it: the mutant
+     tier rejects every non-abort diagnostic that names no line of its own
+     source or falls outside the requested wrapper's region, and the body tier
+     requires every reported failure to be located in the mutated body.
+     Falsified by six new tests — a foreign located failure among the right
+     ones, an unlocated failure among the right ones, a same-named file at a
+     different path, a duplicated invariant text with one location, a
+     same-named body at another path, and an assertion outside the body — and
+     by a test that replays the committed `wrap.log` through the rule, so the
+     real transcript is admitted rather than only the constructed shapes.
+  2. *The body mutant's write rewrite* — rebutted by measurement. The
+     assessment asked for evidence that the write substitution is observable.
+     It is not: a copy mutated at the write only verifies at `15 verified, 0
+     errors` under the same generated root, because the scan pass's invariant
+     has already established that every position is in range, where
+     `wrapping_add` equals `+`. The rewrite is retained for fidelity to the
+     plan's stated mutation and the plan now says so, with the figure, rather
+     than claiming it produces evidence.
+  3. *K4's "least"* (`verus/elementwise_add.rs`). `witness_least_overflow`
+     used one overflowing position, which any reporting body satisfies, so
+     nothing separated "first overflowing" from "some overflowing".
+     `witness_two_overflows` adds `[i64::MAX, 1]` against `[1, i64::MAX]`,
+     where both positions overflow, and states position 0. The positive count
+     moved 19 → 20 and the pin moved with it. Falsified by a body that reports
+     the *second* failure: the positive run then fails exactly at
+     `witness_two_overflows`.
+  4. *The always-`Err` K3 evidence*. Verus reports
+     one obligation per function by default and says so; the earlier transcript
+     therefore proved K0 and K2, not the K3 the EP-M2 criterion names, and it
+     labelled line 94 as K1 when the kernel labels it K2.
+     `--multiple-errors=10` produces K0, K2, K3 and K5 at lines 87, 94, 96 and
+     105, with the count at 17. Both runs are recorded in
+     `Artefacts and notes`, and the criterion's Red step now says the limit is
+     what makes K3 visible.
+  5. *The "both inputs unchanged" step* (`tests/ordinary_application/
+     ordinary_path.rs`). It compared only buffer pointers, so an addition that
+     wrote over an operand in place would have passed. The scenario now
+     records each operand's values and asserts them as well as the pointers.
+     Falsified by inverting the kernel to write its first operand: the
+     scenario failed at that step with `[1, 2, 3]` against `[2, 2, 3]`.
+  6. *Scope overrun* — **escalated, not granted**. Re-measured at **77 files
+     and 8,389 net added lines** against the tolerances' 60 and 4,500. The
+     tolerances say a breach is an escalation "to the user", and both this
+     plan's `Constraints` preamble and `AGENTS.md` make an exception the
+     maintainer's decision. Until the maintainer records one, this plan does
+     not claim the tolerances are met; the entry at `2026-11-20` above records
+     the measurement and the proposed disposition for that decision.
 
 ## Surprises & discoveries
 
@@ -1340,7 +1400,9 @@ The proof files are:
     exported specification;
   - proof-function witnesses that inhabit the premises of K1 (`[1,2,3]` plus
     `[10,20,30]`), K3 (lengths 2 and 1) and K4 (`[0, i64::MAX]` plus `[0, 1]`
-    gives position 1);
+    gives position 1), plus `witness_two_overflows` (`[i64::MAX, 1]` plus
+    `[1, i64::MAX]`, both positions out of range, so a body naming the first
+    is separated from one naming any);
   - the determinacy lemma.
 - `verus/elementwise_add_mutants.rs`: wrappers around, or guarded edits of,
   the shipped call, each ensuring `k0` to `k5`.
@@ -1357,34 +1419,69 @@ The proof files are:
 
 A body-tier mutant, M-wrap, copies `src/elementwise_add.rs` into a scratch
 directory under `target/`, replaces `checked_add` with `wrapping_add`, and
-verifies it under the positive root. It must fail at a loop invariant or K1.
-The mutation rewrites two sites, because replacing only the test would leave
-the shipped write arithmetic checked: the overflow test becomes
+verifies it under a generated root. That root is deliberately not the positive
+root: the positive root includes the shipped source by `#[path]`, so verifying
+"the mutated body" under it would verify the unmutated file. The generated
+`wrap.rs` includes the mutated copy instead, states no clauses of its own, and
+calls the mutated `add_i64_into`, so the only obligations in the run are the
+mutated body's own annotations. `scripts/verus_kernel_body.py` owns both the
+substitution and that root.
+
+The recorded mutation rewrites two sites: the overflow test becomes
 `lhs[scan].wrapping_add(rhs[scan]) == i64::MIN`, and the write becomes
 `out[write_at] = lhs[write_at].wrapping_add(rhs[write_at])`. Both rewrites are
 required to match, so a mutant that silently matched nothing cannot pass as an
-unmutated copy. `scripts/verus_kernel_body.py` owns the substitution.
+unmutated copy. The two rewrites are not equally observable, and the measured
+difference is recorded here rather than assumed:
+
+- The test rewrite fails. `wrapping_add` trips the scan pass's own assertion
+  `!in_range_at(lhs@, rhs@, scan as int)` at positions where the sum is out of
+  range but is not `i64::MIN`, and the scan loop's invariant then fails. This
+  is the failure the committed `wrap.log` records.
+- At the maximum reporting limit the run reports one error per function, and
+  the recorded run also carries the `error: assertion failed` beside the test.
+  Both are located in the mutated body, and both were produced by the run whose
+  log is committed.
+- The write rewrite alone does **not** fail. Under the scan pass's invariant
+  every position is already in range, so `wrapping_add` computes exactly the
+  value the ordinary `+` computes and the write pass's invariant holds. This
+  was measured, not reasoned: a copy mutated at the write only, verified under
+  the same generated root, reports `15 verified, 0 errors`. The write rewrite
+  is therefore present for fidelity to the plan's stated mutation, not as a
+  control that produces evidence; the verdict below does not claim it does.
+
+The rejection rule for M-wrap is the body's own obligations, qualified on
+location: at least one `error: invariant not satisfied` naming a line of the
+mutated body, and every other admitted failure naming a line of it too. An
+assertion failure is admitted because the mutated body contains the assertion
+the test rewrite breaks; an assertion anywhere else still disqualifies the run.
 
 Red step (EP-M2): `elementwise_add.rs` with the full contract and body
 `Err(AddFailure::LengthMismatch)`. The positive run exits 1 with located
-failures at the K2 and K3 lines of `add_i64_into`. That always-`Err` log is
-kept as a negative control on the shipped item. The witnesses, lemma and mutant
-verdicts already hold at this point, because they depend only on the
-specification. Green: the real two-pass body fully verifies, and the mutant
-verdicts are unchanged.
+failures at the K2 and K3 lines of `add_i64_into`, once the reporting limit
+allows both to be printed; a default-limit run locates only the first. That
+always-`Err` log is kept as a negative control on the shipped item. The
+witnesses, lemma and mutant verdicts already hold at this point, because they
+depend only on the specification. Green: the real two-pass body fully verifies,
+and the mutant verdicts are unchanged.
 
 Rejection rule (`scripts/verus_kernel.py`). A mutant counts as rejected only
 when all of the following hold:
 
 - the exit status is 1;
 - at least one error was reported;
-- every error is a postcondition (or, for M-wrap, a loop-invariant) failure
-  inside that mutant's own source region;
+- every diagnostic is a postcondition failure inside that mutant's own source
+  region, and (for M-wrap) a loop-invariant or assertion failure inside the
+  mutated body;
 - the intended K line is among the failures.
 
-Any type, syntax, precondition, arithmetic-overflow or unsupported-feature
-error disqualifies the run. The positive pass requires exactly the pinned
-`N verified, 0 errors`, with no partial-verification suffix.
+"Every diagnostic" means each `error:` line paired with the `-->` location it
+names, not the log's set of error texts. A failure with no location, a failure
+in another file with the same base name, and a failure in another wrapper of
+the same file all disqualify the run, even when the intended clause is also
+present. Any type, syntax, precondition, arithmetic-overflow or
+unsupported-feature error disqualifies it too. The positive pass requires
+exactly the pinned `N verified, 0 errors`, with no partial-verification suffix.
 
 Method rationale: Verus suits arbitrary-length sequence relations, loop
 invariants and frame conditions (technical design §17.1). §17.1 also prefers
@@ -1398,6 +1495,9 @@ Kani wiring. Runtime `rstest`, const-evaluation and `proptest` cases at
 Non-vacuity:
 
 - The witnesses inhabit the success, overflow and length-failure premises.
+  The overflow witness is stated twice: once for "an overflowing position is
+  reported" and once for "the *first* one is", because a single overflowing
+  position cannot separate "least" from "some".
 - The always-`Err` stub is rejected, as is every mutant at its own clause.
 - The determinacy lemma shows no second outcome satisfies the contract.
 - `scripts/trust_audit.py crates/combobulate-kernel/src/elementwise_add.rs`
@@ -1518,7 +1618,11 @@ not the Rust implementation's.
   nightly-2026-11-06 (ordinary) give the same semantics to the kernel's
   `core`-only source. The kernel source compiles as a crate-root module in one
   build and as a `#[path]` submodule in the other, so it contains no `crate::`
-  or `super::` path.
+  or `super::` path in code the ordinary compiler sees. One such path exists
+  behind `cfg(verus_keep_ghost)`, which the ordinary builds disable: the
+  contract imports. Removing that gate fails the ordinary build with `E0432`,
+  so the wording above is a property the compiler enforces rather than a
+  convention being observed.
 - AXIOM-4. `Arc::new(vec)` moves the `Vec` header without copying elements.
   FACADE-3 observes this directly by pointer equality, so nothing relies on the
   axiom unobserved.
@@ -1991,10 +2095,10 @@ uv run --no-project --python 3.14 --with-requirements scripts/requirements.txt \
 # 7 passed, 1 warning, 43 subtests passed
 ```
 
-The kernel proof, as observed on 2026-11-14:
+The kernel proof, as observed on 2026-11-20:
 
 ```plaintext
-positive: verification results:: 19 verified, 0 errors
+positive: verification results:: 20 verified, 0 errors
 mutant mutant_err: rejected at k2 (elementwise_add_mutants.rs:40), k3 (elementwise_add_mutants.rs:41)
 mutant mutant_late: rejected at k4 (elementwise_add_mutants.rs:58)
 mutant mutant_ok_on_overflow: rejected at k1 (elementwise_add_mutants.rs:82)
@@ -2003,7 +2107,7 @@ mutant mutant_early_write: rejected at k5 (elementwise_add_mutants.rs:133)
 body mutant wrap: rejected at loop invariant
 ```
 
-`N` is pinned at **19**. It is the positive root's whole-crate count with no
+`N` is pinned at **20**. It is the positive root's whole-crate count with no
 `--verify-*` flag, so the shipped body is verified as well as its wrappers. A
 change to the body or the specification moves it, and the run then fails until
 the new figure has been reviewed.
@@ -2033,26 +2137,48 @@ Negative-control transcripts are added here as each is observed:
 
 The Verus always-`Err` stub was observed on 2026-11-20 by replacing
 `add_i64_into`'s body with
-`let _ = (lhs, rhs, out); Err(AddFailure::LengthMismatch)` and running
-`make verus-kernel`. The driver refused the positive stage rather than
-reporting a pass:
+`let _ = (lhs, rhs, out); Err(AddFailure::LengthMismatch)` and running the
+positive root. The driver refused the positive stage rather than reporting a
+pass.
+
+Verus reports one obligation per function by default and says so with a
+`note: not all errors may have been reported` line, so a single run does not
+enumerate every clause a wrong body violates. The stub was therefore run twice,
+and the second run is the evidence for the K2 and K3 criterion this plan states
+at EP-M2:
 
 ```text
-verification results:: 16 verified, 1 errors
+# default reporting limit
+verification results:: 17 verified, 1 errors
 error: postcondition not satisfied
-   --> <repo>/crates/combobulate-kernel/verus/../src/elementwise_add.rs:87:9
+   --> <repo>/…/elementwise_add_stub.rs:87:9
  87 |           final(out)@.len() == old(out)@.len(),
 error: postcondition not satisfied
-   --> <repo>/crates/combobulate-kernel/verus/../src/elementwise_add.rs:94:9
+   --> <repo>/…/elementwise_add_stub.rs:94:9
  94 |           same_len(lhs@, rhs@, old(out)@) && all_in_range(lhs@, rhs@) ==> r is Ok,
-RuntimeError: the positive run did not verify: exit 1
+
+# --multiple-errors=10
+verification results:: 17 verified, 1 errors
+error: postcondition not satisfied
+   --> <repo>/…/elementwise_add_stub.rs:87:9   K0, the length frame
+error: postcondition not satisfied
+   --> <repo>/…/elementwise_add_stub.rs:94:9   K2, the success premise
+error: postcondition not satisfied
+   --> <repo>/…/elementwise_add_stub.rs:96:9   K3, length mismatch iff
+error: postcondition not satisfied
+   --> <repo>/…/elementwise_add_stub.rs:105:9  K5, a failure publishes nothing
 ```
 
-Line 94 is K1 and line 87 is the output-length clause. The count falls from 19
-to 16, so the three witnesses — which state `Ok` outcomes the stub cannot
-produce — also fail; the specification rejects the wrong body at more than one
-obligation rather than at one clause alone. The stub was removed and the record
-rebound immediately afterwards, so no committed artefact carries it.
+The two runs are the same stub at two reporting limits, not two stubs. At the
+default limit only K0 and K2 are located, so the earlier transcript here proved
+less than the criterion claimed and labelled line 94 as K1; it is K2. At
+`--multiple-errors=10` the run also locates K3, which is the clause the
+criterion names, and K5. K4 is not among them because the stub never produces an
+`Overflow`, so that implication is vacuous for this body. The count falls from
+20 to 17, so the three witnesses — which state outcomes the stub cannot produce
+— also fail; the specification rejects the wrong body at more than one
+obligation rather than at one clause alone. The stub was removed immediately
+afterwards and the record rebound, so no committed artefact carries it.
 
 Each seeded Verus mutant is a live negative control and its transcript is the
 committed log beside `provenance.json`: `mutant_err.log`, `mutant_late.log`,
