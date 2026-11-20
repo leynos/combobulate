@@ -14,6 +14,7 @@ reaches the capture boundary fails loudly rather than running a verifier.
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
@@ -77,9 +78,17 @@ def load_verdicts() -> ModuleType:
 
 
 def load(name: str, path: Path) -> ModuleType:
-    """Execute ``path`` as ``name``, resolving imports from ``sys.modules``."""
+    """Execute ``path`` as ``name``, resolving imports from ``sys.modules``.
+
+    The module is registered before it runs. ``dataclasses`` resolves a field
+    annotation such as ``Path`` by looking the defining module up in
+    ``sys.modules``, so executing it unregistered raises ``AttributeError`` on
+    the first ``@dataclass`` in the file; registration is also what lets a
+    module in this package import a sibling by its bare name.
+    """
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 

@@ -10,6 +10,8 @@
 //! it, and it works only on text the sibling scanner has already stripped of
 //! comments and literals.
 
+use super::scanner::Code;
+
 /// A crate-level lint level, in the order attributes can override each other.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum LintLevel {
@@ -38,7 +40,7 @@ pub(super) struct Attribute<'a> {
     pub(super) is_inner: bool,
 }
 
-impl Attribute<'_> {
+impl<'a> Attribute<'a> {
     /// The attribute's body with every space removed.
     ///
     /// An attribute may be written `#[cfg( kani )]`, and the compiler reads it
@@ -50,18 +52,71 @@ impl Attribute<'_> {
             .filter(|character| !character.is_whitespace())
             .collect()
     }
+
+    /// Split this attribute into its level name and its list.
+    ///
+    /// The body belongs to the attribute, so reading the two halves here keeps
+    /// the parse with the data it parses rather than with a free function that
+    /// takes any string.
+    pub(super) fn split(&self) -> Option<Split<'a>> { split_body(self) }
+}
+
+/// Split one attribute body into its level name and its list.
+///
+/// The two halves are only meaningful together — a name without its list
+/// cannot decide a lint, and a list without its name cannot decide a level —
+/// so a split returns both or neither.
+#[derive(Clone, Copy)]
+pub(super) struct Split<'a> {
+    /// The attribute name, such as `deny`.
+    pub(super) name: &'a str,
+    /// The text between the parentheses, trimmed.
+    pub(super) list: &'a str,
+}
+
+/// Split `deny(a, b)` into its level name and its parenthesized list.
+///
+/// The body is read from the attribute rather than accepted as free text,
+/// because an attribute body is the only thing this can correctly split: a
+/// caller that handed over some other slice would be parsing a shape no
+/// attribute has.
+fn split_body<'a>(attribute: &Attribute<'a>) -> Option<Split<'a>> {
+    let body = attribute.body;
+    let open = body.find('(')?;
+    let close = body.rfind(')')?;
+    if close <= open {
+        return None;
+    }
+    Some(Split {
+        name: body.get(..open)?.trim(),
+        list: body.get(open + 1..close)?.trim(),
+    })
+}
+
+impl<'a> Split<'a> {
+    /// Yield the lint names this list sets, skipping `reason = ...` clauses.
+    ///
+    /// A `reason` clause is not a lint name, so treating the commas naively
+    /// would let `reason = "..."` stand in for the lint it documents.
+    pub(super) fn lints(self) -> impl Iterator<Item = &'a str> {
+        self.list
+            .split(',')
+            .map(str::trim)
+            .filter(|item| !item.is_empty() && !item.contains('='))
+    }
 }
 
 /// Collects the attributes in `code` that fall within `scope`.
-pub(super) fn attributes(code: &str, scope: Scope) -> Vec<Attribute<'_>> {
+pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
+    let text = code.text();
     let mut found = Vec::new();
     let mut index = 0;
-    while let Some(rest) = code.get(index..) {
+    while let Some(rest) = text.get(index..) {
         let Some((offset, opener, is_inner)) = next_attribute(rest, scope) else {
             break;
         };
         let start = index + offset + opener;
-        let Some(tail) = code.get(start..) else {
+        let Some(tail) = text.get(start..) else {
             break;
         };
         let Some(end) = matching_bracket(tail) else {
@@ -125,26 +180,13 @@ pub(super) fn matching_bracket(tail: &str) -> Option<usize> {
 /// Scanning in source order keeps a later `#![allow(...)]` from being hidden by
 /// an earlier `#![deny(...)]`: the last level a compiler sees is the effective
 /// one, so a deny that is later allowed does not satisfy the boundary.
-pub(super) fn final_lint_level(code: &str, lint: &str) -> Option<LintLevel> {
+pub(super) fn final_lint_level(code: &Code, lint: &str) -> Option<LintLevel> {
     attributes(code, Scope::Inner)
         .iter()
-        .filter_map(|attribute| split_attribute(attribute.body))
-        .filter_map(|(name, body)| parse_lint_level(name).map(|level| (level, body)))
-        .rfind(|(_, body)| lint_list(body).any(|item| item == lint))
-        .map(|(level, _)| level)
-}
-
-/// Splits `deny(a, b)` into its level name and its parenthesized list.
-pub(super) fn split_attribute(attribute: &str) -> Option<(&str, &str)> {
-    let open = attribute.find('(')?;
-    let close = attribute.rfind(')')?;
-    if close > open {
-        let name = attribute.get(..open)?.trim();
-        let body = attribute.get(open + 1..close)?.trim();
-        Some((name, body))
-    } else {
-        None
-    }
+        .filter_map(Attribute::split)
+        .filter(|split| split.lints().any(|item| item == lint))
+        .filter_map(|split| parse_lint_level(split.name))
+        .next_back()
 }
 
 /// Maps an attribute name to a lint level, ignoring attributes of other kinds.
@@ -158,21 +200,14 @@ fn parse_lint_level(name: &str) -> Option<LintLevel> {
     }
 }
 
-/// Yields the lint names in an attribute list, skipping `reason = ...` clauses.
-pub(super) fn lint_list(body: &str) -> impl Iterator<Item = &str> {
-    body.split(',')
-        .map(str::trim)
-        .filter(|item| !item.is_empty() && !item.contains('='))
-}
-
 /// Reports whether the item after `from` is a function definition.
 ///
 /// The item's head is read token by token, so any stack of further attributes
 /// is skipped first and a qualifier such as `pub const` is walked past. A
 /// `{`, `;` or `=` before the `fn` token means the item is something else — a
 /// module, a use declaration, or a constant — and stops the walk.
-pub(super) fn gates_a_function(code: &str, from: usize) -> bool {
-    let mut rest = code.get(from..).unwrap_or_default().trim_start();
+pub(super) fn gates_a_function(code: &Code, from: usize) -> bool {
+    let mut rest = code.text().get(from..).unwrap_or_default().trim_start();
     while let Some(tail) = rest.strip_prefix("#[") {
         let Some(end) = matching_bracket(tail) else {
             return false;
@@ -203,17 +238,25 @@ mod tests {
 
     use rstest::rstest;
 
-    use super::{Scope, attributes, final_lint_level, gates_a_function, split_attribute};
+    use super::{Attribute, Code, Scope, attributes, final_lint_level, gates_a_function};
 
     /// A lint list may carry a `reason`, which is not a lint name.
     #[test]
     fn reason_clauses_are_not_lint_names() {
-        let (name, list) = split_attribute("deny(clippy::std_instead_of_core, reason = \"x\")")
+        let code =
+            Code::stripped("#![deny(clippy::std_instead_of_core, reason = \"x\")]".to_owned());
+        let split = attributes(&code, Scope::Inner)
+            .first()
+            .and_then(Attribute::split)
             .expect("a lint attribute must split into a level and a list");
-        assert_eq!(name, "deny", "the level is the text before the parenthesis");
+        assert_eq!(
+            split.name, "deny",
+            "the level is the text before the parenthesis"
+        );
         assert!(
-            super::lint_list(list).eq(["clippy::std_instead_of_core"]),
-            "the reason clause must not be read as a lint, got {list:?}"
+            split.lints().eq(["clippy::std_instead_of_core"]),
+            "the reason clause must not be read as a lint, got {:?}",
+            split.list
         );
     }
 
@@ -222,9 +265,9 @@ mod tests {
     #[case::inner_only(Scope::Inner, 1)]
     #[case::all_attributes(Scope::All, 2)]
     fn scope_selects_inner_attributes_only(#[case] scope: Scope, #[case] expected: usize) {
-        let code = "#![no_std] fn probe() {} #[cfg(kani)]";
+        let code = Code::stripped("#![no_std] fn probe() {} #[cfg(kani)]".to_owned());
         assert_eq!(
-            attributes(code, scope).len(),
+            attributes(&code, scope).len(),
             expected,
             "the inner scope must not collect outer attributes"
         );
@@ -233,8 +276,8 @@ mod tests {
     /// An attribute's body is compared without its spacing.
     #[test]
     fn spacing_does_not_change_an_attributes_shape() {
-        let code = "#[cfg( verus_keep_ghost )]";
-        let scanned = attributes(code, Scope::All);
+        let code = Code::stripped("#[cfg( verus_keep_ghost )]".to_owned());
+        let scanned = attributes(&code, Scope::All);
         let [attribute] = scanned.as_slice() else {
             panic!("one attribute in the source must be one attribute in the scan");
         };
@@ -255,7 +298,7 @@ mod tests {
     #[case::constant("pub const LIMIT: usize = 1;", false)]
     fn the_item_after_an_attribute_is_classified(#[case] item: &str, #[case] expected: bool) {
         assert_eq!(
-            gates_a_function(item, 0),
+            gates_a_function(&Code::stripped(item.to_owned()), 0),
             expected,
             "the scan must classify {item:?} by the item it opens"
         );
@@ -264,13 +307,16 @@ mod tests {
     /// The last crate-level level wins, as the compiler reads it.
     #[test]
     fn a_later_allow_overrides_an_earlier_deny() {
-        let code = concat!(
-            "#![deny(clippy::std_instead_of_core)]\n",
-            "#![allow(clippy::std_instead_of_core)]\n"
+        let code = Code::stripped(
+            concat!(
+                "#![deny(clippy::std_instead_of_core)]\n",
+                "#![allow(clippy::std_instead_of_core)]\n"
+            )
+            .to_owned(),
         );
         assert!(
             matches!(
-                final_lint_level(code, "clippy::std_instead_of_core"),
+                final_lint_level(&code, "clippy::std_instead_of_core"),
                 Some(super::LintLevel::Allow)
             ),
             "the last level a compiler sees is the effective one"

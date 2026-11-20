@@ -23,6 +23,7 @@
 
 use std::{error::Error, io};
 
+use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
 #[path = "workspace_attributes.rs"]
@@ -34,12 +35,11 @@ use attributes::{
     Attribute,
     LintLevel,
     Scope,
+    Split,
     attributes as scan_attributes,
     final_lint_level,
-    lint_list,
-    split_attribute,
 };
-use scanner::strip_comments_and_literals;
+use scanner::{Code, strip_comments_and_literals};
 
 /// The file name that alone carries the crate attributes.
 const CRATE_ROOT: &str = "lib.rs";
@@ -59,7 +59,11 @@ const FORBIDDEN_LEVELS: [&str; 3] = ["allow", "warn", "expect"];
 /// One Rust source file read from a kernel-shaped tree.
 pub(super) struct KernelFile {
     /// The file's path, relative to the directory the walk started at.
-    pub(super) path: String,
+    ///
+    /// A `Utf8PathBuf` rather than a `String` because the value is joined,
+    /// compared against a file name, and printed as a path; an arbitrary
+    /// string would let a caller pass something no walk could produce.
+    pub(super) path: Utf8PathBuf,
     /// The file's own text.
     pub(super) source: String,
 }
@@ -81,10 +85,10 @@ pub(super) fn kernel_source() -> Result<String, Box<dyn Error>> {
 /// sources_under("crates/combobulate-kernel/src")
 /// // [lib.rs, elementwise_add.rs, ...], sorted by path
 /// ```
-pub(super) fn sources_under(directory: &str) -> Result<Vec<KernelFile>, Box<dyn Error>> {
+pub(super) fn sources_under(directory: &Utf8Path) -> Result<Vec<KernelFile>, Box<dyn Error>> {
     let root = Dir::open_ambient_dir(env!("CARGO_MANIFEST_DIR"), ambient_authority())?;
     let mut files = Vec::new();
-    collect(&root.open_dir(directory)?, "", &mut files)?;
+    collect(&root.open_dir(directory)?, Utf8Path::new(""), &mut files)?;
     files.sort_by(|left, right| left.path.cmp(&right.path));
     Ok(files)
 }
@@ -94,11 +98,11 @@ pub(super) fn sources_under(directory: &str) -> Result<Vec<KernelFile>, Box<dyn 
 /// The extension check is case-insensitive, as the compiler's own file lookup
 /// is on a case-insensitive filesystem, so a file named `Lib.RS` cannot slip
 /// past the rules by its spelling.
-fn collect(directory: &Dir, prefix: &str, files: &mut Vec<KernelFile>) -> io::Result<()> {
+fn collect(directory: &Dir, prefix: &Utf8Path, files: &mut Vec<KernelFile>) -> io::Result<()> {
     for listing in directory.read_dir(".")? {
         let entry = listing?;
         let name = entry.file_name()?;
-        let path = join_path(prefix, &name);
+        let path = prefix.join(&name);
         // A subdirectory is descended into rather than inspected: the rules are
         // about files, and a directory that shares the kernel's shape must be
         // walked just as the root is.
@@ -111,24 +115,12 @@ fn collect(directory: &Dir, prefix: &str, files: &mut Vec<KernelFile>) -> io::Re
     Ok(())
 }
 
-/// Returns the repository-relative path of an entry named `name`.
-///
-/// The walk's first level has no prefix, so an empty one must not produce a
-/// leading separator: `lib.rs`, not `/lib.rs`.
-fn join_path(prefix: &str, name: &str) -> String {
-    if prefix.is_empty() {
-        name.to_owned()
-    } else {
-        format!("{prefix}/{name}")
-    }
-}
-
 /// Reads `name` into `files` when Rust would compile it, and ignores it
 /// otherwise.
 fn push_if_rust(
     directory: &Dir,
     name: &str,
-    path: String,
+    path: Utf8PathBuf,
     files: &mut Vec<KernelFile>,
 ) -> io::Result<()> {
     if has_rust_extension(name) {
@@ -158,7 +150,10 @@ fn has_rust_extension(name: &str) -> bool {
 /// ```
 pub(super) fn kernel_tree_violations(files: &[KernelFile]) -> Vec<String> {
     let mut violations = Vec::new();
-    if !files.iter().any(|file| file.path == CRATE_ROOT) {
+    if !files
+        .iter()
+        .any(|file| file.path == Utf8Path::new(CRATE_ROOT))
+    {
         violations.push(format!(
             "the kernel tree must contain its {CRATE_ROOT} crate root"
         ));
@@ -171,10 +166,13 @@ pub(super) fn kernel_tree_violations(files: &[KernelFile]) -> Vec<String> {
 
 /// Reports the rules one kernel file breaks, naming the file.
 fn file_violations(file: &KernelFile) -> Vec<String> {
-    item_violations(&code_only(&file.source), file.path == CRATE_ROOT)
-        .into_iter()
-        .map(|message| format!("{}: {message}", file.path))
-        .collect()
+    item_violations(
+        &code_only(&file.source),
+        file.path == Utf8Path::new(CRATE_ROOT),
+    )
+    .into_iter()
+    .map(|message| format!("{}: {message}", file.path))
+    .collect()
 }
 
 /// Reports the `no_std`, allocation, and lint rules the kernel source lacks.
@@ -196,18 +194,19 @@ pub(super) fn kernel_source_violations(source: &str) -> Vec<String> {
 ///
 /// The crate-attribute rules are stated over the file name, so a root-only
 /// check cannot be smuggled onto a submodule by copying the attributes there.
-fn item_violations(code: &str, is_root: bool) -> Vec<String> {
+fn item_violations(code: &Code, is_root: bool) -> Vec<String> {
+    let text = code.text();
     let mut violations = if is_root {
         crate_rule_violations(code)
     } else {
         Vec::new()
     };
-    for text in ["extern crate alloc", "extern crate std"] {
-        if code.contains(text) {
-            violations.push(format!("must not contain {text}"));
+    for declaration in ["extern crate alloc", "extern crate std"] {
+        if text.contains(declaration) {
+            violations.push(format!("must not contain {declaration}"));
         }
     }
-    if code.contains("cfg(not(verus_keep_ghost))") {
+    if text.contains("cfg(not(verus_keep_ghost))") {
         violations.push("must not contain cfg(not(verus_keep_ghost))".to_owned());
     }
     for attribute in scan_attributes(code, Scope::All) {
@@ -217,9 +216,9 @@ fn item_violations(code: &str, is_root: bool) -> Vec<String> {
 }
 
 /// Reports the crate attributes a kernel root must declare.
-fn crate_rule_violations(code: &str) -> Vec<String> {
+fn crate_rule_violations(code: &Code) -> Vec<String> {
     let mut violations = Vec::new();
-    if !code.contains("#![no_std]") {
+    if !code.text().contains("#![no_std]") {
         violations.push("the kernel crate root must declare #![no_std]".to_owned());
     }
     for lint in CORE_LINTS {
@@ -234,8 +233,8 @@ fn crate_rule_violations(code: &str) -> Vec<String> {
 }
 
 /// Reports the rules one attribute breaks in a kernel file.
-fn attribute_violations(code: &str, attribute: &Attribute<'_>) -> Vec<String> {
-    let mut violations = lint_level_violations(attribute.body);
+fn attribute_violations(code: &Code, attribute: &Attribute<'_>) -> Vec<String> {
+    let mut violations = lint_level_violations(attribute);
     let normal = attribute.normalised();
     if substitutes_a_function(code, attribute) {
         violations.push(format!("must not put {normal} on a fn item"));
@@ -250,21 +249,21 @@ fn attribute_violations(code: &str, attribute: &Attribute<'_>) -> Vec<String> {
 /// `cfg_attr` is how the contract attributes reach the shipped body. The item
 /// after the attribute must be a function, because gating a `use` or a
 /// constant replaces no executable body.
-fn substitutes_a_function(code: &str, attribute: &Attribute<'_>) -> bool {
+fn substitutes_a_function(code: &Code, attribute: &Attribute<'_>) -> bool {
     let normal = attribute.normalised();
     let is_substitute_gate = matches!(normal.as_str(), "cfg(verus_keep_ghost)" | "cfg(kani)");
     is_substitute_gate && !attribute.is_inner && attributes::gates_a_function(code, attribute.end)
 }
 
 /// Reports a core lint this attribute allows, warns about, or expects.
-fn lint_level_violations(body: &str) -> Vec<String> {
-    let Some((level, list)) = lint_setting(body) else {
+fn lint_level_violations(attribute: &Attribute<'_>) -> Vec<String> {
+    let Some(split) = lint_setting(attribute) else {
         return Vec::new();
     };
     CORE_LINTS
         .iter()
-        .filter(|lint| lint_list(list).any(|item| item == **lint))
-        .map(|lint| format!("must not {level} {lint}"))
+        .filter(|lint| split.lints().any(|item| item == **lint))
+        .map(|lint| format!("must not {} {lint}", split.name))
         .collect()
 }
 
@@ -273,18 +272,22 @@ fn lint_level_violations(body: &str) -> Vec<String> {
 /// `expect` is included even though no crate-level `expect` can weaken a
 /// `deny`: a file that expected one of these lints would still be the place
 /// where core-only code stopped being enforced.
-fn lint_setting(body: &str) -> Option<(&str, &str)> {
-    let (name, list) = split_attribute(body)?;
-    FORBIDDEN_LEVELS.contains(&name).then_some((name, list))
+fn lint_setting<'a>(attribute: &Attribute<'a>) -> Option<Split<'a>> {
+    let split = attribute.split()?;
+    FORBIDDEN_LEVELS.contains(&split.name).then_some(split)
 }
 
-/// Returns `source` with comments and string literals removed.
+/// Returns `source` with comments and string literals removed, as [`Code`].
 ///
 /// Whitespace is collapsed so `extern /* note */ crate alloc` still reads as
-/// the declaration a violation check must see.
-fn code_only(source: &str) -> String {
-    strip_comments_and_literals(source)
+/// the declaration a violation check must see. Collapsing happens here rather
+/// than in the scanner because it is about how these rules read the text, not
+/// about what a comment or literal is.
+fn code_only(source: &str) -> Code {
+    let collapsed = strip_comments_and_literals(source)
+        .text()
         .split_whitespace()
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    Code::stripped(collapsed)
 }

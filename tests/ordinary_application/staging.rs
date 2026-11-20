@@ -66,12 +66,37 @@ fn prepares_and_executes(world: &mut World) {
     }
 }
 
+/// The error `world` recorded for `stage`, if that stage reported one.
+///
+/// The five `Then` steps below assert one property each of a stage's error, so
+/// they share this lookup: a step that reached into `World` itself would repeat
+/// the field choice and the missing-value diagnostic, and the two fields are
+/// the only thing that varies between the preparation and execution cases.
+///
+/// `Stage` is `#[non_exhaustive]`, so a stage this scenario does not model
+/// records nothing. Returning `None` rather than panicking keeps the failure
+/// at the `Then` step that asked, where the diagnostic still names the stage
+/// it wanted.
+fn reported(world: &World, stage: Stage) -> Option<&ExpressionError> {
+    match stage {
+        Stage::Preparation => world.preparation.as_ref(),
+        Stage::Execution => world.execution.as_ref(),
+        _ => None,
+    }
+}
+
+/// The error `world` recorded for `stage`, which every `Then` step requires.
+fn reported_error(world: &World, stage: Stage) -> &ExpressionError {
+    let diagnosed = match stage {
+        Stage::Preparation => "the shape disagreement must be reported by preparation",
+        _ => "the overflow must be reported by execution",
+    };
+    reported(world, stage).expect(diagnosed)
+}
+
 #[then("the preparation reports a shape disagreement")]
 fn preparation_reports_shape(world: &World) {
-    let error = world
-        .preparation
-        .as_ref()
-        .expect("the shape disagreement must be reported by preparation");
+    let error = reported_error(world, Stage::Preparation);
     assert_eq!(
         error.failures().first().map(Failure::code),
         Some("ShapeAgreement"),
@@ -89,10 +114,7 @@ fn preparation_succeeds(world: &World) {
 
 #[then("the execution reports an integer overflow")]
 fn execution_reports_overflow(world: &World) {
-    let error = world
-        .execution
-        .as_ref()
-        .expect("the overflow must be reported by execution");
+    let error = reported_error(world, Stage::Execution);
     assert_eq!(
         error.failures().first().map(Failure::code),
         Some("IntegerOverflow"),
@@ -102,10 +124,7 @@ fn execution_reports_overflow(world: &World) {
 
 #[then("the reported stage is preparation")]
 fn stage_is_preparation(world: &World) {
-    let error = world
-        .preparation
-        .as_ref()
-        .expect("a preparation failure must exist by now");
+    let error = reported_error(world, Stage::Preparation);
     assert_eq!(
         error.stage(),
         Stage::Preparation,
@@ -115,10 +134,7 @@ fn stage_is_preparation(world: &World) {
 
 #[then("the reported stage is execution")]
 fn stage_is_execution(world: &World) {
-    let error = world
-        .execution
-        .as_ref()
-        .expect("an execution failure must exist by now");
+    let error = reported_error(world, Stage::Execution);
     assert_eq!(
         error.stage(),
         Stage::Execution,
