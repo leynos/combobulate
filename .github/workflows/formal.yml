@@ -31,6 +31,7 @@ name: Formal verification
       - 'scripts/verus_probe.py'
       - 'scripts/verus_kernel.py'
       - 'scripts/verus_kernel_verdicts.py'
+      - 'scripts/verus_kernel_body.py'
       - 'scripts/verus_kernel_identity.py'
       - 'scripts/kernel_record.py'
       - 'scripts/tests/test_verus_kernel.py'
