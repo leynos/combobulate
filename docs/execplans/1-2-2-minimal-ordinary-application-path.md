@@ -586,8 +586,9 @@ The thresholds are:
     `#[expect(clippy::indexing_slicing)]` attributes. Three more `#[expect]`
     sites sit beside them and one `#[allow]` pair is shared by both BDD
     modules: `clippy::unused_self` on `NativeExecutor::run` (the receiver is
-    what carries the plan back to its engine), the `rstest`-fixture `unused_braces` pair
-    with its accompanying `clippy::allow_attributes` (the repository's
+    what carries the plan back to its engine), the `rstest`-fixture
+    `unused_braces` pair with its accompanying `clippy::allow_attributes` (the
+    repository's
     sanctioned workaround, matching `tests/build_profiles.rs`), and
     `expect_used` in `#[cfg(test)]` bodies, which the workspace already allows
     for tests. None suppresses a correctness lint, and none is
