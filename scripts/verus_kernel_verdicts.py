@@ -48,10 +48,15 @@ _PERMITTED = ("error: postcondition not satisfied", "error: aborting due to")
 # range, which a wrapping sum detects at a different set of positions. Both are
 # qualified on location, so an assertion anywhere else still disqualifies the
 # run.
+#
+# A postcondition failure is deliberately absent, though the mutant tier admits
+# one: the wrap root states no clauses of its own, so it has no postcondition to
+# fail, and a log that reported one is describing some obligation the body tier
+# never claimed. It is not permitted merely because the other tier permits it.
 _BODY_PERMITTED = (
-    *_PERMITTED,
     "error: invariant not satisfied",
     "error: assertion failed",
+    "error: aborting due to",
 )
 
 
@@ -214,6 +219,16 @@ def _require_permitted(
     candidate never got that far, so it is not evidence whatever else the log
     says.
 
+    Parameters
+    ----------
+    items
+        The diagnostics the log reported.
+    request
+        The mutant whose name appears in the rejection message.
+    permitted
+        The error prefixes this tier admits. Each tier passes its own set, so a
+        failure one tier owes is not thereby admitted by the other.
+
     Raises
     ------
     RuntimeError
@@ -343,6 +358,11 @@ def _require_loop_invariant(items: list[Diagnostic], source: Path) -> None:
     same reason the invariant does. It is admitted, but each diagnostic is
     qualified on its own: a located failure cannot account for a second one
     that merely repeats its wording, because the second names no line.
+
+    A postcondition failure is not admitted here even though the seeded-mutant
+    tier admits one. The generated wrap root states no clauses of its own, so
+    the mutated body has nothing to fail a postcondition of; a log reporting
+    one is describing an obligation this tier never claimed.
 
     Raises
     ------

@@ -27,7 +27,7 @@
     "crates/combobulate-kernel/verus/elementwise_add.rs": "ast-sha256:1693aaf7d97b7391410f1c53e96c2abd87b3a1fad1a3858d849e63b0ca01a9ea",
     "crates/combobulate-kernel/verus/elementwise_add_mutants.rs": "ast-sha256:1d07bb6b817f5e9791196484a6027fe22d6517a583e729fa56b74788ef29aa3c",
     "scripts/verus_kernel.py": "ast-sha256:b1a1b2acbe2cc9fae855a05b04ead6eafe06343431cc5e2d853be5278c945802",
-    "scripts/verus_kernel_verdicts.py": "ast-sha256:042da6bf558d640dd06335d0585087f1a7c31a88917990dedf2338bc318c29b6",
+    "scripts/verus_kernel_verdicts.py": "ast-sha256:067912b8c98ca32b9049ec4f6e9632d3bf7e36f2d062491d7dbeea13f90fc9e2",
     "scripts/verus_kernel_diagnostic.py": "ast-sha256:73ccfb4f8aa78af4feaae1f5e65dba4f6dc24bdb6a4ce917d167535e23d62f21",
     "scripts/verus_kernel_body.py": "ast-sha256:bce1275f98485e35eb9994e8652b3c2a5afcc9d0f7ad051e6e9361ed4534435e",
     "scripts/verus_kernel_identity.py": "ast-sha256:7b378dcdc8812c7d7ba7b255e856ddae692a61cfeb2844a957ed0a48ee207d0f",

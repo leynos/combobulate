@@ -1,33 +1,23 @@
-"""Qualify the shipped kernel's Verus verdicts without running a solver.
+"""Qualify the shipped kernel's seeded-mutant verdicts without a solver.
 
 The kernel driver admits a positive root only on its exact pinned count and a
-mutant only on a located postcondition failure at that mutant's own clause.
-These tests exercise those two rules and the portable-log rewriting, so a
-changed summary, a disqualified error, or a host path in a committed log fails
-here rather than silently weakening the record.
+seeded mutant only on a located postcondition failure at that mutant's own
+clause. These tests exercise those two rules, so a changed summary, a
+disqualified error, or a host path in a committed log fails here rather than
+silently weakening the record.
 
-The loader that stubs the driver's module-scope imports lives in
-:mod:`verus_kernel_fixtures`, so this file states what each rule must decide.
+The body-tier mutant is qualified by a different rule, in
+:mod:`test_verus_kernel_body`. The loader that stubs the driver's module-scope
+imports lives in :mod:`verus_kernel_fixtures`, so each file states what its
+rule must decide.
 """
 
 from __future__ import annotations
 
-import hashlib
-import json
 import unittest
 from pathlib import Path
 
-from verus_kernel_fixtures import (
-    RECORD,
-    ROOT,
-    SUMMARY,
-    load,
-    load_driver,
-    load_verdicts,
-)
-from verus_kernel_fixtures import SCRIPTS
-
-SUMMARY = 'verification results:: 20 verified, 0 errors\n'
+from verus_kernel_fixtures import ROOT, SCRIPTS, SUMMARY, load, load_driver, load_verdicts
 
 
 class PositiveQualificationTests(unittest.TestCase):
@@ -244,127 +234,6 @@ class MutantQualificationTests(unittest.TestCase):
         """A mutant that verifies is not rejected, whatever the log says."""
         with self.assertRaisesRegex(RuntimeError, 'expected exit 1'):
             self._qualify(self._diagnostic('k2'), 0, 'mutant_err', ['k2'])
-
-
-class BodyMutantTests(unittest.TestCase):
-    """Require the wrapping body to fail a loop invariant, not something else."""
-
-    def setUp(self) -> None:
-        """Load the verdict rules and the body they qualify once per test."""
-        self.driver = load_driver()
-        self.invariant = self._invariant_line()
-
-    def _invariant_line(self) -> int:
-        """Return the line of the scan loop's invariant in the shipped body."""
-        lines = self.driver.PRODUCTION.read_text(encoding='utf-8').splitlines()
-        return next(
-            index
-            for index, text in enumerate(lines, start=1)
-            if 'invariant' in text
-        )
-
-    def _assertion_line(self) -> int:
-        """Return the line of the scan pass's own assertion."""
-        lines = self.driver.PRODUCTION.read_text(encoding='utf-8').splitlines()
-        return next(
-            index
-            for index, text in enumerate(lines, start=1)
-            if 'assert(!in_range_at' in text
-        )
-
-    def test_a_loop_invariant_failure_qualifies(self) -> None:
-        """An invariant failure with a non-zero error count is the verdict."""
-        log = (
-            'error: invariant not satisfied at loop head\n'
-            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
-            'error: assertion failed\n'
-            f'  --> {self.driver.WRAP_BODY}:{self._assertion_line()}:29\n'
-            'verification results:: 14 verified, 2 errors\n'
-        )
-        verdict = self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
-
-        self.assertEqual(verdict['clause'], 'loop-invariant')
-
-    def test_a_verified_body_is_rejected(self) -> None:
-        """A body that verifies is not a rejected mutant."""
-        with self.assertRaisesRegex(RuntimeError, 'must not verify'):
-            self.driver._qualify_body(SUMMARY, 0, self.driver.WRAP_BODY)
-
-    def test_a_postcondition_only_failure_is_rejected(self) -> None:
-        """Some other obligation must not stand in for the loop invariant."""
-        log = (
-            'error: postcondition not satisfied\n'
-            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
-            'verification results:: 0 verified, 1 errors\n'
-        )
-        with self.assertRaisesRegex(RuntimeError, 'must fail a loop invariant'):
-            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
-
-    def test_a_duplicated_invariant_with_one_location_is_rejected(self) -> None:
-        """One located failure must not account for two reported failures.
-
-        Verus can report the same obligation twice, once with a location and
-        once without. Comparing error text alone treats the second as
-        explained; it is a separate diagnostic that could have failed anywhere.
-        """
-        log = (
-            'error: invariant not satisfied at end of loop body\n'
-            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
-            'error: invariant not satisfied at end of loop body\n'
-            'verification results:: 14 verified, 2 errors\n'
-        )
-        with self.assertRaisesRegex(RuntimeError, 'must all be located in the body'):
-            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
-
-    def test_a_same_named_body_at_another_path_is_rejected(self) -> None:
-        """A failure located in a copy of the body is not evidence about it."""
-        elsewhere = Path('/tmp/another-checkout/elementwise_add.rs')
-        log = (
-            'error: invariant not satisfied at end of loop body\n'
-            f'  --> {elsewhere}:{self.invariant}:13\n'
-            'verification results:: 14 verified, 1 errors\n'
-        )
-        with self.assertRaisesRegex(RuntimeError, 'must name a line of the body'):
-            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
-
-    def test_an_assertion_outside_the_body_is_rejected(self) -> None:
-        """An admitted assertion is only evidence when the body raised it."""
-        log = (
-            'error: invariant not satisfied at end of loop body\n'
-            f'  --> {self.driver.WRAP_BODY}:{self.invariant}:13\n'
-            'error: assertion failed\n'
-            '  --> wrap.rs:9:5\n'
-            'verification results:: 14 verified, 2 errors\n'
-        )
-        with self.assertRaisesRegex(RuntimeError, 'must all be located in the body'):
-            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
-
-    def test_the_committed_wrap_log_is_the_verdict_it_records(self) -> None:
-        """The recorded body mutant must still be the run its log describes.
-
-        The log is the transcript of a real run, so it is the strongest
-        available check that the rule admits the observation it was written
-        for rather than only the shapes its unit tests construct. It is
-        committed with the repository root rewritten to ``<repo>``, so it also
-        exercises the marker restoration a fresh log does not need.
-        """
-        driver = load_driver()
-        log = (ROOT / 'tools/verifier-fixtures/verus-kernel/wrap.log').read_text(
-            encoding='utf-8'
-        )
-
-        verdict = driver._qualify_body(log, 1, driver.WRAP_BODY)
-
-        self.assertEqual(verdict['clause'], 'loop-invariant')
-
-    def test_an_unlocated_invariant_is_rejected(self) -> None:
-        """An invariant error with no location is not evidence about the body."""
-        log = (
-            'error: invariant not satisfied at loop head\n'
-            'verification results:: 14 verified, 1 errors\n'
-        )
-        with self.assertRaisesRegex(RuntimeError, 'must name a line of the body'):
-            self.driver._qualify_body(log, 1, self.driver.WRAP_BODY)
 
 
 class InvocationTests(unittest.TestCase):
