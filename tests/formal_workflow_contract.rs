@@ -143,6 +143,51 @@ fn the_kernel_proof_fails_the_step_on_a_failed_proof() -> Result<(), String> {
     Ok(())
 }
 
+/// The scripts that decide a kernel verdict, as the record binds them.
+///
+/// Each one moves a verdict when it changes, so the workflow that runs the
+/// proof must start when one of them changes. `provenance.json` names the same
+/// set under `source_digests`; a reader added there and not here would be
+/// bound into the record yet never exercised by the job that produces it.
+const VERDICT_SOURCES: [&str; 6] = [
+    "scripts/verus_kernel.py",
+    "scripts/verus_kernel_verdicts.py",
+    "scripts/verus_kernel_diagnostic.py",
+    "scripts/verus_kernel_body.py",
+    "scripts/verus_kernel_identity.py",
+    "scripts/kernel_record.py",
+];
+
+/// Requires every verdict-deciding script to start the formal workflow.
+///
+/// The filter is a list of literals, so a new sibling module is invisible to it
+/// until someone remembers to add it. The diagnostic reader was exactly that
+/// case: a PR changing only how diagnostics are paired with their locations
+/// would not have run the proof whose verdict depends on that pairing. This
+/// test derives the requirement from the same module list the record binds, so
+/// the two cannot drift apart silently.
+#[test]
+fn every_verdict_source_triggers_the_formal_workflow() -> Result<(), String> {
+    let workflow: Value =
+        serde_yaml::from_str(FORMAL).map_err(|error| format!("formal.yml must parse: {error}"))?;
+    let paths = at(&workflow, &["on", "pull_request", "paths"])
+        .and_then(Value::as_sequence)
+        .ok_or_else(|| "the workflow must filter pull requests by path".to_owned())?;
+    let listed: Vec<&str> = paths.iter().filter_map(Value::as_str).collect();
+    let missing: Vec<&str> = VERDICT_SOURCES
+        .iter()
+        .copied()
+        .filter(|source| !listed.contains(source))
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "a change to {missing:?} moves a kernel verdict, so the formal workflow must list \
+             each of them under `on.pull_request.paths`"
+        ));
+    }
+    Ok(())
+}
+
 /// Requires the kernel log to be uploaded even when the proof fails.
 #[test]
 fn the_kernel_log_is_uploaded_even_on_failure() -> Result<(), String> {
