@@ -87,9 +87,11 @@ global-timeout = "60m"
 # same binary run directly at similar queue depths. The difference is that the
 # suite's run competes with the root build's own compiler jobs, which the
 # direct run does not, so the contended figure is not a property of the gate
-# alone. Twenty periods (1,200 s) clears the overrun by 600 s, stays below the
-# whole-run cap above, and still ends a genuinely hung nested build long before
-# an outer job timeout would.
+# alone. Twenty periods (1,200 s) clears the overrun by 600 s and stays below
+# the whole-run cap above. It does not end a hung build before the hosted job
+# would: that job's `timeout-minutes: 20` is also 1,200 s and starts first, so
+# on the hosted lane the job is what ends a hang. Locally there is no such job,
+# which is where this allowance does the work.
 
 [[profile.default.overrides]]
 filter = 'test(/^checked_cardinality_result_must_be_used($|::)/)'
