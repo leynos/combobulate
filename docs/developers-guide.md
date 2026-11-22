@@ -259,6 +259,15 @@ s, classified by `scripts/tests/test_cardinality_ui_deadline.py`), because the
 standalone `cargo test --test cardinality_ui` invocation inside the gate
 package has no `terminate-after` behind it.
 
+The root test that runs that binary scrubs the caller's build selectors —
+`RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS` and `CARGO_BUILD_TARGET` — as well as
+`CARGO_MANIFEST_DIR`. `make test` assigns `RUSTFLAGS`, and `trybuild` hands the
+inherited value to the nested build it starts, so leaving it in place made the
+nested fingerprint depend on how the suite was invoked and discarded the gate's
+warm cache on every run. With the selectors removed, a second run reuses the
+first's output: measured at 143 s under the suite's own `RUSTFLAGS` against a
+cold compile that did not finish inside the 600 s allowance.
+
 ### Preparation happens outside test bodies
 
 No test body fetches packages or compiles the repository. The suite used to,
