@@ -56,7 +56,7 @@ class RunClassificationTests(unittest.TestCase):
             )
         )
         self.assertEqual(status, 124)
-        self.assertIn('exceeded its 600s deadline', diagnostics)
+        self.assertIn('exceeded its 1200s deadline', diagnostics)
 
     def test_an_announced_kill_reports_the_escalation(self) -> None:
         """A trapped SIGTERM ends through SIGKILL, which is still a deadline.
@@ -129,7 +129,7 @@ class RunClassificationTests(unittest.TestCase):
 
             self.assertEqual(
                 captured['arguments'][:5],
-                ['timeout', '--verbose', '--signal=TERM', '--kill-after=2s', '600'],
+                ['timeout', '--verbose', '--signal=TERM', '--kill-after=2s', '1200'],
             )
             self.assertEqual(captured['arguments'][5], str(binary))
             self.assertNotIn('CARGO_MANIFEST_DIR', captured['options']['env'])

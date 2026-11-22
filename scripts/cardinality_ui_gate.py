@@ -41,9 +41,12 @@ GATE_DIRECTORY = MANIFEST.parent
 RECORD = GATE_DIRECTORY / 'target/cardinality-ui-binary'
 EXECUTABLE_NAME = 'cardinality_ui'
 
-# The recorded run has no nextest behind it, so it carries the same
-# 600-second bound the nextest override applies to the root test.
-DEADLINE_SECONDS = '600'
+# The recorded run has no nextest behind it, so it carries the same bound the
+# nextest override applies to the root test: twenty 60-second periods. The
+# figure moved from ten when the suite's run was measured overrunning 600 s
+# under a shared compile queue; the two routes must agree, or the direct one
+# ends a run the suite would have allowed to finish.
+DEADLINE_SECONDS = '1200'
 
 # The escalation grace and the announcement that distinguishes an enforced
 # kill from a child that died of `SIGKILL` for any other reason.
