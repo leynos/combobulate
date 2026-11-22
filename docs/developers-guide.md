@@ -227,12 +227,11 @@ test, which compiles a generated crate, and `non_exhaustive_contract`, which
 builds its downstream fixture four times. Both compile a nested crate under the
 shared compile queue, and the comment beside each figure records the
 measurements it came from. The whole run carries a `global-timeout` of 60
-minutes, far
-above any measured test and above the hosted jobs' own 8-minute limit, so in
-practice it is an outer limit on local `cargo nextest` runs; the coverage
-action's own 1,800-second Cargo watchdog stops a hung coverage lane first. An
-earlier version of this file left the bound out on purpose, and the file
-records why that was superseded. Tests that start Cargo or rustc
+minutes, far above any measured test and above the hosted jobs' own 8-minute
+limit, so in practice it is an outer limit on local `cargo nextest` runs; the
+coverage action's own 1,800-second Cargo watchdog stops a hung coverage lane
+first. An earlier version of this file left the bound out on purpose, and the
+file records why that was superseded. Tests that start Cargo or rustc
 (`polars_surface_ui`, `native_consumer_e2e`, `non_exhaustive_contract`, the
 cardinality gate's `cardinality_probe_ui`, and the read-only
 `workspace_profiles`, `workspace_boundaries` and `build_toolchain_contract`)
@@ -276,22 +275,22 @@ something a test body starts.
 
 Two test bodies compile a downstream fixture, and both are bounded exceptions
 rather than the incident's shape. `tests/native_consumer_e2e.rs` builds
-`tools/fixtures/native-consumer/`, and `tests/non_exhaustive_contract.rs`
-builds `tools/fixtures/non-exhaustive-contract/`; each is a separate workspace
-whose only dependency is the facade by path with default features off, so
-nothing either compiles is the repository's own crate graph and no
-dev-dependency of this suite reaches it. That separation is the point: the
-tests exist to prove the facade works for a consumer outside the workspace,
-which cannot be shown by anything already inside it. Both run their nested
-Cargo with `--locked` and a target directory under `CARGO_TARGET_TMPDIR`, so
-neither resolves a new lockfile nor writes into the repository, and a later
-build in the same run reuses the first's output. `native_consumer_e2e` is
-bounded by the default tier; measured at four seconds warm on an idle host, and
-it is the fixture's own compile rather than a build of this repository.
-`non_exhaustive_contract` carries the wider override, because its first build
-compiles the facade and kernel from cold: measured at 4 m 07 s locally while the
-shared compile queue held about 230 waiting builds, against 76 s for the whole
-binary on an idle host.
+`tools/fixtures/native-consumer/`, and `tests/non_exhaustive_contract.rs` builds
+`tools/fixtures/non-exhaustive-contract/`; each is a separate workspace whose
+only dependency is the facade by path with default features off, so nothing
+either compiles is the repository's own crate graph and no dev-dependency of
+this suite reaches it. That separation is the point: the tests exist to prove
+the facade works for a consumer outside the workspace, which cannot be shown by
+anything already inside it. Both run their nested Cargo with `--locked` and a
+target directory under `CARGO_TARGET_TMPDIR`, so neither resolves a new
+lockfile nor writes into the repository, and a later build in the same run
+reuses the first's output. `native_consumer_e2e` is bounded by the default
+tier; measured at four seconds warm on an idle host, and it is the fixture's
+own compile rather than a build of this repository. `non_exhaustive_contract`
+carries the wider override, because its first build compiles the facade and
+kernel from cold: measured at 4 m 07 s locally while the shared compile queue
+held about 230 waiting builds, against 76 s for the whole binary on an idle
+host.
 
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
