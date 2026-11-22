@@ -229,19 +229,19 @@ measured overrunning 600 s inside the suite, and `non_exhaustive_contract` at
 Both compile a nested crate under the shared compile queue, and the comment
 beside each figure records the measurements it came from. The whole run carries
 a `global-timeout` of 60 minutes, far above any measured test and above the
-hosted jobs' own 8-minute limit, so in practice it is an outer limit on local
-`cargo nextest` runs; the coverage action's own 1,800-second Cargo watchdog
-stops a hung coverage lane first. An earlier version of this file left the
-bound out on purpose, and the file records why that was superseded. Tests that
-start Cargo or rustc (`polars_surface_ui`, `native_consumer_e2e`,
-`non_exhaustive_contract`, the cardinality gate's `cardinality_probe_ui`, and
-the read-only `workspace_profiles`, `workspace_boundaries` and
-`build_toolchain_contract`) run one at a time in the `nested-cargo` test group,
-so their nested builds and queries do not compete for cores or the
-package-cache lock; a new test that spawns Cargo, even only to read metadata,
-is added to that group's override filter. Those numbers, the arithmetic behind
-them, and the reasons for the bound are policy, and they live in that file
-beside the values rather than here.
+hosted jobs' own 20-minute `timeout-minutes`, so in practice it is an outer
+limit on local `cargo nextest` runs; the coverage action's own 1,800-second
+Cargo watchdog stops a hung coverage lane first. An earlier version of this
+file left the bound out on purpose, and the file records why that was
+superseded. Tests that start Cargo or rustc (`polars_surface_ui`,
+`native_consumer_e2e`, `non_exhaustive_contract`, the cardinality gate's
+`cardinality_probe_ui`, and the read-only `workspace_profiles`,
+`workspace_boundaries` and `build_toolchain_contract`) run one at a time in the
+`nested-cargo` test group, so their nested builds and queries do not compete
+for cores or the package-cache lock; a new test that spawns Cargo, even only to
+read metadata, is added to that group's override filter. Those numbers, the
+arithmetic behind them, and the reasons for the bound are policy, and they live
+in that file beside the values rather than here.
 
 Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
