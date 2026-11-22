@@ -224,8 +224,8 @@ test. Nextest bounds that work: `.config/nextest.toml` sets a 60 s slow warning
 with `terminate-after = 5`, so an ordinary test ends at 300 s. Two tests carry
 their own override at `terminate-after = 10`: the cardinality gate's `trybuild`
 test, which compiles a generated crate, and `non_exhaustive_contract`, which
-builds its downstream fixture four times. Both compile a nested crate under the
-shared compile queue, and the comment beside each figure records the
+builds its downstream fixture seven times. Both compile a nested crate under
+the shared compile queue, and the comment beside each figure records the
 measurements it came from. The whole run carries a `global-timeout` of 60
 minutes, far above any measured test and above the hosted jobs' own 8-minute
 limit, so in practice it is an outer limit on local `cargo nextest` runs; the
@@ -290,7 +290,9 @@ own compile rather than a build of this repository. `non_exhaustive_contract`
 carries the wider override, because its first build compiles the facade and
 kernel from cold: measured at 4 m 07 s locally while the shared compile queue
 held about 230 waiting builds, against 76 s for the whole binary on an idle
-host.
+host when it stated three contracts. The six-contract version measured 330 s
+for the failing half and 202 s for the covered half in one contended run, so
+the margin is thinner than the first-build figure alone suggests.
 
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
