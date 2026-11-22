@@ -88,6 +88,20 @@ global-timeout = "60m"
 filter = 'test(/^checked_cardinality_result_must_be_used($|::)/)'
 slow-timeout = { period = "60s", terminate-after = 10 }
 
+# `non_exhaustive_contract` builds `tools/fixtures/non-exhaustive-contract`
+# four times: once for the covered binary and once per failing contract, each
+# with its own `--cfg`. The fixture is a separate workspace whose only
+# dependency is the facade by path, so the first build compiles the facade and
+# the kernel, and the three that follow reuse that output. Measured: 4 m 07 s
+# for the first build locally while the shared compile queue held about 230
+# waiting builds, and 76 s for the whole binary on an idle host. Ten periods
+# (600 s) clears the contended sample by 193 s, which is the same allowance the
+# cardinality gate above carries for the same reason: a nested build under a
+# shared compile queue, not a test that computes.
+[[profile.default.overrides]]
+filter = 'binary(non_exhaustive_contract)'
+slow-timeout = { period = "60s", terminate-after = 10 }
+
 # Tests that start Cargo run one at a time, so their nested builds do not
 # compete with each other for cores or the package-cache lock (Concordat
 # NC-004). Add the binary of any new test that spawns Cargo or rustc to the

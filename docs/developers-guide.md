@@ -221,10 +221,13 @@ push. This scaffold does not include an automerge workflow.
 A test that starts a child process owns a nested build, and a nested build is
 where this repository has already lost two and a quarter hours to a single
 test. Nextest bounds that work: `.config/nextest.toml` sets a 60 s slow warning
-with `terminate-after = 5`, so an ordinary test ends at 300 s. The cardinality
-gate's `trybuild` test has its own override at `terminate-after = 10`, because
-it compiles a generated crate; the comment there records the measurements the
-figure came from. The whole run carries a `global-timeout` of 60 minutes, far
+with `terminate-after = 5`, so an ordinary test ends at 300 s. Two tests carry
+their own override at `terminate-after = 10`: the cardinality gate's `trybuild`
+test, which compiles a generated crate, and `non_exhaustive_contract`, which
+builds its downstream fixture four times. Both compile a nested crate under the
+shared compile queue, and the comment beside each figure records the
+measurements it came from. The whole run carries a `global-timeout` of 60
+minutes, far
 above any measured test and above the hosted jobs' own 8-minute limit, so in
 practice it is an outer limit on local `cargo nextest` runs; the coverage
 action's own 1,800-second Cargo watchdog stops a hung coverage lane first. An
@@ -271,19 +274,24 @@ and are bounded by nextest when it runs them. The gate preparation itself is a
 Cargo command, but it is a Make recipe that runs before any test body, not
 something a test body starts.
 
-The one compiling test body is `tests/native_consumer_e2e.rs`, and it is a
-bounded exception rather than the incident's shape. It builds
-`tools/fixtures/native-consumer/`, a separate workspace whose only dependency
-is the facade by path with default features off, so nothing it compiles is the
-repository's own crate graph and no dev-dependency of this suite reaches it.
-That separation is the point: the test exists to prove the profile works for a
-consumer outside the workspace, which cannot be shown by anything already
-inside it. The nested Cargo runs with `--locked` and its target directory under
-`CARGO_TARGET_TMPDIR`, so it neither resolves a new lockfile nor writes into
-the repository, and a second build in the same run reuses the first's output.
-Nextest bounds it with the default tier; measured at four seconds warm on an
-idle host, and it is the fixture's own compile rather than a build of this
-repository.
+Two test bodies compile a downstream fixture, and both are bounded exceptions
+rather than the incident's shape. `tests/native_consumer_e2e.rs` builds
+`tools/fixtures/native-consumer/`, and `tests/non_exhaustive_contract.rs`
+builds `tools/fixtures/non-exhaustive-contract/`; each is a separate workspace
+whose only dependency is the facade by path with default features off, so
+nothing either compiles is the repository's own crate graph and no
+dev-dependency of this suite reaches it. That separation is the point: the
+tests exist to prove the facade works for a consumer outside the workspace,
+which cannot be shown by anything already inside it. Both run their nested
+Cargo with `--locked` and a target directory under `CARGO_TARGET_TMPDIR`, so
+neither resolves a new lockfile nor writes into the repository, and a later
+build in the same run reuses the first's output. `native_consumer_e2e` is
+bounded by the default tier; measured at four seconds warm on an idle host, and
+it is the fixture's own compile rather than a build of this repository.
+`non_exhaustive_contract` carries the wider override, because its first build
+compiles the facade and kernel from cold: measured at 4 m 07 s locally while the
+shared compile queue held about 230 waiting builds, against 76 s for the whole
+binary on an idle host.
 
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
