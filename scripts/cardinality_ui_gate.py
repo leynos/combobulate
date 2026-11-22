@@ -69,6 +69,20 @@ REDIRECTING_VARIABLES = (
     'CARGO_PROFILE_DEV_CODEGEN_BACKEND',
 )
 
+# Build selectors the *run* child must not inherit.
+#
+# The gate binary is already compiled by the time ``run`` starts it, so these
+# reach only the nested build ``trybuild`` starts. That build's fingerprint
+# includes the flags it is given, so composing ``RUSTFLAGS`` here would make
+# ``make test-ui`` and ``make test`` disagree about the same cache: each route
+# would discard what the other wrote and pay a cold compile. The root test
+# removes the same three for the same reason.
+RUN_SELECTORS = (
+    'RUSTFLAGS',
+    'CARGO_ENCODED_RUSTFLAGS',
+    'CARGO_BUILD_TARGET',
+)
+
 
 def _cargo() -> str:
     """Return the Cargo executable the surrounding route selected."""
@@ -238,6 +252,8 @@ def run() -> int:
         )
     environment = _base_environment()
     environment.pop(MANIFEST_DIR_VARIABLE, None)
+    for variable in RUN_SELECTORS:
+        environment.pop(variable, None)
     result = subprocess.run(
         _run_command(binary),
         cwd=GATE_DIRECTORY,

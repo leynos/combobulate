@@ -50,9 +50,14 @@ _PERMITTED = ("error: postcondition not satisfied", "error: aborting due to")
 # run.
 #
 # A postcondition failure is deliberately absent, though the mutant tier admits
-# one: the wrap root states no clauses of its own, so it has no postcondition to
-# fail, and a log that reported one is describing some obligation the body tier
-# never claimed. It is not permitted merely because the other tier permits it.
+# one, and the reason is policy rather than impossibility: the generated root
+# states no clauses of its own, but the body it copies retains `add_i64_into`'s
+# own `verus_spec` postconditions, so a postcondition failure is a real
+# obligation the body could fail. The body tier exists to see the mutation
+# break the loop invariant and the body's assertion, and admitting a
+# postcondition failure would let a log that also broke the contract pass as
+# that expected rejection. It is not permitted merely because the other tier
+# permits it.
 _BODY_PERMITTED = (
     "error: invariant not satisfied",
     "error: assertion failed",
@@ -360,9 +365,11 @@ def _require_loop_invariant(items: list[Diagnostic], source: Path) -> None:
     that merely repeats its wording, because the second names no line.
 
     A postcondition failure is not admitted here even though the seeded-mutant
-    tier admits one. The generated wrap root states no clauses of its own, so
-    the mutated body has nothing to fail a postcondition of; a log reporting
-    one is describing an obligation this tier never claimed.
+    tier admits one. That is a policy choice, not an impossibility: the
+    generated root states no clauses of its own, but the body it copies retains
+    the shipped function's postconditions, so a postcondition failure is a real
+    obligation. Admitting it would let a log that broke the contract as well as
+    the loop invariant pass as the expected rejection.
 
     Raises
     ------

@@ -259,14 +259,20 @@ s, classified by `scripts/tests/test_cardinality_ui_deadline.py`), because the
 standalone `cargo test --test cardinality_ui` invocation inside the gate
 package has no `terminate-after` behind it.
 
-The root test that runs that binary scrubs the caller's build selectors —
-`RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS` and `CARGO_BUILD_TARGET` — as well as
-`CARGO_MANIFEST_DIR`. `make test` assigns `RUSTFLAGS`, and `trybuild` hands the
+Both routes that run the gate binary — the root test and `make test-ui` — scrub
+the caller's build selectors: `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS` and
+`CARGO_BUILD_TARGET`. `make test` assigns `RUSTFLAGS`, and `trybuild` hands the
 inherited value to the nested build it starts, so leaving it in place made the
 nested fingerprint depend on how the suite was invoked and discarded the gate's
-warm cache on every run. With the selectors removed, a second run reuses the
-first's output: measured at 143 s under the suite's own `RUSTFLAGS` against a
-cold compile that did not finish inside the 600 s allowance.
+warm cache on every run. Both routes must agree, or each discards what the
+other wrote and pays a cold compile in turn. With the selectors removed, a
+second run reuses the first's output: measured at 143 s under the suite's own
+`RUSTFLAGS` against a cold compile that did not finish inside the 600 s
+allowance. The root test scrubs them in `tests/cardinality_probe_ui.rs` and the
+direct route in `scripts/cardinality_ui_gate.py run`; the latter's
+`test_cardinality_ui_deadline.py` case sets all three and requires their
+removal, so a route that stopped scrubbing them fails rather than silently
+thrashing the cache.
 
 ### Preparation happens outside test bodies
 
