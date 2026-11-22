@@ -14,6 +14,11 @@
 //! non-exhaustive item is matched exhaustively (`E0004`) or constructed
 //! (`E0639`).
 //!
+//! Every attribute gets its own statement, because a contract that only some
+//! of them are checked for would let a dropped attribute pass: `Dtype` and
+//! `Stage` are matched, `Failure` is matched as an enum and each of its two
+//! variants is constructed, and `NativeExecutor` is constructed.
+//!
 //! The fixture is a path-dependency build rather than `trybuild`, following
 //! `tests/polars_surface_ui.rs`: `trybuild` copies the host package's whole
 //! dev-dependency graph into a generated crate, which is the incident
@@ -48,10 +53,13 @@ const COVERED_BINARY: &str = "covered";
 /// because the fixture had lost the facade (`E0432`) or because a name moved
 /// (`E0425`) would mean something else entirely, and accepting any failure
 /// would let a dropped attribute pass as long as the fixture was broken too.
-const FAILING: [(&str, &str); 3] = [
+const FAILING: [(&str, &str); 6] = [
     ("exhaustive_dtype", "E0004"),
     ("exhaustive_stage", "E0004"),
+    ("exhaustive_failure_match", "E0004"),
     ("exhaustive_failure", "E0639"),
+    ("exhaustive_shape_agreement", "E0639"),
+    ("exhaustive_executor", "E0639"),
 ];
 
 /// The fixture's manifest, resolved from the repository root Cargo sets.

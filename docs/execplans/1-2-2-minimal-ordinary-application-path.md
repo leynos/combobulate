@@ -137,7 +137,7 @@ These are hard invariants. Violating one requires escalation, not a workaround.
     and Whitaker must pass.
   - The new suppressions are DL-8's two, plus one further site recorded here
     rather than left implicit: `#[expect(clippy::unused_self)]` on
-    `PreparedPlan::run`, whose receiver is the engine hand-off E017 needs and
+    `NativeExecutor::run`, whose receiver is the engine hand-off E017 needs and
     which a free function would lose. That site was not anticipated when DL-8
     was written; it is recorded as delivered, not as pre-approved, and the
     delivery ledger carries it for the maintainer's decision alongside the
@@ -585,8 +585,8 @@ The thresholds are:
   - Suppressions beyond DL-8. DL-8 pre-approves two
     `#[expect(clippy::indexing_slicing)]` attributes. Three more `#[expect]`
     sites sit beside them and one `#[allow]` pair is shared by both BDD
-    modules: `clippy::unused_self` on `Plan::run` (the receiver is what carries
-    the plan back to its engine), the `rstest`-fixture `unused_braces` pair
+    modules: `clippy::unused_self` on `NativeExecutor::run` (the receiver is
+    what carries the plan back to its engine), the `rstest`-fixture `unused_braces` pair
     with its accompanying `clippy::allow_attributes` (the repository's
     sanctioned workaround, matching `tests/build_profiles.rs`), and
     `expect_used` in `#[cfg(test)]` bodies, which the workspace already allows
@@ -1444,14 +1444,25 @@ required to match, so a mutant that silently matched nothing cannot pass as an
 unmutated copy. The two rewrites are not equally observable, and the measured
 difference is recorded here rather than assumed:
 
-- The test rewrite fails. `wrapping_add` trips the scan pass's own assertion
-  `!in_range_at(lhs@, rhs@, scan as int)` at positions where the sum is out of
-  range but is not `i64::MIN`, and the scan loop's invariant then fails. This
-  is the failure the committed `wrap.log` records.
+- The test rewrite fails, by two distinct mechanisms that the committed
+  `wrap.log` records separately. The original branch is taken when the sum is
+  out of range; the mutated branch is taken when the *wrapped* sum is
+  `i64::MIN`, and those conditions are not the same set:
+  - **The assertion fails.** A sum that is in range but whose wrapped value is
+    `i64::MIN` — `i64::MIN + 0`, for instance — enters a branch the original
+    never entered, and the scan pass's own assertion
+    `!in_range_at(lhs@, rhs@, scan as int)` is false. This is the
+    `error: assertion failed` at the body's line 138.
+  - **The invariant fails.** A sum that is out of range but wraps to something
+    other than `i64::MIN` — `i64::MAX + 2` wraps to `i64::MIN + 1`, for
+    instance — skips a branch the original always entered, so the scan runs on
+    past an out-of-range position and the loop invariant
+    `forall|j: int| 0 <= j < scan ==> in_range_at(lhs@, rhs@, j)` is false at
+    the end of the body. This is the `error: invariant not satisfied` at the
+    body's line 129.
 - At the maximum reporting limit the run reports one error per function, and
-  the recorded run also carries the `error: assertion failed` beside the test.
-  Both are located in the mutated body, and both were produced by the run whose
-  log is committed.
+  the recorded run carries both failures. Both are located in the mutated body,
+  and both were produced by the run whose log is committed.
 - The write rewrite alone does **not** fail. Under the scan pass's invariant
   every position is already in range, so `wrapping_add` computes exactly the
   value the ordinary `+` computes and the write pass's invariant holds. This
@@ -2068,7 +2079,7 @@ Quality criteria:
   FACADE-1 to FACADE-8 pass.
 - Lint and format: `make lint` and `make check-fmt` pass, with no
   suppressions beyond the three the `Constraints` section names: DL-8's two, the
-  `unused_self` site on `PreparedPlan::run`, and the pre-approved
+  `unused_self` site on `NativeExecutor::run`, and the pre-approved
   `missing_const_for_fn` fallback if it were needed.
 - Documentation: `make markdownlint`, `make nixie` and `make spelling` pass.
 - Governance: `make design-check` passes.
@@ -2371,7 +2382,12 @@ gate-order and build-standard contracts; its rules are tested by
       then `formal_workflow_contract` because EP-M5 requires a job that runs
       the proof, and `non_exhaustive_contract` because `AGENTS.md` requires
       compile-time behaviour tests for the new `#[non_exhaustive]` contracts.
-      The count is recorded as delivered, not as an exception granted;
+      That last one states six separate contracts, one binary each, because
+      rustc stops after the first error in a crate: `Dtype` and `Stage` are
+      matched exhaustively, `Failure` is matched exhaustively as an enum, and
+      `Failure::ShapeAgreement`, `Failure::IntegerOverflow` and
+      `NativeExecutor` are each constructed. The count is recorded as
+      delivered, not as an exception granted;
     - `docs/validation-results.json` regenerated per milestone;
     - a new `scripts/verus_kernel.py` instead of editing digest-bound scripts;
     - observations under `tools/verifier-fixtures/verus-kernel/`;

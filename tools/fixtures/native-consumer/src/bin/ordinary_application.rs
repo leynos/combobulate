@@ -31,10 +31,11 @@ fn main() {
     println!("add: {:?}", sum);
     println!("dtype: {:?}", dtype_of(&input));
 
-    let prepared = prepared(&input, &right);
+    let executor = engine();
+    let prepared = prepared(&executor, &input, &right);
     println!("collect: {:?}", executed(&prepared));
     println!("operation: {}", unary_id(&identity_operation()).name());
-    report_stages();
+    report_stages(&executor);
 }
 
 /// Applies the identity, starting from an [`Array`] and naming the [`Unary`].
@@ -68,14 +69,22 @@ fn summed(left: &Array, right: &Array) -> Vec<i64> {
 /// The dtype an [`Array`] reports, as the [`Dtype`] value itself.
 fn dtype_of(array: &Array) -> Dtype { array.dtype() }
 
-/// Prepares a sum on the [`NativeExecutor`], yielding a [`PreparedPlan`].
+/// The engine a caller builds, named in a signature so it stays nameable.
 ///
-/// This is where a caller meets the executor: naming it in a signature is what
-/// requires the type to stay nameable, which an inferred construction would not.
-fn prepared(left: &Array, right: &Array) -> Result<PreparedPlan, ExpressionError> {
+/// `NativeExecutor` is `#[non_exhaustive]`, so a caller must reach it through
+/// one of its constructors. Naming it here is what requires the type to stay
+/// nameable; an inferred construction would not.
+fn engine() -> NativeExecutor { NativeExecutor::sequential() }
+
+/// Prepares a sum on an [`NativeExecutor`], yielding a [`PreparedPlan`].
+fn prepared(
+    engine: &NativeExecutor,
+    left: &Array,
+    right: &Array,
+) -> Result<PreparedPlan, ExpressionError> {
     addition()
         .apply(&expression_of(left), &expression_of(right))
-        .prepare(&NativeExecutor::sequential())
+        .prepare(engine)
 }
 
 /// Executes a plan and returns its values.
@@ -98,19 +107,21 @@ fn values(expression: AExpr) -> Vec<i64> {
         .unwrap_or_default()
 }
 
+/// The [`Stage`] a failure came from, named in a signature so it stays nameable.
+fn stage_of(error: &ExpressionError) -> Stage { error.stage() }
+
 /// Describes each [`Stage`] and the [`Failure`] it holds.
 ///
 /// The stage and failure are earned from a real run, because neither can be
 /// constructed from outside the crate. Reading them here is what proves both
 /// types, and their accessors, reach a downstream caller.
-fn report_stages() {
+fn report_stages(engine: &NativeExecutor) {
     let disagreement = add()
         .apply(&Array::from_i64(vec![1, 2, 3]).expr(), &Array::from_i64(vec![1, 2]).expr())
-        .prepare(&NativeExecutor::sequential())
+        .prepare(engine)
         .expect_err("operands of different lengths cannot be prepared");
-    let stage: Stage = disagreement.stage();
     let reported: &[Failure] = disagreement.failures();
-    println!("stage: {stage} failures: {}", codes(reported));
+    println!("stage: {} failures: {}", stage_of(&disagreement), codes(reported));
 
     let overflow = add()
         .apply(
@@ -119,7 +130,7 @@ fn report_stages() {
         )
         .collect()
         .expect_err("a sum past the I64 range cannot be collected");
-    println!("stage: {} failures: {}", overflow.stage(), codes(overflow.failures()));
+    println!("stage: {} failures: {}", stage_of(&overflow), codes(overflow.failures()));
 }
 
 /// The diagnostic codes of some failures, joined for one printed line.
