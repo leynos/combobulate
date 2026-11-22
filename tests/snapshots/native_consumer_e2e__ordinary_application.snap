@@ -4,4 +4,8 @@ expression: built().application
 ---
 identity: [1, 2, 3] (shared buffer: true)
 add: [11, 22, 33]
+dtype: I64
 collect: [11, 22, 33]
+operation: identity
+stage: preparation failures: ShapeAgreement
+stage: execution failures: IntegerOverflow
