@@ -125,9 +125,15 @@ fn node_spec(prefix: usize) -> impl Strategy<Value = NodeSpec> {
     ]
 }
 
-/// Whether any node has two consumers, so a shared subterm is evaluated.
+/// Whether any node the root reaches has two consumers, so a shared subterm is
+/// evaluated.
+///
+/// Only nodes reachable from the root are counted. A node nothing consumes is
+/// never prepared, so crediting it with a shared consumer would report the
+/// sharing case as exercised by a graph that never evaluates a shared subterm.
 pub(super) fn shares(graph: &Graph) -> bool {
-    let mut uses: Vec<usize> = vec![0; graph.inputs.len() + graph.nodes.len()];
+    let total = graph.inputs.len() + graph.nodes.len();
+    let mut uses: Vec<usize> = vec![0; total];
     for spec in &graph.nodes {
         match spec {
             NodeSpec::Identity { of } => bump(&mut uses, *of),
@@ -137,7 +143,53 @@ pub(super) fn shares(graph: &Graph) -> bool {
             }
         }
     }
-    uses.into_iter().any(|count| count > 1)
+    let reached = reachable(graph);
+    uses.iter()
+        .zip(&reached)
+        .any(|(count, is_reached)| *is_reached && *count > 1)
+}
+
+/// Marks every node the root's operands reach, inputs included.
+///
+/// The root is always the last node and every operand index is smaller, so a
+/// single backwards pass marks the whole reachable set: a node is reachable
+/// when the root is it, or when a reachable node names it.
+fn reachable(graph: &Graph) -> Vec<bool> {
+    let total = graph.inputs.len() + graph.nodes.len();
+    let mut reached = vec![false; total];
+    if graph.nodes.is_empty() {
+        // A graph with no operations is a lone input, which the root names.
+        if let Some(first) = reached.first_mut() {
+            *first = true;
+        }
+        return reached;
+    }
+    reached[graph.root()] = true;
+    // Walking backwards guarantees a node's consumers are decided before it
+    // is, because consumers always have larger indices.
+    for at in (graph.inputs.len()..total).rev() {
+        if !reached[at] {
+            continue;
+        }
+        let Some(spec) = graph.nodes.get(at - graph.inputs.len()) else {
+            continue;
+        };
+        match spec {
+            NodeSpec::Identity { of } => mark(&mut reached, *of),
+            NodeSpec::Add { lhs, rhs } => {
+                mark(&mut reached, *lhs);
+                mark(&mut reached, *rhs);
+            }
+        }
+    }
+    reached
+}
+
+/// Marks one node as reached.
+fn mark(reached: &mut [bool], node: usize) {
+    if let Some(flag) = reached.get_mut(node) {
+        *flag = true;
+    }
 }
 
 /// Counts one more consumer of `node`.
