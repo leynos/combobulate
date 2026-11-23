@@ -52,14 +52,21 @@ const ACT_PATH_SHIM: &str = concat!(
 ///
 /// `FAIL_CARGO_INVOCATION` counts only the test-bearing Cargo commands, so a
 /// preparation fetch or the gate build cannot shift the invocation numbering
-/// those failure cases assert. Preparation succeeds unconditionally: it is a
-/// network-shaped step whose failure the Make recipe reports itself, and this
-/// harness is about routing, not acquisition.
+/// those failure cases assert. Fetches succeed unless `FAIL_FETCH_INVOCATION`
+/// names one by its position among the fetches (1 and 2 are preparation, 3 is
+/// the test recipe's own), so a failed fetch can be proved to stop the run.
 const CARGO_SCRIPT: &str = concat!(
     "#!/bin/sh\n",
     include_str!("act_make_record.sh"),
     "record_invocation \"$@\"\n",
-    "if [ \"$1\" = fetch ]; then exit 0; fi\n",
+    "if [ \"$1\" = fetch ]; then\n",
+    "  fetches=0\n",
+    "  if [ -f \"$CARGO_COUNT.fetch\" ]; then IFS= read -r fetches < \"$CARGO_COUNT.fetch\"; fi\n",
+    "  fetches=$((fetches + 1))\n",
+    "  printf '%s' \"$fetches\" > \"$CARGO_COUNT.fetch\"\n",
+    "  [ \"${FAIL_FETCH_INVOCATION:-}\" != \"$fetches\" ] || exit 23\n",
+    "  exit 0\n",
+    "fi\n",
     "if [ \"$#\" -eq 2 ] && [ \"$1\" = nextest ] && [ \"$2\" = --version ]; then\n",
     "  if [ \"${NEXTTEST_AVAILABLE:-}\" = 1 ]; then\n",
     "    printf '%s\\n' 'cargo-nextest fixture 0.1'\n",
@@ -156,6 +163,8 @@ pub(super) struct MakeOptions {
     pub(super) with_act: bool,
     /// Which real Cargo test invocation should fail, if any.
     pub(super) fail_cargo_invocation: Option<usize>,
+    /// Which `cargo fetch` should fail, counting fetches from 1, if any.
+    pub(super) fail_fetch_invocation: Option<usize>,
     /// Controlled executor stage that should fail, if any.
     pub(super) failure: Option<ExecutorFailure>,
     /// Whether the Cargo version probe reports an installed Nextest binary.
@@ -209,6 +218,9 @@ impl MakeOptions {
     fn apply_executor_controls(&self, command: &mut Command) {
         if let Some(invocation) = self.fail_cargo_invocation {
             command.env("FAIL_CARGO_INVOCATION", invocation.to_string());
+        }
+        if let Some(invocation) = self.fail_fetch_invocation {
+            command.env("FAIL_FETCH_INVOCATION", invocation.to_string());
         }
         if self.failure == Some(ExecutorFailure::Act) {
             command.env("FAIL_ACT", "1");
@@ -291,6 +303,7 @@ impl MakeHarness {
             .env_remove("CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER")
             .env_remove("GITHUB_TOKEN")
             .env_remove("FAIL_CARGO_INVOCATION")
+            .env_remove("FAIL_FETCH_INVOCATION")
             .env_remove("FAIL_ACT")
             .env_remove("FAIL_PREFLIGHT")
             .env_remove("NEXTTEST_AVAILABLE")
