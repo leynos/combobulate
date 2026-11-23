@@ -101,18 +101,19 @@ slow-timeout = { period = "60s", terminate-after = 20 }
 # seven times: once for the covered binary and once per failing contract, each
 # with its own `--cfg`. The fixture is a separate workspace whose only
 # dependency is the facade by path, so the first build compiles the facade and
-# the kernel, and the six that follow reuse that output. Measured: 4 m 07 s
-# for the first build locally while the shared compile queue held about 230
-# waiting builds, and 76 s for the whole binary on an idle host when it stated
-# three contracts. Ten periods (600 s) clears the contended sample by 193 s.
-# The six-contract version measured 330 s for the failing half and 202 s for
-# the covered half in one contended run, so the margin is thinner than the
-# first-build figure alone suggests. It keeps the ten-period allowance rather
-# than the cardinality gate's twenty: that gate's figure was raised after it
-# was measured overrunning, and this one has not been.
+# the kernel cold and the six that follow reuse that output. Measured: 4 m 07 s
+# for the first build at about 230 waiting builds, 7 m 32 s at about 376, and
+# 76 s for the whole binary on an idle host when it stated three contracts. The
+# six-contract version measured 330 s for the failing half and 202 s for the
+# covered half in one contended run.
+#
+# It carried ten periods until that figure was measured overrunning: 600.050 s
+# for the covered half after a change to the formatter invalidated the facade's
+# cache. The cold build is the cost, and it scales with the compile queue, so
+# both fixture tests carry the cardinality gate's twenty periods (1,200 s).
 [[profile.default.overrides]]
 filter = 'binary(non_exhaustive_contract)'
-slow-timeout = { period = "60s", terminate-after = 10 }
+slow-timeout = { period = "60s", terminate-after = 20 }
 
 # `native_consumer_e2e` builds `tools/fixtures/native-consumer`, a separate
 # workspace whose only dependency is the facade by path, so its first build
