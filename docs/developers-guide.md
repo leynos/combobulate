@@ -861,6 +861,14 @@ snapshot SHA-256 input beyond the fragments they run, and installer archive
 integrity remains the upstream action's own digest-manifest check. Acquisition
 has a size and time limit; the CI gate has a three-minute timeout.
 
+The denial stubs live in `scripts/probe_command_guard.py`, which holds no
+Whitaker vocabulary; `scripts/whitaker_capability.py` imports them and keeps
+the Whitaker-specific scenarios. The split is deliberate. Concordat's
+`whitaker-provisioning` rule (QG-002) reads a whole script for an HTTP client
+name next to a Whitaker tool name, and it cannot distinguish a denial list from
+a download route. The probe does not provision Whitaker; it only models the
+pinned action's fragments and refuses network and build executors.
+
 ## Profile measurements
 
 `.github/workflows/profile-measurements.yml` measures the standalone Polars

@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import copy
+import re
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -10,10 +13,20 @@ from unittest.mock import patch
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from probe_command_guard import DENIED_COMMAND_MARKER, install_denied_commands
 from whitaker_capability import Scenario, fragments, probe_manifest, run_scenario
 
 FIXTURES = Path(__file__).parent / 'fixtures' / 'whitaker'
 MANIFEST = yaml.safe_load((FIXTURES / 'current.yml').read_text())
+SCRIPTS = Path(__file__).resolve().parents[1]
+CAPABILITY_SOURCE = (SCRIPTS / 'whitaker_capability.py').read_text(encoding='utf-8')
+GUARD_SOURCE = (SCRIPTS / 'probe_command_guard.py').read_text(encoding='utf-8')
+FETCH_EXECUTOR = re.compile(
+    r'\b(curl|wget|Invoke-WebRequest|iwr|Invoke-RestMethod|urlretrieve|urlopen|'
+    r'requests\.get|httpx\.get)\b|\bgh\s+release\s+download\b|'
+    r'\bgh\s+api\b[^\n]*(\n[^\n]*)?/releases\b')
+WHITAKER_TOKEN = re.compile(
+    r'\b(whitaker-installer|cargo-dylint|dylint-link)\b|\bleynos/whitaker\b')
 
 
 def fragment(manifest: dict, name: str) -> dict:
@@ -175,3 +188,57 @@ class CapabilityMutationTests(unittest.TestCase):
         step['run'] += '\ncurl https://fixture.invalid\n'
         with self.assertRaisesRegex(ValueError, 'network/build'):
             probe_manifest(changed)
+
+
+class SourceSeparationTests(unittest.TestCase):
+    """QG-002 reads command text, so each audited module stays one-sided."""
+
+    def test_capability_source_names_no_fetch_executor(self):
+        """The Whitaker module must not read as a QG-002 download route.
+
+        Concordat's `whitaker-provisioning` rule matches a fetch executor and a
+        Whitaker tool name anywhere in one script. It strips Shell and Make
+        comments only, so Python docstrings and string literals remain in the
+        searched text. See
+        `platform-standards/canon/lint-rules/whitaker-provisioning/policy/whitaker_provisioning.rego`.
+        """
+        match = FETCH_EXECUTOR.search(CAPABILITY_SOURCE)
+        self.assertIsNone(
+            match,
+            'capability source must not name a QG-002 fetch executor: '
+            + (match.group(0) if match else ''),
+        )
+
+    def test_guard_source_stays_free_of_whitaker_vocabulary(self):
+        """The generic guard must not complete a QG-002 route by naming a tool."""
+        match = WHITAKER_TOKEN.search(GUARD_SOURCE)
+        self.assertIsNone(
+            match,
+            'guard source must not name a Whitaker token: '
+            + (match.group(0) if match else ''),
+        )
+        self.assertNotIn(
+            'whitaker', GUARD_SOURCE.lower(),
+            'guard source must stay generic; found Whitaker vocabulary',
+        )
+
+    def test_denied_commands_still_refuse_network_clients(self):
+        """Moving the denial list must not stop `curl` and `wget` being refused."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bin_directory = root / 'bin'
+            bin_directory.mkdir()
+            marker = root / DENIED_COMMAND_MARKER
+            install_denied_commands(bin_directory, marker)
+            for command in ('curl', 'wget'):
+                with self.subTest(command=command):
+                    result = subprocess.run(
+                        [str(bin_directory / command)],
+                        capture_output=True, text=True, check=False)
+                    self.assertEqual(
+                        result.returncode, 95,
+                        f'{command} stub must refuse with status 95')
+            self.assertEqual(
+                marker.read_text(encoding='utf-8').splitlines(),
+                [str(bin_directory / 'curl'), str(bin_directory / 'wget')],
+                'the marker must record each attempted network client')
