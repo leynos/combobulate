@@ -146,7 +146,10 @@ def main(
     installation = verus_installation or ROOT / ".verus" / version / "verus"
     solver = z3.resolve()
     environment = _verus_environment(solver)
-    output = output_dir or OBSERVATIONS
+    # Resolved once, here, so a relative or external `--output-dir` is a real
+    # path by the time the record is built rather than a value that only
+    # happens to work when it sits under the repository.
+    output = (output_dir or OBSERVATIONS).resolve()
     invocation = _Invocation(prover_tools, installation)
     context = _Context(invocation, output, environment)
     observations = [_positive(context)]
@@ -156,6 +159,21 @@ def main(
     _report(observations)
     if output_dir is None:
         _write_record(version, solver, observations)
+
+
+def _portable_path(path: Path) -> str:
+    """Render a path relative to the repository when it is inside it.
+
+    A log under the repository is recorded relative to ``ROOT``, which is what
+    a reader comparing the record against the tree expects. A path outside it
+    — an external ``--output-dir``, or a working directory the caller supplied
+    — cannot be relative, so it is rendered with the stable markers instead of
+    raising from ``relative_to``.
+    """
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return portable_argument(str(path))
 
 
 def _verus_environment(z3_path: Path) -> dict[str, str]:
@@ -204,9 +222,9 @@ def _capture(
     # or a reader checking the record against the file would see a mismatch.
     return {
         "command": [portable_argument(argument) for argument in argv],
-        "cwd": str(cwd.relative_to(ROOT)),
+        "cwd": str(_portable_path(cwd)),
         "exit_code": result.exit_code,
-        "log": str(output.relative_to(ROOT)),
+        "log": str(_portable_path(output)),
         "sha256": exact_digest(output),
     }
 

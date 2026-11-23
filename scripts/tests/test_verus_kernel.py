@@ -14,9 +14,12 @@ rule must decide.
 
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from kernel_record import portable_argument
 from verus_kernel_fixtures import ROOT, SCRIPTS, SUMMARY, load, load_driver, load_verdicts
 
 
@@ -296,6 +299,84 @@ class SummaryPatternTests(unittest.TestCase):
 
         self.assertIsNotNone(match)
         self.assertEqual(match['clause'], 'k4')
+
+
+class PortablePathTests(unittest.TestCase):
+    """Render a log path relative inside the repository, marked outside it."""
+
+    def setUp(self) -> None:
+        """Load the driver, whose `_portable_path` this class exercises."""
+        self.driver = load_driver()
+
+    def test_a_path_inside_the_repository_is_relative(self) -> None:
+        """A committed log is named relative to the tree, as a reader expects."""
+        inside = self.driver.ROOT / 'tools/verifier-fixtures/verus-kernel/positive.log'
+
+        self.assertEqual(
+            self.driver._portable_path(inside),
+            'tools/verifier-fixtures/verus-kernel/positive.log',
+            'a repository path must be recorded relative to the root',
+        )
+
+    def test_a_path_outside_the_repository_does_not_raise(self) -> None:
+        """`relative_to` raises on an external path; the record must not.
+
+        `--output-dir` accepts a directory outside the checkout, and a working
+        directory may be supplied by the caller, so the record has to render
+        those with the stable markers rather than fail.
+        """
+        outside = Path('/tmp/verus-elsewhere/positive.log')
+
+        rendered = self.driver._portable_path(outside)
+
+        self.assertEqual(
+            rendered,
+            '/tmp/verus-elsewhere/positive.log',
+            f'an external path must render with its markers, got {rendered!r}',
+        )
+
+    def test_a_relative_output_directory_still_reads_inside(self) -> None:
+        """`--output-dir target/proof-logs` is resolved before it is recorded.
+
+        The un-resolved value is relative while `ROOT` is absolute, so
+        `relative_to` would fail; resolving once at entry is what makes the
+        two comparable. The relative value is built against the driver's own
+        root so this case does not depend on the process's working directory.
+        """
+        driver = self.driver
+        relative = Path('target/proof-logs/positive.log')
+
+        rendered = driver._portable_path((driver.ROOT / relative).resolve())
+
+        self.assertEqual(
+            rendered,
+            'target/proof-logs/positive.log',
+            f'a relative output directory must resolve inside the root, got {rendered!r}',
+        )
+
+    def test_the_record_renders_an_external_log_path(self) -> None:
+        """`_capture` builds its record's path through the helper, not `relative_to`.
+
+        Calling the helper directly would pass even if `_capture` kept its own
+        `relative_to`, so this case drives `_capture` with an external output
+        directory and reads the record back.
+        """
+        driver = self.driver
+        captured_command = load('captured_command', SCRIPTS / 'captured_command.py')
+        captured = captured_command.CapturedResult(exit_code=0, output='')
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(driver, 'run_captured', return_value=captured),
+        ):
+            log = Path(directory) / 'positive.log'
+
+            record = driver._capture(['true'], Path(directory), log, {})
+
+        self.assertEqual(
+            record['log'],
+            portable_argument(str(log)),
+            f'an external log path must be marked, got {record["log"]!r}',
+        )
 
 
 if __name__ == '__main__':
