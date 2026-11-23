@@ -242,7 +242,7 @@ pub(super) fn assert_forwarded_environment(invocations: &[Invocation]) {
         Some(&EnvironmentValue::Value("-C debuginfo=0".to_owned())),
         "supported caller flags must reach the child preflight unchanged"
     );
-    for index in [5, 6, 7, 8] {
+    for index in [5, 6, 7, 8, 9] {
         let cargo_invocation =
             invocation_at(invocations, index, "Cargo test invocation must exist");
         assert_development_flags_are_present(cargo_invocation);
