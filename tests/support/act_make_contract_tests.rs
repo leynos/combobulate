@@ -36,21 +36,26 @@ fn available_nextest_selects_the_nextest_run_branch() {
         ),
         (
             5,
+            vec!["fetch", "--locked"],
+            "the test recipe must fetch, success-gated, before its first test run",
+        ),
+        (
+            6,
             vec!["nextest", "run", "--all-targets", "--no-default-features"],
             "a successful Nextest probe must select its run command for the first gate profile",
         ),
         (
-            6,
+            7,
             vec!["test", "--doc", "--workspace", "--no-default-features"],
             "doctests must still follow Nextest",
         ),
         (
-            7,
+            8,
             vec!["nextest", "run", "--all-targets"],
             "the Polars-enabled profile must run in its own Nextest invocation",
         ),
         (
-            8,
+            9,
             vec!["test", "--doc", "--workspace"],
             "the Polars-enabled profile must run in its own doctest invocation",
         ),
@@ -58,6 +63,86 @@ fn available_nextest_selects_the_nextest_run_branch() {
     for (position, arguments, message) in expected {
         assert_arguments_at(&invocations, position, &arguments, message);
     }
+}
+
+/// Checks the plain `cargo test` branch fetches before its first test run.
+///
+/// With no Nextest the recipe falls back to `cargo test`, which no Nextest
+/// setup script covers, so the recipe's own success-gated fetch is what keeps
+/// the nested builds off a cold, resolving cache.
+#[test]
+fn unavailable_nextest_fetches_before_the_first_plain_cargo_test() {
+    let harness = MakeHarness::new().expect("create the Make harness");
+    let output = harness
+        .run_make_test(MakeOptions::default())
+        .expect("run Make with the Nextest probe disabled");
+    let invocations = harness.invocations().expect("read controlled invocations");
+
+    assert!(
+        output.status.success(),
+        "the plain Cargo route must succeed"
+    );
+    assert_arguments_at(
+        &invocations,
+        5,
+        &["fetch", "--locked"],
+        "the test recipe must fetch, success-gated, before its first test run",
+    );
+    assert_arguments_at(
+        &invocations,
+        6,
+        &["test", "--all-targets", "--no-default-features"],
+        "the plain Cargo test branch must run only after that fetch",
+    );
+}
+
+/// Checks a failed fetch in the test recipe stops it before any test or Act run.
+///
+/// Fetches are numbered from 1: the first two belong to preparation and the
+/// third is the test recipe's own, so failing it proves the recipe waits on it.
+#[test]
+fn failed_test_recipe_fetch_runs_no_test_and_no_act() {
+    let harness = MakeHarness::new().expect("create the Make harness");
+    let output = harness
+        .run_make_test(MakeOptions {
+            with_act: true,
+            fail_fetch_invocation: Some(3),
+            ..MakeOptions::default()
+        })
+        .expect("run Make with the recipe's fetch failing");
+    let invocations = harness.invocations().expect("read controlled invocations");
+
+    assert!(
+        !output.status.success(),
+        "a failed fetch in the test recipe must fail make"
+    );
+    // The recipe's own fetch is the sixth recorded call (index 5), and it is the
+    // last: the failure came from it, not from an earlier preflight or gate.
+    assert_arguments_at(
+        &invocations,
+        5,
+        &["fetch", "--locked"],
+        "the recipe's own fetch must be the call that failed",
+    );
+    assert_eq!(
+        invocations.len(),
+        6,
+        "nothing may be recorded after the recipe's failed fetch"
+    );
+    assert!(
+        invocations.iter().all(|call| call.executable != "act"),
+        "Act must not start after a failed fetch"
+    );
+    let runs_tests = |call: &Invocation| {
+        matches!(
+            call.arguments.first().map(String::as_str),
+            Some("test" | "nextest")
+        ) && call.arguments.get(1).map(String::as_str) != Some("--version")
+    };
+    assert!(
+        !invocations.iter().any(runs_tests),
+        "no test command may run after the recipe's fetch failed"
+    );
 }
 
 /// Asserts the Cargo call at `position` received exactly `expected` arguments.

@@ -47,6 +47,9 @@ pub(super) const ALL_STAGES: &[&str] = &[
     "prepare-dependencies",
     "prepare-ui-gate-dependencies",
     "prepare-ui-gate",
+    // The test recipe's own success-gated fetch, which the classifier names as
+    // the root fetch it repeats.
+    "prepare-dependencies",
     "nextest-native-only",
     "doctest-native-only",
     "nextest-polars-enabled",

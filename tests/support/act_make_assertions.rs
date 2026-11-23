@@ -161,12 +161,14 @@ pub(super) fn assert_outer_invocations_are_ordered(invocations: &[Invocation]) {
                 "tools/gates/cardinality-ui/Cargo.toml",
             ],
             vec!["scripts/cardinality_ui_gate.py", "prepare"],
+            vec!["fetch", "--locked"],
             vec!["test", "--all-targets", "--no-default-features"],
             vec!["test", "--doc", "--workspace", "--no-default-features"],
             vec!["test", "--all-targets"],
             vec!["test", "--doc", "--workspace"],
         ],
-        "acquisition and the gate build must precede both profiles' unit and documentation tests"
+        "acquisition, the gate build and the test recipe's own fetch must precede both profiles' \
+         unit and documentation tests"
     );
 }
 
@@ -217,17 +219,17 @@ pub(super) fn assert_act_invocation_matches(invocation: &Invocation, common_dire
 /// Checks caller flags and selected Act settings at their intended child boundaries.
 ///
 /// The indexes follow the measured `make test WITH_ACT=1` route: the parse-time
-/// Nextest probe, the preflight, both fetches, the gate build, one Nextest and
-/// one doctest run per gate profile, the nested Make's own Nextest probe, and
-/// finally Act.
+/// Nextest probe, the preflight, both fetches, the gate build, the test recipe's
+/// own fetch, one Nextest and one doctest run per gate profile, the nested Make's own Nextest
+/// probe, and finally Act.
 pub(super) fn assert_forwarded_environment(invocations: &[Invocation]) {
     assert_eq!(
-        invocation_at(invocations, 10, "Act invocation must be recorded").github_token,
+        invocation_at(invocations, 11, "Act invocation must be recorded").github_token,
         GitHubToken::Present,
         "the configured token must reach the controlled Act process"
     );
     assert_eq!(
-        invocation_at(invocations, 10, "Act invocation must be recorded")
+        invocation_at(invocations, 11, "Act invocation must be recorded")
             .environment
             .get("WITH_ACT"),
         Some(&EnvironmentValue::Value("1".to_owned())),
@@ -240,7 +242,7 @@ pub(super) fn assert_forwarded_environment(invocations: &[Invocation]) {
         Some(&EnvironmentValue::Value("-C debuginfo=0".to_owned())),
         "supported caller flags must reach the child preflight unchanged"
     );
-    for index in [5, 6, 7, 8] {
+    for index in [5, 6, 7, 8, 9] {
         let cargo_invocation =
             invocation_at(invocations, index, "Cargo test invocation must exist");
         assert_development_flags_are_present(cargo_invocation);
