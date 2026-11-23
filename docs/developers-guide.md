@@ -295,22 +295,26 @@ Two test bodies compile a downstream fixture, and both are bounded exceptions
 rather than the incident's shape. `tests/native_consumer_e2e.rs` builds
 `tools/fixtures/native-consumer/`, and `tests/non_exhaustive_contract.rs` builds
 `tools/fixtures/non-exhaustive-contract/`; each is a separate workspace whose
-only dependency is the facade by path with default features off, so nothing
-either compiles is the repository's own crate graph and no dev-dependency of
-this suite reaches it. That separation is the point: the tests exist to prove
-the facade works for a consumer outside the workspace, which cannot be shown by
-anything already inside it. Both run their nested Cargo with `--locked` and a
-target directory under `CARGO_TARGET_TMPDIR`, so neither resolves a new
-lockfile nor writes into the repository, and a later build in the same run
-reuses the first's output. `native_consumer_e2e` is bounded by the default
-tier; measured at four seconds warm on an idle host, and it is the fixture's
-own compile rather than a build of this repository. `non_exhaustive_contract`
-carries the wider override, because its first build compiles the facade and
-kernel from cold: measured at 4 m 07 s locally while the shared compile queue
-held about 230 waiting builds, against 76 s for the whole binary on an idle
-host when it stated three contracts. The six-contract version measured 330 s
-for the failing half and 202 s for the covered half in one contended run, so
-the margin is thinner than the first-build figure alone suggests.
+only dependency is the facade by path with default features off. What that
+excludes is the root suite's dev-dependency graph: nothing either fixture
+compiles is a dev-dependency of this suite, which is the graph the incident
+compiled. The facade and the kernel still build through the facade's normal
+dependencies, and that cold build is a real part of both fixtures' cost — it is
+what the `non_exhaustive_contract` measurement below records. That separation
+is the point: the tests exist to prove the facade works for a consumer outside
+the workspace, which cannot be shown by anything already inside it. Both run
+their nested Cargo with `--locked` and a target directory under
+`CARGO_TARGET_TMPDIR`, so neither resolves a new lockfile nor writes into the
+repository, and a later build in the same run reuses the first's output.
+`native_consumer_e2e` is bounded by the default tier; measured at four seconds
+warm on an idle host, and it is the fixture's own compile rather than a build
+of this repository. `non_exhaustive_contract` carries the wider override,
+because its first build compiles the facade and kernel from cold: measured at 4
+m 07 s locally while the shared compile queue held about 230 waiting builds,
+against 76 s for the whole binary on an idle host when it stated three
+contracts. The six-contract version measured 330 s for the failing half and 202
+s for the covered half in one contended run, so the margin is thinner than the
+first-build figure alone suggests.
 
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`

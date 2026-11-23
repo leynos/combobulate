@@ -208,7 +208,10 @@ fn item_violations(code: &Code, is_root: bool) -> Vec<String> {
     }
     // Compared without whitespace, because `cfg( not(verus_keep_ghost) )` is
     // the same gate to a compiler and a literal match would let it through.
-    if text.chars().filter(|character| !character.is_whitespace()).collect::<String>()
+    if text
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect::<String>()
         .contains("cfg(not(verus_keep_ghost))")
     {
         violations.push("must not contain cfg(not(verus_keep_ghost))".to_owned());

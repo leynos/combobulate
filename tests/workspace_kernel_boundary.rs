@@ -168,7 +168,10 @@ fn gated_functions_are_reported_through_their_attribute_stack(#[case] source: &s
 fn the_negative_gate_is_reported_however_it_is_spaced(#[case] gate: &str) {
     let source = format!("#[cfg_attr({gate}, allow(dead_code))]\nfn probe() {{}}\n");
     assert_that!(
-        source::kernel_tree_violations(&[file("lib.rs", CLEAN_ROOT), file("operation.rs", &source)]),
+        source::kernel_tree_violations(&[
+            file("lib.rs", CLEAN_ROOT),
+            file("operation.rs", &source)
+        ]),
         contains(contains_substring(
             "must not contain cfg(not(verus_keep_ghost))"
         )),
@@ -188,9 +191,15 @@ fn the_negative_gate_is_reported_however_it_is_spaced(#[case] gate: &str) {
 fn a_conditional_core_lint_setting_is_reported(#[case] setting: &str) {
     let source = format!("#[cfg_attr(not(verus_keep_ghost), {setting})]\nfn probe() {{}}\n");
     assert_that!(
-        source::kernel_tree_violations(&[file("lib.rs", CLEAN_ROOT), file("operation.rs", &source)]),
-        contains(contains_substring("must not allow").or(contains_substring("must not expect"))
-            .or(contains_substring("must not warn"))),
+        source::kernel_tree_violations(&[
+            file("lib.rs", CLEAN_ROOT),
+            file("operation.rs", &source)
+        ]),
+        contains(
+            contains_substring("must not allow")
+                .or(contains_substring("must not expect"))
+                .or(contains_substring("must not warn"))
+        ),
         "a conditional core-lint setting must be reported, got {source}"
     );
 }
