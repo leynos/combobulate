@@ -33,14 +33,15 @@ const ACT_TOKEN: &str = "controlled-act-token";
 const RUNNER_IMAGE: &str = "controlled/ubuntu:act-test";
 /// Commands recorded before the first test-bearing Cargo call.
 ///
-/// The parse-time Nextest probe, the preflight, both fetches, and the gate
-/// build. Fixed by the Make route, so a failure case that shifts it should fail
-/// here rather than silently loosen the count.
-const PREPARATION_INVOCATIONS: usize = 5;
+/// The parse-time Nextest probe, the preflight, both fetches, the gate build,
+/// and the test recipe's own success-gated fetch. Fixed by the Make route, so a
+/// failure case that shifts it should fail here rather than silently loosen the
+/// count.
+const PREPARATION_INVOCATIONS: usize = 6;
 
 /// The executor sequence a successful `make test` records without Act.
 ///
-/// The probe and the four preparation commands, then one Nextest run and one
+/// The probe and the five preparation commands, then one Nextest run and one
 /// doctest run for each gate profile. Under DL-18 the two profiles are separate
 /// Cargo invocations, so the test phase is four commands rather than two.
 const OUTER_EXECUTORS: &[&str] = &[
@@ -49,6 +50,7 @@ const OUTER_EXECUTORS: &[&str] = &[
     "cargo",
     "cargo",
     "python",
+    "cargo",
     "cargo",
     "cargo",
     "cargo",
@@ -119,9 +121,9 @@ fn with_act_enabled_runs_outer_tests_then_configured_act() {
     assert!(output.status.success(), "make test WITH_ACT=1 must succeed");
     assert_eq!(
         invocations.len(),
-        11,
-        "recursive Make must replay preparation, the gate build, both profile routes, and the \
-         probe before invoking Act"
+        12,
+        "recursive Make must replay preparation, the gate build, the test recipe's fetch, both \
+         profile routes, and the probe before invoking Act"
     );
     assert_preparation_invocations(
         invocations
@@ -134,18 +136,18 @@ fn with_act_enabled_runs_outer_tests_then_configured_act() {
         "build preflight must be recorded",
     ));
     assert_outer_invocations_are_ordered(
-        invocations.get(2..9).expect(
+        invocations.get(2..10).expect(
             "preparation, the gate build, and both profiles' test commands must be recorded",
         ),
     );
     assert_invocations_use_repository_directory(&invocations);
     assert_cargo_probe(invocation_at(
         &invocations,
-        9,
+        10,
         "recursive Make must repeat the Cargo probe",
     ));
     assert_act_invocation_matches(
-        invocation_at(&invocations, 10, "Act invocation must be recorded"),
+        invocation_at(&invocations, 11, "Act invocation must be recorded"),
         &expected_common_directory,
     );
     assertions::assert_forwarded_environment(&invocations);

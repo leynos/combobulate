@@ -36,21 +36,26 @@ fn available_nextest_selects_the_nextest_run_branch() {
         ),
         (
             5,
+            vec!["fetch", "--locked"],
+            "the test recipe must fetch, success-gated, before its first test run",
+        ),
+        (
+            6,
             vec!["nextest", "run", "--all-targets", "--no-default-features"],
             "a successful Nextest probe must select its run command for the first gate profile",
         ),
         (
-            6,
+            7,
             vec!["test", "--doc", "--workspace", "--no-default-features"],
             "doctests must still follow Nextest",
         ),
         (
-            7,
+            8,
             vec!["nextest", "run", "--all-targets"],
             "the Polars-enabled profile must run in its own Nextest invocation",
         ),
         (
-            8,
+            9,
             vec!["test", "--doc", "--workspace"],
             "the Polars-enabled profile must run in its own doctest invocation",
         ),
