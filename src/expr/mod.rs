@@ -233,29 +233,40 @@ impl Debug for AExpr {
         let mut stack = vec![Frame::Open(self.clone())];
         while let Some(frame) = stack.pop() {
             match frame {
-                Frame::Open(handle) => {
-                    let identity = Arc::as_ptr(&handle.node) as usize;
-                    if let Some(position) = seen.get(&identity) {
-                        write!(formatter, "^{position}")?;
-                        continue;
-                    }
-                    seen.insert(identity, seen.len());
-                    match &handle.node.kind {
-                        NodeKind::Input(values) => write!(formatter, "input({})", values.len())?,
-                        NodeKind::Inert => formatter.write_str("inert")?,
-                        NodeKind::Add { lhs, rhs } => {
-                            formatter.write_str("add(")?;
-                            stack.push(Frame::Close(")"));
-                            stack.push(Frame::Open(rhs.clone()));
-                            stack.push(Frame::Close(", "));
-                            stack.push(Frame::Open(lhs.clone()));
-                        }
-                    }
-                }
+                Frame::Open(handle) => open_node(formatter, &handle, &mut seen, &mut stack)?,
                 Frame::Close(text) => formatter.write_str(text)?,
             }
         }
         Ok(())
+    }
+}
+
+/// Writes one node's opening text, scheduling what follows on `stack`.
+///
+/// A node already numbered is written as `^n` and its operands are not
+/// scheduled, which is what keeps the output linear in the node count.
+fn open_node(
+    formatter: &mut Formatter<'_>,
+    handle: &AExpr,
+    seen: &mut HashMap<usize, usize>,
+    stack: &mut Vec<Frame>,
+) -> fmt::Result {
+    let identity = Arc::as_ptr(&handle.node) as usize;
+    if let Some(position) = seen.get(&identity) {
+        return write!(formatter, "^{position}");
+    }
+    seen.insert(identity, seen.len());
+    match &handle.node.kind {
+        NodeKind::Input(values) => write!(formatter, "input({})", values.len()),
+        NodeKind::Inert => formatter.write_str("inert"),
+        NodeKind::Add { lhs, rhs } => {
+            formatter.write_str("add(")?;
+            stack.push(Frame::Close(")"));
+            stack.push(Frame::Open(rhs.clone()));
+            stack.push(Frame::Close(", "));
+            stack.push(Frame::Open(lhs.clone()));
+            Ok(())
+        }
     }
 }
 

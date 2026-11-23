@@ -164,11 +164,14 @@ fn reachable(graph: &Graph) -> Vec<bool> {
         }
         return reached;
     }
-    reached[graph.root()] = true;
+    mark(&mut reached, graph.root());
     // Walking backwards guarantees a node's consumers are decided before it
     // is, because consumers always have larger indices.
     for at in (graph.inputs.len()..total).rev() {
-        if !reached[at] {
+        let Some(&is_reached) = reached.get(at) else {
+            continue;
+        };
+        if !is_reached {
             continue;
         }
         let Some(spec) = graph.nodes.get(at - graph.inputs.len()) else {

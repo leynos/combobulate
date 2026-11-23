@@ -160,11 +160,11 @@ pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
 /// already been removed. Only `{` and `}` are counted: a `(` or `[` cannot
 /// open a module body, and counting them would make a signature's brackets
 /// look like nesting.
-fn advance_depth(text: &str, from: usize, to: usize, depth: usize) -> usize {
+fn advance_depth(text: &str, from: usize, to: usize, start: usize) -> usize {
     text.get(from..to)
         .unwrap_or_default()
         .chars()
-        .fold(depth, |depth, character| match character {
+        .fold(start, |depth, character| match character {
             '{' => depth + 1,
             '}' => depth.saturating_sub(1),
             _ => depth,
