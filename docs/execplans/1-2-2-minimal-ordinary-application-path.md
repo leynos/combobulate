@@ -2159,6 +2159,25 @@ Negative-control transcripts are added here as each is observed:
 - the Verus always-`Err` stub;
 - each Verus mutant.
 
+Local-versus-hosted test cost, observed 2026-11-23. The three nested-cargo
+tests are all fast on the hosted runner and slow on this workstation, and the
+difference is the shared compile queue rather than the code:
+
+| Test                      | Hosted | Local, queue at 400+ |
+| ------------------------- | ------ | -------------------- |
+| `cardinality_probe_ui`    | 1.5 s  | 324.8 s direct       |
+| `native_consumer_e2e`     | 0.9 s  | 7 m 30 s cold        |
+| `non_exhaustive_contract` | 0.7 s  | 7 m 32 s cold        |
+
+The hosted figures come from the green `build-test` run at `8ae6cf1`. The local
+figures come from running the same binaries while other agents held 400 to 500
+compiler slots; the nested builds queue behind them, and each fixture's first
+build compiles the facade and kernel from cold. The hosted `build-test` job is
+the authoritative gate, and it passes all three within its own timeout. A local
+`make test` that times out in one of these three is reporting host contention,
+not a defect, and the tier values in `.config/nextest.toml` are sized for the
+contended local case.
+
 The Verus always-`Err` stub was observed on 2026-11-20 by replacing
 `add_i64_into`'s body with
 `let _ = (lhs, rhs, out); Err(AddFailure::LengthMismatch)` and running the
