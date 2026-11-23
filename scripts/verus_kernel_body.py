@@ -54,7 +54,6 @@ def wrapping_body(shipped: str) -> str:
 WRAP_ROOT = """//! Generated root for the body-tier wrapping mutant.
 #![no_std]
 #![feature(proc_macro_hygiene)]
-#![allow(dead_code)]
 use vstd::prelude::*;
 
 #[path = "contract.rs"]

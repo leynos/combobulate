@@ -15,7 +15,6 @@
 //! failure cannot be attributed to another.
 
 #![feature(proc_macro_hygiene)]
-#![allow(dead_code)]
 
 use vstd::prelude::*;
 

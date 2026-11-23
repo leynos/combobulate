@@ -24,12 +24,12 @@
   "source_digests": {
     "crates/combobulate-kernel/verus/elementwise_add_contract.rs": "ast-sha256:a170f3ef3104e330c4663b8f971b46b54ad05e28512643fb0805394f84399b0f",
     "crates/combobulate-kernel/src/elementwise_add.rs": "ast-sha256:13f2a4f28333824f43ece4f4001bd031cd812efe486c38f125e83ec1a2b145dd",
-    "crates/combobulate-kernel/verus/elementwise_add.rs": "ast-sha256:1693aaf7d97b7391410f1c53e96c2abd87b3a1fad1a3858d849e63b0ca01a9ea",
-    "crates/combobulate-kernel/verus/elementwise_add_mutants.rs": "ast-sha256:1d07bb6b817f5e9791196484a6027fe22d6517a583e729fa56b74788ef29aa3c",
+    "crates/combobulate-kernel/verus/elementwise_add.rs": "ast-sha256:397f8f5599d6fe39163470e0fa306d8847671caccd548125e7b777017e2aa87f",
+    "crates/combobulate-kernel/verus/elementwise_add_mutants.rs": "ast-sha256:c348428b0d6166fe20c8ec3afe1ef60ff469ea3237a06d7cb9438362438097ac",
     "scripts/verus_kernel.py": "ast-sha256:b1a1b2acbe2cc9fae855a05b04ead6eafe06343431cc5e2d853be5278c945802",
     "scripts/verus_kernel_verdicts.py": "ast-sha256:91dc4c28c11858c48b5542a9e07e4cf98be7bc45caf9afac0ce9f8c2fc27f0da",
     "scripts/verus_kernel_diagnostic.py": "ast-sha256:73ccfb4f8aa78af4feaae1f5e65dba4f6dc24bdb6a4ce917d167535e23d62f21",
-    "scripts/verus_kernel_body.py": "ast-sha256:bce1275f98485e35eb9994e8652b3c2a5afcc9d0f7ad051e6e9361ed4534435e",
+    "scripts/verus_kernel_body.py": "ast-sha256:c942888738ae537217ad9fb51e13c6ce1f7d21e4b967bc9df192424c944cbb9e",
     "scripts/verus_kernel_identity.py": "ast-sha256:7b378dcdc8812c7d7ba7b255e856ddae692a61cfeb2844a957ed0a48ee207d0f",
     "scripts/kernel_record.py": "ast-sha256:bd6ee1ad459573658928caa7797596f9e1dda1fad23c4ce4ef133aae51ef075f"
   },
@@ -87,7 +87,7 @@
       "cwd": ".",
       "exit_code": 1,
       "log": "tools/verifier-fixtures/verus-kernel/mutant_err.log",
-      "sha256": "639cffdc2e330cf409a8e38481bf1dbf94d8539e698d06268147a4543c3cd459",
+      "sha256": "6606083a597b265cc026fa9cc66049c5f2f96beb85a398d7982c8c7492086d93",
       "candidate": "mutant_err",
       "verdict": {
         "kind": "mutant",
@@ -96,8 +96,8 @@
           "k3"
         ],
         "lines": {
-          "40": "k2",
-          "41": "k3"
+          "39": "k2",
+          "40": "k3"
         }
       }
     },
@@ -125,7 +125,7 @@
       "cwd": ".",
       "exit_code": 1,
       "log": "tools/verifier-fixtures/verus-kernel/mutant_late.log",
-      "sha256": "f428e1e773134692a0666ba28692070073bec954eddf9b2b90187d8702529043",
+      "sha256": "08f8ac1a70a44cb78c2a55490797cb05fb33d109c8fe8e8150abf7a9bf1b911d",
       "candidate": "mutant_late",
       "verdict": {
         "kind": "mutant",
@@ -133,7 +133,7 @@
           "k4"
         ],
         "lines": {
-          "58": "k4"
+          "57": "k4"
         }
       }
     },
@@ -161,7 +161,7 @@
       "cwd": ".",
       "exit_code": 1,
       "log": "tools/verifier-fixtures/verus-kernel/mutant_ok_on_overflow.log",
-      "sha256": "1bbc85ee5106dd18f12e935556b4110c93ae6b9ae335a7a036b943dcb9cf1bf0",
+      "sha256": "68ec0d63aae1bfb3139aaf448e8ee2ea4571ca48ca99024abc96fc7774036aea",
       "candidate": "mutant_ok_on_overflow",
       "verdict": {
         "kind": "mutant",
@@ -169,7 +169,7 @@
           "k1"
         ],
         "lines": {
-          "82": "k1"
+          "81": "k1"
         }
       }
     },
@@ -197,7 +197,7 @@
       "cwd": ".",
       "exit_code": 1,
       "log": "tools/verifier-fixtures/verus-kernel/mutant_mismatch_write.log",
-      "sha256": "4baaa2ac3e48bc55f152ad3948463a647e4c1be3782a8cddc58af30ec8a64c16",
+      "sha256": "3781b47d127bbb3db92eec4fd63bdf8ed84582580c81459990103fb772e0df81",
       "candidate": "mutant_mismatch_write",
       "verdict": {
         "kind": "mutant",
@@ -205,7 +205,7 @@
           "k5"
         ],
         "lines": {
-          "107": "k5"
+          "106": "k5"
         }
       }
     },
@@ -233,7 +233,7 @@
       "cwd": ".",
       "exit_code": 1,
       "log": "tools/verifier-fixtures/verus-kernel/mutant_early_write.log",
-      "sha256": "fecdf1b5d73f754820059f4531a265fad0366080956966b18885e85dfed5abde",
+      "sha256": "ce790e7edb11ee9e3f9de1b8c6ff40831afbfa490e1255bd8f6f169dc41449c7",
       "candidate": "mutant_early_write",
       "verdict": {
         "kind": "mutant",
@@ -241,7 +241,7 @@
           "k5"
         ],
         "lines": {
-          "133": "k5"
+          "132": "k5"
         }
       }
     },

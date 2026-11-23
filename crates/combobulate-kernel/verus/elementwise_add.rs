@@ -12,7 +12,6 @@
 //! the determinacy lemma is applied rather than merely stated.
 
 #![feature(proc_macro_hygiene)]
-#![allow(dead_code)]
 
 use vstd::prelude::*;
 

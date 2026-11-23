@@ -2,15 +2,15 @@ verification results:: 0 verified, 1 errors (partial verification with `--verify
 note: verifying root module (selected functions)
 
 error: postcondition not satisfied
-  --> <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs:82:9
+  --> <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs:81:9
    |
-82 |           k1(lhs@, rhs@, old(out)@, final(out)@, r),
+81 |           k1(lhs@, rhs@, old(out)@, final(out)@, r),
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
 ...
-88 | /     match add_i64_into(lhs, rhs, out) {
-89 | |         Err(AddFailure::Overflow { .. }) => Ok(()),
-90 | |         other => other,
-91 | |     }
+87 | /     match add_i64_into(lhs, rhs, out) {
+88 | |         Err(AddFailure::Overflow { .. }) => Ok(()),
+89 | |         other => other,
+90 | |     }
    | |_____- at the end of the function body
 
 error: aborting due to 1 previous error
