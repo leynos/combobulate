@@ -60,6 +60,41 @@ fn a_deep_chain_formats() {
     });
 }
 
+/// A doubling chain formats in space linear in its node count.
+///
+/// `e = add().apply(&e, &e)` repeated 32 times is a valid expression of 33
+/// distinct nodes. Expanding both references on every visit would produce
+/// `2^32` input strings and more than 60 GB of text, so the case is a
+/// regression guard rather than a style preference: it fails by taking the
+/// whole machine down, which is why the depth is 32 and the assertion is on
+/// the rendered length rather than on a timeout.
+///
+/// The `^n` form is checked too. Without it a reader could not tell a shared
+/// node from two equal ones, and a formatter that silently dropped the second
+/// operand would pass a length check alone.
+#[test]
+fn a_shared_doubling_chain_formats_in_linear_space() {
+    on_small_stack(|| {
+        let mut chain = expr_of(1);
+        for _ in 0..32 {
+            chain = add().apply(&chain, &chain);
+        }
+        let rendered = format!("{chain:?}");
+        assert!(
+            rendered.len() < 4_096,
+            "33 distinct nodes must not expand to their 2^32 unfoldings; got {} bytes",
+            rendered.len()
+        );
+        // Numbers are assigned as nodes are first reached, so the root — the
+        // last node the walk opens — is the highest, and the repeat that names
+        // it is the one this chain produces.
+        assert!(
+            rendered.contains("^32"),
+            "a repeated node must be named rather than expanded, got {rendered}"
+        );
+    });
+}
+
 #[test]
 fn identity_folding_does_not_grow_a_chain() {
     on_small_stack(|| {
