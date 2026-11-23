@@ -116,6 +116,19 @@ fn failed_test_recipe_fetch_runs_no_test_and_no_act() {
         !output.status.success(),
         "a failed fetch in the test recipe must fail make"
     );
+    // The recipe's own fetch is the sixth recorded call (index 5), and it is the
+    // last: the failure came from it, not from an earlier preflight or gate.
+    assert_arguments_at(
+        &invocations,
+        5,
+        &["fetch", "--locked"],
+        "the recipe's own fetch must be the call that failed",
+    );
+    assert_eq!(
+        invocations.len(),
+        6,
+        "nothing may be recorded after the recipe's failed fetch"
+    );
     assert!(
         invocations.iter().all(|call| call.executable != "act"),
         "Act must not start after a failed fetch"
