@@ -227,7 +227,6 @@ impl AExpr {
     pub fn then(&self, operation: &Unary) -> Self { operation.apply(self) }
 }
 
-
 /// A unary operation that may be applied to one expression.
 ///
 /// ```
