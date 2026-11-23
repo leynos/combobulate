@@ -188,6 +188,9 @@ clean: ## Remove build artefacts
 BUILD_STANDARD_ENV = RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(DEV_RUST_FLAGS)"
 
 test: prepare-ui-gate ## Run tests with warnings treated as errors
+	@# `prepare-dependencies` has already fetched; this line is instant on a warm
+	@# cache and states the success-gated fetch where the test recipe itself shows it.
+	@$(BUILD_STANDARD_ENV) $(CARGO) fetch --locked
 	@set -euo pipefail; for profile in $(GATE_PROFILES); do \
 		printf '\n== test profile: %s ==\n' "$$profile"; \
 		case "$$profile" in \
