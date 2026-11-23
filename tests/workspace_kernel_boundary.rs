@@ -156,6 +156,45 @@ fn gated_functions_are_reported_through_their_attribute_stack(#[case] source: &s
     );
 }
 
+/// The negative gate is recognised however its spacing is written.
+///
+/// `cfg( not(verus_keep_ghost) )` is the same gate to a compiler. A literal
+/// substring match would let the spaced spelling through, which is the
+/// substitution the rule exists to reject.
+#[rstest]
+#[case::tight("cfg(not(verus_keep_ghost))")]
+#[case::spaced("cfg( not(verus_keep_ghost) )")]
+#[case::spaced_inner("cfg( not( verus_keep_ghost ) )")]
+fn the_negative_gate_is_reported_however_it_is_spaced(#[case] gate: &str) {
+    let source = format!("#[cfg_attr({gate}, allow(dead_code))]\nfn probe() {{}}\n");
+    assert_that!(
+        source::kernel_tree_violations(&[file("lib.rs", CLEAN_ROOT), file("operation.rs", &source)]),
+        contains(contains_substring(
+            "must not contain cfg(not(verus_keep_ghost))"
+        )),
+        "the spaced spelling is the same gate, got {source}"
+    );
+}
+
+/// A conditional core-lint allowance is reported as the allowance it is.
+///
+/// `#[cfg_attr(not(verus_keep_ghost), allow(clippy::std_instead_of_core))]`
+/// applies an allowance whenever the condition holds. The boundary cannot
+/// evaluate the condition, so the file may not carry one at all.
+#[rstest]
+#[case::conditional_allow("allow(clippy::std_instead_of_core)")]
+#[case::conditional_expect("expect(clippy::alloc_instead_of_core)")]
+#[case::conditional_warn("warn(clippy::std_instead_of_core)")]
+fn a_conditional_core_lint_setting_is_reported(#[case] setting: &str) {
+    let source = format!("#[cfg_attr(not(verus_keep_ghost), {setting})]\nfn probe() {{}}\n");
+    assert_that!(
+        source::kernel_tree_violations(&[file("lib.rs", CLEAN_ROOT), file("operation.rs", &source)]),
+        contains(contains_substring("must not allow").or(contains_substring("must not expect"))
+            .or(contains_substring("must not warn"))),
+        "a conditional core-lint setting must be reported, got {source}"
+    );
+}
+
 /// VO-6 non-vacuity: comments and literals cannot stand in for attributes.
 #[rstest]
 #[case::line_comment(concat!(

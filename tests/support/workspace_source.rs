@@ -206,7 +206,11 @@ fn item_violations(code: &Code, is_root: bool) -> Vec<String> {
             violations.push(format!("must not contain {declaration}"));
         }
     }
-    if text.contains("cfg(not(verus_keep_ghost))") {
+    // Compared without whitespace, because `cfg( not(verus_keep_ghost) )` is
+    // the same gate to a compiler and a literal match would let it through.
+    if text.chars().filter(|character| !character.is_whitespace()).collect::<String>()
+        .contains("cfg(not(verus_keep_ghost))")
+    {
         violations.push("must not contain cfg(not(verus_keep_ghost))".to_owned());
     }
     for attribute in scan_attributes(code, Scope::All) {
@@ -272,8 +276,23 @@ fn lint_level_violations(attribute: &Attribute<'_>) -> Vec<String> {
 /// `expect` is included even though no crate-level `expect` can weaken a
 /// `deny`: a file that expected one of these lints would still be the place
 /// where core-only code stopped being enforced.
+///
+/// A `cfg_attr` is unwrapped to the attribute it applies conditionally, so
+/// `#[cfg_attr(not(verus_keep_ghost), allow(clippy::std_instead_of_core))]`
+/// is read as the `allow` it is. The condition is not evaluated: a kernel
+/// file may not carry a conditional allowance at all, because whether it
+/// applies depends on a build the boundary cannot see.
 fn lint_setting<'a>(attribute: &Attribute<'a>) -> Option<Split<'a>> {
     let split = attribute.split()?;
+    if split.name == "cfg_attr" {
+        let (_, conditional) = split.list.split_once(',')?;
+        let unwrapped = Attribute {
+            body: conditional.trim(),
+            end: attribute.end,
+            is_inner: attribute.is_inner,
+        };
+        return lint_setting(&unwrapped);
+    }
     FORBIDDEN_LEVELS.contains(&split.name).then_some(split)
 }
 
