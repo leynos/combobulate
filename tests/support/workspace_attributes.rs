@@ -107,15 +107,26 @@ impl<'a> Split<'a> {
 }
 
 /// Collects the attributes in `code` that fall within `scope`.
+///
+/// An inner attribute is crate-level only when it sits outside every brace
+/// pair. `#![allow(...)]` written inside `mod tests { ... }` applies to that
+/// module, not to the crate, so collecting it would let a submodule's
+/// allowance stand in for the root's — the exact substitution the kernel
+/// boundary exists to reject.
 pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
     let text = code.text();
     let mut found = Vec::new();
     let mut index = 0;
+    // The brace depth at `index`, carried forward rather than recomputed: a
+    // rescan per attribute would make the walk quadratic in the file size.
+    let mut depth = 0_usize;
     while let Some(rest) = text.get(index..) {
         let Some((offset, opener, is_inner)) = next_attribute(rest, scope) else {
             break;
         };
-        let start = index + offset + opener;
+        let attribute_at = index + offset;
+        depth = advance_depth(text, index, attribute_at, depth);
+        let start = attribute_at + opener;
         let Some(tail) = text.get(start..) else {
             break;
         };
@@ -125,6 +136,14 @@ pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
         let Some(body) = tail.get(..end) else {
             break;
         };
+        if is_inner && depth > 0 {
+            // Inside a module or a function body: an inner attribute here is
+            // not a crate attribute, so it is skipped rather than collected.
+            // The walk still advances past it, so the depth it carries stays
+            // aligned with `index`.
+            index = start + end + 1;
+            continue;
+        }
         found.push(Attribute {
             body: body.trim(),
             end: start + end + 1,
@@ -133,6 +152,23 @@ pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
         index = start + end + 1;
     }
     found
+}
+
+/// Returns the brace depth after reading `text[from..to]`.
+///
+/// The scan is over stripped code, so a brace in a comment or a string has
+/// already been removed. Only `{` and `}` are counted: a `(` or `[` cannot
+/// open a module body, and counting them would make a signature's brackets
+/// look like nesting.
+fn advance_depth(text: &str, from: usize, to: usize, depth: usize) -> usize {
+    text.get(from..to)
+        .unwrap_or_default()
+        .chars()
+        .fold(depth, |depth, character| match character {
+            '{' => depth + 1,
+            '}' => depth.saturating_sub(1),
+            _ => depth,
+        })
 }
 
 /// Returns the next attribute's offset, opener length, and inner-ness.
@@ -270,6 +306,32 @@ mod tests {
             attributes(&code, scope).len(),
             expected,
             "the inner scope must not collect outer attributes"
+        );
+    }
+
+    /// An inner attribute inside a module is not a crate attribute.
+    ///
+    /// `#![allow(...)]` written in `mod tests { ... }` applies to that module.
+    /// Collecting it as crate-level would let a submodule's allowance stand in
+    /// for the root's, which is the substitution the kernel boundary exists to
+    /// reject.
+    #[test]
+    fn a_nested_modules_inner_attribute_is_not_crate_level() {
+        let code = Code::stripped(
+            concat!(
+                "#![no_std]\n",
+                "mod tests {\n",
+                "    #![allow(clippy::std_instead_of_core)]\n",
+                "}\n"
+            )
+            .to_owned(),
+        );
+        let found = attributes(&code, Scope::Inner);
+        let bodies: Vec<&str> = found.iter().map(|attribute| attribute.body).collect();
+        assert_eq!(
+            bodies,
+            vec!["no_std"],
+            "only the crate-level attribute may be collected, got {bodies:?}"
         );
     }
 
