@@ -107,6 +107,7 @@ fn record(
     let here = Slot(steps.len());
     match &handle.node.kind {
         NodeKind::Input(values) => steps.push(Step::Input(Arc::clone(values))),
+        NodeKind::Inert => {}
         NodeKind::Add { lhs, rhs } => {
             record_mismatch(handle, lhs, rhs, mismatches);
             // Both slots exist: the walk finishes every operand before its

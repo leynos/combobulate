@@ -82,6 +82,15 @@ pub(crate) enum NodeKind {
         /// The right operand.
         rhs: AExpr,
     },
+    /// The inert leaf a node is replaced with while it is being dropped.
+    ///
+    /// It holds nothing, so replacing a node's kind with it allocates nothing.
+    /// Using an empty [`NodeKind::Input`] instead would allocate an `Arc`
+    /// control block per dropped node, which for a 100,000-node chain is
+    /// 100,000 allocations the drop path does not need. The variant is never
+    /// reachable from a live graph: it exists only between the `mem::replace`
+    /// and the release of the fields it replaced.
+    Inert,
 }
 
 /// One node of an expression graph, shared by its handles.
@@ -108,7 +117,7 @@ impl Drop for Node {
         // kind is taken out and replaced with an inert leaf, so the `Drop` that
         // runs when this node's fields are released sees no children and
         // cannot recurse. The inert leaf allocates nothing.
-        let own_kind = std::mem::replace(&mut self.kind, NodeKind::Input(Arc::default()));
+        let own_kind = std::mem::replace(&mut self.kind, NodeKind::Inert);
         let mut work = Vec::new();
         collect_children(own_kind, &mut work);
         while let Some(handle) = work.pop() {
@@ -117,7 +126,7 @@ impl Drop for Node {
             let Some(mut node) = Arc::into_inner(handle) else {
                 continue;
             };
-            let detached = std::mem::replace(&mut node.kind, NodeKind::Input(Arc::default()));
+            let detached = std::mem::replace(&mut node.kind, NodeKind::Inert);
             collect_children(detached, &mut work);
             // `node` is a bare `Node` here, not an `Arc`, so dropping it runs
             // this implementation again — with an inert kind, so it does
@@ -133,7 +142,7 @@ impl Drop for Node {
 /// wrapper would only be unwrapped again.
 fn collect_children(kind: NodeKind, work: &mut Vec<Arc<Node>>) {
     match kind {
-        NodeKind::Input(_) => (),
+        NodeKind::Input(_) | NodeKind::Inert => (),
         NodeKind::Add { lhs, rhs } => {
             work.push(lhs.node);
             work.push(rhs.node);
@@ -233,6 +242,7 @@ impl Debug for AExpr {
                     seen.insert(identity, seen.len());
                     match &handle.node.kind {
                         NodeKind::Input(values) => write!(formatter, "input({})", values.len())?,
+                        NodeKind::Inert => formatter.write_str("inert")?,
                         NodeKind::Add { lhs, rhs } => {
                             formatter.write_str("add(")?;
                             stack.push(Frame::Close(")"));
@@ -259,6 +269,7 @@ impl Debug for Node {
         let name = match self.kind {
             NodeKind::Input(_) => "input",
             NodeKind::Add { .. } => "add",
+            NodeKind::Inert => "inert",
         };
         write!(
             formatter,

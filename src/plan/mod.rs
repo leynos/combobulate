@@ -255,7 +255,7 @@ const fn dispatch_add(lhs: &[i64], rhs: &[i64], out: &mut [i64]) -> Result<(), A
 /// first.
 pub(super) fn child_frames(handle: &AExpr) -> Vec<Frame> {
     match &handle.node.kind {
-        NodeKind::Input(_) => Vec::new(),
+        NodeKind::Input(_) | NodeKind::Inert => Vec::new(),
         NodeKind::Add { lhs, rhs } => vec![Frame::Expand(rhs.clone()), Frame::Expand(lhs.clone())],
     }
 }

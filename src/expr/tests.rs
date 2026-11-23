@@ -45,7 +45,7 @@ fn an_input_reports_the_buffer_length(#[case] width: usize) {
 fn input_ptr(expression: &AExpr) -> Option<*const i64> {
     match &expression.node.kind {
         NodeKind::Input(values) => Some(values.as_ptr()),
-        NodeKind::Add { .. } => None,
+        NodeKind::Add { .. } | NodeKind::Inert => None,
     }
 }
 
