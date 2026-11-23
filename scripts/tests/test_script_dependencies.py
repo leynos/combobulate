@@ -19,6 +19,8 @@ from __future__ import annotations
 import ast
 import re
 import sys
+import tempfile
+import tomllib
 import unittest
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -27,8 +29,6 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1]
 
 _METADATA = re.compile(r'^# /// script\n(?P<body>.*?)^# ///', re.S | re.M)
-_DEPENDENCIES = re.compile(r'dependencies = (?P<list>\[.*?\])', re.S)
-_REQUIRES_PYTHON = re.compile(r'requires-python = "(?P<spec>[^"]*)"')
 
 # A distribution name differs from its import name often enough that guessing
 # would produce false failures; these are the spellings this repository uses.
@@ -124,18 +124,25 @@ def _requirement_name(spec: str) -> str:
 
 
 def _declared(script: Path) -> tuple[set[str], str]:
-    """Return the block's dependency names and its interpreter specifier."""
+    """Return the block's dependency names and its interpreter specifier.
+
+    PEP 723 defines the block as TOML, so it is parsed as TOML rather than
+    with a regular expression. A pattern cannot find the end of a list whose
+    entries contain brackets: ``jsonschema[format]>=4,<5`` closes the match at
+    the ``]`` inside the requirement, and the truncated text then fails to
+    evaluate or, worse, evaluates to the wrong list.
+    """
     block = _METADATA.search(script.read_text(encoding='utf-8')).group('body')
-    # Every line of the block is a Python comment; a multi-line dependency list
-    # is only parseable once its ``# `` leader is removed.
+    # Every line of the block is a Python comment; the TOML begins once its
+    # ``# `` leader is removed.
     text = '\n'.join(
         line[2:] if line.startswith('# ') else line[1:]
         for line in block.splitlines()
     )
-    specs = ast.literal_eval(_DEPENDENCIES.search(text).group('list'))
+    metadata = tomllib.loads(text)
+    specs = metadata.get('dependencies', [])
     names = {_normalise(_requirement_name(spec)) for spec in specs}
-    specifier = _REQUIRES_PYTHON.search(text)
-    return names, specifier.group('spec') if specifier else ''
+    return names, metadata.get('requires-python', '')
 
 
 @dataclass(frozen=True)
@@ -210,6 +217,58 @@ class ScriptDependencyTests(unittest.TestCase):
             '<3.15',
             specifier,
             f'verus_kernel.py must exclude 3.15, which has no grammar wheel; got {specifier!r}',
+        )
+
+
+class MetadataParsingTests(unittest.TestCase):
+    """Parse the PEP 723 block as the TOML it is, not as a bracketed list."""
+
+    def declared_from(self, block: str) -> tuple[set[str], str]:
+        """Return the names and specifier a metadata body declares."""
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / 'script.py'
+            script.write_text(
+                f'# /// script\n{block}# ///\nprint("hi")\n',
+                encoding='utf-8',
+            )
+            return _declared(script)
+
+    def test_a_plain_requirement_is_read(self) -> None:
+        """The common case: one pinned distribution and no extras."""
+        names, specifier = self.declared_from(
+            '# dependencies = ["cyclopts==5.2.0"]\n# requires-python = ">=3.14"\n'
+        )
+
+        self.assertEqual(names, {'cyclopts'}, f'expected only cyclopts, got {names}')
+        self.assertEqual(specifier, '>=3.14', f'expected the specifier, got {specifier!r}')
+
+    def test_a_requirement_with_extras_is_read_whole(self) -> None:
+        """A bracket inside a requirement must not end the list.
+
+        ``jsonschema[format]>=4,<5`` contains a ``]``, so a pattern that
+        matched to the first one would truncate the list and either fail to
+        evaluate or silently drop the requirements after it.
+        """
+        names, _ = self.declared_from(
+            '# dependencies = ["jsonschema[format]>=4,<5", "PyYAML==6.0.3"]\n'
+        )
+
+        self.assertEqual(
+            names,
+            {'jsonschema', 'pyyaml'},
+            f'both requirements must be read, got {names}',
+        )
+
+    def test_a_multi_line_list_is_read(self) -> None:
+        """A list split across lines is still one TOML array."""
+        names, _ = self.declared_from(
+            '# dependencies = [\n#     "cyclopts==5.2.0",\n#     "cuprum==0.1.0",\n# ]\n'
+        )
+
+        self.assertEqual(
+            names,
+            {'cyclopts', 'cuprum'},
+            f'every line of the list must be read, got {names}',
         )
 
 
