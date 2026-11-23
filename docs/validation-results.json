@@ -168,7 +168,7 @@
       "check": "polars-confinement",
       "status": "pass",
       "detail": "Polars paths appear only in src/polars_backend.rs; a seeded violation in a copy of the facade is still reported.",
-      "count": 12
+      "count": 13
     }
   ],
   "not_run": [
