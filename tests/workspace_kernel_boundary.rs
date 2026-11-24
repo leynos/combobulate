@@ -204,6 +204,35 @@ fn a_conditional_core_lint_setting_is_reported(#[case] setting: &str) {
     );
 }
 
+/// A `cfg_attr` payload is found whatever its predicate contains.
+///
+/// The payload follows the predicate, and splitting at the first comma would
+/// cut inside a predicate such as `any(unix, windows)` — the remaining text
+/// then starts with `windows)`, which is not a lint level, and the attribute
+/// goes unreported. A `cfg_attr` may also carry several payloads, so every one
+/// after the predicate has to be examined.
+#[rstest]
+#[case::any_predicate("#[cfg_attr(any(unix, windows), allow(clippy::std_instead_of_core))]")]
+#[case::all_predicate(
+    "#[cfg_attr(all(unix, target_pointer_width = \"64\"), allow(clippy::alloc_instead_of_core))]"
+)]
+#[case::second_payload("#[cfg_attr(unix, inline, allow(clippy::std_instead_of_core))]")]
+fn a_cfg_attr_payload_is_found_past_its_predicate(#[case] attribute: &str) {
+    let source = format!("{attribute}\nfn probe() {{}}\n");
+    assert_that!(
+        source::kernel_tree_violations(&[
+            file("lib.rs", CLEAN_ROOT),
+            file("operation.rs", &source)
+        ]),
+        contains(
+            contains_substring("must not allow")
+                .or(contains_substring("must not expect"))
+                .or(contains_substring("must not warn"))
+        ),
+        "a nested-predicate payload must still be reported, got {source}"
+    );
+}
+
 /// VO-6 non-vacuity: comments and literals cannot stand in for attributes.
 #[rstest]
 #[case::line_comment(concat!(

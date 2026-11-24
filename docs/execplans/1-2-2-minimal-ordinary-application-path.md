@@ -2172,11 +2172,19 @@ difference is the shared compile queue rather than the code:
 The hosted figures come from the green `build-test` run at `8ae6cf1`. The local
 figures come from running the same binaries while other agents held 400 to 500
 compiler slots; the nested builds queue behind them, and each fixture's first
-build compiles the facade and kernel from cold. The hosted `build-test` job is
-the authoritative gate, and it passes all three within its own timeout. A local
-`make test` that times out in one of these three is reporting host contention,
-not a defect, and the tier values in `.config/nextest.toml` are sized for the
-contended local case.
+build compiles the facade and kernel from cold.
+
+Contention is a *possible* cause of a local timeout in one of these three, not
+a conclusion: a hosted pass at one commit does not establish why a later local
+run failed, and a fixture that hangs on a regression would look the same.
+Before treating a timeout as contention, check that the compile queue is deep
+(`build-limits-status`), that the fixture's target directory under `target/tmp`
+was repopulated, and that the test passes when run directly with its cache
+warm. A fixture that hangs inside its own code shows none of those signs and is
+a real regression.
+
+The tier values in `.config/nextest.toml` are sized for the contended local
+case, so a timeout means the run exceeded that allowance.
 
 The Verus always-`Err` stub was observed on 2026-11-20 by replacing
 `add_i64_into`'s body with

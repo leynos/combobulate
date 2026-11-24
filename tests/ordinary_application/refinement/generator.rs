@@ -133,8 +133,16 @@ fn node_spec(prefix: usize) -> impl Strategy<Value = NodeSpec> {
 /// sharing case as exercised by a graph that never evaluates a shared subterm.
 pub(super) fn shares(graph: &Graph) -> bool {
     let total = graph.inputs.len() + graph.nodes.len();
+    let reached = reachable(graph);
     let mut uses: Vec<usize> = vec![0; total];
-    for spec in &graph.nodes {
+    for (at, spec) in graph.nodes.iter().enumerate() {
+        // A consumer the root does not reach is never evaluated, so its
+        // operands are not consumers either. Counting them would let a
+        // reachable node with a single consumer look shared.
+        let node = graph.inputs.len() + at;
+        if !reached.get(node).copied().unwrap_or(false) {
+            continue;
+        }
         match spec {
             NodeSpec::Identity { of } => bump(&mut uses, *of),
             NodeSpec::Add { lhs, rhs } => {
@@ -143,7 +151,6 @@ pub(super) fn shares(graph: &Graph) -> bool {
             }
         }
     }
-    let reached = reachable(graph);
     uses.iter()
         .zip(&reached)
         .any(|(count, is_reached)| *is_reached && *count > 1)
@@ -199,5 +206,53 @@ fn mark(reached: &mut [bool], node: usize) {
 fn bump(uses: &mut [usize], node: usize) {
     if let Some(count) = uses.get_mut(node) {
         *count += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Whether a graph counts as sharing, and why the reachable set matters.
+
+    use super::{Graph, NodeSpec, shares};
+
+    /// A graph whose only repeated reference is a dead node is not sharing.
+    ///
+    /// Node 1 is the root and reads input 0 once. Node 2 also reads input 0,
+    /// but nothing reaches node 2, so preparation never visits it. Counting its
+    /// consumer would make input 0 look shared and report the sharing case as
+    /// exercised by a graph that evaluates nothing shared.
+    #[test]
+    fn an_unreachable_consumer_does_not_count_as_sharing() {
+        let graph = Graph {
+            inputs: vec![vec![1]],
+            nodes: vec![NodeSpec::Identity { of: 0 }, NodeSpec::Identity { of: 0 }],
+        };
+
+        assert!(
+            !shares(&graph),
+            "a consumer the root does not reach is not a consumer; the root reads input 0 once"
+        );
+    }
+
+    /// A reachable node with two consumers is sharing.
+    ///
+    /// The case establishes the positive half: with both reads reachable the
+    /// same shape must be reported, so the guard above is not passing merely
+    /// because `shares` never fires.
+    #[test]
+    fn a_reachable_node_with_two_consumers_is_sharing() {
+        let graph = Graph {
+            inputs: vec![vec![1]],
+            nodes: vec![
+                NodeSpec::Identity { of: 0 },
+                NodeSpec::Identity { of: 0 },
+                NodeSpec::Add { lhs: 1, rhs: 2 },
+            ],
+        };
+
+        assert!(
+            shares(&graph),
+            "input 0 is read by nodes 1 and 2, and the root reaches both"
+        );
     }
 }

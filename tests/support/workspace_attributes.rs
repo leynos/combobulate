@@ -136,11 +136,14 @@ pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
         let Some(body) = tail.get(..end) else {
             break;
         };
-        if is_inner && depth > 0 {
-            // Inside a module or a function body: an inner attribute here is
-            // not a crate attribute, so it is skipped rather than collected.
-            // The walk still advances past it, so the depth it carries stays
-            // aligned with `index`.
+        if is_inner && depth > 0 && matches!(scope, Scope::Inner) {
+            // The depth restriction serves the crate-level lookup: an inner
+            // attribute inside a module or a function body is not a crate
+            // attribute, so `Scope::Inner` skips it. `Scope::All` exists to
+            // find every attribute a file carries — the per-file kernel rule
+            // forbids a lint setting anywhere in a kernel file — so it must
+            // still see a nested one. The walk advances past the attribute in
+            // both cases, so the depth it carries stays aligned with `index`.
             index = start + end + 1;
             continue;
         }
@@ -332,6 +335,36 @@ mod tests {
             bodies,
             vec!["no_std"],
             "only the crate-level attribute may be collected, got {bodies:?}"
+        );
+    }
+
+    /// `Scope::All` still sees an inner attribute inside a module.
+    ///
+    /// The depth restriction exists for the crate-level lookup, which is
+    /// `Scope::Inner`. The per-file kernel rule uses `Scope::All` and forbids a
+    /// lint setting anywhere in a kernel file, so skipping a nested attribute
+    /// there would let `mod m { #![allow(clippy::std_instead_of_core)] }`
+    /// through.
+    #[test]
+    fn the_all_scope_sees_a_nested_modules_inner_attribute() {
+        let code = Code::stripped(
+            concat!(
+                "#![no_std]\n",
+                "mod m {\n",
+                "    #![allow(clippy::std_instead_of_core)]\n",
+                "}\n"
+            )
+            .to_owned(),
+        );
+        let bodies: Vec<&str> = attributes(&code, Scope::All)
+            .iter()
+            .map(|attribute| attribute.body)
+            .collect();
+        assert!(
+            bodies
+                .iter()
+                .any(|body| body.contains("std_instead_of_core")),
+            "the all scope must see the nested allowance, got {bodies:?}"
         );
     }
 

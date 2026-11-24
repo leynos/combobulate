@@ -288,15 +288,45 @@ fn lint_level_violations(attribute: &Attribute<'_>) -> Vec<String> {
 fn lint_setting<'a>(attribute: &Attribute<'a>) -> Option<Split<'a>> {
     let split = attribute.split()?;
     if split.name == "cfg_attr" {
-        let (_, conditional) = split.list.split_once(',')?;
-        let unwrapped = Attribute {
-            body: conditional.trim(),
-            end: attribute.end,
-            is_inner: attribute.is_inner,
-        };
-        return lint_setting(&unwrapped);
+        // The payload follows the predicate, and the payload itself may hold
+        // several attributes. Splitting on the first comma would cut inside a
+        // predicate such as `any(unix, windows)`, so the top-level commas are
+        // found by depth and every payload after the first is examined.
+        return payloads(split.list).find_map(|payload| {
+            let unwrapped = Attribute {
+                body: payload,
+                end: attribute.end,
+                is_inner: attribute.is_inner,
+            };
+            lint_setting(&unwrapped)
+        });
     }
     FORBIDDEN_LEVELS.contains(&split.name).then_some(split)
+}
+
+/// Yields the `cfg_attr` payloads after its predicate, split at depth zero.
+///
+/// `#[cfg_attr(predicate, attribute, attribute)]` carries one predicate and
+/// one or more payloads. A comma inside parentheses or brackets belongs to
+/// whichever of them encloses it, so only commas seen at depth zero separate
+/// the parts. The first part is the predicate and is skipped.
+fn payloads(list: &str) -> impl Iterator<Item = &str> + '_ {
+    let mut depth = 0_usize;
+    let mut start = 0_usize;
+    let mut parts: Vec<&str> = Vec::new();
+    for (position, character) in list.char_indices() {
+        match character {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                parts.push(list.get(start..position).unwrap_or_default());
+                start = position + 1;
+            }
+            _ => {}
+        }
+    }
+    parts.push(list.get(start..).unwrap_or_default());
+    parts.into_iter().skip(1).map(str::trim)
 }
 
 /// Returns `source` with comments and string literals removed, as [`Code`].

@@ -14,13 +14,25 @@ rule must decide.
 
 from __future__ import annotations
 
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from kernel_record import portable_argument
-from verus_kernel_fixtures import ROOT, SCRIPTS, SUMMARY, load, load_driver, load_verdicts
+SCRIPTS_DIRECTORY = Path(__file__).resolve().parents[1]
+if str(SCRIPTS_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIRECTORY))
+
+from kernel_record import portable_argument  # noqa: E402
+from verus_kernel_fixtures import (  # noqa: E402
+    ROOT,
+    SCRIPTS,
+    SUMMARY,
+    load,
+    load_driver,
+    load_verdicts,
+)
 
 
 class PositiveQualificationTests(unittest.TestCase):
