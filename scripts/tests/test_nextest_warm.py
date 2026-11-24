@@ -153,7 +153,7 @@ class WarmUpBehaviourTests(unittest.TestCase):
     """Each warm-up gives its child the build the tests will find, and judges nothing."""
 
     def test_fixtures_build_privately_and_a_failing_fixture_is_not_fatal(self) -> None:
-        """Both fixtures build in their own directories; the absence build may fail."""
+        """Every fixture builds in its own directory; the absence build may fail."""
         with tempfile.TemporaryDirectory() as directory:
             cargo = recording_executable(directory, 'cargo', status=101)
             environment = {
@@ -164,14 +164,16 @@ class WarmUpBehaviourTests(unittest.TestCase):
             with patch.dict(os.environ, environment, clear=True):
                 self.assertEqual(nextest_warm.main(['fixtures']), 0)
             calls = recorded_lines(directory, 'cargo')
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(calls), 3, f'every fixture must be warmed, got {calls}')
         targets = [call[1] for call in calls]
         self.assertEqual(
             targets,
             [
                 f'{directory}/target/tmp/polars-surface-absent',
                 f'{directory}/target/tmp/native-consumer',
+                f'{directory}/target/tmp/non-exhaustive-contract',
             ],
+            'each fixture builds into the directory its test reads',
         )
         for call in calls:
             self.assertEqual(call[3], 'unset', 'RUSTFLAGS must not reach a fixture')
