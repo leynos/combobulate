@@ -37,6 +37,7 @@ DISPATCH_GATE = "github.event_name == 'workflow_dispatch'"
 SETUP_RUST_ACTION = 'leynos/shared-actions/.github/actions/setup-rust@'
 CACHE_ASSERTION_STEP = 'Confirm the measured environment carries no cache'
 COLD_BUILD_STEP = 'Measure five cold builds per profile, alternating'
+INCREMENTAL_BUILD_STEP = 'Measure five incremental builds per profile, alternating'
 FETCH_STEP = 'Fetch dependencies once, untimed'
 BUILD_STANDARD_STEP = 'Install the pinned build standard'
 PROVER_STEP = 'Install the pinned Kani and Verus releases'
@@ -196,6 +197,7 @@ def _check_cache_assertion_order(job: dict) -> None:
     assertion_step = _named_step(job, CACHE_ASSERTION_STEP)
     _check_assertion_step(job, assertion_step)
     _check_assertion_script(assertion_step)
+    _check_no_step_wrapper(job)
 
 
 def _check_assertion_position(job: dict, assertion: int) -> None:
@@ -255,15 +257,14 @@ def _is_timed(step: dict) -> bool:
 def _check_assertion_step(job: dict, step: dict) -> None:
     """Require the assertion step itself to run and to fail the job.
 
-    A step-level ``RUSTC_WRAPPER`` would let the assertion observe an empty
-    value while the timed builds inherit a job-level wrapper. A job-level
-    wrapper contaminates every sample directly, so neither is accepted.
+    A job-level ``RUSTC_WRAPPER`` contaminates every sample, so it is rejected
+    outright; a step-level value is caught by :func:`_check_no_step_wrapper`.
 
     Raises
     ------
     AssertionError
         When the step carries an ``if`` guard or ``continue-on-error``, or when
-        either the job or the step sets ``RUSTC_WRAPPER``.
+        the job sets ``RUSTC_WRAPPER``.
     """
     for key in ('if', 'continue-on-error'):
         if key in step:
@@ -276,11 +277,26 @@ def _check_assertion_step(job: dict, step: dict) -> None:
             'the job must not configure RUSTC_WRAPPER; the control requires '
             'it unset'
         )
-    if 'RUSTC_WRAPPER' in step.get('env', {}):
-        raise AssertionError(
-            'the assertion must not override RUSTC_WRAPPER for its own step; '
-            'the timed builds would still inherit the job value'
-        )
+
+
+def _check_no_step_wrapper(job: dict) -> None:
+    """Reject a step-level ``RUSTC_WRAPPER`` anywhere in the job.
+
+    A step-level value applies to that step alone, so an assertion that
+    observed an empty wrapper would say nothing about a timed, warm-up, or
+    proof step that configured its own cache.
+
+    Raises
+    ------
+    AssertionError
+        When any step's ``env`` mapping sets ``RUSTC_WRAPPER``.
+    """
+    for step in job['steps']:
+        if 'RUSTC_WRAPPER' in step.get('env', {}):
+            raise AssertionError(
+                f'step {step.get("name", step.get("uses", ""))!r} must not '
+                'configure RUSTC_WRAPPER; the control requires it unset'
+            )
 
 
 def _check_assertion_script(step: dict) -> None:
@@ -936,6 +952,18 @@ def _override_wrapper_on_the_step(job: dict) -> None:
     _named_step(job, CACHE_ASSERTION_STEP)['env'] = {'RUSTC_WRAPPER': ''}
 
 
+def _override_wrapper_on_a_cold_build(job: dict) -> None:
+    """Give the first measured phase its own cache wrapper."""
+    step = _named_step(job, COLD_BUILD_STEP)
+    step.setdefault('env', {})['RUSTC_WRAPPER'] = 'sccache'
+
+
+def _override_wrapper_on_an_incremental_build(job: dict) -> None:
+    """Give the incremental phase its own cache wrapper."""
+    step = _named_step(job, INCREMENTAL_BUILD_STEP)
+    step.setdefault('env', {})['RUSTC_WRAPPER'] = 'sccache'
+
+
 def _time_a_prelude(job: dict) -> None:
     """Insert a timed step ahead of the whole provisioning phase."""
     _insert_step(job, 0, 'Time a prelude', '/usr/bin/time -v true')
@@ -961,7 +989,9 @@ def _time_a_prelude(job: dict) -> None:
     pytest.param(_exit_before_the_check, id='early-exit'),
     pytest.param(_drop_strict_mode, id='no-strict-mode'),
     pytest.param(_set_job_level_wrapper, id='job-level-wrapper'),
-    pytest.param(_override_wrapper_on_the_step, id='step-level-wrapper'),
+    pytest.param(_override_wrapper_on_the_step, id='assertion-step-wrapper'),
+    pytest.param(_override_wrapper_on_a_cold_build, id='cold-step-wrapper'),
+    pytest.param(_override_wrapper_on_an_incremental_build, id='incremental-step-wrapper'),
     pytest.param(_time_a_prelude, id='timed-prelude'),
 ])
 def test_one_removed_protection_is_rejected(mutate: Callable[[dict], None]) -> None:
