@@ -28,6 +28,9 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 
 #[path = "workspace_attributes.rs"]
 mod attributes;
+#[cfg(test)]
+#[path = "workspace_attributes_tests.rs"]
+mod attributes_tests;
 #[path = "workspace_scanner.rs"]
 mod scanner;
 
@@ -288,20 +291,26 @@ fn lint_level_violations(attribute: &Attribute<'_>) -> Vec<String> {
 fn lint_setting<'a>(attribute: &Attribute<'a>) -> Option<Split<'a>> {
     let split = attribute.split()?;
     if split.name == "cfg_attr" {
-        // The payload follows the predicate, and the payload itself may hold
-        // several attributes. Splitting on the first comma would cut inside a
-        // predicate such as `any(unix, windows)`, so the top-level commas are
-        // found by depth and every payload after the first is examined.
-        return payloads(split.list).find_map(|payload| {
-            let unwrapped = Attribute {
-                body: payload,
-                end: attribute.end,
-                is_inner: attribute.is_inner,
-            };
-            lint_setting(&unwrapped)
-        });
+        return conditional_setting(attribute, split.list);
     }
     FORBIDDEN_LEVELS.contains(&split.name).then_some(split)
+}
+
+/// Returns the lint setting a `cfg_attr` applies, if any.
+///
+/// The payload follows the predicate, and the payload itself may hold several
+/// attributes. Splitting on the first comma would cut inside a predicate such
+/// as `any(unix, windows)`, so the top-level commas are found by depth and
+/// every payload after the predicate is examined.
+fn conditional_setting<'a>(attribute: &Attribute<'a>, list: &'a str) -> Option<Split<'a>> {
+    payloads(list).find_map(|payload| {
+        let unwrapped = Attribute {
+            body: payload,
+            end: attribute.end,
+            is_inner: attribute.is_inner,
+        };
+        lint_setting(&unwrapped)
+    })
 }
 
 /// Yields the `cfg_attr` payloads after its predicate, split at depth zero.
