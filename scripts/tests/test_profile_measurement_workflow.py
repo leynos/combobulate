@@ -40,6 +40,10 @@ FETCH_STEP = 'Fetch dependencies once, untimed'
 BUILD_STANDARD_STEP = 'Install the pinned build standard'
 PROVER_STEP = 'Install the pinned Kani and Verus releases'
 ABSENCE_CHECK = 'test -z "${RUSTC_WRAPPER-}"'
+ENVIRONMENT_RECORD = (
+    "printf '%s\\n' \"${RUSTC_WRAPPER-}\" \"$CARGO_INCREMENTAL\" "
+    '> build-budget/build-environment'
+)
 TIMED_INVOCATION = '/usr/bin/time'
 STRICT_MODE = 'set -euo pipefail'
 
@@ -163,14 +167,6 @@ def _executable_lines(script: str) -> list[str]:
     return [line for line in stripped if line and not line.startswith('#')]
 
 
-def _is_environment_record(line: str) -> bool:
-    """Whether ``line`` records the observed build environment as evidence."""
-    return (
-        line.startswith('printf ')
-        and 'build-budget/build-environment' in line
-        and 'RUSTC_WRAPPER' in line
-        and 'CARGO_INCREMENTAL' in line
-    )
 
 
 def _check_cache_assertion_order(job: dict) -> None:
@@ -312,18 +308,17 @@ def _check_assertion_script(step: dict) -> None:
 def _is_permitted_assertion_sequence(lines: list[str]) -> bool:
     """Whether ``lines`` is the strict-mode, check, and record sequence.
 
+    The record line is compared exactly. A looser match accepts a line that
+    prints the names of the two variables rather than their values, which
+    creates no evidence for the acceptance record.
+
     Examples
     --------
     The committed script is the permitted sequence::
 
         _is_permitted_assertion_sequence(['set -euo pipefail', ...])  # True
     """
-    return (
-        len(lines) == 3
-        and lines[0] == STRICT_MODE
-        and lines[1] == ABSENCE_CHECK
-        and _is_environment_record(lines[2])
-    )
+    return lines == [STRICT_MODE, ABSENCE_CHECK, ENVIRONMENT_RECORD]
 
 
 def _setup_rust_inputs(job: dict) -> dict[str, str]:
@@ -976,6 +971,21 @@ class CacheAssertionMutationTests(unittest.TestCase):
             step['run'] = '\n'.join(kept) + '\n'
 
         self.assert_rejected(drop_record)
+
+    def test_a_record_of_variable_names_is_rejected(self) -> None:
+        """Printing `RUSTC_WRAPPER` rather than its value records no evidence."""
+
+        def record_names(job: dict) -> None:
+            """Replace the record with one that prints the literal names."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            self.assertIn(ENVIRONMENT_RECORD, step['run'])
+            step['run'] = step['run'].replace(
+                ENVIRONMENT_RECORD,
+                "printf '%s\\n' RUSTC_WRAPPER CARGO_INCREMENTAL "
+                'build-budget/build-environment',
+            )
+
+        self.assert_rejected(record_names)
 
     def test_an_early_successful_exit_is_rejected(self) -> None:
         """`exit 0` after strict mode would skip the check and the record."""
