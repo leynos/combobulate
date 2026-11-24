@@ -2433,3 +2433,11 @@ gate-order and build-standard contracts; its rules are tested by
     added.
   Effect on remaining work: one more milestone (EP-M1), a larger but bounded
   file count, and no change to the public success criterion.
+- 2026-11-24, rebased onto `main` at `138af92`, which had moved five commits.
+  The only conflict was `docs/validation-results.json`, a generated file,
+  resolved by regenerating it. Main's NC-010 setup scripts now warm the nested
+  builds before the timed tests, which supersedes this branch's provisional
+  answer of raising the per-test tiers: the tiers stay, as the backstop for a
+  run whose warm-up is skipped or cannot model the target directory, and
+  `non_exhaustive_contract` joins the fixture warm-up and its test because it
+  is a third downstream fixture this branch adds.
