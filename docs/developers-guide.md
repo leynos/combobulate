@@ -308,9 +308,10 @@ that fails is reported by its own test. A third script resolves the workspace
 once for the read-only `cargo tree` and `cargo metadata` tests.
 
 A setup script is given none of the build's arguments, so the fixture warm-up
-finds the test build's target directory from the environment:
-`CARGO_TARGET_DIR`, else the directory `cargo llvm-cov` writes its profiles to
-(it passes `--target-dir`, not the variable), else Cargo's own answer. A route
+finds the test build's target directory from the environment: the directory
+`cargo llvm-cov` writes its profiles to in a coverage run (it passes
+`--target-dir`, nesting its own `llvm-cov-target` under any
+`CARGO_TARGET_DIR`), else `CARGO_TARGET_DIR`, else Cargo's own answer. A route
 that moves the directory only through a build argument
 (`TEST_FLAGS='--target-dir ...'`), or sets `CARGO_BUILD_TARGET`, builds the
 fixtures cold, as before this warm-up; that trade-off is accepted rather than

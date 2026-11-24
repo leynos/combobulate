@@ -59,23 +59,46 @@ class TargetTmpdirTests(unittest.TestCase):
         fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
         return str(fake)
 
-    def test_an_explicit_target_directory_wins(self) -> None:
+    def test_an_ordinary_run_honours_the_explicit_target_directory(self) -> None:
         """Cargo honours ``CARGO_TARGET_DIR``, so the warm-up does too."""
-        environment = {
-            'CARGO_TARGET_DIR': '/explicit',
-            'LLVM_PROFILE_FILE': '/coverage/x-%p.profraw',
-        }
-        with patch.dict(os.environ, environment, clear=True):
+        with patch.dict(os.environ, {'CARGO_TARGET_DIR': '/explicit'}, clear=True):
             self.assertEqual(nextest_warm.target_tmpdir(), Path('/explicit/tmp'))
 
     def test_coverage_runs_are_found_through_the_profile_directory(self) -> None:
         """``cargo llvm-cov`` builds in the directory it writes profiles to."""
-        environment = {'LLVM_PROFILE_FILE': '/work/target/llvm-cov-target/x-%p.profraw'}
+        environment = {
+            'CARGO_LLVM_COV': '1',
+            'LLVM_PROFILE_FILE': '/work/target/llvm-cov-target/x-%p.profraw',
+        }
         with patch.dict(os.environ, environment, clear=True):
             self.assertEqual(
                 nextest_warm.target_tmpdir(),
                 Path('/work/target/llvm-cov-target/tmp'),
             )
+
+    def test_a_coverage_run_with_an_explicit_target_directory_uses_the_profile_one(
+        self,
+    ) -> None:
+        """``cargo llvm-cov`` nests its build under ``CARGO_TARGET_DIR``."""
+        environment = {
+            'CARGO_LLVM_COV': '1',
+            'CARGO_TARGET_DIR': '/tmp/build',
+            'LLVM_PROFILE_FILE': '/tmp/build/llvm-cov-target/x-%p.profraw',
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertEqual(
+                nextest_warm.target_tmpdir(),
+                Path('/tmp/build/llvm-cov-target/tmp'),
+            )
+
+    def test_a_stray_profile_variable_does_not_redirect_an_ordinary_run(self) -> None:
+        """Only a coverage run's profile directory is the build directory."""
+        environment = {
+            'CARGO_TARGET_DIR': '/explicit',
+            'LLVM_PROFILE_FILE': '/elsewhere/x-%p.profraw',
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertEqual(nextest_warm.target_tmpdir(), Path('/explicit/tmp'))
 
     def test_a_plain_run_asks_cargo_for_the_workspace_target(self) -> None:
         """With no hint in the environment, Cargo's own answer is used."""

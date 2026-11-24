@@ -60,10 +60,12 @@ def test_build_target_directory() -> Path:
     Nextest hands a setup script no build arguments, so the directory is read
     from what each route leaves in the environment, most specific first:
 
-    1. ``CARGO_TARGET_DIR``, which Cargo itself honours;
-    2. the directory of ``LLVM_PROFILE_FILE``, because ``cargo llvm-cov`` passes
-       its own ``llvm-cov-target`` directory to the build as ``--target-dir``
-       (not as ``CARGO_TARGET_DIR``) and puts its profile files in it;
+    1. the directory of ``LLVM_PROFILE_FILE`` in a ``cargo llvm-cov`` run
+       (``CARGO_LLVM_COV`` is set), because it passes its own
+       ``llvm-cov-target`` directory to the build as ``--target-dir`` and puts
+       its profile files in it, whatever ``CARGO_TARGET_DIR`` says (it then
+       nests that directory under the variable's value);
+    2. ``CARGO_TARGET_DIR``, which Cargo itself honours in an ordinary run;
     3. the workspace's own target directory, which is what a plain
        ``cargo nextest run`` builds in.
 
@@ -73,12 +75,12 @@ def test_build_target_directory() -> Path:
         When no environment hint exists and Cargo cannot report the workspace
         metadata.
     """
+    profile_file = os.environ.get('LLVM_PROFILE_FILE')
+    if os.environ.get('CARGO_LLVM_COV') and profile_file:
+        return Path(profile_file).parent
     explicit = os.environ.get('CARGO_TARGET_DIR')
     if explicit:
         return Path(explicit)
-    profile_file = os.environ.get('LLVM_PROFILE_FILE')
-    if profile_file:
-        return Path(profile_file).parent
     return workspace_target_directory()
 
 

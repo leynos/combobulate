@@ -116,9 +116,10 @@ test-group = "nested-cargo"
 # One script per family, selected by binary, so a run that selects one of these
 # tests warms only that family. A setup script is given no build arguments, so
 # the fixture warm-up finds the test build's target directory from the
-# environment (`CARGO_TARGET_DIR`, else the directory `cargo llvm-cov` writes its
-# profiles to, since it passes `--target-dir` rather than the variable, else
-# Cargo's own answer); a run with an explicit `CARGO_BUILD_TARGET` moves the
+# environment (the directory `cargo llvm-cov` writes its profiles to in a
+# coverage run, since it passes `--target-dir` and nests its `llvm-cov-target`
+# under any `CARGO_TARGET_DIR`; else `CARGO_TARGET_DIR`; else Cargo's own
+# answer); a run with an explicit `CARGO_BUILD_TARGET` moves the
 # tests' directory in a way the warm-up does not model, so it builds cold. The
 # allowances sum to 1,320 s, which `global-timeout` stays well above.
 #
