@@ -101,6 +101,91 @@ class TargetTmpdirTests(unittest.TestCase):
                     nextest_warm.target_tmpdir()
 
 
+def recording_executable(directory: str, name: str, status: int) -> Path:
+    """Write an executable that logs its arguments and environment, then exits.
+
+    The log line holds the working directory, the target directory and
+    manifest-directory variables, whether ``RUSTFLAGS`` was inherited, and the
+    arguments, so a test can state what the child was given.
+    """
+    log = Path(directory) / f'{name}.log'
+    script = Path(directory) / name
+    script.write_text(
+        '#!/bin/sh\n'
+        f'printf "%s|%s|%s|%s|%s\\n" "$PWD" "${{CARGO_TARGET_DIR-unset}}" '
+        f'"${{CARGO_MANIFEST_DIR-unset}}" "${{RUSTFLAGS-unset}}" "$*" >> {log}\n'
+        f'exit {status}\n'
+    )
+    script.chmod(script.stat().st_mode | stat.S_IXUSR)
+    return script
+
+
+def recorded_lines(directory: str, name: str) -> list[list[str]]:
+    """Return each logged invocation of a ``recording_executable`` as fields."""
+    log = Path(directory) / f'{name}.log'
+    return [line.split('|') for line in log.read_text().splitlines()]
+
+
+class WarmUpBehaviourTests(unittest.TestCase):
+    """Each warm-up gives its child the build the tests will find, and judges nothing."""
+
+    def test_fixtures_build_privately_and_a_failing_fixture_is_not_fatal(self) -> None:
+        """Both fixtures build in their own directories; the absence build may fail."""
+        with tempfile.TemporaryDirectory() as directory:
+            cargo = recording_executable(directory, 'cargo', status=101)
+            environment = {
+                'CARGO': str(cargo),
+                'CARGO_TARGET_DIR': f'{directory}/target',
+                'RUSTFLAGS': '-D warnings',
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                self.assertEqual(nextest_warm.main(['fixtures']), 0)
+            calls = recorded_lines(directory, 'cargo')
+        self.assertEqual(len(calls), 2)
+        targets = [call[1] for call in calls]
+        self.assertEqual(
+            targets,
+            [
+                f'{directory}/target/tmp/polars-surface-absent',
+                f'{directory}/target/tmp/native-consumer',
+            ],
+        )
+        for call in calls:
+            self.assertEqual(call[3], 'unset', 'RUSTFLAGS must not reach a fixture')
+            self.assertIn('--frozen build --locked --offline', call[4])
+
+    def test_the_gate_runs_from_its_own_directory_without_the_manifest_variable(
+        self,
+    ) -> None:
+        """The recorded binary starts where the root test starts it."""
+        with tempfile.TemporaryDirectory() as directory:
+            binary = recording_executable(directory, 'gate', status=1)
+            with (
+                patch.dict(os.environ, {'CARGO_MANIFEST_DIR': '/root'}, clear=True),
+                patch.object(
+                    nextest_warm.cardinality_ui_gate,
+                    'recorded_binary',
+                    return_value=binary,
+                ),
+            ):
+                self.assertEqual(nextest_warm.main(['gate']), 0)
+            (call,) = recorded_lines(directory, 'gate')
+        self.assertEqual(
+            Path(call[0]).resolve(),
+            nextest_warm.cardinality_ui_gate.GATE_DIRECTORY.resolve(),
+        )
+        self.assertEqual(call[2], 'unset')
+
+    def test_the_workspace_read_is_offline_and_a_failure_is_not_fatal(self) -> None:
+        """A failing resolution is left for the tests that read it to report."""
+        with tempfile.TemporaryDirectory() as directory:
+            cargo = recording_executable(directory, 'cargo', status=1)
+            with patch.dict(os.environ, {'CARGO': str(cargo)}, clear=True):
+                self.assertEqual(nextest_warm.main(['workspace']), 0)
+            (call,) = recorded_lines(directory, 'cargo')
+        self.assertTrue(call[4].startswith('--frozen tree'))
+
+
 class MainTests(unittest.TestCase):
     """The command line accepts exactly one known warm-up."""
 

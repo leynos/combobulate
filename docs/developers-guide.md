@@ -307,6 +307,15 @@ It judges nothing; every assertion stays in the tests, and a fixture or gate
 that fails is reported by its own test. A third script resolves the workspace
 once for the read-only `cargo tree` and `cargo metadata` tests.
 
+A setup script is given none of the build's arguments, so the fixture warm-up
+finds the test build's target directory from the environment:
+`CARGO_TARGET_DIR`, else the directory `cargo llvm-cov` writes its profiles to
+(it passes `--target-dir`, not the variable), else Cargo's own answer. A route
+that moves the directory only through a build argument
+(`TEST_FLAGS='--target-dir ...'`), or sets `CARGO_BUILD_TARGET`, builds the
+fixtures cold, as before this warm-up; that trade-off is accepted rather than
+modelled.
+
 The script needs `make prepare-ui-gate` to have recorded the gate binary, as
 the root test does, and fails with that instruction when it has not. The
 allowances add to 1,320 s and `global-timeout` stays above them. The warm-up
