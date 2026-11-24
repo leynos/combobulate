@@ -42,6 +42,16 @@ PROVER_STEP = 'Install the pinned Kani and Verus releases'
 ABSENCE_CHECK = 'test -z "${RUSTC_WRAPPER-}"'
 TIMED_INVOCATION = '/usr/bin/time'
 
+# A shell keyword that opens, closes or joins a compound command. The cache
+# assertion must be a flat sequence of simple commands: a check inside a branch
+# that never runs is present in the text but never protects the measurement.
+CONTROL_FLOW_KEYWORDS = frozenset({
+    'if', 'then', 'else', 'elif', 'fi',
+    'for', 'while', 'until', 'do', 'done',
+    'case', 'esac', 'function', 'select',
+    '!', '{', '}', '(', ')',
+})
+
 
 def _workflow() -> dict:
     """Return the measurement workflow decoded with every scalar as a string.
@@ -178,8 +188,9 @@ def _check_cache_assertion_order(job: dict) -> None:
     The assertion must observe the environment the samples inherit, so every
     provisioning step and the untimed fetch run before it, and the first timed
     phase runs immediately after it. The assertion must also be
-    unconditional: a skipped step, a soft failure, or a masked command would
-    leave the measurement cache-free only by assumption.
+    unconditional: a skipped step, a soft failure, a masked command, or a
+    check inside a branch that never runs would leave the measurement
+    cache-free only by assumption.
 
     Raises
     ------
@@ -193,6 +204,28 @@ def _check_cache_assertion_order(job: dict) -> None:
         _check_cache_assertion_order(_job('build-budget'))
     """
     assertion = _step_index_named(job, CACHE_ASSERTION_STEP)
+    _check_assertion_position(job, assertion)
+    assertion_step = _named_step(job, CACHE_ASSERTION_STEP)
+    _check_assertion_step(assertion_step)
+    _check_assertion_script(assertion_step)
+
+
+def _check_assertion_position(job: dict, assertion: int) -> None:
+    """Require every prerequisite before the assertion and the cold build after.
+
+    Parameters
+    ----------
+    job
+        One parsed workflow job mapping.
+    assertion
+        Index of the cache assertion step in ``job['steps']``.
+
+    Raises
+    ------
+    AssertionError
+        When a prerequisite follows the assertion, the first timed phase does
+        not immediately follow it, or an earlier step is already timed.
+    """
     if _step_index_named(job, COLD_BUILD_STEP) != assertion + 1:
         raise AssertionError(
             'the first timed phase must immediately follow the cache assertion'
@@ -218,25 +251,40 @@ def _check_cache_assertion_order(job: dict) -> None:
                 'before the cache assertion'
             )
 
-    assertion_step = _named_step(job, CACHE_ASSERTION_STEP)
+
+def _check_assertion_step(step: dict) -> None:
+    """Require the assertion step itself to run and to fail the job.
+
+    Raises
+    ------
+    AssertionError
+        When the step carries an ``if`` guard or ``continue-on-error``.
+    """
     for key in ('if', 'continue-on-error'):
-        if key in assertion_step:
+        if key in step:
             raise AssertionError(
                 f'the cache assertion must not carry {key!r}; it must always '
                 'run and must fail the job'
             )
 
-    lines = _executable_lines(cast('str', assertion_step.get('run', '')))
+
+def _check_assertion_script(step: dict) -> None:
+    """Require a fail-fast, unconditional script that checks and records.
+
+    Raises
+    ------
+    AssertionError
+        When strict mode is missing, a line could mask or skip the check, the
+        exact absence check is absent, or nothing records the environment.
+    """
+    lines = _executable_lines(cast('str', step.get('run', '')))
     if not lines or lines[0] != 'set -euo pipefail':
         raise AssertionError(
             'the cache assertion must begin by enabling shell failure '
             'propagation'
         )
     for line in lines:
-        if '||' in line or 'set +e' in line:
-            raise AssertionError(
-                f'the cache assertion must not mask a failure: {line!r}'
-            )
+        _reject_conditional_line(line)
     if ABSENCE_CHECK not in lines:
         raise AssertionError(
             'the cache assertion must run an unconditional RUSTC_WRAPPER '
@@ -246,6 +294,47 @@ def _check_cache_assertion_order(job: dict) -> None:
         raise AssertionError(
             'the cache assertion must record the environment it observed'
         )
+
+
+def _reject_conditional_line(line: str) -> None:
+    """Reject a shell line that could mask, skip, or join the assertion.
+
+    Raises
+    ------
+    AssertionError
+        When the line contains a masking operator or is part of a compound
+        command.
+    """
+    if '||' in line or '&&' in line or 'set +e' in line:
+        raise AssertionError(
+            f'the cache assertion must not mask a failure: {line!r}'
+        )
+    if _opens_control_flow(line):
+        raise AssertionError(
+            f'the cache assertion must be an unconditional command '
+            f'sequence: {line!r}'
+        )
+
+
+def _opens_control_flow(line: str) -> bool:
+    """Whether a stripped shell line opens, closes, or joins a compound command.
+
+    A check wrapped in ``if false; then ... fi`` is still present in the script
+    text, so membership alone would accept a job that never checks anything.
+    Requiring only simple commands keeps the assertion flat.
+
+    Examples
+    --------
+    An inline conditional is recognised by its leading keyword::
+
+        _opens_control_flow('if false; then test -z "$X"; fi')  # True
+    """
+    first = line.split(maxsplit=1)[0]
+    return (
+        first in CONTROL_FLOW_KEYWORDS
+        or '; then' in line
+        or '; do' in line
+    )
 
 
 def _setup_rust_inputs(job: dict) -> dict[str, str]:
@@ -848,6 +937,47 @@ class CacheAssertionMutationTests(unittest.TestCase):
             step['run'] = step['run'].replace(ABSENCE_CHECK, '# ' + ABSENCE_CHECK)
 
         self.assert_rejected(comment_out)
+
+    def test_an_absence_check_in_a_dead_branch_is_rejected(self) -> None:
+        """Text inside `if false` is never executed, so it checks nothing."""
+
+        def wrap_in_dead_branch(job: dict) -> None:
+            """Wrap the absence check in a branch that cannot run."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            self.assertIn(ABSENCE_CHECK, step['run'])
+            step['run'] = step['run'].replace(
+                ABSENCE_CHECK,
+                f'if false; then {ABSENCE_CHECK}; fi',
+            )
+
+        self.assert_rejected(wrap_in_dead_branch)
+
+    def test_a_short_circuited_absence_check_is_rejected(self) -> None:
+        """`&&` still lets a later failure be skipped after a passing check."""
+
+        def chain(job: dict) -> None:
+            """Join the check to another command with `&&`."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            self.assertIn(ABSENCE_CHECK, step['run'])
+            step['run'] = step['run'].replace(
+                ABSENCE_CHECK,
+                f'{ABSENCE_CHECK} && true',
+            )
+
+        self.assert_rejected(chain)
+
+    def test_a_script_that_records_nothing_is_rejected(self) -> None:
+        """An unrecorded assertion leaves no evidence for the acceptance record."""
+
+        def drop_record(job: dict) -> None:
+            """Remove the line that records the observed environment."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            lines = step['run'].splitlines()
+            kept = [line for line in lines if 'build-budget/build-environment' not in line]
+            self.assertLess(len(kept), len(lines), 'the record line must be present to remove')
+            step['run'] = '\n'.join(kept) + '\n'
+
+        self.assert_rejected(drop_record)
 
     def test_a_script_without_failure_propagation_is_rejected(self) -> None:
         """Without `set -e` a failing check would not fail the job."""
