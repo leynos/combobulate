@@ -291,6 +291,38 @@ parallel, and measurement showed the gate build sometimes starting before the
 fetches that populate its own workspace. Do not make `prepare-ui-gate` a
 sibling prerequisite of `prepare-dependencies`.
 
+### Nextest warms the nested builds first
+
+Three tests still start a nested build by design: the two consumer fixtures
+(`polars_surface_ui` and `native_consumer_e2e`) and the cardinality gate's
+`trybuild` cases (run by `cardinality_probe_ui`). On a cold `target` directory,
+or on a host whose compile pool is queueing, that first build used to spend a
+test's whole allowance and end it with a timeout instead of an assertion.
+`.config/nextest.toml` therefore selects a setup script for each family, which
+`scripts/nextest_warm.py` runs once before the family's tests, under an
+allowance of its own. The script repeats what the tests do (the same scrubbed
+environment, the same target directory under `<target>/tmp`, the recorded gate
+binary run from the gate's directory), so the timed body finds the build done.
+It judges nothing; every assertion stays in the tests, and a fixture or gate
+that fails is reported by its own test. A third script resolves the workspace
+once for the read-only `cargo tree` and `cargo metadata` tests.
+
+A setup script is given none of the build's arguments, so the fixture warm-up
+finds the test build's target directory from the environment: the directory
+`cargo llvm-cov` writes its profiles to in a coverage run (it passes
+`--target-dir`, nesting its own `llvm-cov-target` under any
+`CARGO_TARGET_DIR`), else `CARGO_TARGET_DIR`, else Cargo's own answer. A route
+that moves the directory only through a build argument
+(`TEST_FLAGS='--target-dir ...'`), or sets `CARGO_BUILD_TARGET`, builds the
+fixtures cold, as before this warm-up; that trade-off is accepted rather than
+modelled.
+
+The script needs `make prepare-ui-gate` to have recorded the gate binary, as
+the root test does, and fails with that instruction when it has not. The
+allowances add to 1,320 s and `global-timeout` stays above them. The warm-up
+moves compile time out of the test bodies; it does not add any to the hosted
+job, which compiles the same fixtures either way.
+
 ### The gate runs with a scrubbed environment
 
 `trybuild` chooses the package whose manifest it copies by reading

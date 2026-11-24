@@ -13,6 +13,10 @@
 # Policy: no blanket retries. A test that fails intermittently is a defect to
 # diagnose, not to paper over with re-runs.
 
+# Setup scripts are experimental in the nextest versions the coverage action may
+# install, so the configuration opts in; newer versions accept the entry.
+experimental = ["setup-scripts"]
+
 [profile.default]
 # Warn after 60 s and terminate after five warning periods, so a hung test ends
 # at 300 s instead of holding the run open until an outer job timeout kills it.
@@ -96,3 +100,52 @@ nested-cargo = { max-threads = 1 }
 [[profile.default.overrides]]
 filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(cardinality_probe_ui) | binary(workspace_profiles) | binary(workspace_boundaries) | binary(build_toolchain_contract)'
 test-group = "nested-cargo"
+
+# Setup scripts: nested builds are prepared before the timed tests start (Concordat
+# NC-010). A test that starts a nested Cargo build, or a `trybuild` crate, pays for
+# a cold build inside its own termination budget unless something has filled the
+# build's target directory first. On a cold `target` directory, or a host whose
+# shared compile pool is queueing, the first run spends its allowance waiting for
+# compile slots and is killed with no failing assertion. Each script below runs
+# once before the tests it serves, under an allowance of its own, and repeats what
+# those tests do (see `scripts/nextest_warm.py`), so the timed bodies find the
+# work done. A script judges nothing: the tests keep every assertion, and a
+# failing fixture or gate is reported by its own test. Only a missing
+# prerequisite (`make prepare-ui-gate` has not run) or a timeout stops the run.
+#
+# One script per family, selected by binary, so a run that selects one of these
+# tests warms only that family. A setup script is given no build arguments, so
+# the fixture warm-up finds the test build's target directory from the
+# environment (the directory `cargo llvm-cov` writes its profiles to in a
+# coverage run, since it passes `--target-dir` and nests its `llvm-cov-target`
+# under any `CARGO_TARGET_DIR`; else `CARGO_TARGET_DIR`; else Cargo's own
+# answer); a run with an explicit `CARGO_BUILD_TARGET` moves the
+# tests' directory in a way the warm-up does not model, so it builds cold. The
+# allowances sum to 1,320 s, which `global-timeout` stays well above.
+#
+# A new test that starts a nested build needs an entry in the nested-cargo filter
+# above and a warm-up here.
+
+[scripts.setup.warm-consumer-fixtures]
+command = "python3 scripts/nextest_warm.py fixtures"
+slow-timeout = { period = "120s", terminate-after = 5 }
+
+[scripts.setup.warm-cardinality-gate]
+command = "python3 scripts/nextest_warm.py gate"
+slow-timeout = { period = "120s", terminate-after = 5 }
+
+[scripts.setup.warm-workspace-reads]
+command = "python3 scripts/nextest_warm.py workspace"
+slow-timeout = { period = "60s", terminate-after = 2 }
+
+[[profile.default.scripts]]
+filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e)'
+setup = "warm-consumer-fixtures"
+
+[[profile.default.scripts]]
+filter = 'binary(cardinality_probe_ui)'
+setup = "warm-cardinality-gate"
+
+[[profile.default.scripts]]
+filter = 'binary(workspace_profiles) | binary(workspace_boundaries) | binary(build_toolchain_contract)'
+setup = "warm-workspace-reads"
