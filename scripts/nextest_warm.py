@@ -54,12 +54,50 @@ def _cargo() -> str:
     return os.environ.get('CARGO', 'cargo')
 
 
-def target_tmpdir() -> Path:
+def test_build_target_directory() -> Path:
+    """Return the target directory the nextest run's test binaries were built in.
+
+    Nextest hands a setup script no build arguments, so the directory is read
+    from what each route leaves in the environment, most specific first:
+
+    1. ``CARGO_TARGET_DIR``, which Cargo itself honours;
+    2. the directory of ``LLVM_PROFILE_FILE``, because ``cargo llvm-cov`` passes
+       its own ``llvm-cov-target`` directory to the build as ``--target-dir``
+       (not as ``CARGO_TARGET_DIR``) and puts its profile files in it;
+    3. the workspace's own target directory, which is what a plain
+       ``cargo nextest run`` builds in.
+
+    Raises
+    ------
+    RuntimeError
+        When no environment hint exists and Cargo cannot report the workspace
+        metadata.
+    """
+    explicit = os.environ.get('CARGO_TARGET_DIR')
+    if explicit:
+        return Path(explicit)
+    profile_file = os.environ.get('LLVM_PROFILE_FILE')
+    if profile_file:
+        return Path(profile_file).parent
+    return workspace_target_directory()
+
+
+def target_tmpdir() -> Path | None:
     """Return the directory Cargo names ``CARGO_TARGET_TMPDIR`` for root tests.
 
-    It is ``tmp`` under the workspace's resolved target directory, so asking
-    Cargo for that directory keeps this warm-up on the path the tests compute
-    even when ``CARGO_TARGET_DIR`` redirects the build (as coverage runs do).
+    It is ``tmp`` under the test build's target directory. An explicit build
+    target (``CARGO_BUILD_TARGET``) moves that directory under the target
+    triple in a way this warm-up does not model, and the native Make build
+    refuses ``--target`` anyway, so it returns ``None`` there and the tests
+    build their fixtures cold, as they did before this warm-up.
+    """
+    if os.environ.get('CARGO_BUILD_TARGET'):
+        return None
+    return test_build_target_directory() / 'tmp'
+
+
+def workspace_target_directory() -> Path:
+    """Return the workspace's own target directory as Cargo reports it.
 
     Raises
     ------
@@ -82,7 +120,7 @@ def target_tmpdir() -> Path:
     )
     if result.returncode != 0:
         raise RuntimeError(f'cargo metadata failed:\n{result.stderr}')
-    return Path(json.loads(result.stdout)['target_directory']) / 'tmp'
+    return Path(json.loads(result.stdout)['target_directory'])
 
 
 def fixture_environment(target_dir: Path) -> dict[str, str]:
@@ -109,6 +147,12 @@ def warm_fixtures() -> None:
     dependencies it shares with the consumer fixture are what this builds.
     """
     tmpdir = target_tmpdir()
+    if tmpdir is None:
+        print(
+            'nextest-warm: CARGO_BUILD_TARGET is set; the fixtures build cold',
+            file=sys.stderr,
+        )
+        return
     for manifest, directory in FIXTURE_BUILDS:
         completed = subprocess.run(
             [

@@ -114,8 +114,12 @@ test-group = "nested-cargo"
 # prerequisite (`make prepare-ui-gate` has not run) or a timeout stops the run.
 #
 # One script per family, selected by binary, so a run that selects one of these
-# tests warms only that family. The scripts take the environment nextest gives
-# them, so a coverage run warms the same target directory it will test in. The
+# tests warms only that family. A setup script is given no build arguments, so
+# the fixture warm-up finds the test build's target directory from the
+# environment (`CARGO_TARGET_DIR`, else the directory `cargo llvm-cov` writes its
+# profiles to, since it passes `--target-dir` rather than the variable, else
+# Cargo's own answer); a run with an explicit `CARGO_BUILD_TARGET` moves the
+# tests' directory in a way the warm-up does not model, so it builds cold. The
 # allowances sum to 1,320 s, which `global-timeout` stays well above.
 #
 # A new test that starts a nested build needs an entry in the nested-cargo filter

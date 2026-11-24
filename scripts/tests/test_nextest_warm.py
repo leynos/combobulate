@@ -51,25 +51,52 @@ class GateEnvironmentTests(unittest.TestCase):
 class TargetTmpdirTests(unittest.TestCase):
     """The warm-up follows Cargo's resolved target directory."""
 
-    def test_tmp_sits_under_the_reported_target_directory(self) -> None:
-        """A redirected target directory moves the warm-up with it."""
+    @staticmethod
+    def fake_cargo(directory: str, script: str) -> str:
+        """Write an executable stand-in for Cargo and return its path."""
+        fake = Path(directory) / 'fake-cargo'
+        fake.write_text(script)
+        fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+        return str(fake)
+
+    def test_an_explicit_target_directory_wins(self) -> None:
+        """Cargo honours ``CARGO_TARGET_DIR``, so the warm-up does too."""
+        environment = {
+            'CARGO_TARGET_DIR': '/explicit',
+            'LLVM_PROFILE_FILE': '/coverage/x-%p.profraw',
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertEqual(nextest_warm.target_tmpdir(), Path('/explicit/tmp'))
+
+    def test_coverage_runs_are_found_through_the_profile_directory(self) -> None:
+        """``cargo llvm-cov`` builds in the directory it writes profiles to."""
+        environment = {'LLVM_PROFILE_FILE': '/work/target/llvm-cov-target/x-%p.profraw'}
+        with patch.dict(os.environ, environment, clear=True):
+            self.assertEqual(
+                nextest_warm.target_tmpdir(),
+                Path('/work/target/llvm-cov-target/tmp'),
+            )
+
+    def test_a_plain_run_asks_cargo_for_the_workspace_target(self) -> None:
+        """With no hint in the environment, Cargo's own answer is used."""
         with tempfile.TemporaryDirectory() as directory:
-            fake = Path(directory) / 'fake-cargo'
-            payload = json.dumps({'target_directory': '/redirected/target'})
-            fake.write_text(f"#!/bin/sh\nprintf '%s' '{payload}'\n")
-            fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-            with patch.dict(os.environ, {'CARGO': str(fake)}):
+            payload = json.dumps({'target_directory': '/workspace/target'})
+            fake = self.fake_cargo(directory, f"#!/bin/sh\nprintf '%s' '{payload}'\n")
+            with patch.dict(os.environ, {'CARGO': fake}, clear=True):
                 self.assertEqual(
-                    nextest_warm.target_tmpdir(), Path('/redirected/target/tmp')
+                    nextest_warm.target_tmpdir(), Path('/workspace/target/tmp')
                 )
 
+    def test_an_explicit_build_target_skips_the_warm_up(self) -> None:
+        """The triple moves the directory in a way the warm-up does not model."""
+        with patch.dict(os.environ, {'CARGO_BUILD_TARGET': 'x86_64-unknown-linux-gnu'}):
+            self.assertIsNone(nextest_warm.target_tmpdir())
+
     def test_a_failing_cargo_is_reported(self) -> None:
-        """Without metadata the warm-up cannot find the tests' directory."""
+        """Without a hint or metadata the tests' directory cannot be found."""
         with tempfile.TemporaryDirectory() as directory:
-            fake = Path(directory) / 'fake-cargo'
-            fake.write_text('#!/bin/sh\nexit 1\n')
-            fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-            with patch.dict(os.environ, {'CARGO': str(fake)}):
+            fake = self.fake_cargo(directory, '#!/bin/sh\nexit 1\n')
+            with patch.dict(os.environ, {'CARGO': fake}, clear=True):
                 with self.assertRaises(RuntimeError):
                     nextest_warm.target_tmpdir()
 
