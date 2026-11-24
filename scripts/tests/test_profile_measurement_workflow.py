@@ -2,9 +2,10 @@
 
 The measurement numbers feed pre-registered acceptance controls, so a silent
 edit to the trigger, the measured routes, the pinned tool versions, the
-cold-run loop, the cache policy, or the artefact conditions would move the
-evidence without anyone noticing. These checks read the workflow file as data
-and assert each of those boundaries; they never start a runner.
+cold-run loop, the cache policy, the position of the cache assertion, or the
+artefact conditions would move the evidence without anyone noticing. These
+checks read the workflow file as data and assert each of those boundaries;
+they never start a runner.
 
 Examples
 --------
@@ -16,7 +17,9 @@ recorded evidence::
 
 from __future__ import annotations
 
+import copy
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -29,6 +32,15 @@ ROUTES = ('rustdoc', 'clippy', 'whitaker', 'nextest', 'coverage', 'ui')
 MEASUREMENT_JOBS = ('measure-profile', 'build-budget')
 LABEL_GATE = "github.event.label.name == 'measure-profiles'"
 DISPATCH_GATE = "github.event_name == 'workflow_dispatch'"
+
+SETUP_RUST_ACTION = 'leynos/shared-actions/.github/actions/setup-rust@'
+CACHE_ASSERTION_STEP = 'Confirm the measured environment carries no cache'
+COLD_BUILD_STEP = 'Measure five cold builds per profile, alternating'
+FETCH_STEP = 'Fetch dependencies once, untimed'
+BUILD_STANDARD_STEP = 'Install the pinned build standard'
+PROVER_STEP = 'Install the pinned Kani and Verus releases'
+ABSENCE_CHECK = 'test -z "${RUSTC_WRAPPER-}"'
+TIMED_INVOCATION = '/usr/bin/time'
 
 
 def _workflow() -> dict:
@@ -57,6 +69,10 @@ def _job(name: str) -> dict:
 def _step_run_matching(job: dict, needle: str) -> str:
     """Return the first ``run`` script in ``job`` that contains ``needle``.
 
+    Ordering-sensitive checks use the index locators below instead: a comment
+    in an earlier step that merely names the same text must not stand in for
+    the step whose position is being asserted.
+
     Raises
     ------
     AssertionError
@@ -69,18 +85,179 @@ def _step_run_matching(job: dict, needle: str) -> str:
     raise AssertionError(f'no step script in the job contains {needle!r}')
 
 
-def _setup_rust_inputs(job: dict) -> dict[str, str]:
-    """Return the ``with:`` inputs of one job's pinned ``setup-rust`` step.
+def _step_index_using(job: dict, prefix: str) -> int:
+    """Return the index of the job's sole step whose ``uses`` starts ``prefix``.
+
+    Binding an ordering assertion to the step that really carries the action
+    keeps a same-named or comment-only mention from satisfying it.
 
     Raises
     ------
     AssertionError
-        When the job has no ``setup-rust`` step.
+        When no step uses ``prefix`` or more than one does.
+
+    Examples
+    --------
+    The measuring job declares one pinned ``setup-rust`` step::
+
+        _step_index_using(_job('build-budget'), SETUP_RUST_ACTION)
     """
-    for step in job['steps']:
-        if 'shared-actions/.github/actions/setup-rust@' in step.get('uses', ''):
-            return cast('dict', step.get('with', {}))
-    raise AssertionError('the job has no setup-rust step')
+    matches = [
+        index
+        for index, step in enumerate(job['steps'])
+        if step.get('uses', '').startswith(prefix)
+    ]
+    if len(matches) != 1:
+        raise AssertionError(
+            f'the job must declare exactly one {prefix} step, found {len(matches)}'
+        )
+    return matches[0]
+
+
+def _step_index_named(job: dict, name: str) -> int:
+    """Return the index of the job's sole step called ``name``.
+
+    Raises
+    ------
+    AssertionError
+        When the job has no such step or more than one.
+
+    Examples
+    --------
+    The cache assertion is located by its exact name::
+
+        _step_index_named(_job('build-budget'), CACHE_ASSERTION_STEP)
+    """
+    matches = [
+        index
+        for index, step in enumerate(job['steps'])
+        if step.get('name') == name
+    ]
+    if len(matches) != 1:
+        raise AssertionError(
+            f'the job must declare exactly one step named {name!r}, '
+            f'found {len(matches)}'
+        )
+    return matches[0]
+
+
+def _named_step(job: dict, name: str) -> dict:
+    """Return the job's sole step called ``name``."""
+    return cast('dict', job['steps'][_step_index_named(job, name)])
+
+
+def _executable_lines(script: str) -> list[str]:
+    """Return the stripped, non-blank, non-comment lines of a shell script.
+
+    A commented-out check is not executable, so it cannot satisfy a contract
+    that requires the check to run.
+
+    Examples
+    --------
+    Comments and blank lines disappear from the result::
+
+        _executable_lines('set -e\\n# note\\ntrue\\n')  # ['set -e', 'true']
+    """
+    stripped = (line.strip() for line in script.splitlines())
+    return [line for line in stripped if line and not line.startswith('#')]
+
+
+def _is_environment_record(line: str) -> bool:
+    """Whether ``line`` records the observed build environment as evidence."""
+    return (
+        line.startswith('printf ')
+        and 'build-budget/build-environment' in line
+        and 'RUSTC_WRAPPER' in line
+        and 'CARGO_INCREMENTAL' in line
+    )
+
+
+def _check_cache_assertion_order(job: dict) -> None:
+    """Require the cache assertion immediately before the first timed build.
+
+    The assertion must observe the environment the samples inherit, so every
+    provisioning step and the untimed fetch run before it, and the first timed
+    phase runs immediately after it. The assertion must also be
+    unconditional: a skipped step, a soft failure, or a masked command would
+    leave the measurement cache-free only by assumption.
+
+    Raises
+    ------
+    AssertionError
+        When an ordering, timing, or failure-propagation guarantee is missing.
+
+    Examples
+    --------
+    The committed job satisfies the contract::
+
+        _check_cache_assertion_order(_job('build-budget'))
+    """
+    assertion = _step_index_named(job, CACHE_ASSERTION_STEP)
+    if _step_index_named(job, COLD_BUILD_STEP) != assertion + 1:
+        raise AssertionError(
+            'the first timed phase must immediately follow the cache assertion'
+        )
+
+    prerequisites = (
+        ('setup-rust', _step_index_using(job, SETUP_RUST_ACTION)),
+        (BUILD_STANDARD_STEP, _step_index_named(job, BUILD_STANDARD_STEP)),
+        (PROVER_STEP, _step_index_named(job, PROVER_STEP)),
+        (FETCH_STEP, _step_index_named(job, FETCH_STEP)),
+    )
+    for label, index in prerequisites:
+        if index >= assertion:
+            raise AssertionError(
+                f'{label!r} must run before the cache assertion observes '
+                'the environment'
+            )
+
+    for step in job['steps'][:assertion]:
+        if TIMED_INVOCATION in step.get('run', ''):
+            raise AssertionError(
+                f'step {step.get("name", step.get("uses", ""))!r} is timed '
+                'before the cache assertion'
+            )
+
+    assertion_step = _named_step(job, CACHE_ASSERTION_STEP)
+    for key in ('if', 'continue-on-error'):
+        if key in assertion_step:
+            raise AssertionError(
+                f'the cache assertion must not carry {key!r}; it must always '
+                'run and must fail the job'
+            )
+
+    lines = _executable_lines(cast('str', assertion_step.get('run', '')))
+    if not lines or lines[0] != 'set -euo pipefail':
+        raise AssertionError(
+            'the cache assertion must begin by enabling shell failure '
+            'propagation'
+        )
+    for line in lines:
+        if '||' in line or 'set +e' in line:
+            raise AssertionError(
+                f'the cache assertion must not mask a failure: {line!r}'
+            )
+    if ABSENCE_CHECK not in lines:
+        raise AssertionError(
+            'the cache assertion must run an unconditional RUSTC_WRAPPER '
+            'absence check'
+        )
+    if not any(_is_environment_record(line) for line in lines):
+        raise AssertionError(
+            'the cache assertion must record the environment it observed'
+        )
+
+
+def _setup_rust_inputs(job: dict) -> dict[str, str]:
+    """Return the ``with:`` inputs of the job's sole pinned ``setup-rust`` step.
+
+    Raises
+    ------
+    AssertionError
+        When the job has no ``setup-rust`` step or more than one.
+    """
+    step = job['steps'][_step_index_using(job, SETUP_RUST_ACTION)]
+    return cast('dict', step.get('with', {}))
 
 
 class TriggerTests(unittest.TestCase):
@@ -355,15 +532,17 @@ class BuildBudgetTests(unittest.TestCase):
 
     def test_the_caching_policy_matches_the_control(self) -> None:
         """A warm sccache or incremental compile would shorten every sample."""
-        environment = _job('build-budget')['env']
+        job = _job('build-budget')
+        environment = job['env']
+        assertion = _named_step(job, CACHE_ASSERTION_STEP)
 
         self.assertEqual(environment['CARGO_INCREMENTAL'], '0', 'incremental state must not shorten a run')
         self.assertEqual(environment['CARGO_BUILD_JOBS'], '4', 'the measured parallelism must stay fixed')
         self.assertNotIn('SCCACHE_RECACHE', environment, 'the control measures with no sccache at all')
         self.assertIn(
-            'test -z "${RUSTC_WRAPPER-}"',
-            _step_run_matching(_job('build-budget'), 'RUSTC_WRAPPER'),
-            'the job must reject an inherited cache wrapper',
+            ABSENCE_CHECK,
+            assertion.get('run', ''),
+            'the assertion step must reject an inherited cache wrapper',
         )
 
     def test_setup_rust_does_not_install_sccache_for_the_measurement(self) -> None:
@@ -380,28 +559,17 @@ class BuildBudgetTests(unittest.TestCase):
         self.assertEqual(inputs.get('use-sccache'), 'false',
                          'the measuring job must not install sccache at all')
 
-    def test_the_cache_assertion_runs_after_the_tools_are_installed(self) -> None:
+    def test_the_cache_assertion_runs_after_setup_rust_and_the_tools(self) -> None:
         """The assertion must observe the environment the timed builds inherit.
 
         An assertion placed before ``setup-rust`` can only observe the runner's
         own environment, so a later provisioning step that exported
-        ``RUSTC_WRAPPER`` would go unnoticed while every sample was cached. The
-        step that asserts and records belongs immediately before the first
-        timed phase, with the tool installs between it and the top of the job.
+        ``RUSTC_WRAPPER`` would go unnoticed while every sample was cached.
+        ``setup-rust``, both named installers, and the untimed fetch must all
+        run first, and the first timed phase must follow the assertion with no
+        intervening step.
         """
-        steps = _job('build-budget')['steps']
-        names = [step.get('name', '') for step in steps]
-        assertion = next(index for index, step in enumerate(steps)
-                         if 'RUSTC_WRAPPER' in step.get('run', ''))
-        cold = names.index('Measure five cold builds per profile, alternating')
-
-        self.assertLess(assertion, cold, 'the assertion must precede the first timed build')
-        self.assertLess(cold - assertion, 2,
-                        'only the fetch may sit between the assertion and the timed builds')
-        for installed in ('Install the pinned build standard',
-                          'Install the pinned Kani and Verus releases'):
-            self.assertLess(names.index(installed), assertion,
-                            f'setup step {installed!r} must run before the assertion observes it')
+        _check_cache_assertion_order(_job('build-budget'))
 
     def test_the_proof_profile_runs_the_installed_driver_directly(self) -> None:
         """The helper's `kani exec` refuses this repository's backend table."""
@@ -503,6 +671,203 @@ class BuildBudgetTests(unittest.TestCase):
                          'the solver path must come from the install action')
         self.assertIn('"$Z3_PATH" --version > build-budget/z3', step['run'],
                       'the recorded version must come from that binary')
+
+
+class CacheAssertionOrderTests(unittest.TestCase):
+    """The committed job and harmless mentions satisfy the cache contract."""
+
+    def test_the_unmodified_job_is_accepted(self) -> None:
+        """A checker that rejected the committed job could not guard it."""
+        _check_cache_assertion_order(_job('build-budget'))
+
+    def test_an_earlier_comment_mentioning_the_wrapper_is_accepted(self) -> None:
+        """Only the named step counts, not the first text that names it."""
+        job = _job('build-budget')
+        begin = _named_step(job, 'Begin the build-budget measurement')
+        begin['run'] = begin['run'] + '\n# RUSTC_WRAPPER must stay unset for AC-04\n'
+        self.assertNotEqual(job, _job('build-budget'), 'the comment must change the parsed job')
+
+        _check_cache_assertion_order(job)
+
+
+def _move_step_after(job: dict, source: int, anchor: str) -> None:
+    """Move one step of ``job`` to immediately follow the step called ``anchor``."""
+    step = job['steps'].pop(source)
+    job['steps'].insert(_step_index_named(job, anchor) + 1, step)
+
+
+def _insert_step(job: dict, index: int, name: str, script: str) -> None:
+    """Insert a step into an in-memory job, leaving the parsed workflow untouched."""
+    job['steps'].insert(index, {'name': name, 'run': script})
+
+
+class CacheAssertionMutationTests(unittest.TestCase):
+    """Each mutation removes one protection the cache contract must keep."""
+
+    def setUp(self) -> None:
+        """Parse the committed job once for every mutation to copy."""
+        self.job = _job('build-budget')
+
+    def assert_rejected(self, mutate: Callable[[dict], None]) -> None:
+        """Apply ``mutate`` to a deep copy and require the checker to reject it.
+
+        The equality guard proves the mutation changed the parsed job, so a
+        passing rejection cannot come from an edit that silently did nothing.
+        """
+        changed = copy.deepcopy(self.job)
+        mutate(changed)
+        self.assertNotEqual(changed, self.job, 'the mutation must change the parsed job')
+        with self.assertRaises(AssertionError):
+            _check_cache_assertion_order(changed)
+
+    def test_setup_rust_moved_after_the_assertion_is_rejected(self) -> None:
+        """Provisioning after the check would leave the samples unwatched."""
+
+        def move(job: dict) -> None:
+            """Move setup-rust between the assertion and the cold build."""
+            _move_step_after(
+                job,
+                _step_index_using(job, SETUP_RUST_ACTION),
+                CACHE_ASSERTION_STEP,
+            )
+
+        self.assert_rejected(move)
+
+    def test_setup_rust_moved_after_the_cold_build_is_rejected(self) -> None:
+        """A provisioning step after the first sample has run too late."""
+
+        def move(job: dict) -> None:
+            """Move setup-rust behind the first timed phase."""
+            _move_step_after(
+                job,
+                _step_index_using(job, SETUP_RUST_ACTION),
+                COLD_BUILD_STEP,
+            )
+
+        self.assert_rejected(move)
+
+    def test_setup_rust_removed_is_rejected(self) -> None:
+        """Without it the job no longer provisions the compiler it times."""
+
+        def remove(job: dict) -> None:
+            """Delete the sole setup-rust step."""
+            job['steps'].pop(_step_index_using(job, SETUP_RUST_ACTION))
+
+        self.assert_rejected(remove)
+
+    def test_a_second_setup_rust_step_is_rejected(self) -> None:
+        """Two setup steps leave the observed environment ambiguous."""
+
+        def duplicate(job: dict) -> None:
+            """Add a second setup-rust step with different inputs."""
+            index = _step_index_using(job, SETUP_RUST_ACTION)
+            extra = copy.deepcopy(job['steps'][index])
+            extra['with'] = {'rustflags': '', 'use-sccache': 'true'}
+            job['steps'].insert(index + 1, extra)
+
+        self.assert_rejected(duplicate)
+
+    def test_the_assertion_removed_is_rejected(self) -> None:
+        """A job that never checks the wrapper measures an unknown environment."""
+
+        def remove(job: dict) -> None:
+            """Delete the cache assertion step."""
+            job['steps'].pop(_step_index_named(job, CACHE_ASSERTION_STEP))
+
+        self.assert_rejected(remove)
+
+    def test_a_second_assertion_step_is_rejected(self) -> None:
+        """A duplicate would let an earlier copy define the observed order."""
+
+        def duplicate(job: dict) -> None:
+            """Insert a copy of the assertion directly after the original."""
+            index = _step_index_named(job, CACHE_ASSERTION_STEP)
+            job['steps'].insert(index + 1, copy.deepcopy(job['steps'][index]))
+
+        self.assert_rejected(duplicate)
+
+    def test_a_step_between_the_assertion_and_the_cold_build_is_rejected(self) -> None:
+        """Strict adjacency keeps the assertion the last check before sampling."""
+
+        def insert(job: dict) -> None:
+            """Place an unrelated step between the assertion and the cold build."""
+            index = _step_index_named(job, CACHE_ASSERTION_STEP)
+            _insert_step(job, index + 1, 'An intervening step', 'true')
+
+        self.assert_rejected(insert)
+
+    def test_the_fetch_moved_after_the_assertion_is_rejected(self) -> None:
+        """The untimed fetch must finish before the environment is observed."""
+
+        def move(job: dict) -> None:
+            """Move the fetch between the assertion and the cold build."""
+            _move_step_after(
+                job,
+                _step_index_named(job, FETCH_STEP),
+                CACHE_ASSERTION_STEP,
+            )
+
+        self.assert_rejected(move)
+
+    def test_an_assertion_that_may_be_skipped_is_rejected(self) -> None:
+        """A conditional assertion could be skipped while the samples run."""
+
+        def add_condition(job: dict) -> None:
+            """Give the assertion an ``if`` guard."""
+            _named_step(job, CACHE_ASSERTION_STEP)['if'] = 'always()'
+
+        self.assert_rejected(add_condition)
+
+    def test_an_assertion_that_may_fail_softly_is_rejected(self) -> None:
+        """`continue-on-error` would hide a contaminated environment."""
+
+        def add_continue_on_error(job: dict) -> None:
+            """Let the assertion report success despite a failed check."""
+            _named_step(job, CACHE_ASSERTION_STEP)['continue-on-error'] = 'true'
+
+        self.assert_rejected(add_continue_on_error)
+
+    def test_a_masked_absence_check_is_rejected(self) -> None:
+        """`|| true` would turn a contaminated environment into a pass."""
+
+        def mask(job: dict) -> None:
+            """Append a success fallback to the absence check."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            self.assertIn(ABSENCE_CHECK, step['run'])
+            step['run'] = step['run'].replace(ABSENCE_CHECK, ABSENCE_CHECK + ' || true')
+
+        self.assert_rejected(mask)
+
+    def test_a_commented_out_absence_check_is_rejected(self) -> None:
+        """A comment is not an assertion; the check must stay executable."""
+
+        def comment_out(job: dict) -> None:
+            """Turn the absence check into a comment."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            self.assertIn(ABSENCE_CHECK, step['run'])
+            step['run'] = step['run'].replace(ABSENCE_CHECK, '# ' + ABSENCE_CHECK)
+
+        self.assert_rejected(comment_out)
+
+    def test_a_script_without_failure_propagation_is_rejected(self) -> None:
+        """Without `set -e` a failing check would not fail the job."""
+
+        def drop_strict_mode(job: dict) -> None:
+            """Remove the strict-mode line from the assertion script."""
+            step = _named_step(job, CACHE_ASSERTION_STEP)
+            self.assertIn('set -euo pipefail\n', step['run'])
+            step['run'] = step['run'].replace('set -euo pipefail\n', '', 1)
+
+        self.assert_rejected(drop_strict_mode)
+
+    def test_a_timed_step_before_the_assertion_is_rejected(self) -> None:
+        """A sample taken before the check would not be covered by it."""
+
+        def time_a_prelude(job: dict) -> None:
+            """Insert a timed step ahead of the whole provisioning phase."""
+            _insert_step(job, 0, 'Time a prelude', '/usr/bin/time -v true')
+
+        self.assert_rejected(time_a_prelude)
 
 
 if __name__ == '__main__':
