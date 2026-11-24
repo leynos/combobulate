@@ -136,14 +136,7 @@ pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
         let Some(body) = tail.get(..end) else {
             break;
         };
-        if is_inner && depth > 0 && matches!(scope, Scope::Inner) {
-            // The depth restriction serves the crate-level lookup: an inner
-            // attribute inside a module or a function body is not a crate
-            // attribute, so `Scope::Inner` skips it. `Scope::All` exists to
-            // find every attribute a file carries — the per-file kernel rule
-            // forbids a lint setting anywhere in a kernel file — so it must
-            // still see a nested one. The walk advances past the attribute in
-            // both cases, so the depth it carries stays aligned with `index`.
+        if is_nested_crate_level_attribute(is_inner, depth, scope) {
             index = start + end + 1;
             continue;
         }
@@ -155,6 +148,17 @@ pub(super) fn attributes(code: &Code, scope: Scope) -> Vec<Attribute<'_>> {
         index = start + end + 1;
     }
     found
+}
+
+/// Whether this inner attribute is nested and the scope is crate-level only.
+///
+/// The depth restriction serves the crate-level lookup: an inner attribute
+/// inside a module or a function body is not a crate attribute, so
+/// `Scope::Inner` skips it. `Scope::All` exists to find every attribute a file
+/// carries — the per-file kernel rule forbids a lint setting anywhere in a
+/// kernel file — so it must still see a nested one.
+fn is_nested_crate_level_attribute(is_inner: bool, depth: usize, scope: Scope) -> bool {
+    is_inner && depth > 0 && matches!(scope, Scope::Inner)
 }
 
 /// Returns the brace depth after reading `text[from..to]`.
