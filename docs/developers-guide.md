@@ -62,6 +62,14 @@ manually. `make coverage` uses `cargo llvm-cov` with `lld` and prepares the
 gate before measuring; see [Test timeouts](#test-timeouts) for why preparation
 sits outside the suite.
 
+Cognitive complexity is not gated by Clippy. Clippy's `cognitive_complexity`
+scores code after macro expansion, so it counts branching a macro generated,
+and neither `Cargo.toml` nor `clippy.toml` enables it. Whitaker's experimental
+`macro_aware_cognitive_complexity` gates it at `max_complexity = 9`,
+CodeScene's ceiling, in every gate profile `lint-whitaker` runs. `dylint.toml`
+opts in with `[whitaker] experimental = ["macro_aware_cognitive_complexity"]`.
+Fix a finding by extracting named helpers, never by raising the threshold.
+
 `make check-fmt` checks Git-tracked Markdown and untracked files Git does not
 ignore; files need not be staged. Markdown lint covers every matching file. The
 spelling gate enumerates files with `git ls-files`, so it checks tracked files
