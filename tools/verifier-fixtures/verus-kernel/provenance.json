@@ -1,6 +1,6 @@
 {
   "verus": "0.2026.09.06.8dea4a2",
-  "z3": "~/.cache/uv/archive-v0/hPnTuCdDC4hFXVHn/bin/z3",
+  "z3": "~/.cache/uv/archive-v0/otsQ8kKxm4z-wcdF/z3_solver-4.16.0.0.data/data/bin/z3",
   "z3_sha256": "a06c2a851d58c5f5a7c1e5de188fd0e1b1135e778112aee83ffd1a433685516b",
   "admission": "PF05.proof@2.3.5 re-runs these; they are not admitted evidence",
   "identity": {
