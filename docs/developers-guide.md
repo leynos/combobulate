@@ -645,39 +645,51 @@ than checking conditional compilation, so it runs once.
 
 ## Workspace layout and module ownership
 
-The workspace holds three crates, and dependency edges point one way. The facade
+The workspace holds four crates, and dependency edges point one way. The facade
 `combobulate` depends on both `combobulate-kernel` and `combobulate-macros`;
-neither of those depends on anything, and the macro crate never reaches the
-kernel. `tests/workspace_boundaries.rs` asserts that shape against live
-`cargo metadata` and `cargo tree` output, so a new edge fails a test rather
-than being noticed at review.
+`combobulate-test-macros` is a test-only dependency of the root package and is
+not on the facade's path. None of the three depends on another, and no macro
+crate ever reaches the kernel. `tests/workspace_boundaries.rs` asserts that
+shape against live `cargo metadata` and `cargo tree` output, so a new edge
+fails a test rather than being noticed at review.
 
-| Path                                               | Role                                                         | Re-use boundary                                               |
-| -------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
-| `crates/combobulate-kernel/`                       | `#![no_std]` without `alloc`; owns `TargetFacts`             | Target facts only; see the first policy below                 |
-| `crates/combobulate-macros/`                       | `proc-macro` crate; exports nothing until task 2.3.1         | Expansion boundary only; must not build `TargetFacts`         |
-| `src/lib.rs`                                       | Facade crate root                                            | Re-exports behind features; owns nothing below the facade     |
-| `src/profile.rs`                                   | `BuildProfile`                                               | Reports features and target facts only                        |
-| `src/array.rs`                                     | `Array`, `Dtype`, and shared I64 storage                     | Values and their construction; no operation knowledge         |
-| `src/expr/`                                        | `AExpr`, `Unary`, `Binary`, `OperationId`, `identity`, `add` | Graphs and their static facts; runs no kernel                 |
-| `src/plan/`                                        | `NativeExecutor`, `PreparedPlan`, the schedule walk          | Prepared execution; the only caller of the kernel dispatch    |
-| `src/error/`                                       | `Stage`, `Failure`, `ExpressionError`                        | Reporting a rejected expression; no recovery policy           |
-| `src/polars_backend.rs`                            | Crate-private Polars module, `cfg(feature = "polars")`       | Wiring target for the pinned release; claims no capability    |
-| `crates/combobulate-kernel/src/elementwise_add.rs` | Verified I64 addition; one kernel per file                   | Called only through the facade's crate-private dispatch       |
-| `scripts/verus_kernel.py`                          | Pipeline that runs the kernel proof and its mutants          | Runs Verus; verdict rules live in its sibling module          |
-| `scripts/verus_kernel_verdicts.py`                 | Decides a proof verdict from one log                         | Reads a log and nothing else                                  |
-| `scripts/verus_kernel_identity.py`                 | The DL-14 executable identity tuple                          | States what a proof record is about; reads no file            |
-| `scripts/docs_validation/trust_audit/`             | Trusted-item scanner behind the evidence gate                | The gate and the design check only                            |
-| `scripts/docs_validation/kani_log/`                | Kani log parser behind the evidence gate                     | The gate's I/O shell only; the decision function is pure      |
-| `scripts/docs_validation/toolchain_profiles.py`    | Pin checker for `spec/toolchain-profiles.json`               | Derives pins; other checks read the record instead of the pin |
-| `scripts/docs_validation/candidate_deferral.py`    | Guard against a tick outrunning a deferred candidate         | Reads the roadmap export and D07's dispositions only          |
+| Path                                               | Role                                                         | Re-use boundary                                                |
+| -------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
+| `crates/combobulate-kernel/`                       | `#![no_std]` without `alloc`; owns `TargetFacts`             | Target facts only; see the first policy below                  |
+| `crates/combobulate-macros/`                       | `proc-macro` crate; exports nothing until task 2.3.1         | Expansion boundary only; must not build `TargetFacts`          |
+| `crates/combobulate-test-macros/`                  | Test-only attributes that suppress macro-expansion lints     | Test code only; not re-exported and never a shipped dependency |
+| `src/lib.rs`                                       | Facade crate root                                            | Re-exports behind features; owns nothing below the facade      |
+| `src/profile.rs`                                   | `BuildProfile`                                               | Reports features and target facts only                         |
+| `src/array.rs`                                     | `Array`, `Dtype`, and shared I64 storage                     | Values and their construction; no operation knowledge          |
+| `src/expr/`                                        | `AExpr`, `Unary`, `Binary`, `OperationId`, `identity`, `add` | Graphs and their static facts; runs no kernel                  |
+| `src/plan/`                                        | `NativeExecutor`, `PreparedPlan`, the schedule walk          | Prepared execution; the only caller of the kernel dispatch     |
+| `src/error/`                                       | `Stage`, `Failure`, `ExpressionError`                        | Reporting a rejected expression; no recovery policy            |
+| `src/polars_backend.rs`                            | Crate-private Polars module, `cfg(feature = "polars")`       | Wiring target for the pinned release; claims no capability     |
+| `crates/combobulate-kernel/src/elementwise_add.rs` | Verified I64 addition; one kernel per file                   | Called only through the facade's crate-private dispatch        |
+| `scripts/verus_kernel.py`                          | Pipeline that runs the kernel proof and its mutants          | Runs Verus; verdict rules live in its sibling module           |
+| `scripts/verus_kernel_verdicts.py`                 | Decides a proof verdict from one log                         | Reads a log and nothing else                                   |
+| `scripts/verus_kernel_identity.py`                 | The DL-14 executable identity tuple                          | States what a proof record is about; reads no file             |
+| `scripts/docs_validation/trust_audit/`             | Trusted-item scanner behind the evidence gate                | The gate and the design check only                             |
+| `scripts/docs_validation/kani_log/`                | Kani log parser behind the evidence gate                     | The gate's I/O shell only; the decision function is pure       |
+| `scripts/docs_validation/toolchain_profiles.py`    | Pin checker for `spec/toolchain-profiles.json`               | Derives pins; other checks read the record instead of the pin  |
+| `scripts/docs_validation/candidate_deferral.py`    | Guard against a tick outrunning a deferred candidate         | Reads the roadmap export and D07's dispositions only           |
 
 *Table 1: Workspace modules, roles, and re-use boundaries.*
 
-Six re-use policies follow from that table. They are stated here because each
+Seven re-use policies follow from that table. They are stated here because each
 one has already been tempting to break in a different file, and a boundary that
 lives only in a review comment is not a boundary.
 
+- `allow_fixture_expansion_lints` is the estate-approved answer to a `rstest`
+  `#[fixture]` whose single-expression body expands into a nested block that
+  `unused_braces` rejects. Apply it above `#[rstest::fixture]` instead of
+  copying the attribute pair onto each fixture: the suppression is then stated
+  once, carries its reason, and cannot drift as fixtures are added. It emits a
+  plain `#[expect(clippy::allow_attributes)]` rather than the upstream
+  `cfg_attr(clippy, …)` form, because Clippy reports that wrapper as
+  `unnecessary_clippy_cfg` and the workspace denies it. It is a test-only
+  crate: the facade does not re-export it, and it is absent from the shipped
+  dependency closure.
 - `TargetFacts` is kernel-owned, and it is the single source of target facts
   for checked rules and for the certificate keys that later tasks derive from
   them. The macro crate must not construct it: a procedural macro runs on the

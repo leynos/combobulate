@@ -7,6 +7,7 @@
 //! feature file's scenarios.
 
 use combobulate::{ExpressionError, Failure, PreparedPlan, Stage, add};
+use combobulate_test_macros::allow_fixture_expansion_lints;
 use rstest_bdd_macros::{given, scenario, then, when};
 
 use super::{engine, expr, single_failure};
@@ -23,16 +24,9 @@ struct World {
 }
 
 // `#[fixture]` expands a single-expression body into a nested block, which
-// `unused_braces` rejects; the attribute pair below is the repository's
-// sanctioned workaround for that expansion (see `tests/build_profiles.rs`).
-#[allow(
-    unused_braces,
-    reason = "fixture macro expansion triggers unused-braces on expression bodies"
-)]
-#[expect(
-    clippy::allow_attributes,
-    reason = "needed to allow unused_braces for fixture macro expansion"
-)]
+// `unused_braces` rejects. The attribute states the suppression once, at the
+// macro boundary, rather than copying the pair onto every fixture.
+#[allow_fixture_expansion_lints]
 #[rstest::fixture]
 fn world() -> World { World::default() }
 

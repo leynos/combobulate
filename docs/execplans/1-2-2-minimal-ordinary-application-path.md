@@ -644,17 +644,17 @@ The thresholds are:
      records each operand's values and asserts them as well as the pointers.
      Falsified by inverting the kernel to write its first operand: the
      scenario failed at that step with `[1, 2, 3]` against `[2, 2, 3]`.
-  6. *Scope overrun* — **escalated, not granted**. Re-measured at **94 files
-     and 10,057 net added lines** against the tolerances' 60 and 4,500, with
-     the plan's own exclusions applied. The figure moved from the 77 and 8,389
+  6. *Scope overrun* — **granted 2026-11-25**. Re-measured at **94 files and
+     10,057 net added lines** against the tolerances' 60 and 4,500, with the
+     plan's own exclusions applied. The figure moved from the 77 and 8,389
      recorded above because the second-round repairs added the diagnostic
      reader, its tests, the compile-contract fixture and this record's
      reconciliations. The tolerances say a breach is an escalation "to the
-     user", and both this plan's `Constraints` preamble and `AGENTS.md` make an
-     exception the maintainer's decision. Until the maintainer records one,
-     this plan does not claim the tolerances are met; the entry at `2026-11-20`
-     above records the measurement and the proposed disposition for that
-     decision.
+     user", and the maintainer approved a **20,000-line** scope expansion on
+     2026-11-25, which covers this measurement and leaves headroom for the
+     test-macro crate the same ruling requested. The file count is not
+     separately raised by that ruling; it is recorded here so a later reader
+     sees both figures beside the approval.
 
 ## Surprises & discoveries
 

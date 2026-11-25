@@ -414,6 +414,7 @@ dependencies = [
  "cardinality-probe",
  "combobulate-kernel",
  "combobulate-macros",
+ "combobulate-test-macros",
  "googletest",
  "insta",
  "polars",
@@ -436,6 +437,15 @@ version = "0.1.0"
 [[package]]
 name = "combobulate-macros"
 version = "0.1.0"
+
+[[package]]
+name = "combobulate-test-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.6",
+]
 
 [[package]]
 name = "compact_str"
