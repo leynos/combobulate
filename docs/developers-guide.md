@@ -669,6 +669,10 @@ narrow repository-specific identifier, API, proper-name, or fixture exceptions
 to `typos.local.toml`; hand-editing `typos.toml` is not supported and any edits
 are overwritten on the next run.
 
+The builder requires Python 3.14, so the `Makefile` runs it with
+`uv tool run --python 3.14`. `uv` downloads that interpreter when it is
+missing; environments that forbid downloads must provide Python 3.14.
+
 ### Security audit ignores
 
 Security audit jobs may set `CARGO_AUDIT_IGNORES` for narrowly scoped RustSec
