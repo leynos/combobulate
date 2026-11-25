@@ -156,7 +156,7 @@
       "check": "trust-audit",
       "status": "pass",
       "detail": "No trust item appears in any workspace member or product proof root; the fixture corpus still reports its seeded items.",
-      "count": 7
+      "count": 8
     },
     {
       "check": "log-parser-registration",
