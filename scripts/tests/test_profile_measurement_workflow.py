@@ -18,6 +18,7 @@ recorded evidence::
 from __future__ import annotations
 
 import copy
+import sys
 import unittest
 from collections.abc import Callable
 from pathlib import Path
@@ -26,6 +27,31 @@ from typing import cast
 import pytest
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from profile_measurement_contract import (
+    ABSENCE_CHECK,
+    BUILD_STANDARD_STEP,
+    CACHE_ASSERTION_STEP,
+    COLD_BUILD_STEP,
+    ENVIRONMENT_RECORD,
+    FETCH_STEP,
+    INCREMENTAL_BUILD_STEP,
+    PROVER_STEP,
+    SETUP_RUST_ACTION,
+    STRICT_MODE,
+    TIMED_INVOCATION,
+)
+from profile_measurement_contract import (
+    check_cache_assertion_order as _check_cache_assertion_order,
+    executable_lines as _executable_lines,
+    named_step as _named_step,
+    setup_rust_inputs as _setup_rust_inputs,
+    step_index_named as _step_index_named,
+    step_index_using as _step_index_using,
+)
+
+
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/profile-measurements.yml'
 
@@ -33,22 +59,6 @@ ROUTES = ('rustdoc', 'clippy', 'whitaker', 'nextest', 'coverage', 'ui')
 MEASUREMENT_JOBS = ('measure-profile', 'build-budget')
 LABEL_GATE = "github.event.label.name == 'measure-profiles'"
 DISPATCH_GATE = "github.event_name == 'workflow_dispatch'"
-
-SETUP_RUST_ACTION = 'leynos/shared-actions/.github/actions/setup-rust@'
-CACHE_ASSERTION_STEP = 'Confirm the measured environment carries no cache'
-COLD_BUILD_STEP = 'Measure five cold builds per profile, alternating'
-INCREMENTAL_BUILD_STEP = 'Measure five incremental builds per profile, alternating'
-FETCH_STEP = 'Fetch dependencies once, untimed'
-BUILD_STANDARD_STEP = 'Install the pinned build standard'
-PROVER_STEP = 'Install the pinned Kani and Verus releases'
-ABSENCE_CHECK = 'test -z "${RUSTC_WRAPPER-}"'
-ENVIRONMENT_RECORD = (
-    "printf '%s\\n' \"${RUSTC_WRAPPER-}\" \"$CARGO_INCREMENTAL\" "
-    '> build-budget/build-environment'
-)
-TIMED_INVOCATION = '/usr/bin/time'
-STRICT_MODE = 'set -euo pipefail'
-
 
 def _workflow() -> dict:
     """Return the measurement workflow decoded with every scalar as a string.
@@ -90,264 +100,6 @@ def _step_run_matching(job: dict, needle: str) -> str:
         if needle in script:
             return cast('str', script)
     raise AssertionError(f'no step script in the job contains {needle!r}')
-
-
-def _step_index_using(job: dict, prefix: str) -> int:
-    """Return the index of the job's sole step whose ``uses`` starts ``prefix``.
-
-    Binding an ordering assertion to the step that really carries the action
-    keeps a same-named or comment-only mention from satisfying it.
-
-    Raises
-    ------
-    AssertionError
-        When no step uses ``prefix`` or more than one does.
-
-    Examples
-    --------
-    The measuring job declares one pinned ``setup-rust`` step::
-
-        _step_index_using(_job('build-budget'), SETUP_RUST_ACTION)
-    """
-    matches = [
-        index
-        for index, step in enumerate(job['steps'])
-        if step.get('uses', '').startswith(prefix)
-    ]
-    if len(matches) != 1:
-        raise AssertionError(
-            f'the job must declare exactly one {prefix} step, found {len(matches)}'
-        )
-    return matches[0]
-
-
-def _step_index_named(job: dict, name: str) -> int:
-    """Return the index of the job's sole step called ``name``.
-
-    Raises
-    ------
-    AssertionError
-        When the job has no such step or more than one.
-
-    Examples
-    --------
-    The cache assertion is located by its exact name::
-
-        _step_index_named(_job('build-budget'), CACHE_ASSERTION_STEP)
-    """
-    matches = [
-        index
-        for index, step in enumerate(job['steps'])
-        if step.get('name') == name
-    ]
-    if len(matches) != 1:
-        raise AssertionError(
-            f'the job must declare exactly one step named {name!r}, '
-            f'found {len(matches)}'
-        )
-    return matches[0]
-
-
-def _named_step(job: dict, name: str) -> dict:
-    """Return the job's sole step called ``name``."""
-    return cast('dict', job['steps'][_step_index_named(job, name)])
-
-
-def _executable_lines(script: str) -> list[str]:
-    """Return the stripped, non-blank, non-comment lines of a shell script.
-
-    A commented-out check is not executable, so it cannot satisfy a contract
-    that requires the check to run.
-
-    Examples
-    --------
-    Comments and blank lines disappear from the result::
-
-        _executable_lines('set -e\\n# note\\ntrue\\n')  # ['set -e', 'true']
-    """
-    stripped = (line.strip() for line in script.splitlines())
-    return [line for line in stripped if line and not line.startswith('#')]
-
-
-
-
-def _check_cache_assertion_order(job: dict) -> None:
-    """Require the cache assertion immediately before the first timed build.
-
-    The assertion must observe the environment the samples inherit, so every
-    provisioning step and the untimed fetch run before it, and the first timed
-    phase runs immediately after it. The assertion must also be
-    unconditional: a skipped step, a soft failure, a masked command, or a
-    check inside a branch that never runs would leave the measurement
-    cache-free only by assumption.
-
-    Raises
-    ------
-    AssertionError
-        When an ordering, timing, or failure-propagation guarantee is missing.
-
-    Examples
-    --------
-    The committed job satisfies the contract::
-
-        _check_cache_assertion_order(_job('build-budget'))
-    """
-    assertion = _step_index_named(job, CACHE_ASSERTION_STEP)
-    _check_assertion_position(job, assertion)
-    assertion_step = _named_step(job, CACHE_ASSERTION_STEP)
-    _check_assertion_step(job, assertion_step)
-    _check_assertion_script(assertion_step)
-    _check_no_step_wrapper(job)
-
-
-def _check_assertion_position(job: dict, assertion: int) -> None:
-    """Require every prerequisite before the assertion and the cold build after.
-
-    Parameters
-    ----------
-    job
-        One parsed workflow job mapping.
-    assertion
-        Index of the cache assertion step in ``job['steps']``.
-
-    Raises
-    ------
-    AssertionError
-        When a prerequisite follows the assertion, the first timed phase does
-        not immediately follow it, or an earlier step is already timed.
-    """
-    if _step_index_named(job, COLD_BUILD_STEP) != assertion + 1:
-        raise AssertionError(
-            'the first timed phase must immediately follow the cache assertion'
-        )
-
-    prerequisites = (
-        ('setup-rust', _step_index_using(job, SETUP_RUST_ACTION)),
-        (BUILD_STANDARD_STEP, _step_index_named(job, BUILD_STANDARD_STEP)),
-        (PROVER_STEP, _step_index_named(job, PROVER_STEP)),
-        (FETCH_STEP, _step_index_named(job, FETCH_STEP)),
-    )
-    for label, index in prerequisites:
-        if index >= assertion:
-            raise AssertionError(
-                f'{label!r} must run before the cache assertion observes '
-                'the environment'
-            )
-
-    for step in job['steps'][:assertion]:
-        if _is_timed(step):
-            raise AssertionError(
-                f'step {step.get("name", step.get("uses", ""))!r} is timed '
-                'before the cache assertion'
-            )
-
-
-def _is_timed(step: dict) -> bool:
-    """Whether any executable line of ``step`` invokes the timing command.
-
-    Comment lines are ignored: a comment naming the timing command does not run
-    it, and rejecting one would make the contract test fail on documentation.
-    """
-    return any(
-        TIMED_INVOCATION in line
-        for line in _executable_lines(cast('str', step.get('run', '')))
-    )
-
-
-def _check_assertion_step(job: dict, step: dict) -> None:
-    """Require the assertion step itself to run and to fail the job.
-
-    A job-level ``RUSTC_WRAPPER`` contaminates every sample, so it is rejected
-    outright; a step-level value is caught by :func:`_check_no_step_wrapper`.
-
-    Raises
-    ------
-    AssertionError
-        When the step carries an ``if`` guard or ``continue-on-error``, or when
-        the job sets ``RUSTC_WRAPPER``.
-    """
-    for key in ('if', 'continue-on-error'):
-        if key in step:
-            raise AssertionError(
-                f'the cache assertion must not carry {key!r}; it must always '
-                'run and must fail the job'
-            )
-    if 'RUSTC_WRAPPER' in job.get('env', {}):
-        raise AssertionError(
-            'the job must not configure RUSTC_WRAPPER; the control requires '
-            'it unset'
-        )
-
-
-def _check_no_step_wrapper(job: dict) -> None:
-    """Reject a step-level ``RUSTC_WRAPPER`` anywhere in the job.
-
-    A step-level value applies to that step alone, so an assertion that
-    observed an empty wrapper would say nothing about a timed, warm-up, or
-    proof step that configured its own cache.
-
-    Raises
-    ------
-    AssertionError
-        When any step's ``env`` mapping sets ``RUSTC_WRAPPER``.
-    """
-    for step in job['steps']:
-        if 'RUSTC_WRAPPER' in step.get('env', {}):
-            raise AssertionError(
-                f'step {step.get("name", step.get("uses", ""))!r} must not '
-                'configure RUSTC_WRAPPER; the control requires it unset'
-            )
-
-
-def _check_assertion_script(step: dict) -> None:
-    """Require the exact fail-fast script that checks and records.
-
-    Only three commands are permitted, in this order: strict mode, the exact
-    absence check, and the environment record. A fourth line could exit
-    successfully before the check, and a condition could skip it, while both
-    required lines remained in the text. This also rejects masking forms such
-    as ``|| true`` and ``set +e`` by construction.
-
-    Raises
-    ------
-    AssertionError
-        When the executable lines are not exactly the permitted sequence.
-    """
-    lines = _executable_lines(cast('str', step.get('run', '')))
-    if not _is_permitted_assertion_sequence(lines):
-        raise AssertionError(
-            'the cache assertion must be exactly the strict-mode line, the '
-            'RUSTC_WRAPPER absence check and the environment record, in that '
-            f'order; got {lines!r}'
-        )
-
-
-def _is_permitted_assertion_sequence(lines: list[str]) -> bool:
-    """Whether ``lines`` is the strict-mode, check, and record sequence.
-
-    The record line is compared exactly. A looser match accepts a line that
-    prints the names of the two variables rather than their values, which
-    creates no evidence for the acceptance record.
-
-    Examples
-    --------
-    The committed script is the permitted sequence::
-
-        _is_permitted_assertion_sequence(['set -euo pipefail', ...])  # True
-    """
-    return lines == [STRICT_MODE, ABSENCE_CHECK, ENVIRONMENT_RECORD]
-
-
-def _setup_rust_inputs(job: dict) -> dict[str, str]:
-    """Return the ``with:`` inputs of the job's sole pinned ``setup-rust`` step.
-
-    Raises
-    ------
-    AssertionError
-        When the job has no ``setup-rust`` step or more than one.
-    """
-    step = job['steps'][_step_index_using(job, SETUP_RUST_ACTION)]
-    return cast('dict', step.get('with', {}))
 
 
 class TriggerTests(unittest.TestCase):
