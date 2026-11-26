@@ -132,14 +132,15 @@ jobs:
   # protocol: five cold and five warm builds per profile, profiles alternating
   # run by run, one discarded warm-up per phase, a fresh CARGO_TARGET_DIR for
   # each cold run, sccache off with RUSTC_WRAPPER verified unset, incremental
-  # compilation disabled, one untimed `cargo fetch --locked`, and a single
-  # timed invocation per step. Nothing here decides the verdict; it records the
+  # compilation disabled, one untimed `cargo fetch --locked`, and one timed
+  # invocation per sample. Nothing here decides the verdict; it records the
   # evidence the acceptance record is written from.
   #
   # The profiles alternate *within one runner*, so this job is a single leg
   # rather than a matrix. Three parallel legs would each be a separate machine
-  # and the interleaving the control requires — native, proof, Polars, native,
-  # proof, Polars … — would never happen. The loop below is the interleaving.
+  # and the interleaving the control requires — native-only, Polars-enabled,
+  # proof, native-only, Polars-enabled, proof … — would never happen. The loop
+  # below is the interleaving.
   #
   # The proof profile's timed region is Kani codegen of the kernel, not
   # `cargo build`. It runs through the installed driver directly rather than
@@ -180,9 +181,11 @@ jobs:
           rustflags: ''
           # The control measures with no sccache, and this action's default is
           # `true`, which installs the binary and exports `SCCACHE_PATH`. Left
-          # at the default, the next step's assertion could only pass because
-          # nothing had wired the wrapper yet — and the setup steps below, which
-          # compile, would run with a cache one environment variable away.
+          # at the default, the cache assertion that runs after provisioning
+          # and the untimed fetch, immediately before the first timed build,
+          # could only pass because nothing had wired the wrapper yet — and the
+          # provisioning steps in between would run with a cache one
+          # environment variable away.
           use-sccache: 'false'
       - uses: astral-sh/setup-uv@12d13f90bc3a5a1971bebad4beb09a4dfa962e91
       - name: Install the linker toolchain
@@ -313,7 +316,7 @@ jobs:
           # The control's cache policy is "no sccache", and every step above this
           # one provisions tools. The assertion belongs here rather than at the
           # top of the job, so it observes the environment the timed builds will
-          # actually inherit: a wrapper exported by any provisioning step below
+          # actually inherit: a wrapper exported by any provisioning step above
           # fails the job instead of quietly caching the samples. The recorded
           # fact goes with it, for the same reason — an environment captured
           # before the tools were installed would describe a runner that never

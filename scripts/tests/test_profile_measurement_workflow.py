@@ -2,9 +2,10 @@
 
 The measurement numbers feed pre-registered acceptance controls, so a silent
 edit to the trigger, the measured routes, the pinned tool versions, the
-cold-run loop, the cache policy, or the artefact conditions would move the
-evidence without anyone noticing. These checks read the workflow file as data
-and assert each of those boundaries; they never start a runner.
+cold-run loop, the cache policy, the position of the cache assertion, or the
+artefact conditions would move the evidence without anyone noticing. These
+checks read the workflow file as data and assert each of those boundaries;
+they never start a runner.
 
 Examples
 --------
@@ -16,11 +17,41 @@ recorded evidence::
 
 from __future__ import annotations
 
+import copy
+import sys
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+import pytest
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from profile_measurement_contract import (
+    ABSENCE_CHECK,
+    BUILD_STANDARD_STEP,
+    CACHE_ASSERTION_STEP,
+    COLD_BUILD_STEP,
+    ENVIRONMENT_RECORD,
+    FETCH_STEP,
+    INCREMENTAL_BUILD_STEP,
+    PROVER_STEP,
+    SETUP_RUST_ACTION,
+    STRICT_MODE,
+    TIMED_INVOCATION,
+)
+from profile_measurement_mutations import _MUTATIONS, assert_rejected
+from profile_measurement_contract import (
+    check_cache_assertion_order as _check_cache_assertion_order,
+    executable_lines as _executable_lines,
+    named_step as _named_step,
+    setup_rust_inputs as _setup_rust_inputs,
+    step_index_named as _step_index_named,
+    step_index_using as _step_index_using,
+)
+
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/profile-measurements.yml'
@@ -29,7 +60,6 @@ ROUTES = ('rustdoc', 'clippy', 'whitaker', 'nextest', 'coverage', 'ui')
 MEASUREMENT_JOBS = ('measure-profile', 'build-budget')
 LABEL_GATE = "github.event.label.name == 'measure-profiles'"
 DISPATCH_GATE = "github.event_name == 'workflow_dispatch'"
-
 
 def _workflow() -> dict:
     """Return the measurement workflow decoded with every scalar as a string.
@@ -57,6 +87,10 @@ def _job(name: str) -> dict:
 def _step_run_matching(job: dict, needle: str) -> str:
     """Return the first ``run`` script in ``job`` that contains ``needle``.
 
+    Ordering-sensitive checks use the index locators below instead: a comment
+    in an earlier step that merely names the same text must not stand in for
+    the step whose position is being asserted.
+
     Raises
     ------
     AssertionError
@@ -67,20 +101,6 @@ def _step_run_matching(job: dict, needle: str) -> str:
         if needle in script:
             return cast('str', script)
     raise AssertionError(f'no step script in the job contains {needle!r}')
-
-
-def _setup_rust_inputs(job: dict) -> dict[str, str]:
-    """Return the ``with:`` inputs of one job's pinned ``setup-rust`` step.
-
-    Raises
-    ------
-    AssertionError
-        When the job has no ``setup-rust`` step.
-    """
-    for step in job['steps']:
-        if 'shared-actions/.github/actions/setup-rust@' in step.get('uses', ''):
-            return cast('dict', step.get('with', {}))
-    raise AssertionError('the job has no setup-rust step')
 
 
 class TriggerTests(unittest.TestCase):
@@ -355,15 +375,17 @@ class BuildBudgetTests(unittest.TestCase):
 
     def test_the_caching_policy_matches_the_control(self) -> None:
         """A warm sccache or incremental compile would shorten every sample."""
-        environment = _job('build-budget')['env']
+        job = _job('build-budget')
+        environment = job['env']
+        assertion = _named_step(job, CACHE_ASSERTION_STEP)
 
         self.assertEqual(environment['CARGO_INCREMENTAL'], '0', 'incremental state must not shorten a run')
         self.assertEqual(environment['CARGO_BUILD_JOBS'], '4', 'the measured parallelism must stay fixed')
         self.assertNotIn('SCCACHE_RECACHE', environment, 'the control measures with no sccache at all')
         self.assertIn(
-            'test -z "${RUSTC_WRAPPER-}"',
-            _step_run_matching(_job('build-budget'), 'RUSTC_WRAPPER'),
-            'the job must reject an inherited cache wrapper',
+            ABSENCE_CHECK,
+            assertion.get('run', ''),
+            'the assertion step must reject an inherited cache wrapper',
         )
 
     def test_setup_rust_does_not_install_sccache_for_the_measurement(self) -> None:
@@ -380,28 +402,17 @@ class BuildBudgetTests(unittest.TestCase):
         self.assertEqual(inputs.get('use-sccache'), 'false',
                          'the measuring job must not install sccache at all')
 
-    def test_the_cache_assertion_runs_after_the_tools_are_installed(self) -> None:
+    def test_the_cache_assertion_runs_after_setup_rust_and_the_tools(self) -> None:
         """The assertion must observe the environment the timed builds inherit.
 
         An assertion placed before ``setup-rust`` can only observe the runner's
         own environment, so a later provisioning step that exported
-        ``RUSTC_WRAPPER`` would go unnoticed while every sample was cached. The
-        step that asserts and records belongs immediately before the first
-        timed phase, with the tool installs between it and the top of the job.
+        ``RUSTC_WRAPPER`` would go unnoticed while every sample was cached.
+        ``setup-rust``, both named installers, and the untimed fetch must all
+        run first, and the first timed phase must follow the assertion with no
+        intervening step.
         """
-        steps = _job('build-budget')['steps']
-        names = [step.get('name', '') for step in steps]
-        assertion = next(index for index, step in enumerate(steps)
-                         if 'RUSTC_WRAPPER' in step.get('run', ''))
-        cold = names.index('Measure five cold builds per profile, alternating')
-
-        self.assertLess(assertion, cold, 'the assertion must precede the first timed build')
-        self.assertLess(cold - assertion, 2,
-                        'only the fetch may sit between the assertion and the timed builds')
-        for installed in ('Install the pinned build standard',
-                          'Install the pinned Kani and Verus releases'):
-            self.assertLess(names.index(installed), assertion,
-                            f'setup step {installed!r} must run before the assertion observes it')
+        _check_cache_assertion_order(_job('build-budget'))
 
     def test_the_proof_profile_runs_the_installed_driver_directly(self) -> None:
         """The helper's `kani exec` refuses this repository's backend table."""
@@ -503,6 +514,44 @@ class BuildBudgetTests(unittest.TestCase):
                          'the solver path must come from the install action')
         self.assertIn('"$Z3_PATH" --version > build-budget/z3', step['run'],
                       'the recorded version must come from that binary')
+
+
+class CacheAssertionOrderTests(unittest.TestCase):
+    """The committed job and harmless mentions satisfy the cache contract."""
+
+    def test_the_unmodified_job_is_accepted(self) -> None:
+        """A checker that rejected the committed job could not guard it."""
+        _check_cache_assertion_order(_job('build-budget'))
+
+    def test_an_earlier_comment_mentioning_the_wrapper_is_accepted(self) -> None:
+        """Only the named step counts, not the first text that names it."""
+        job = _job('build-budget')
+        begin = _named_step(job, 'Begin the build-budget measurement')
+        begin['run'] = begin['run'] + '\n# RUSTC_WRAPPER must stay unset for AC-04\n'
+        self.assertNotEqual(job, _job('build-budget'), 'the comment must change the parsed job')
+
+        _check_cache_assertion_order(job)
+
+    def test_an_earlier_comment_mentioning_the_timing_command_is_accepted(self) -> None:
+        """A comment naming the timing command runs nothing and must not fail."""
+        job = _job('build-budget')
+        begin = _named_step(job, 'Begin the build-budget measurement')
+        begin['run'] = begin['run'] + '\n# Samples use /usr/bin/time per invocation\n'
+        self.assertNotEqual(job, _job('build-budget'), 'the comment must change the parsed job')
+
+        _check_cache_assertion_order(job)
+
+
+@pytest.mark.parametrize('mutate', _MUTATIONS)
+def test_one_removed_protection_is_rejected(mutate: Callable[[dict], None]) -> None:
+    """Each mutation removes exactly one protection, and must be rejected.
+
+    The equality guard inside :func:`assert_rejected` proves the mutation
+    changed the parsed job, so a passing rejection cannot come from an edit
+    that silently did nothing. The case ids name the protection each mutation
+    removes, so a failure points at the guard that stopped working.
+    """
+    assert_rejected(_job('build-budget'), mutate)
 
 
 if __name__ == '__main__':
