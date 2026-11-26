@@ -247,13 +247,22 @@ def _export_wrapper_in_an_incremental_build(job: dict) -> None:
     step['run'] = step['run'] + '\nexport RUSTC_WRAPPER=sccache\n'
 
 
+_TIMED_CARGO = (
+    '/usr/bin/time -v -o "$output.time" \\\n'
+    '      cargo build --workspace'
+)
+_WRAPPED_TIMED_CARGO = (
+    '/usr/bin/time -v -o "$output.time" \\\n'
+    '      env CARGO_BUILD_JOBS=4 RUSTC_WRAPPER=sccache \\\n'
+    '      cargo build --workspace'
+)
+
+
 def _hide_wrapper_after_env_arguments(job: dict) -> None:
-    """Set a wrapper after other `env` assignments in a measured script."""
+    """Set a wrapper after other `env` arguments on the timed Cargo build."""
     step = _named_step(job, COLD_BUILD_STEP)
-    step['run'] = (
-        step['run'].rstrip('\n')
-        + '\nenv CARGO_BUILD_JOBS=4 RUSTC_WRAPPER=sccache true\n'
-    )
+    assert _TIMED_CARGO in step['run'], 'the cold phase must run the timed Cargo build'
+    step['run'] = step['run'].replace(_TIMED_CARGO, _WRAPPED_TIMED_CARGO)
 
 
 def _move_tool_identity_after_the_cold_build(job: dict) -> None:
