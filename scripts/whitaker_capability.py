@@ -13,6 +13,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from probe_command_guard import (
+    DENIED_COMMAND_MARKER,
+    install_denied_commands,
+    write_executable,
+)
+
 PROBE_TIMEOUT_SECONDS = 5
 INSTALLER_STUB = '''#!/bin/bash
 set -eu
@@ -26,10 +32,6 @@ fi
 printf '%s' "$PROBE_STDOUT"
 printf '%s' "$PROBE_STDERR" >&2
 exit "$PROBE_STATUS"
-'''
-DENIED_EXECUTOR = '''#!/bin/bash
-printf '%s\\n' "$0" >> "$PROBE_ROOT/denied-command"
-exit 95
 '''
 
 
@@ -81,12 +83,6 @@ def input_values(inputs: dict, scenario: Scenario, root: Path) -> dict[str, str]
             'installer-version': scenario.installer_version or defaults['installer-version']}
 
 
-def executable(path: Path, source: str) -> None:
-    """Write a private fake command; e.g. denied download tools record and fail."""
-    path.write_text(source, encoding='utf-8')
-    path.chmod(0o700)
-
-
 def environment(root: Path, values: dict, scenario: Scenario) -> dict[str, str]:
     """Create an explicit child environment without credentials or ambient tool paths."""
     tools = root / 'utilities'
@@ -95,11 +91,10 @@ def environment(root: Path, values: dict, scenario: Scenario) -> dict[str, str]:
         origin = Path('/usr/bin') / command
         require(origin.is_file(), f'probe utility unavailable: {origin}')
         (tools / command).symlink_to(origin)
-    for command in ('curl', 'wget', 'git', 'cargo', 'rustup', 'python', 'python3', 'node', 'uv'):
-        executable(tools / command, DENIED_EXECUTOR)
+    install_denied_commands(tools, root / DENIED_COMMAND_MARKER)
     installer = root / 'cargo-home' / 'bin' / 'whitaker-installer'
     installer.parent.mkdir(parents=True)
-    executable(installer, INSTALLER_STUB)
+    write_executable(installer, INSTALLER_STUB)
     (root / 'output').touch()
     (root / 'path').touch()
     (root / 'summary').touch()
@@ -112,24 +107,32 @@ def environment(root: Path, values: dict, scenario: Scenario) -> dict[str, str]:
             'WHITAKER_INSTALLER_PATH': str(installer), 'WHITAKER_INSTALLER_VERSION': values['installer-version']}
 
 
+def input_expression_value(expression: str, values: dict) -> str:
+    """Resolve one `${{ inputs.<name> }}` expression from the action's inputs."""
+    input_name = expression.removeprefix('${{ inputs.').removesuffix(' }}')
+    require(input_name in values, f'unknown action input: {input_name}')
+    return values[input_name]
+
+
 def resolve_env(step: dict, values: dict, base: dict) -> dict[str, str]:
     """Resolve the limited input/output expressions the probed fragments consume."""
+    outputs = {
+        '${{ steps.validate-inputs.outputs.installer-path }}': base['WHITAKER_INSTALLER_PATH'],
+        '${{ steps.validate-inputs.outputs.installer-version }}': values['installer-version'],
+        # The probe never acquires a Clippy snapshot: the step publishes no bundle
+        # unless a scenario supplies a synthetic path to check the argument hand-off.
+        '${{ steps.snapshot-download.outputs.bundle }}': base['PROBE_BUNDLE'],
+    }
     result = dict(base)
     for name, expression in step.get('env', {}).items():
-        if isinstance(expression, str) and expression.startswith('${{ inputs.'):
-            input_name = expression.removeprefix('${{ inputs.').removesuffix(' }}')
-            require(input_name in values, f'unknown action input: {input_name}')
-            result[name] = values[input_name]
-        elif expression == '${{ steps.validate-inputs.outputs.installer-path }}':
-            result[name] = base['WHITAKER_INSTALLER_PATH']
-        elif expression == '${{ steps.validate-inputs.outputs.installer-version }}':
-            result[name] = values['installer-version']
-        elif expression == '${{ steps.snapshot-download.outputs.bundle }}':
-            # The probe never downloads a Clippy snapshot: the step publishes no bundle
-            # unless a scenario supplies a synthetic path to check the argument hand-off.
-            result[name] = base['PROBE_BUNDLE']
+        require(isinstance(expression, str),
+                f'unsupported probe environment expression: {name}={expression}')
+        if expression.startswith('${{ inputs.'):
+            result[name] = input_expression_value(expression, values)
         else:
-            raise ValueError(f'unsupported probe environment expression: {name}={expression}')
+            require(expression in outputs,
+                    f'unsupported probe environment expression: {name}={expression}')
+            result[name] = outputs[expression]
     return result
 
 
@@ -159,8 +162,8 @@ def run_scenario(parts: tuple, scenario: Scenario, expectation: str) -> None:
         if expectation == 'invalid-input':
             require(validated.returncode != 0, 'prohibited installer/suite input was accepted')
             require(not any((root / name).exists() for name in
-                            ('arguments', 'cargo-started', 'denied-command')),
-                    'invalid inputs must fail before installation/download/build executors')
+                            ('arguments', 'cargo-started', DENIED_COMMAND_MARKER)),
+                    'invalid inputs must fail before installation or network/build executors')
             return
         require(validated.returncode == 0, f'action defaults/inputs rejected: {validated.stderr}')
         outputs = dict(line.split('=', 1) for line in (root / 'output').read_text().splitlines())
@@ -169,7 +172,8 @@ def run_scenario(parts: tuple, scenario: Scenario, expectation: str) -> None:
         require(outputs.get('installer-version') == values['installer-version'],
                 'validation must preserve the requested installer version')
         result = execute(installation, root, resolve_env(installation, values, base))
-        require(not (root / 'denied-command').exists(), 'fragment attempted a network/build executor')
+        require(not (root / DENIED_COMMAND_MARKER).exists(),
+                'fragment attempted a network/build executor')
         require(not (root / 'cargo-started').exists(), 'missing assets permitted a source build')
         arguments = (root / 'arguments').read_text().splitlines() if (root / 'arguments').exists() else []
         expected_args = ['--no-source-fallback'] + (['--cranelift'] if scenario.cranelift == 'true' else [])
