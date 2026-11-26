@@ -27,12 +27,24 @@ from __future__ import annotations
 from typing import cast
 
 SETUP_RUST_ACTION = 'leynos/shared-actions/.github/actions/setup-rust@'
+SETUP_PYTHON_ACTION = 'astral-sh/setup-uv@'
+LINKER_STEP = 'Install the linker toolchain'
 CACHE_ASSERTION_STEP = 'Confirm the measured environment carries no cache'
 COLD_BUILD_STEP = 'Measure five cold builds per profile, alternating'
 INCREMENTAL_BUILD_STEP = 'Measure five incremental builds per profile, alternating'
 FETCH_STEP = 'Fetch dependencies once, untimed'
 BUILD_STANDARD_STEP = 'Install the pinned build standard'
 PROVER_STEP = 'Install the pinned Kani and Verus releases'
+
+# Every step that could provision a compiler wrapper must finish before the
+# assertion observes the environment, not merely the three named installers.
+PROVISIONING_STEPS = (
+    ('setup-rust', SETUP_RUST_ACTION),
+    ('setup-uv', SETUP_PYTHON_ACTION),
+    (LINKER_STEP, LINKER_STEP),
+    (BUILD_STANDARD_STEP, BUILD_STANDARD_STEP),
+    (PROVER_STEP, PROVER_STEP),
+)
 
 ABSENCE_CHECK = 'test -z "${RUSTC_WRAPPER-}"'
 ENVIRONMENT_RECORD = (
@@ -152,6 +164,7 @@ def check_cache_assertion_order(job: dict) -> None:
     check_assertion_step(job, assertion_step)
     check_assertion_script(assertion_step)
     check_no_step_wrapper(job)
+    check_no_script_wrapper(job)
 
 
 def check_cold_build_follows(job: dict, assertion: int) -> None:
@@ -169,19 +182,24 @@ def check_cold_build_follows(job: dict, assertion: int) -> None:
 
 
 def check_prerequisites_precede(job: dict, assertion: int) -> None:
-    """Require setup-rust, both installers and the fetch before the assertion.
+    """Require every provisioning step and the untimed fetch before the check.
+
+    The named installers are not the whole set: the linker toolchain and the
+    ``setup-uv`` action also run ahead of the assertion, and either could
+    export a wrapper. Checking every provisioning step, rather than a sample of
+    them, keeps the guarantee that nothing that provisions tools can follow the
+    observation.
 
     Raises
     ------
     AssertionError
         When any provisioning step or the fetch follows the assertion.
     """
-    prerequisites = (
-        ('setup-rust', step_index_using(job, SETUP_RUST_ACTION)),
-        (BUILD_STANDARD_STEP, step_index_named(job, BUILD_STANDARD_STEP)),
-        (PROVER_STEP, step_index_named(job, PROVER_STEP)),
-        (FETCH_STEP, step_index_named(job, FETCH_STEP)),
-    )
+    prerequisites = [
+        (label, _locate(job, target))
+        for label, target in PROVISIONING_STEPS
+    ]
+    prerequisites.append((FETCH_STEP, step_index_named(job, FETCH_STEP)))
     for label, index in prerequisites:
         if index >= assertion:
             raise AssertionError(
@@ -190,8 +208,19 @@ def check_prerequisites_precede(job: dict, assertion: int) -> None:
             )
 
 
+def _locate(job: dict, target: str) -> int:
+    """Return the index of a step named ``target`` or carried by that action."""
+    if target.endswith('@'):
+        return step_index_using(job, target)
+    return step_index_named(job, target)
+
+
 def check_no_earlier_timed_step(job: dict, assertion: int) -> None:
     """Reject a sample taken before the environment is observed.
+
+    The check rejects a timed step ahead of the assertion even when it runs the
+    timing command inside a script rather than through a dedicated step, because
+    it reads every step's script rather than only that step's name.
 
     Raises
     ------
@@ -276,6 +305,46 @@ def check_no_step_wrapper(job: dict) -> None:
                 f'step {step_label(step)!r} must not configure RUSTC_WRAPPER; '
                 'the control requires it unset'
             )
+
+
+def check_no_script_wrapper(job: dict) -> None:
+    """Reject a wrapper assigned inside any step's script.
+
+    A script can export ``RUSTC_WRAPPER`` for the commands it runs without
+    touching YAML ``env``, so a scan of ``env`` mappings alone cannot see it.
+    An assignment in the assertion's own script is rejected by the exact
+    sequence check; this scan covers every other step.
+
+    Raises
+    ------
+    AssertionError
+        When any step's executable lines assign ``RUSTC_WRAPPER``.
+
+    Examples
+    --------
+    An export inside a timed script is rejected::
+
+        check_no_script_wrapper({'steps': [{'run': 'export RUSTC_WRAPPER=x'}]})
+    """
+    for step in job['steps']:
+        for line in executable_lines(cast('str', step.get('run', ''))):
+            if assigns_wrapper(line):
+                raise AssertionError(
+                    f'step {step_label(step)!r} must not assign RUSTC_WRAPPER '
+                    f'in its script: {line!r}'
+                )
+
+
+def assigns_wrapper(line: str) -> bool:
+    """Whether a shell line assigns ``RUSTC_WRAPPER``.
+
+    Both ``RUSTC_WRAPPER=value`` and ``export RUSTC_WRAPPER=value`` count.
+    """
+    return (
+        line.startswith('RUSTC_WRAPPER=')
+        or 'export RUSTC_WRAPPER=' in line
+        or line.startswith('env RUSTC_WRAPPER=')
+    )
 
 
 def check_assertion_script(step: dict) -> None:
