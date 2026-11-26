@@ -56,7 +56,7 @@ pretty_assertions = "1.4.1"
 # values, which a finite table cannot cover (DL-6). It is dev-only: the shipped
 # dependency closure is unchanged apart from the lockfile.
 proptest = "1.12.0"
-rstest = { version = "0.27.0", default-features = false }
+rstest = { version = "0.29.0", default-features = false }
 rstest-bdd = "0.6.0"
 rstest-bdd-macros = "0.6.0"
 serde = { version = "1.0.228", features = ["derive"] }
