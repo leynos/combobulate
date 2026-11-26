@@ -107,24 +107,32 @@ def environment(root: Path, values: dict, scenario: Scenario) -> dict[str, str]:
             'WHITAKER_INSTALLER_PATH': str(installer), 'WHITAKER_INSTALLER_VERSION': values['installer-version']}
 
 
+def input_expression_value(expression: str, values: dict) -> str:
+    """Resolve one `${{ inputs.<name> }}` expression from the action's inputs."""
+    input_name = expression.removeprefix('${{ inputs.').removesuffix(' }}')
+    require(input_name in values, f'unknown action input: {input_name}')
+    return values[input_name]
+
+
 def resolve_env(step: dict, values: dict, base: dict) -> dict[str, str]:
     """Resolve the limited input/output expressions the probed fragments consume."""
+    outputs = {
+        '${{ steps.validate-inputs.outputs.installer-path }}': base['WHITAKER_INSTALLER_PATH'],
+        '${{ steps.validate-inputs.outputs.installer-version }}': values['installer-version'],
+        # The probe never acquires a Clippy snapshot: the step publishes no bundle
+        # unless a scenario supplies a synthetic path to check the argument hand-off.
+        '${{ steps.snapshot-download.outputs.bundle }}': base['PROBE_BUNDLE'],
+    }
     result = dict(base)
     for name, expression in step.get('env', {}).items():
-        if isinstance(expression, str) and expression.startswith('${{ inputs.'):
-            input_name = expression.removeprefix('${{ inputs.').removesuffix(' }}')
-            require(input_name in values, f'unknown action input: {input_name}')
-            result[name] = values[input_name]
-        elif expression == '${{ steps.validate-inputs.outputs.installer-path }}':
-            result[name] = base['WHITAKER_INSTALLER_PATH']
-        elif expression == '${{ steps.validate-inputs.outputs.installer-version }}':
-            result[name] = values['installer-version']
-        elif expression == '${{ steps.snapshot-download.outputs.bundle }}':
-            # The probe never acquires a Clippy snapshot: the step publishes no bundle
-            # unless a scenario supplies a synthetic path to check the argument hand-off.
-            result[name] = base['PROBE_BUNDLE']
+        require(isinstance(expression, str),
+                f'unsupported probe environment expression: {name}={expression}')
+        if expression.startswith('${{ inputs.'):
+            result[name] = input_expression_value(expression, values)
         else:
-            raise ValueError(f'unsupported probe environment expression: {name}={expression}')
+            require(expression in outputs,
+                    f'unsupported probe environment expression: {name}={expression}')
+            result[name] = outputs[expression]
     return result
 
 
