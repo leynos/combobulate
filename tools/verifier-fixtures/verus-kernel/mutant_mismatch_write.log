@@ -1,0 +1,18 @@
+verification results:: 0 verified, 1 errors (partial verification with `--verify-*`)
+note: verifying root module (selected functions)
+
+error: postcondition not satisfied
+   --> <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs:106:9
+    |
+106 |         k5(lhs@, rhs@, old(out)@, final(out)@, r),
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+...
+113 |         return Err(AddFailure::LengthMismatch);
+    |         -------------------------------------- at this exit
+
+error: aborting due to 1 previous error
+
+Verus proofs failed (exit 1).
+Binary: <repo>/.verus/0.2026.09.06.8dea4a2/verus/verus
+Proof file: <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs
+Toolchain: 1.98.0-x86_64-unknown-linux-gnu

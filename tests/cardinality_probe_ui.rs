@@ -59,6 +59,17 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 /// gate binary, or the gate silently becomes the nested build it replaced.
 const MANIFEST_DIR_VARIABLE: &str = "CARGO_MANIFEST_DIR";
 
+/// Build selectors the gate child must not inherit.
+///
+/// `make test` assigns `RUSTFLAGS` for the root suite, and `trybuild` passes
+/// the inherited value to the nested build it starts. That makes the nested
+/// build's fingerprint depend on how the suite was invoked, so the gate's
+/// warm cache is discarded on every run and the test pays a cold compile under
+/// the shared queue. The gate is its own workspace with its own manifest, so
+/// the root suite's flags have no business reaching it; removing them is what
+/// lets a second run reuse the first's output.
+const BUILD_SELECTORS: [&str; 3] = ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"];
+
 /// The gate package's directory, relative to the repository root.
 const GATE_DIRECTORY: &str = "tools/gates/cardinality-ui";
 
@@ -86,11 +97,12 @@ fn checked_cardinality_result_must_be_used() {
         )
     });
 
-    let observed = Command::new(&binary)
-        .current_dir(&gate)
-        .env_remove(MANIFEST_DIR_VARIABLE)
-        .output()
-        .expect("the gate test binary must start");
+    let mut command = Command::new(&binary);
+    command.current_dir(&gate).env_remove(MANIFEST_DIR_VARIABLE);
+    for name in BUILD_SELECTORS {
+        command.env_remove(name);
+    }
+    let observed = command.output().expect("the gate test binary must start");
 
     assert!(
         observed.status.success(),

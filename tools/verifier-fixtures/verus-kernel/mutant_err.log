@@ -1,0 +1,39 @@
+verification results:: 0 verified, 1 errors (partial verification with `--verify-*`)
+note: verifying root module (selected functions)
+
+note: function body check: not all errors may have been reported; rerun with a higher value for --multiple-errors to find other potential errors in this function
+  --> <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs:36:1
+   |
+36 | pub fn mutant_err(lhs: &[i64], rhs: &[i64], out: &mut [i64]) -> (r: Result<(), AddFailure>)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: postcondition not satisfied
+  --> <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs:39:9
+   |
+39 |           k2(lhs@, rhs@, old(out)@, final(out)@, r),
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+...
+43 | / {
+44 | |     let _ = (lhs, rhs, out);
+45 | |     Err(AddFailure::LengthMismatch)
+46 | | }
+   | |_- at the end of the function body
+
+error: postcondition not satisfied
+  --> <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs:40:9
+   |
+40 |           k3(lhs@, rhs@, old(out)@, final(out)@, r),
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ failed this postcondition
+...
+43 | / {
+44 | |     let _ = (lhs, rhs, out);
+45 | |     Err(AddFailure::LengthMismatch)
+46 | | }
+   | |_- at the end of the function body
+
+error: aborting due to 2 previous errors
+
+Verus proofs failed (exit 1).
+Binary: <repo>/.verus/0.2026.09.06.8dea4a2/verus/verus
+Proof file: <repo>/crates/combobulate-kernel/verus/elementwise_add_mutants.rs
+Toolchain: 1.98.0-x86_64-unknown-linux-gnu

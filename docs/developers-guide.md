@@ -221,29 +221,33 @@ push. This scaffold does not include an automerge workflow.
 A test that starts a child process owns a nested build, and a nested build is
 where this repository has already lost two and a quarter hours to a single
 test. Nextest bounds that work: `.config/nextest.toml` sets a 60 s slow warning
-with `terminate-after = 5`, so an ordinary test ends at 300 s. The cardinality
-gate's `trybuild` test has its own override at `terminate-after = 10`, because
-it compiles a generated crate; the comment there records the measurements the
-figure came from. The whole run carries a `global-timeout` of 60 minutes, far
-above any measured test and above the hosted jobs' own 8-minute limit, so in
-practice it is an outer limit on local `cargo nextest` runs; the coverage
+with `terminate-after = 5`, so an ordinary test ends at 300 s. Three tests
+carry their own override at `terminate-after = 20`: the cardinality gate's
+`trybuild` test, which compiles a generated crate and has been measured
+overrunning 600 s inside the suite, and the two downstream-fixture tests, whose
+first build compiles the facade and kernel cold and was measured at about 7 m
+30 s under a contended queue. All three compile a nested crate under the shared
+compile queue, and the comment beside each figure records the measurements it
+came from. The whole run carries a `global-timeout` of 60 minutes, far above
+any measured test and above the hosted jobs' own 20-minute `timeout-minutes`,
+so in practice it is an outer limit on local `cargo nextest` runs; the coverage
 action's own 1,800-second Cargo watchdog stops a hung coverage lane first. An
 earlier version of this file left the bound out on purpose, and the file
 records why that was superseded. Tests that start Cargo or rustc
-(`polars_surface_ui`, `native_consumer_e2e`, the cardinality gate's
-`cardinality_probe_ui`, and the read-only `workspace_profiles`,
-`workspace_boundaries` and `build_toolchain_contract`) run one at a time in the
-`nested-cargo` test group, so their nested builds and queries do not compete
-for cores or the package-cache lock; a new test that spawns Cargo, even only to
-read metadata, is added to that group's override filter. Those numbers, the
-arithmetic behind them, and the reasons for the bound are policy, and they live
-in that file beside the values rather than here.
+(`polars_surface_ui`, `native_consumer_e2e`, `non_exhaustive_contract`, the
+cardinality gate's `cardinality_probe_ui`, and the read-only
+`workspace_profiles`, `workspace_boundaries` and `build_toolchain_contract`)
+run one at a time in the `nested-cargo` test group, so their nested builds and
+queries do not compete for cores or the package-cache lock; a new test that
+spawns Cargo, even only to read metadata, is added to that group's override
+filter. Those numbers, the arithmetic behind them, and the reasons for the
+bound are policy, and they live in that file beside the values rather than here.
 
 Tests start plain `std::process::Command` children and add no deadline of their
 own. Nextest terminates the test's process group at the limit. A descendant
 that ignores `SIGTERM` can outlive a test that itself exits on `SIGTERM`,
 because nextest then has no process left to escalate to `SIGKILL`. Only the
-job's own `timeout-minutes` bounds it (all three required jobs set 8;
+job's own `timeout-minutes` bounds it (all three required jobs set 20;
 `coverage-main.yml` sets none, so GitHub's 360-minute default applies there,
 and neither nextest's limits, including the 60-minute `global-timeout`, nor the
 coverage action's Cargo watchdog bound a surviving descendant, and none of them
@@ -252,10 +256,26 @@ run, which `make test` falls back to when cargo-nextest is missing, has no
 limit at all. Ordinary builds and sleeping children do end under nextest.
 
 `make test-ui` is the one route with its own bound. It runs the recorded gate
-binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run` (600
-s, classified by `scripts/tests/test_cardinality_ui_deadline.py`), because the
-standalone `cargo test --test cardinality_ui` invocation inside the gate
-package has no `terminate-after` behind it.
+binary itself under GNU `timeout` in `scripts/cardinality_ui_gate.py run`
+(1,200 s, the same twenty-period allowance the nextest override gives the root
+test, and classified by `scripts/tests/test_cardinality_ui_deadline.py`),
+because the standalone `cargo test --test cardinality_ui` invocation inside the
+gate package has no `terminate-after` behind it.
+
+Both routes that run the gate binary — the root test and `make test-ui` — scrub
+the caller's build selectors: `RUSTFLAGS`, `CARGO_ENCODED_RUSTFLAGS` and
+`CARGO_BUILD_TARGET`. `make test` assigns `RUSTFLAGS`, and `trybuild` hands the
+inherited value to the nested build it starts, so leaving it in place made the
+nested fingerprint depend on how the suite was invoked and discarded the gate's
+warm cache on every run. Both routes must agree, or each discards what the
+other wrote and pays a cold compile in turn. With the selectors removed, a
+second run reuses the first's output: measured at 143 s under the suite's own
+`RUSTFLAGS` against a cold compile that did not finish inside the 600 s
+allowance. The root test scrubs them in `tests/cardinality_probe_ui.rs` and the
+direct route in `scripts/cardinality_ui_gate.py run`; the latter's
+`test_cardinality_ui_deadline.py` case sets all three and requires their
+removal, so a route that stopped scrubbing them fails rather than silently
+thrashing the cache.
 
 ### Preparation happens outside test bodies
 
@@ -270,6 +290,34 @@ workspace reads in `tests/workspace_boundaries.rs` run `cargo metadata` and
 and are bounded by nextest when it runs them. The gate preparation itself is a
 Cargo command, but it is a Make recipe that runs before any test body, not
 something a test body starts.
+
+Two test bodies compile a downstream fixture, and both are bounded exceptions
+rather than the incident's shape. `tests/native_consumer_e2e.rs` builds
+`tools/fixtures/native-consumer/`, and `tests/non_exhaustive_contract.rs` builds
+`tools/fixtures/non-exhaustive-contract/`; each is a separate workspace whose
+only dependency is the facade by path with default features off. What that
+excludes is the root suite's dev-dependency graph: nothing either fixture
+compiles is a dev-dependency of this suite, which is the graph the incident
+compiled. The facade and the kernel still build through the facade's normal
+dependencies, and that cold build is a real part of both fixtures' cost — it is
+what the `non_exhaustive_contract` measurement below records. That separation
+is the point: the tests exist to prove the facade works for a consumer outside
+the workspace, which cannot be shown by anything already inside it. Both run
+their nested Cargo with `--locked` and a target directory under
+`CARGO_TARGET_TMPDIR`, so neither resolves a new lockfile nor writes into the
+repository, and a later build in the same run reuses the first's output.
+`native_consumer_e2e` carries the twenty-period override: its four-second warm
+measurement on an idle host describes the case where the fixture's target
+directory already holds the facade and kernel, and its first build compiles
+them cold. Measured at 7 m 30 s locally while the shared compile queue held
+about 376 waiting builds, and it timed out at the default 300 s in the suite
+when a change to the facade invalidated the cache. `non_exhaustive_contract`
+carries the same override for the same reason, and its first build measured the
+same order of cost: 4 m 07 s at about 230 waiting builds, 7 m 32 s at about
+376, and 76 s for the whole binary on an idle host when it stated three
+contracts. It carried ten periods until the covered half was measured
+overrunning 600 s after a change to the formatter invalidated the cache; the
+cold build is what both fixtures pay, and it scales with the compile queue.
 
 `make prepare-dependencies` runs `cargo fetch --locked` for the root workspace
 and for the cardinality gate's separate workspace. `make prepare-ui-gate`
@@ -597,31 +645,51 @@ than checking conditional compilation, so it runs once.
 
 ## Workspace layout and module ownership
 
-The workspace holds three crates, and dependency edges point one way. The facade
+The workspace holds four crates, and dependency edges point one way. The facade
 `combobulate` depends on both `combobulate-kernel` and `combobulate-macros`;
-neither of those depends on anything, and the macro crate never reaches the
-kernel. `tests/workspace_boundaries.rs` asserts that shape against live
-`cargo metadata` and `cargo tree` output, so a new edge fails a test rather
-than being noticed at review.
+`combobulate-test-macros` is a test-only dependency of the root package and is
+not on the facade's path. None of the three depends on another, and no macro
+crate ever reaches the kernel. `tests/workspace_boundaries.rs` asserts that
+shape against live `cargo metadata` and `cargo tree` output, so a new edge
+fails a test rather than being noticed at review.
 
-| Path                                            | Role                                                   | Re-use boundary                                               |
-| ----------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------- |
-| `crates/combobulate-kernel/`                    | `#![no_std]` without `alloc`; owns `TargetFacts`       | Target facts only; see the first policy below                 |
-| `crates/combobulate-macros/`                    | `proc-macro` crate; exports nothing until task 2.3.1   | Expansion boundary only; must not build `TargetFacts`         |
-| `src/lib.rs`                                    | Facade crate root                                      | Re-exports behind features; owns nothing below the facade     |
-| `src/profile.rs`                                | `BuildProfile`                                         | Reports features and target facts only                        |
-| `src/polars_backend.rs`                         | Crate-private Polars module, `cfg(feature = "polars")` | Wiring target for the pinned release; claims no capability    |
-| `scripts/docs_validation/trust_audit/`          | Trusted-item scanner behind the evidence gate          | The gate and the design check only                            |
-| `scripts/docs_validation/kani_log/`             | Kani log parser behind the evidence gate               | The gate's I/O shell only; the decision function is pure      |
-| `scripts/docs_validation/toolchain_profiles.py` | Pin checker for `spec/toolchain-profiles.json`         | Derives pins; other checks read the record instead of the pin |
-| `scripts/docs_validation/candidate_deferral.py` | Guard against a tick outrunning a deferred candidate   | Reads the roadmap export and D07's dispositions only          |
+| Path                                               | Role                                                         | Re-use boundary                                                |
+| -------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- |
+| `crates/combobulate-kernel/`                       | `#![no_std]` without `alloc`; owns `TargetFacts`             | Target facts only; see the first policy below                  |
+| `crates/combobulate-macros/`                       | `proc-macro` crate; exports nothing until task 2.3.1         | Expansion boundary only; must not build `TargetFacts`          |
+| `crates/combobulate-test-macros/`                  | Test-only attributes that suppress macro-expansion lints     | Test code only; not re-exported and never a shipped dependency |
+| `src/lib.rs`                                       | Facade crate root                                            | Re-exports behind features; owns nothing below the facade      |
+| `src/profile.rs`                                   | `BuildProfile`                                               | Reports features and target facts only                         |
+| `src/array.rs`                                     | `Array`, `Dtype`, and shared I64 storage                     | Values and their construction; no operation knowledge          |
+| `src/expr/`                                        | `AExpr`, `Unary`, `Binary`, `OperationId`, `identity`, `add` | Graphs and their static facts; runs no kernel                  |
+| `src/plan/`                                        | `NativeExecutor`, `PreparedPlan`, the schedule walk          | Prepared execution; the only caller of the kernel dispatch     |
+| `src/error/`                                       | `Stage`, `Failure`, `ExpressionError`                        | Reporting a rejected expression; no recovery policy            |
+| `src/polars_backend.rs`                            | Crate-private Polars module, `cfg(feature = "polars")`       | Wiring target for the pinned release; claims no capability     |
+| `crates/combobulate-kernel/src/elementwise_add.rs` | Verified I64 addition; one kernel per file                   | Called only through the facade's crate-private dispatch        |
+| `scripts/verus_kernel.py`                          | Pipeline that runs the kernel proof and its mutants          | Runs Verus; verdict rules live in its sibling module           |
+| `scripts/verus_kernel_verdicts.py`                 | Decides a proof verdict from one log                         | Reads a log and nothing else                                   |
+| `scripts/verus_kernel_identity.py`                 | The DL-14 executable identity tuple                          | States what a proof record is about; reads no file             |
+| `scripts/docs_validation/trust_audit/`             | Trusted-item scanner behind the evidence gate                | The gate and the design check only                             |
+| `scripts/docs_validation/kani_log/`                | Kani log parser behind the evidence gate                     | The gate's I/O shell only; the decision function is pure       |
+| `scripts/docs_validation/toolchain_profiles.py`    | Pin checker for `spec/toolchain-profiles.json`               | Derives pins; other checks read the record instead of the pin  |
+| `scripts/docs_validation/candidate_deferral.py`    | Guard against a tick outrunning a deferred candidate         | Reads the roadmap export and D07's dispositions only           |
 
 *Table 1: Workspace modules, roles, and re-use boundaries.*
 
-Five re-use policies follow from that table. They are stated here because each
+Seven re-use policies follow from that table. They are stated here because each
 one has already been tempting to break in a different file, and a boundary that
 lives only in a review comment is not a boundary.
 
+- `allow_fixture_expansion_lints` is the estate-approved answer to a `rstest`
+  `#[fixture]` whose single-expression body expands into a nested block that
+  `unused_braces` rejects. Apply it above `#[rstest::fixture]` instead of
+  copying the attribute pair onto each fixture: the suppression is then stated
+  once, carries its reason, and cannot drift as fixtures are added. It emits a
+  plain `#[expect(clippy::allow_attributes)]` rather than the upstream
+  `cfg_attr(clippy, …)` form, because Clippy reports that wrapper as
+  `unnecessary_clippy_cfg` and the workspace denies it. It is a test-only
+  crate: the facade does not re-export it, and it is absent from the shipped
+  dependency closure.
 - `TargetFacts` is kernel-owned, and it is the single source of target facts
   for checked rules and for the certificate keys that later tasks derive from
   them. The macro crate must not construct it: a procedural macro runs on the
@@ -655,6 +723,16 @@ lives only in a review comment is not a boundary.
 - `toolchain_profiles` validates pins. Other checks read pins from
   `spec/toolchain-profiles.json` rather than duplicating them, so a pin bump
   edits one record and the sites it names, not every consumer.
+- `elementwise_add` is reached only through the facade's single crate-private
+  dispatch function. No other module calls the kernel, and the kernel does not
+  reach back: its only input is the borrowed slices the dispatch supplies, so
+  the facade's storage, error and plan types never appear in a kernel
+  signature. Each new kernel gets its own file, its own `verus_spec`, its own
+  contract file, its own mutant root and its own `verus_kernel.py` entry rather
+  than joining a shared multi-operation proof, because a proof root that
+  verified two bodies at once would leave a reader unable to tell which body a
+  rejection belonged to. Reusing `elementwise_add` for a second operation is
+  therefore not a re-use of the kernel but a second kernel.
 
 ## Spelling policy
 
@@ -1251,7 +1329,7 @@ Keep calibration records in `spec/calibration/` and acceptance measurements in
 control. Validation checks that every control defines the registered fields and
 that each measurement record binds to its control, registration date, runner
 and toolchains. The accepted environment is the hosted `ubuntu-24.04` runner,
-and every required pull-request job has an eight-minute timeout. The matching
+and every required pull-request job has a 20-minute timeout. The matching
 `make act-validation` target maps `build-test` to the configured `ubuntu-24.04`
 Act runner image; the two Polars jobs are not run under Act. See the
 [acceptance calibration report](acceptance-calibration.md) for methodology,
@@ -1347,17 +1425,18 @@ cooldown would delay nothing.
 
 ## Formal verification
 
-The proofs that exist today are the calibration probes', not the kernel's; the
-kernel's own harnesses arrive with task 1.2.4 and join `make kani` and
-`make verus` then. What runs, and where:
+The proofs fall in two groups. The calibration probes and fixtures came first;
+the kernel's own proof is `make verus-kernel`, and its Kani harnesses arrive
+with task 1.2.4 and join `make kani` then. What runs, and where:
 
-| Proof                                                          | Target             | What it must show                                               |
-| -------------------------------------------------------------- | ------------------ | --------------------------------------------------------------- |
-| `tools/calibration/cardinality-probe` (2 Kani harnesses)       | `make kani`        | Both verify                                                     |
-| `tools/verifier-fixtures/kani-native-workspace` (1 harness)    | `make kani`        | The facade's target-facts harness verifies, cover satisfied     |
-| `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus` | Each run decides as `kani_logs/expected.json` records           |
-| `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`       | 8 functions verified, 0 errors                                  |
-| `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`       | Macro, attributes and single-root qualify; companion is refused |
+| Proof                                                          | Target              | What it must show                                               |
+| -------------------------------------------------------------- | ------------------- | --------------------------------------------------------------- |
+| `tools/calibration/cardinality-probe` (2 Kani harnesses)       | `make kani`         | Both verify                                                     |
+| `tools/verifier-fixtures/kani-native-workspace` (1 harness)    | `make kani`         | The facade's target-facts harness verifies, cover satisfied     |
+| `tools/verifier-fixtures/kani-corpus` (9 mixed Kani harnesses) | `make kani-corpus`  | Each run decides as `kani_logs/expected.json` records           |
+| `tools/calibration/cardinality-probe/verus/cardinality.rs`     | `make verus`        | 8 functions verified, 0 errors                                  |
+| `tools/verifier-fixtures/verus-wiring-probe` (4 Verus wirings) | `make verus`        | Macro, attributes and single-root qualify; companion is refused |
+| `crates/combobulate-kernel/verus/elementwise_add.rs`           | `make verus-kernel` | 20 verified, 0 errors; five mutants and `wrap` rejected         |
 
 `.github/workflows/formal.yml` runs all of them on a pull request that touches
 them and weekly. The ordinary commit gates do not install or execute a
@@ -1458,3 +1537,96 @@ The Kani log parser (`scripts/docs_validation/kani_log/`), the trust-audit
 scanner (`scripts/docs_validation/trust_audit/`) and `scripts/verus_probe.py`
 are prover-output tooling that the shared `rust-prover-tools` is expected to
 adopt; the request is <https://github.com/leynos/rust-prover-tools/issues/250>.
+
+## Product Verus proofs
+
+`make verus-kernel` is the first proof about shipped product code rather than
+about a probe fixture. It verifies `add_i64_into` in
+`crates/combobulate-kernel/src/elementwise_add.rs` against SC-12 and rejects
+the seeded mutants that would otherwise pass for a proof. The proofs are ADR
+evidence for a claim this repository makes about its own kernel, and they are
+committed as observations rather than admitted as evidence: DL-1 hands
+admission to `PF05.proof@2.3.5`, which re-runs the roots instead of adopting
+these logs.
+
+Two roots run. `verus/elementwise_add.rs` includes the production file by
+`#[path]`, so the proof is about the bytes Cargo compiles, and it must report
+exactly the pinned `20 verified, 0 errors` with no partial-verification suffix;
+a selection-sized run is not the crate. `verus/elementwise_add_mutants.rs`
+states the same clauses for five deliberately wrong bodies, and each runs alone
+with `--verify-root --verify-function=<name>`. A sixth, body-tier `wrap` mutant
+copies the production file under `target/`, replaces the checked addition with
+a wrapping one, and must fail a loop invariant located in that copy. It runs
+under a generated root that includes the mutated copy, not under the positive
+root, which would include the unmutated production file. That sixth run is what
+shows the shipped body's own annotation catches a wrong body rather than only a
+wrong wrapper: without it, a mutant suite could be satisfied entirely by the
+wrapper's postcondition.
+
+A mutant counts as rejected only when its diagnostic is a postcondition failure
+located inside its own declaration, at a clause it owes — the clause line is
+resolved from the file rather than hard-coded, so moving a clause keeps the
+record honest instead of stale. A diagnostic that names no location, another
+source, or a neighbouring clause does not qualify, and neither does an exit
+code by itself: a type, syntax or unsupported-feature error fails the run.
+Qualification is per diagnostic, not per distinct error text:
+`scripts/verus_kernel_diagnostic.py` pairs each `error:` with the `-->` line
+that follows it, so two failures that read alike stay two failures and an
+unlocated one cannot be absorbed by a located twin.
+`scripts/verus_kernel_verdicts.py` owns those rules and reads a log and nothing
+else; `scripts/verus_kernel.py` owns the pipeline, the log capture and the
+record. Keeping the split means the deciding rules can be unit-tested against
+synthetic logs without a solver, which is what
+`scripts/tests/test_verus_kernel.py` does. The record's own reproduction is
+tested separately in `scripts/tests/test_verus_record.py`, and the loader that
+stubs the driver's module-scope imports lives in
+`scripts/tests/verus_kernel_fixtures.py`.
+
+A bound source digest is only evidence while it still describes the file beside
+it, so `test_verus_record.py` recomputes every entry and fails on any that an
+edit has left behind. Rebinding is `make verus-kernel`'s job, not a manual
+edit: the digest is a property of the run that produced the observations.
+
+Each `uv run --script` script builds its environment from its own PEP 723
+block, so a third-party import that the block omits is absent on a machine
+whose cache is cold — even when it is installed here. `scripts/verus_kernel.py`
+therefore declares `tree-sitter` and `tree-sitter-rust`, which only
+`scripts/kernel_record.py` names, and inside a function rather than at module
+scope. `scripts/tests/test_script_dependencies.py` follows the import graph
+beneath every script and fails when a block omits a distribution it reaches. It
+also holds `verus_kernel.py` below Python 3.15, because the grammar publishes
+abi3 wheels only up to 3.14 and uv would otherwise build it from source and
+fail. A dependency that is declared but cannot install is still a broken script.
+
+A committed log carries the verifier's own words and nothing else. Two kinds of
+line are removed before a log is written: an absolute path that names the
+capture worktree, and the shared helper's `Installed N packages in …` report of
+an environment it has just built. Neither says anything about the proof, and
+both differ between checkouts and cache states, so keeping either would make
+the record irreproducible. `scripts/kernel_record.py` owns both rewrites, in
+`portable_argument` and `portable_log`.
+
+The record lives at `tools/verifier-fixtures/verus-kernel/provenance.json`
+beside one log per candidate. It binds the tool identities, a structural digest
+of every input, and the DL-14 identity tuple — catalogue id `V001`, the
+operation `add`, dtype `I64`, the symbol, and the executable and specification
+digests — so a later release cannot read these observations as evidence for a
+different body. The tuple is composed by `scripts/verus_kernel_identity.py` and
+checked against the shipped Rust declarations, so a catalogue id or symbol that
+drifts from the code fails a test rather than leaving a record about an
+operation that no longer exists. Re-run `make verus-kernel` after any edit to
+the kernel, the contract, the mutants, or any of the scripts the record binds:
+the record is fully regenerated, and a committed digest that disagrees with its
+source fails a test. The bound set is the driver, the verdict rules, the
+diagnostic reader, the body mutation, the identity statement and the record
+writer, so splitting one of them does not leave a deciding rule outside the
+record.
+
+`.github/workflows/formal.yml` runs `make verus-kernel` in its Verus job after
+the shared install-prover-tools action has installed Verus and Z3, and uploads
+the log unconditionally so a failed proof still names the clause or mutant that
+failed. The target is not part of `make test`, `make lint` or `make all`,
+because it needs an installed Verus release that most checkouts do not have. It
+is the only Make target that verifies product code; `make kani` runs the
+cardinality probe's and the native-workspace fixture's harnesses, and the
+kernel's own Kani harnesses arrive with task 1.2.4.

@@ -98,6 +98,42 @@
         "tests/native_consumer_e2e.rs",
         "tools/fixtures/native-consumer/Cargo.toml"
       ]
+    },
+    {
+      "task": "1.2.2",
+      "decisions": [
+        "D06",
+        "D07",
+        "D16"
+      ],
+      "artefacts": [
+        "docs/adrs/adr-0012-minimal-value-and-expression-representation.md",
+        "docs/decision-register.md#d06",
+        "docs/decision-register.md#d07",
+        "spec/semantic-contracts.json",
+        "src/array.rs",
+        "src/expr/mod.rs",
+        "src/plan/mod.rs",
+        "src/plan/schedule.rs",
+        "src/error/mod.rs",
+        "src/lib.rs",
+        "crates/combobulate-kernel/src/elementwise_add.rs",
+        "crates/combobulate-kernel/verus/elementwise_add.rs",
+        "crates/combobulate-kernel/verus/elementwise_add_contract.rs",
+        "crates/combobulate-kernel/verus/elementwise_add_mutants.rs",
+        "scripts/verus_kernel.py",
+        "scripts/verus_kernel_verdicts.py",
+        "scripts/verus_kernel_identity.py",
+        "tools/verifier-fixtures/verus-kernel/provenance.json",
+        "tests/ordinary_application.rs",
+        "tests/native_consumer_e2e.rs",
+        "tools/fixtures/native-consumer/Cargo.toml",
+        "scripts/kernel_record.py",
+        "scripts/tests/test_verus_kernel.py",
+        "scripts/tests/test_verus_record.py",
+        "scripts/tests/test_script_dependencies.py",
+        "scripts/tests/verus_kernel_fixtures.py"
+      ]
     }
   ]
 }

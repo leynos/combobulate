@@ -1,0 +1,20 @@
+[package]
+name = "combobulate-test-macros"
+version = "0.1.0"
+edition.workspace = true
+description = "Test-only attribute macros that suppress lints triggered by macro expansion"
+license = "ISC"
+publish = false
+repository.workspace = true
+homepage.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = { version = "3.0.6", features = ["full"] }
+
+[lints]
+workspace = true

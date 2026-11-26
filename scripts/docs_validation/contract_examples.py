@@ -11,42 +11,17 @@ and 64-bit integers survive serialization.
 from __future__ import annotations
 
 import math
-import struct
 from collections.abc import Callable
 from fractions import Fraction
 
 from .context import ValidationContext, require, same_typed_value
+from .elementwise_examples import elementwise_add
+from .scalar_codec import decode, encode
 from .semantics import SemanticFailure
 
 I64_MIN, I64_MAX = -(2**63), 2**63 - 1
 MEAN_COUNT_LIMIT = 2**53
 Mutations = frozenset[str]
-
-
-def decode(value: object) -> object:
-    """Decode a tagged JSON scalar or list; e.g. {'f64': '-0.0'} becomes -0.0."""
-    if isinstance(value, list):
-        return [decode(item) for item in value]
-    if isinstance(value, dict):
-        (tag, text), = value.items()
-        if tag == 'f64':
-            return float(text)
-        if tag == 'f64_bits':
-            return struct.unpack('>d', int(text, 16).to_bytes(8, 'big'))[0]
-        require(tag == 'i64', f'Unknown scalar tag {tag}')
-        return int(text)
-    return value
-
-
-def encode(value: object) -> object:
-    """Encode a model value so floats compare by bits; e.g. -0.0 becomes {'f64': '-0.0'}."""
-    if isinstance(value, list):
-        return [encode(item) for item in value]
-    if isinstance(value, float):
-        if math.isnan(value):
-            return {'f64_bits': f"0x{struct.unpack('>Q', struct.pack('>d', value))[0]:016x}"}
-        return {'f64': repr(value)}
-    return value
 
 
 def dtype(value: object) -> str | None:
@@ -341,7 +316,8 @@ def evaluate_contract(case: dict, mutations: Mutations = frozenset()) -> object:
         return variance(case, mutations)
     if operation in AGGREGATES or operation == 'mean':
         return aggregate(operation, case, mutations)
-    handlers = {'mean_count': mean_count, 'batch_axis': batch_axis, 'atomic_commit': atomic_commit}
+    handlers = {'mean_count': mean_count, 'batch_axis': batch_axis, 'atomic_commit': atomic_commit,
+                'elementwise_add': elementwise_add}
     require(operation in handlers, f"Unknown contract operation {operation}")
     return handlers[operation](case, mutations)
 

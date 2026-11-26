@@ -4,8 +4,13 @@ name: Formal verification
 # cardinality probe's Kani harnesses and Verus proof, the Kani log corpus whose
 # harnesses mostly fail on purpose, and the four Verus wiring candidates. It
 # runs on a pull request that touches what the proofs verify or how they are
-# run, and weekly. The kernel's own harnesses arrive with task 1.2.4 and join
-# `make kani` then.
+# run, and weekly. The kernel's own Kani harnesses arrive with task 1.2.4 and
+# join `make kani` then.
+#
+# The kernel's own Verus proof and its seeded mutants run here too
+# (`make verus-kernel`): a proof no job runs cannot report its own rot, and
+# this one decides whether the shipped `add_i64_into` still satisfies SC-12.
+# It is development evidence until PF05.proof@2.3.5 admits it (DL-1).
 #
 # Kani and Verus are installed only through the shared install-prover-tools
 # action, which reads the releases from tools/kani/VERSION and
@@ -24,6 +29,17 @@ name: Formal verification
       - 'scripts/check_kani_corpus.py'
       - 'scripts/captured_command.py'
       - 'scripts/verus_probe.py'
+      - 'scripts/verus_kernel.py'
+      - 'scripts/verus_kernel_verdicts.py'
+      - 'scripts/verus_kernel_diagnostic.py'
+      - 'scripts/verus_kernel_body.py'
+      - 'scripts/verus_kernel_identity.py'
+      - 'scripts/kernel_record.py'
+      - 'scripts/tests/test_verus_kernel.py'
+      - 'scripts/tests/test_verus_kernel_body.py'
+      - 'scripts/tests/test_verus_record.py'
+      - 'scripts/tests/test_script_dependencies.py'
+      - 'scripts/tests/verus_kernel_fixtures.py'
       - 'scripts/docs_validation/kani_log/**'
       - 'scripts/tests/fixtures/kani_logs/**'
       - 'crates/**'
@@ -99,3 +115,24 @@ jobs:
         env:
           VERUS_Z3_PATH: ${{ steps.prover.outputs.z3-path }}
         run: make verus
+      - name: Verify the kernel proof and reject its mutants
+        # The step order matters: this needs the pinned installation the
+        # previous step proves still works.
+        #
+        # `pipefail` is explicit because the default shell is `bash -e`, which
+        # reports only `tee`'s status: without it a failed proof would leave a
+        # green step and a log nobody reads.
+        env:
+          VERUS_Z3_PATH: ${{ steps.prover.outputs.z3-path }}
+        run: |
+          set -o pipefail
+          mkdir -p formal-results
+          make verus-kernel 2>&1 | tee formal-results/verus-kernel.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        # `always()` so a failed proof still leaves the log naming the clause or
+        # mutant that failed.
+        if: always()
+        with:
+          name: verus-kernel-log
+          path: formal-results/verus-kernel.log
+          if-no-files-found: warn

@@ -1,14 +1,25 @@
 //! Combobulate: inspectable array and typed-collection algebra.
 //!
-//! The array algebra and `comb!` notation are not implemented yet. This
-//! release publishes the workspace layout and its build profiles: a `#![no_std]`
-//! kernel that owns target facts, a procedural-macro crate waiting for the
-//! notation, an optional Polars backend, and this facade. See the repository
-//! design documents for the intended contracts.
+//! The `comb!` notation is not implemented yet, but this release carries the
+//! minimal ordinary application path: materialized [`Array`] values, deferred
+//! [`AExpr`] handles, and the [`identity`] and [`add`] operations that a first
+//! consumer can apply to I64 vectors. The workspace also publishes its build
+//! profiles, a `#![no_std]` kernel that owns target facts and the verified
+//! addition, a procedural-macro crate waiting for the notation, and an
+//! optional Polars backend.
 
 #![forbid(unsafe_code)]
 
+mod array;
+mod error;
+mod expr;
+mod plan;
 mod profile;
+
+pub use array::{Array, Dtype};
+pub use error::{ExpressionError, Failure, Stage};
+pub use expr::{AExpr, Binary, OperationId, Unary, add, identity};
+pub use plan::{NativeExecutor, PreparedPlan};
 
 #[cfg(feature = "polars")]
 pub(crate) mod polars_backend;

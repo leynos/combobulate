@@ -46,6 +46,10 @@ FIXTURE_SCRUBBED_VARIABLES = (
 FIXTURE_BUILDS = (
     ('tools/fixtures/polars-surface-absent/Cargo.toml', 'polars-surface-absent'),
     ('tools/fixtures/native-consumer/Cargo.toml', 'native-consumer'),
+    (
+        'tools/fixtures/non-exhaustive-contract/Cargo.toml',
+        'non-exhaustive-contract',
+    ),
 )
 
 
@@ -143,10 +147,13 @@ def fixture_environment(target_dir: Path) -> dict[str, str]:
 
 
 def warm_fixtures() -> None:
-    """Build both consumer fixtures the root tests build.
+    """Build every consumer fixture the root tests build.
 
     The absence fixture is meant to fail, and its test asserts that; the
-    dependencies it shares with the consumer fixture are what this builds.
+    dependencies it shares with the consumer fixture are what this builds. The
+    non-exhaustive contract fixture is built through its covered binary, which
+    is the build its own tests pay for first; the failing binaries it builds
+    with `--cfg` reuse that output.
     """
     tmpdir = target_tmpdir()
     if tmpdir is None:

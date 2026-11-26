@@ -39,14 +39,14 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # This file used to omit a `global-timeout` on purpose. The reasoning was that a
 # whole-run budget on a developer's host would diagnose local compile-queue
 # contention rather than a defect, that the host is shared with other agents,
-# and that the hosted `build-test` lane already has `timeout-minutes: 8`, so a
+# and that the hosted `build-test` lane already has `timeout-minutes: 20`, so a
 # runaway suite there is ended by the job rather than by nextest. The user's
 # ruling of 16 November 2026 on the nested-cargo rules supersedes that
 # reasoning: a run with tests that start nested builds carries a whole-run
 # bound. No concrete failure stands against the figure. The slowest sample on
 # record for a single test is 443 s under 185 queued builds, so 60 minutes is
 # far from tripping on contention, and the hosted lanes are still ended first
-# by their own 8-minute `timeout-minutes`.
+# by their own 20-minute `timeout-minutes`.
 #
 # The bound is an outer limit for nextest itself, chiefly on a local
 # `cargo nextest` run. It is not what ends a hung coverage lane: the pinned
@@ -63,9 +63,10 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # only when no config resolves, and it prefers any existing one. Landing this
 # file therefore replaced that temporary file in `build-test`: the per-test
 # allowance is 300 s instead of 180 s, and the whole-run cap is 60 minutes
-# instead of 10. The lane's effective ceiling does not move, because the job's
-# own 8-minute `timeout-minutes` is stricter than either cap, and no workspace
-# member test comes close to the per-test figure.
+# instead of 10. The lane's effective ceiling is the job's own 20-minute
+# `timeout-minutes` either way, which is stricter than the 60-minute bound this
+# file supplies; the only other change is the wider per-test allowance, and no
+# workspace member test comes close to either figure.
 global-timeout = "60m"
 
 # An anchored regex, not `test(=NAME)`. Nextest's `=` form compares the whole
@@ -79,13 +80,53 @@ global-timeout = "60m"
 # `build-test` run, 99.2 s and 102.2 s on an idle local host, 134.2 s in the
 # hosted profile measurement, 377.2 s locally while the shared compile queue
 # held 86 waiting builds, and 443.24 s locally with 185 builds queued ahead.
-# Ten periods (600 s) clears the slowest contended sample by 157 s. It stays
-# below the whole-run cap above and still ends a genuinely hung
-# nested build long before an outer job timeout would.
+#
+# Ten periods (600 s) cleared that slowest sample by 157 s, and was measured
+# overrunning: 600.026 s and 600.029 s in two consecutive suite runs while the
+# queue held about 200 waiting builds, against 109 s, 144 s and 190 s for the
+# same binary run directly at similar queue depths. The difference is that the
+# suite's run competes with the root build's own compiler jobs, which the
+# direct run does not, so the contended figure is not a property of the gate
+# alone. Twenty periods (1,200 s) clears the overrun by 600 s and stays below
+# the whole-run cap above. It does not end a hung build before the hosted job
+# would: that job's `timeout-minutes: 20` is also 1,200 s and starts first, so
+# on the hosted lane the job is what ends a hang. Locally there is no such job,
+# which is where this allowance does the work.
 
 [[profile.default.overrides]]
 filter = 'test(/^checked_cardinality_result_must_be_used($|::)/)'
-slow-timeout = { period = "60s", terminate-after = 10 }
+slow-timeout = { period = "60s", terminate-after = 20 }
+
+# `non_exhaustive_contract` builds `tools/fixtures/non-exhaustive-contract`
+# seven times: once for the covered binary and once per failing contract, each
+# with its own `--cfg`. The fixture is a separate workspace whose only
+# dependency is the facade by path, so the first build compiles the facade and
+# the kernel cold and the six that follow reuse that output. Measured: 4 m 07 s
+# for the first build at about 230 waiting builds, 7 m 32 s at about 376, and
+# 76 s for the whole binary on an idle host when it stated three contracts. The
+# six-contract version measured 330 s for the failing half and 202 s for the
+# covered half in one contended run.
+#
+# It carried ten periods until that figure was measured overrunning: 600.050 s
+# for the covered half after a change to the formatter invalidated the facade's
+# cache. The cold build is the cost, and it scales with the compile queue, so
+# both fixture tests carry the cardinality gate's twenty periods (1,200 s).
+[[profile.default.overrides]]
+filter = 'binary(non_exhaustive_contract)'
+slow-timeout = { period = "60s", terminate-after = 20 }
+
+# `native_consumer_e2e` builds `tools/fixtures/native-consumer`, a separate
+# workspace whose only dependency is the facade by path, so its first build
+# compiles the facade and the kernel exactly as `non_exhaustive_contract`'s
+# does. It carried the default tier on the strength of a four-second warm
+# measurement, which is the reuse case and not the first build. Measured cold
+# at 7 m 30 s locally while the shared compile queue held about 376 waiting
+# builds, and it timed out at the default 300 s in the suite when a change to
+# the facade invalidated the cache. Twenty periods (1,200 s) clears the cold
+# sample by 450 s, the same allowance the cardinality gate carries.
+[[profile.default.overrides]]
+filter = 'binary(native_consumer_e2e)'
+slow-timeout = { period = "60s", terminate-after = 20 }
 
 # Tests that start Cargo run one at a time, so their nested builds do not
 # compete with each other for cores or the package-cache lock (Concordat
@@ -98,7 +139,7 @@ slow-timeout = { period = "60s", terminate-after = 10 }
 nested-cargo = { max-threads = 1 }
 
 [[profile.default.overrides]]
-filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(cardinality_probe_ui) | binary(workspace_profiles) | binary(workspace_boundaries) | binary(build_toolchain_contract)'
+filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(non_exhaustive_contract) | binary(cardinality_probe_ui) | binary(workspace_profiles) | binary(workspace_boundaries) | binary(build_toolchain_contract)'
 test-group = "nested-cargo"
 
 # Setup scripts: nested builds are prepared before the timed tests start (Concordat
@@ -139,7 +180,7 @@ command = "python3 scripts/nextest_warm.py workspace"
 slow-timeout = { period = "60s", terminate-after = 2 }
 
 [[profile.default.scripts]]
-filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e)'
+filter = 'binary(polars_surface_ui) | binary(native_consumer_e2e) | binary(non_exhaustive_contract)'
 setup = "warm-consumer-fixtures"
 
 [[profile.default.scripts]]

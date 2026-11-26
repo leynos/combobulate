@@ -29,6 +29,7 @@ mod shared {
     //! field the other no longer has.
 
     use combobulate::BuildProfile;
+    use combobulate_test_macros::allow_fixture_expansion_lints;
     use pretty_assertions::assert_eq;
     use rstest::fixture;
     use rstest_bdd_macros::{then, when};
@@ -47,24 +48,11 @@ mod shared {
     //
     // `fn_single_line = true` in `rustfmt.toml` puts this body on one line, and
     // `#[fixture]` then expands it into a nested single-expression block, which
-    // is what `unused_braces` rejects. The attribute pair is the workaround the
-    // maintainer sanctions for that expansion (see
-    // `weaver-test-macros::allow_fixture_expansion_lints`, which emits exactly
-    // these two attributes): the `allow` suppresses the lint on the expansion,
-    // and the `expect` keeps `clippy::allow_attributes` satisfied for using
-    // `allow` rather than `expect` on a lint that only fires in the expansion.
-    //
-    // The `expect` is not behind `cfg(clippy)`. Clippy rejects that wrapper
-    // with `unnecessary_clippy_cfg`, and the plain wrapper is also what the
-    // driver emits, so the two agree on one spelling.
-    #[allow(
-        unused_braces,
-        reason = "fixture macro expansion triggers unused-braces on expression bodies"
-    )]
-    #[expect(
-        clippy::allow_attributes,
-        reason = "needed to allow unused_braces for fixture macro expansion"
-    )]
+    // is what `unused_braces` rejects. The attribute is the estate-approved
+    // answer to that expansion and emits the same two attributes this file used
+    // to spell out: an `allow` for the lint on the expansion, and an `expect`
+    // keeping `clippy::allow_attributes` satisfied for using `allow` on it.
+    #[allow_fixture_expansion_lints]
     #[fixture]
     pub(super) fn observed() -> Observed { Observed::default() }
 

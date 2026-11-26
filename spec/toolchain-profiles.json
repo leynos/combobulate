@@ -232,7 +232,9 @@
     {
       "id": "proof-verus",
       "crates": [
-        "verus-wiring-probe"
+        "verus-wiring-probe",
+        "combobulate-kernel-verus",
+        "verus-kernel-observations"
       ],
       "features": {
         "macros": false,
@@ -241,7 +243,8 @@
       "toolchain": "1.98.0 + Z3 4.16.0 (Verus 0.2026.09.06.8dea4a2)",
       "commands": [
         "prover-tools verus install --repo-root .",
-        "cargo verus verify"
+        "cargo verus verify",
+        "make verus-kernel"
       ]
     }
   ],

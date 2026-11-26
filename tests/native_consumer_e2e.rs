@@ -2,10 +2,14 @@
 //!
 //! `tools/fixtures/native-consumer/` is a standalone binary crate, outside the
 //! workspace, that depends on the facade by path with `default-features =
-//! false`. This test builds it, runs it, reads its dependency graph, and
-//! compares its output with the committed native-only snapshot. A profile that
-//! only works inside its own workspace would pass every unit test and fail
-//! here.
+//! false`. This test builds it once, runs both of its binaries, reads its
+//! dependency graph, and compares their output with committed snapshots. A
+//! profile that only works inside its own workspace would pass every unit test
+//! and fail here.
+//!
+//! The exposed-application binary is the roadmap's success criterion made
+//! executable: it is an ordinary `main` that builds, prepares, executes and
+//! collects an array expression using only the facade's public names.
 
 use std::{
     collections::BTreeSet,
@@ -16,12 +20,22 @@ use std::{
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
-use serde_json::Value;
+
+#[path = "support/native_consumer_build.rs"]
+mod build;
+
+use build::binary_named;
 
 /// Package-name prefixes that may never appear in a native-only consumer.
 const FORBIDDEN_PREFIXES: &[&str] = &["polars", "glam", "kani", "verus", "vstd"];
 
-/// The `insta` snapshot the native-only profile test asserts against.
+/// The fixture's default binary target, which prints the build profile.
+const PROFILE_BINARY: &str = "native-consumer";
+
+/// The fixture's exposed-application binary target.
+const APPLICATION_BINARY: &str = "ordinary_application";
+
+/// The `insta` snapshot the profile binary's output is compared with.
 ///
 /// The fixture is compared with the same artefact `tests/build_profiles.rs`
 /// owns rather than a second copy, so the two routes cannot drift: `insta`
@@ -31,24 +45,27 @@ const FORBIDDEN_PREFIXES: &[&str] = &["polars", "glam", "kani", "verus", "vstd"]
 /// prefix no longer names the profile; the snapshot's own name does.
 const NATIVE_ONLY_SNAPSHOT: &str = "tests/snapshots/build_profiles__rendered__native_only.snap";
 
+/// The committed snapshot of the exposed application's three lines.
+const APPLICATION_SNAPSHOT: &str = "tests/snapshots/native_consumer_e2e__ordinary_application.snap";
+
 /// The fixture's manifest, resolved from the repository root Cargo sets.
 fn fixture_manifest() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tools/fixtures/native-consumer/Cargo.toml")
 }
 
-/// The committed snapshot the fixture's output must equal.
+/// Reads one committed snapshot's body.
 ///
 /// The read goes through a capability handle rather than `std::fs`, per the
 /// repository's filesystem policy: the directory the test opens is the one
 /// capability it holds, and the snapshot's path is relative to it. The
 /// repository root is the ambient directory Cargo sets, and opening it here is
 /// the one place a test names an ambient path.
-fn native_only_snapshot() -> Result<String, Box<dyn Error>> {
+fn committed_body(path: &str) -> Result<String, Box<dyn Error>> {
     let root = Dir::open_ambient_dir(
         Utf8Path::new(env!("CARGO_MANIFEST_DIR")),
         ambient_authority(),
     )?;
-    let contents = root.read_to_string(NATIVE_ONLY_SNAPSHOT)?;
+    let contents = root.read_to_string(path)?;
     Ok(snapshot_body(&contents)?.to_owned())
 }
 
@@ -112,46 +129,37 @@ fn run_cargo(mut command: Command, description: &str) -> Result<String, Box<dyn 
     Ok(String::from_utf8(output.stdout)?)
 }
 
-/// Extracts the fixture's built binary from Cargo's JSON message stream.
+/// Runs a built fixture binary with the caller's build selectors removed.
 ///
-/// The profile directory and the executable name both come from Cargo rather
-/// than from a literal `debug/native-consumer` path. A literal would silently
-/// stop matching if the fixture were renamed or built under a custom profile,
-/// and it would omit the platform's `.exe` suffix. `compiler-artifact`
-/// messages carry an `executable` for binaries, tests, and build scripts, so
-/// the target kind is checked as well: only a `bin` is the fixture itself, and
-/// its dependencies' library artefacts carry no executable at all.
-fn built_binary(stream: &str) -> Result<PathBuf, Box<dyn Error>> {
-    let executable = stream
-        .lines()
-        .filter_map(|line| serde_json::from_str::<Value>(line).ok())
-        .filter(is_binary_artifact)
-        .find_map(|message| {
-            message
-                .get("executable")
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        })
-        .ok_or("Cargo reported no executable for the fixture's binary target")?;
-    Ok(PathBuf::from(executable))
+/// The child inherits the caller's environment apart from the selectors, so a
+/// program that read one would behave differently under the suite than when a
+/// person runs it. The removal is the same set `fixture_cargo` pins.
+fn run_fixture(binary: &Path) -> Result<String, Box<dyn Error>> {
+    let mut command = Command::new(binary);
+    for name in ["RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS"] {
+        command.env_remove(name);
+    }
+    run_cargo(command, &format!("running {}", binary.display()))
 }
 
-/// Reports whether a Cargo JSON message describes the fixture's own binary.
-///
-/// `pointer` is used rather than `Value`'s index operator because a message
-/// whose shape is not the one Cargo documents must simply stop matching, not
-/// panic or reach for a key that only some artifact kinds carry.
-fn is_binary_artifact(message: &Value) -> bool {
-    let is_artifact = message.get("reason").and_then(Value::as_str) == Some("compiler-artifact");
-    let is_bin = message
-        .pointer("/target/kind")
-        .and_then(Value::as_array)
-        .is_some_and(|kinds| kinds.iter().any(|kind| kind.as_str() == Some("bin")));
-    is_artifact && is_bin
+/// What the fixture produced, from one nested build.
+struct Fixture {
+    /// The dependency graph `cargo tree` reported.
+    tree: String,
+    /// The profile binary's standard output.
+    profile: String,
+    /// The exposed application's standard output.
+    application: String,
 }
 
-/// Builds the fixture and returns its `cargo tree` output and rendered profile.
-fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
+/// Builds the fixture, runs both binaries, and returns its graph and outputs.
+///
+/// One build, not two: the message stream from that build names both binary
+/// artifacts, and each output is selected by its target name. Running the
+/// application's binary is a separate child because each binary is its own
+/// `main`, which is the point of the fixture that its output is what a real
+/// program prints.
+fn build_and_inspect() -> Result<Fixture, Box<dyn Error>> {
     let target_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("native-consumer");
     let manifest = fixture_manifest()
         .to_str()
@@ -171,7 +179,8 @@ fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
         ),
         "building the native consumer",
     )?;
-    let binary = built_binary(&build)?;
+    let profile = run_fixture(&binary_named(&build, PROFILE_BINARY)?)?;
+    let application = run_fixture(&binary_named(&build, APPLICATION_BINARY)?)?;
     let tree = run_cargo(
         fixture_cargo(
             &[
@@ -187,16 +196,11 @@ fn build_and_inspect() -> Result<(String, String), Box<dyn Error>> {
         ),
         "reading the native consumer's dependency graph",
     )?;
-    let rendered = run_cargo(
-        {
-            let mut command = Command::new(&binary);
-            command.env_remove("RUSTFLAGS");
-            command.env_remove("CARGO_ENCODED_RUSTFLAGS");
-            command
-        },
-        &format!("running {}", binary.display()),
-    )?;
-    Ok((tree, rendered.trim_end().to_owned()))
+    Ok(Fixture {
+        tree,
+        profile: profile.trim_end().to_owned(),
+        application: application.trim_end().to_owned(),
+    })
 }
 
 /// Reports every forbidden package the fixture's graph reached.
@@ -212,10 +216,33 @@ fn forbidden_packages(tree: &str) -> BTreeSet<String> {
         .collect()
 }
 
+/// Runs the fallible build and reports its failure as a panic.
+///
+/// A `#[test]` that returns `Result` may contain no assertion, because the
+/// workspace denies `clippy::panic_in_result_fn`. So the fallible part is
+/// confined to this helper, which returns plain values, and the tests that use
+/// it stay infallible and may assert. The Cargo diagnostics are carried into
+/// the panic message because Cargo's own failure otherwise reads as an
+/// unrelated assertion.
+fn built() -> Fixture {
+    match build_and_inspect() {
+        Ok(values) => values,
+        Err(error) => panic!("the native consumer must build and run: {error}"),
+    }
+}
+
+/// Reads a committed snapshot, reporting failure as a panic.
+fn snapshot(path: &str) -> String {
+    match committed_body(path) {
+        Ok(body) => body,
+        Err(error) => panic!("the committed snapshot {path} must be readable: {error}"),
+    }
+}
+
 /// The consumer's graph carries no backend, no verifier, and no macro crate.
 #[test]
 fn native_consumer_reaches_no_optional_dependency() {
-    let (tree, _) = built();
+    let tree = built().tree;
     let reached = forbidden_packages(&tree);
     assert!(
         reached.is_empty(),
@@ -227,38 +254,24 @@ fn native_consumer_reaches_no_optional_dependency() {
     );
 }
 
-/// The consumer's printed line equals the committed native-only snapshot.
+/// The profile binary's printed line equals the committed native-only snapshot.
 #[test]
 fn native_consumer_output_matches_the_native_only_snapshot() {
-    let (_, rendered) = built();
-    let expected = committed_snapshot();
     assert_eq!(
-        rendered, expected,
+        built().profile,
+        snapshot(NATIVE_ONLY_SNAPSHOT),
         "the consumer must print the native-only profile line"
     );
 }
 
-/// Runs the fallible build and reports its failure as a panic.
-///
-/// A `#[test]` that returns `Result` may contain no assertion, because the
-/// workspace denies `clippy::panic_in_result_fn`. So the fallible part is
-/// confined to this helper, which returns plain values, and the tests that
-/// use it stay infallible and may assert. The Cargo diagnostics are carried
-/// into the panic message because Cargo's own failure otherwise reads as an
-/// unrelated assertion.
-fn built() -> (String, String) {
-    match build_and_inspect() {
-        Ok(values) => values,
-        Err(error) => panic!("the native consumer must build and run: {error}"),
-    }
-}
-
-/// Reads the committed native-only snapshot, reporting failure as a panic.
-fn committed_snapshot() -> String {
-    match native_only_snapshot() {
-        Ok(snapshot) => snapshot,
-        Err(error) => panic!("the committed native-only snapshot must be readable: {error}"),
-    }
+/// The exposed application's three lines equal their committed snapshot.
+#[test]
+fn ordinary_application_output_matches_its_snapshot() {
+    assert_eq!(
+        built().application,
+        snapshot(APPLICATION_SNAPSHOT),
+        "the fixture must run an ordinary application of identity and add"
+    );
 }
 
 /// The build-selector removal is real, not a comment: the child sees no flags.
@@ -276,38 +289,4 @@ fn fixture_cargo_removes_the_caller_build_selectors() {
             "{expected} must not reach the fixture's Cargo child: {cleared:?}"
         );
     }
-}
-
-/// The binary lookup rejects a stream that names no binary target.
-#[test]
-fn binary_lookup_reports_a_stream_without_a_binary() {
-    let library_only = concat!(
-        r#"{"reason":"compiler-artifact","target":{"kind":["lib"],"name":"combobulate"},"#,
-        r#""executable":null}"#,
-        "\n",
-        "Compiling combobulate v0.1.0\n"
-    );
-    assert!(
-        built_binary(library_only).is_err(),
-        "a stream with no bin target must report the missing executable rather than fall back to \
-         a guessed path"
-    );
-}
-
-/// The binary lookup takes the binary target's own reported path.
-#[test]
-fn binary_lookup_uses_the_reported_executable() {
-    let stream = concat!(
-        r#"{"reason":"compiler-artifact","target":{"kind":["lib"],"name":"combobulate"}"#,
-        ",\"executable\":null}\n",
-        r#"{"reason":"compiler-artifact","target":{"kind":["bin"],"name":"native-consumer"},"#,
-        r#""executable":"/tmp/target/debug/native-consumer"}"#,
-        "\n"
-    );
-    let binary = built_binary(stream);
-    assert_eq!(
-        binary.as_deref().ok(),
-        Some(Path::new("/tmp/target/debug/native-consumer")),
-        "the reported bin artifact's executable is the path to run"
-    );
 }

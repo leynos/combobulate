@@ -8,8 +8,8 @@ under a digest, before any acceptance measurement; thresholds come from
 recorded calibration extrapolated to the hosted runner class. Records D11 and
 D12 in the [decision register](../decision-register.md); the controls are
 `AC-01` to `AC-07` in `spec/acceptance-controls.json`, calibrated in
-[acceptance calibration](../acceptance-calibration.md). Amended on 2026-10-31:
-see [Amendments](#amendments).
+[acceptance calibration](../acceptance-calibration.md). Amended on 2026-10-31
+and 2026-11-14: see [Amendments](#amendments).
 
 ## Date
 
@@ -73,7 +73,8 @@ with the evidence recorded.
   reruns and every conclusion. The p90 uses all available attempt durations;
   any failed, timed-out, cancelled, resource-exhausted, or missing attempt
   fails the control independently of the p90. The job pins
-  `runs-on: ubuntu-24.04` and its timeout to the registered eight-minute budget.
+  `runs-on: ubuntu-24.04` and its timeout to the registered budget, which the
+  2026-11-14 amendment widened to 20 minutes.
 - Thresholds (D12). Calibrate on a development machine with parallelism
   pinned to the runner's 4 vCPUs, take the median of repeated runs, and record
   compile-admission queueing separately. Extrapolate with a factor measured on
@@ -122,3 +123,30 @@ through a pull request and Git history is the record. Each acceptance record
 names its control, is dated on or after the control's registration date, and
 uses the hosted acceptance environment. A threshold change after an acceptance
 measurement is registered as a new control identifier.
+
+2026-11-14: the `AC-07` budget is widened from 8 to 20 minutes, for both the
+p90 threshold and the workflow's own `timeout-minutes`. This replaces the
+eight-minute figure in the CI-control decision above; the wider budget is the
+one now in force.
+
+Reason: the eight-minute budget was derived from a pre-DL-03 calibration that
+timed a single `build-test` job, and the three-job shape DL-14 registered has a
+longer critical path on the hosted runner. Provisioning, the lint routes and
+the measured coverage step together exceed eight minutes on a warm cache, so
+jobs were being cancelled while still making progress and no `AC-07` window
+could fill. A job limit shorter than the work it bounds measures the runner's
+provisioning rather than the code under review.
+
+What this amendment does not change: the calibration record
+(`spec/calibration/ci-history.json`), its `220 s` p90 derivation, the
+registered workload (`ci-required-jobs`), the estimand, the statistic, the
+environment and the sample window. The registered derivation text says so,
+because the 20-minute figure is administrative: it is set to admit the observed
+critical path rather than extrapolated from the calibration sample, and it is
+deliberately wider than the 220 s p90 the sample supports. A future control may
+replace it with a calibrated figure once a window of three-job runs exists.
+
+Because no `AC-07` acceptance measurement has been recorded, ADR-0008's rule
+that a threshold change after an acceptance measurement becomes a new control
+identifier does not apply. The control keeps its identifier, and the change is
+visible in Git history as an ordinary reviewed edit.

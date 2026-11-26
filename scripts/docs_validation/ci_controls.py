@@ -42,7 +42,7 @@ class _CiAttemptSummary:
 
 @dataclass(frozen=True)
 class RequiredJob:
-    """One required pull-request job; e.g. `build-test` on `ubuntu-24.04` for eight minutes."""
+    """One required pull-request job; e.g. `build-test` on `ubuntu-24.04` for the AC-07 timeout."""
 
     name: str
     runner_image: object
@@ -382,7 +382,7 @@ def check_acceptance_workflow(settings: AcceptanceWorkflowSettings, control: Map
     Examples
     --------
     check_acceptance_workflow(settings, control) accepts two jobs on
-    `ubuntu-24.04` with eight-minute timeouts.
+    `ubuntu-24.04` whose timeouts equal AC-07's registered budget.
     """
     image = control['frozen']['environment']['image']
     timeout = control['frozen']['decision_rule']['thresholds']['timeout_minutes']

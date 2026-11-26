@@ -56,7 +56,7 @@ class RunClassificationTests(unittest.TestCase):
             )
         )
         self.assertEqual(status, 124)
-        self.assertIn('exceeded its 600s deadline', diagnostics)
+        self.assertIn('exceeded its 1200s deadline', diagnostics)
 
     def test_an_announced_kill_reports_the_escalation(self) -> None:
         """A trapped SIGTERM ends through SIGKILL, which is still a deadline.
@@ -113,16 +113,23 @@ class RunClassificationTests(unittest.TestCase):
                     args=arguments, returncode=0, stdout='', stderr=''
                 )
 
+            inherited = {
+                'CARGO_MANIFEST_DIR': '/root/package',
+                'RUSTFLAGS': '-D warnings',
+                'CARGO_ENCODED_RUSTFLAGS': '-Dwarnings',
+                'CARGO_BUILD_TARGET': 'x86_64-unknown-linux-gnu',
+                'DEV_RUST_FLAGS': '-Zthreads=8',
+            }
             with (
                 patch.object(cardinality_ui_gate, 'RECORD', record),
                 patch.object(cardinality_ui_gate.subprocess, 'run', run_child),
-                patch.dict(os.environ, {'CARGO_MANIFEST_DIR': '/root/package'}, clear=True),
+                patch.dict(os.environ, inherited, clear=True),
             ):
                 self.assertEqual(cardinality_ui_gate.run(), 0)
 
             self.assertEqual(
                 captured['arguments'][:5],
-                ['timeout', '--verbose', '--signal=TERM', '--kill-after=2s', '600'],
+                ['timeout', '--verbose', '--signal=TERM', '--kill-after=2s', '1200'],
             )
             self.assertEqual(captured['arguments'][5], str(binary))
             self.assertNotIn('CARGO_MANIFEST_DIR', captured['options']['env'])
@@ -131,6 +138,19 @@ class RunClassificationTests(unittest.TestCase):
                 cardinality_ui_gate.GATE_DIRECTORY,
                 'trybuild needs the gate package as its working directory',
             )
+
+            # The gate binary is already built, so these reach only the nested
+            # build `trybuild` starts. Leaving them in would make this route and
+            # the root test disagree about the same cache, and each would pay a
+            # cold compile after the other ran.
+            environment = captured['options']['env']
+            for variable in ('RUSTFLAGS', 'CARGO_ENCODED_RUSTFLAGS', 'CARGO_BUILD_TARGET'):
+                self.assertNotIn(
+                    variable,
+                    environment,
+                    f'the run child must not inherit {variable}, or the nested build '
+                    'fingerprint changes and the warm cache is discarded',
+                )
 
 
 if __name__ == '__main__':

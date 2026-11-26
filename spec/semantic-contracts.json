@@ -16,7 +16,8 @@
     "NonFinite",
     "NonIntegral",
     "OutOfRange",
-    "Propagated"
+    "Propagated",
+    "ShapeAgreement"
   ],
   "excluded_names": [
     {
@@ -616,6 +617,57 @@
         "PF07.proof@2.2.4"
       ],
       "proof_sketch": "Verus: specify the ordered two-pass sequence function and prove the executable accumulator/finalizer refines it, including null filtering, count bounds, and count <= ddof failure. Kani: bounded symbolic lanes compare F64 result bits against the sequential oracle and exercise empty, singleton, ddof, and count-bound cases. This establishes algorithmic refinement, not real-number accuracy."
+    },
+    {
+      "id": "SC-12",
+      "title": "Elementwise checked I64 addition and equal-shape agreement",
+      "decision": "D07",
+      "catalogue_ids": [
+        "V001"
+      ],
+      "preconditions": [
+        "Both operands are rank-one I64 vectors; nullability, scalars, and scalar extension belong to 2.1.1.",
+        "Both operands are materialized before the addition is applied; an expression handle holds no result."
+      ],
+      "success_relation": "add(l, r) yields [l[0] + r[0], ..., l[n-1] + r[n-1]] exactly when the operand lengths agree and every sum lies in [i64::MIN, i64::MAX]; there is no reassociation, operand reordering, or widening.",
+      "success_conditions": [
+        "Equal non-zero lengths add pointwise and preserve the length.",
+        "Two empty vectors add to the empty vector.",
+        "A sum at either I64 boundary is a success: [i64::MAX] + [0] and [i64::MIN] + [0] return their operands."
+      ],
+      "error_relation": [
+        {
+          "condition": "The operand lengths differ.",
+          "error": "ShapeAgreement"
+        },
+        {
+          "condition": "Some position i has l[i] + r[i] outside [i64::MIN, i64::MAX]; the reported position is the least such i.",
+          "error": "IntegerOverflow"
+        }
+      ],
+      "mutation_frame": "Pure: neither operand is modified, and a failed addition publishes no output at all, including on the overflow path after earlier positions succeeded.",
+      "termination": "Total: one pass over the common length to find the least overflowing position, then one pass to write the sums, and both are O(n).",
+      "empty_rule": "Two empty vectors add to the empty vector; an empty operand paired with a non-empty one fails ShapeAgreement.",
+      "examples": [
+        "EX89",
+        "EX90",
+        "EX91",
+        "EX92",
+        "EX93",
+        "EX94",
+        "EX95"
+      ],
+      "seeded_mutations": [
+        {
+          "id": "wrapping-add",
+          "description": "Wrap the sum modulo 2^64 instead of reporting IntegerOverflow."
+        }
+      ],
+      "discharged_by": [
+        "task:1.2.2",
+        "PF05.proof@2.3.5"
+      ],
+      "proof_sketch": "Verus: specify addv over mathematical integers and prove the two-pass kernel add_i64_into refines it, with K1 relating every written slot on success, K3 binding the length failure exactly, K4 naming the least overflowing position, and K5 keeping the destination unchanged on every error, so the frame above holds. A determinacy lemma shows no second outcome satisfies the contract. The facade's refinement to the same denotation is checked by a proptest against an i128 oracle; the Python examples here only pin the specification, not the Rust implementation."
     }
   ]
 }

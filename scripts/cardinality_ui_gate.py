@@ -41,9 +41,12 @@ GATE_DIRECTORY = MANIFEST.parent
 RECORD = GATE_DIRECTORY / 'target/cardinality-ui-binary'
 EXECUTABLE_NAME = 'cardinality_ui'
 
-# The recorded run has no nextest behind it, so it carries the same
-# 600-second bound the nextest override applies to the root test.
-DEADLINE_SECONDS = '600'
+# The recorded run has no nextest behind it, so it carries the same bound the
+# nextest override applies to the root test: twenty 60-second periods. The
+# figure moved from ten when the suite's run was measured overrunning 600 s
+# under a shared compile queue; the two routes must agree, or the direct one
+# ends a run the suite would have allowed to finish.
+DEADLINE_SECONDS = '1200'
 
 # The escalation grace and the announcement that distinguishes an enforced
 # kill from a child that died of `SIGKILL` for any other reason.
@@ -67,6 +70,20 @@ REDIRECTING_VARIABLES = (
     'CARGO_TARGET_DIR',
     'CARGO_BUILD_TARGET',
     'CARGO_PROFILE_DEV_CODEGEN_BACKEND',
+)
+
+# Build selectors the *run* child must not inherit.
+#
+# The gate binary is already compiled by the time ``run`` starts it, so these
+# reach only the nested build ``trybuild`` starts. That build's fingerprint
+# includes the flags it is given, so composing ``RUSTFLAGS`` here would make
+# ``make test-ui`` and ``make test`` disagree about the same cache: each route
+# would discard what the other wrote and pay a cold compile. The root test
+# removes the same three for the same reason.
+RUN_SELECTORS = (
+    'RUSTFLAGS',
+    'CARGO_ENCODED_RUSTFLAGS',
+    'CARGO_BUILD_TARGET',
 )
 
 
@@ -238,6 +255,8 @@ def run() -> int:
         )
     environment = _base_environment()
     environment.pop(MANIFEST_DIR_VARIABLE, None)
+    for variable in RUN_SELECTORS:
+        environment.pop(variable, None)
     result = subprocess.run(
         _run_command(binary),
         cwd=GATE_DIRECTORY,

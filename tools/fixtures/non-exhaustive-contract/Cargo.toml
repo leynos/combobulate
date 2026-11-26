@@ -1,0 +1,22 @@
+# nested-cargo-allow: manifest a consumer fixture: `tests/non_exhaustive_contract.rs`
+# builds it — once plainly, and once per failing binary with a `--cfg` set — so the
+# fixture must stay its own workspace rather than inherit the repository's selection.
+[package]
+name = "non-exhaustive-contract"
+version = "0.1.0"
+edition = "2024"
+license = "ISC"
+publish = false
+
+[workspace]
+
+# The `exhaustive_*.rs` binaries are gated on this name so an ordinary build
+# never compiles the half that must fail. Declaring it keeps `unexpected_cfgs`
+# quiet while the contract test enables it by passing `--cfg` to rustc.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nonexhaustive_contract)'] }
+
+# The fixture is a downstream caller of the facade, so it takes it exactly as one
+# would: by path, default features off.
+[dependencies]
+combobulate = { path = "../../..", version = "0.1.0", default-features = false }
