@@ -3,8 +3,9 @@
 A capability probe runs a source-derived shell fragment with synthetic inputs.
 The stubs written here keep that fragment away from the host's network and
 build tools: each denied name records that it was invoked, then exits with a
-status the probe treats as a failed capability. They are a behavioural check,
-not an operating-system sandbox.
+status the probe treats as a failed capability. They intercept bare command
+names on ``PATH``; a fragment naming an absolute executable path bypasses
+them. They are a behavioural check, not an operating-system sandbox.
 
 The module deliberately holds no domain vocabulary. A probe-specific module
 keeps its own tool names, so an audit that reads a whole script as command text
