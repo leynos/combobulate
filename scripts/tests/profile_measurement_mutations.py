@@ -242,9 +242,9 @@ def _export_wrapper_in_a_cold_build(job: dict) -> None:
 
 
 def _export_wrapper_in_an_incremental_build(job: dict) -> None:
-    """Export a wrapper inside the incremental measured script."""
+    """Export a wrapper before the incremental measured loop runs."""
     step = _named_step(job, INCREMENTAL_BUILD_STEP)
-    step['run'] = step['run'] + '\nexport RUSTC_WRAPPER=sccache\n'
+    step['run'] = 'export RUSTC_WRAPPER=sccache\n' + step['run']
 
 
 _TIMED_CARGO = (
