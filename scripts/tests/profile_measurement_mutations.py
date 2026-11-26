@@ -35,6 +35,7 @@ from profile_measurement_contract import (
     PROVER_STEP,
     SETUP_RUST_ACTION,
     STRICT_MODE,
+    TOOL_IDENTITY_STEP,
     check_cache_assertion_order,
     named_step,
     step_index_named,
@@ -246,6 +247,20 @@ def _export_wrapper_in_an_incremental_build(job: dict) -> None:
     step['run'] = step['run'] + '\nexport RUSTC_WRAPPER=sccache\n'
 
 
+def _hide_wrapper_after_env_arguments(job: dict) -> None:
+    """Set a wrapper after other `env` assignments in a measured script."""
+    step = _named_step(job, COLD_BUILD_STEP)
+    step['run'] = (
+        step['run'].rstrip('\n')
+        + '\nenv CARGO_BUILD_JOBS=4 RUSTC_WRAPPER=sccache true\n'
+    )
+
+
+def _move_tool_identity_after_the_cold_build(job: dict) -> None:
+    """Move the tool-identity step behind the first timed phase."""
+    _move_step_after(job, _step_index_named(job, TOOL_IDENTITY_STEP), COLD_BUILD_STEP)
+
+
 def _move_linker_after_the_assertion(job: dict) -> None:
     """Move the linker installer between the assertion and the cold build."""
     source = _step_index_named(job, 'Install the linker toolchain')
@@ -285,6 +300,8 @@ _MUTATIONS = (
     pytest.param(_time_inside_a_provisioning_script, id='timed-inside-script'),
     pytest.param(_export_wrapper_in_a_cold_build, id='cold-script-wrapper'),
     pytest.param(_export_wrapper_in_an_incremental_build, id='incremental-script-wrapper'),
+    pytest.param(_hide_wrapper_after_env_arguments, id='env-argument-wrapper'),
+    pytest.param(_move_tool_identity_after_the_cold_build, id='tool-identity-after-cold'),
     pytest.param(_move_linker_after_the_assertion, id='linker-after-assertion'),
     pytest.param(_move_setup_uv_after_the_assertion, id='setup-uv-after-assertion'),
 )

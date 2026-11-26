@@ -24,6 +24,7 @@ The committed job satisfies every rule::
 
 from __future__ import annotations
 
+import re
 from typing import cast
 
 SETUP_RUST_ACTION = 'leynos/shared-actions/.github/actions/setup-rust@'
@@ -35,16 +36,25 @@ INCREMENTAL_BUILD_STEP = 'Measure five incremental builds per profile, alternati
 FETCH_STEP = 'Fetch dependencies once, untimed'
 BUILD_STANDARD_STEP = 'Install the pinned build standard'
 PROVER_STEP = 'Install the pinned Kani and Verus releases'
+TOOL_IDENTITY_STEP = 'Record the tool identities'
 
 # Every step that could provision a compiler wrapper must finish before the
 # assertion observes the environment, not merely the three named installers.
+# The tool-identity step also belongs here: it runs `rustup toolchain install`.
 PROVISIONING_STEPS = (
     ('setup-rust', SETUP_RUST_ACTION),
     ('setup-uv', SETUP_PYTHON_ACTION),
     (LINKER_STEP, LINKER_STEP),
     (BUILD_STANDARD_STEP, BUILD_STANDARD_STEP),
     (PROVER_STEP, PROVER_STEP),
+    (TOOL_IDENTITY_STEP, TOOL_IDENTITY_STEP),
 )
+
+# An assignment anywhere a shell word can start: at the start of the line,
+# after `export`, after `env` or its options, or after another leading
+# `VAR=value`. Requiring whitespace or the line start keeps it from matching a
+# quoted mention such as `"RUSTC_WRAPPER=x"`.
+WRAPPER_ASSIGNMENT = re.compile(r'(^|\s)RUSTC_WRAPPER=')
 
 ABSENCE_CHECK = 'test -z "${RUSTC_WRAPPER-}"'
 ENVIRONMENT_RECORD = (
@@ -338,13 +348,18 @@ def check_no_script_wrapper(job: dict) -> None:
 def assigns_wrapper(line: str) -> bool:
     """Whether a shell line assigns ``RUSTC_WRAPPER``.
 
-    Both ``RUSTC_WRAPPER=value`` and ``export RUSTC_WRAPPER=value`` count.
+    The assignment may be the whole command's environment, follow ``export``
+    or ``env`` and its options, or sit among other leading assignments such as
+    ``env CARGO_BUILD_JOBS=4 RUSTC_WRAPPER=sccache cargo build``. All of those
+    forms set the wrapper for the commands that follow.
+
+    Examples
+    --------
+    A wrapper hidden after another assignment is still detected::
+
+        assigns_wrapper('env JOBS=4 RUSTC_WRAPPER=sccache cargo build')  # True
     """
-    return (
-        line.startswith('RUSTC_WRAPPER=')
-        or 'export RUSTC_WRAPPER=' in line
-        or line.startswith('env RUSTC_WRAPPER=')
-    )
+    return WRAPPER_ASSIGNMENT.search(line) is not None
 
 
 def check_assertion_script(step: dict) -> None:
