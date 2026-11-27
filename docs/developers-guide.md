@@ -1640,3 +1640,25 @@ because it needs an installed Verus release that most checkouts do not have. It
 is the only Make target that verifies product code; `make kani` runs the
 cardinality probe's and the native-workspace fixture's harnesses, and the
 kernel's own Kani harnesses arrive with task 1.2.4.
+
+## YAML lint
+
+`make lint` runs `make yamllint` and `make actionlint` as prerequisites.
+`make yamllint` runs `yamllint --strict` over every tracked `.yml` and `.yaml`
+file, reading `.yamllint.yml`, which extends the estate base
+`.yamllint-estate.yml` (a verbatim copy of the estate canon; do not edit it).
+The base ignores Helm chart templates (`**/charts/**/templates/`), so a tracked
+file there is passed to yamllint but not checked, and a local `ignore` in
+`.yamllint.yml` replaces that entry rather than adding to it. Run it from the
+repository root, because yamllint resolves `extends` against the current
+directory. `make actionlint` checks the GitHub Actions workflows, accepting the
+runner labels in `.github/actionlint.yaml`, and runs ShellCheck over their Bash
+and `sh` `run:` scripts when it is on `PATH` (it skips PowerShell steps).
+
+Install the tools locally at the versions CI uses:
+`uv tool install yamllint==1.38.0`, and the `actionlint` 1.7.12 and
+`shellcheck` 0.11.0 release binaries (a package manager's builds can differ and
+change what the lint reports). CI installs the same pinned versions with the
+`install-yaml-lint` action of `leynos/shared-actions` before it runs
+`make lint`. The `YAMLLINT` and `ACTIONLINT` variables name the commands when
+they are not on `PATH`.

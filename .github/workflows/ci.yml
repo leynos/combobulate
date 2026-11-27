@@ -1,4 +1,3 @@
-
 name: CI
 
 # DL-03: `build-test` keeps the native-only profile, and the Polars-enabled
@@ -157,6 +156,8 @@ jobs:
       - name: Audit dependencies
         if: github.actor != 'dependabot[bot]'
         run: make audit
+      - name: Install the YAML lint tools
+        uses: leynos/shared-actions/.github/actions/install-yaml-lint@a108423efa7fb83565089449f2647d34286a48a4
       - name: Lint
         # A private path exercises Dylint's cold driver construction on each
         # hosted run before the repository lint check.
@@ -264,6 +265,8 @@ jobs:
         uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2 # shared-actions 0eabb6bc (whitaker-installer 0.2.12)
         with:
           cranelift: 'true'
+      - name: Install the YAML lint tools
+        uses: leynos/shared-actions/.github/actions/install-yaml-lint@a108423efa7fb83565089449f2647d34286a48a4
       - name: Lint
         # A private path exercises Dylint's cold driver construction on each
         # hosted run before the repository lint check.

@@ -1,0 +1,6 @@
+---
+extends: .yamllint-estate.yml
+# A local `ignore` replaces the base's, so the Helm template glob is restated.
+ignore: |
+  **/charts/**/templates/
+  scripts/tests/fixtures/whitaker/

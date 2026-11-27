@@ -364,7 +364,7 @@ coverage: check-coverage-tools prepare-ui-gate ## Generate lcov coverage with ll
 # `cardinality_probe_ui` test finds no prebuilt gate binary and fails the lane.
 # Both must therefore run before the coverage action, and `make lint` is the
 # only Make target the hosted lane runs first.
-lint: prepare-dependencies prepare-ui-gate ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
+lint: prepare-dependencies prepare-ui-gate yamllint actionlint ## Run rustdoc, Clippy, Whitaker, and Python docstring coverage sequentially
 	+$(MAKE) lint-clippy
 	+$(MAKE) lint-whitaker
 	+$(MAKE) lint-python
@@ -559,3 +559,18 @@ design-check: ## Validate design documents, fixtures, and generator contracts
 	$(PYTHON) scripts/check_docs.py --as-of $(AS_OF) $(if $(BASE_REV),--base-rev $(BASE_REV))
 	$(PYTHON) -m unittest discover -s scripts/tests
 	$(PYTHON) -m pytest -q scripts/tests
+
+YAMLLINT ?= yamllint
+ACTIONLINT ?= actionlint
+
+.PHONY: yamllint actionlint
+
+# yamllint reads `.yamllint.yml`, which extends `.yamllint-estate.yml`, and
+# resolves that path against the current directory, so run it from the root.
+yamllint: SHELL := bash
+yamllint: .SHELLFLAGS := -eo pipefail -c
+yamllint: ## Lint every tracked YAML file strictly
+	git ls-files -z '*.yml' '*.yaml' | xargs -0 -r $(YAMLLINT) --strict --
+
+actionlint: ## Lint the GitHub Actions workflows (and their shell scripts when ShellCheck is on PATH)
+	$(ACTIONLINT)
