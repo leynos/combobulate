@@ -145,6 +145,8 @@ impl CargoProbe {
             .arg(format!("PYTHON={}", self.path.join("probe-python")))
             .arg(format!("CHECK_BUILD_TOOLS={}", options.check))
             .arg("WHITAKER=true")
+            .arg("YAMLLINT=true")
+            .arg("ACTIONLINT=true")
             .arg(format!("WITH_ACT={}", u8::from(options.with_act)))
             .current_dir(Utf8Path::new(env!("CARGO_MANIFEST_DIR")))
             .env(
