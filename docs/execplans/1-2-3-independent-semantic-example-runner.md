@@ -587,18 +587,18 @@ by a second independent model (the Python documentation model, DL-3).
 
 ### Axioms (trusted, not verified here)
 
-- AX-1. Cargo's resolved metadata (`cargo metadata --format-version 1`)
+- AXIOM-1. Cargo's resolved metadata (`cargo metadata --format-version 1`)
   faithfully reports every dependency edge Cargo will compile.
-- AX-2. Rust privacy: a struct with private fields and no public constructor
+- AXIOM-2. Rust privacy: a struct with private fields and no public constructor
   cannot be built outside its crate (OIB-4).
-- AX-3. `f64::to_bits` and `f64::from_bits` round-trip IEEE binary64 bit
+- AXIOM-3. `f64::to_bits` and `f64::from_bits` round-trip IEEE binary64 bit
   patterns, including NaN payloads, on the pinned toolchain and targets.
-- AX-4. `serde_json` parses the decimal strings used by the tagged scalars
+- AXIOM-4. `serde_json` parses the decimal strings used by the tagged scalars
   without loss; decoding F64 from `{"f64": "<decimal>"}` uses Rust's
   correctly-rounded `str::parse::<f64>`, and `{"f64_bits": "<hex>"}` is parsed
   as a `u64`.
-- AX-5. `core::any::type_name_of_val` names a function item by its path on the
-  pinned nightly (used only in a drift test, never in a route decision).
+- AXIOM-5. `core::any::type_name_of_val` names a function item by its path on
+  the pinned nightly (used only in a drift test, never in a route decision).
 
 ### Where formal verification is not warranted
 
