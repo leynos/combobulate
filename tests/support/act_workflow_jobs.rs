@@ -92,6 +92,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Verify Whitaker capability"),
             Some("Install Whitaker"),
             Some("Audit dependencies"),
+            Some("Install the YAML lint tools"),
             Some("Lint"),
             Some("Log coverage linker configuration"),
             Some("Test and Measure Coverage"),
@@ -106,6 +107,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             INSTALL_TOOL_PATH,
             "actions/setup-python",
             "leynos/shared-actions/.github/actions/install-whitaker",
+            "leynos/shared-actions/.github/actions/install-yaml-lint",
             "leynos/shared-actions/.github/actions/generate-coverage",
         ],
         env: &[
@@ -132,6 +134,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             Some("Setup uv"),
             Some("Verify Whitaker capability"),
             Some("Install Whitaker"),
+            Some("Install the YAML lint tools"),
             Some("Lint"),
         ],
         actions: &[
@@ -139,6 +142,7 @@ pub(crate) const JOBS: &[JobContract] = &[
             action_ref::SETUP_RUST_PATH,
             "astral-sh/setup-uv",
             "leynos/shared-actions/.github/actions/install-whitaker",
+            "leynos/shared-actions/.github/actions/install-yaml-lint",
         ],
         env: &[
             ("CARGO_TERM_COLOR", "always"),
@@ -226,6 +230,11 @@ pub(crate) const ACTIONS: &[ActionContract] = &[
         "leynos/shared-actions/.github/actions/install-whitaker",
         "Install Whitaker",
         &[("cranelift", "true")],
+    ),
+    (
+        "leynos/shared-actions/.github/actions/install-yaml-lint",
+        "Install the YAML lint tools",
+        &[],
     ),
     (
         "leynos/shared-actions/.github/actions/generate-coverage",
