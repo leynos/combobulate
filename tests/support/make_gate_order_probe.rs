@@ -155,6 +155,8 @@ impl GateProbe {
             .arg(format!("CURDIR={}", self.path))
             .args([
                 "WITH_ACT=0",
+                "YAMLLINT=true",
+                "ACTIONLINT=true",
                 "BUILD_JOBS=",
                 "CARGO_FLAGS=--all-targets",
                 "TEST_FLAGS=--all-targets",
